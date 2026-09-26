@@ -59,7 +59,7 @@ Node id: `UnifiedSDXLResolution`. Workflows saved with earlier versions of this 
 ### Notes
 
 - Rounding to `vae_alignment` applies to fixed sizes too: with the default 64, 864 becomes 896. Set `vae_alignment` to 32 or lower to keep 864 exactly.
-- `seed` has no automatic increment on this node. Change it yourself, or connect a seed node, to get a new random size.
+- Like any `seed` input, it gets the frontend's *control after generate* option, which is *randomize* by default, so the random options give a new size on each run. Set it to *fixed* to keep the same size.
 
 ## Resolution Selector (Random)
 
@@ -74,7 +74,7 @@ It works like the core ComfyUI *Resolution Selector*, using the same size calcul
 | `aspect_ratio` | main | `1:1 (Square)` | A fixed ratio, or one of the random options below. |
 | `megapixels` | main | `1.0` | Target total size (0.1–16). 1.0 MP = 1024x1024 for a square. |
 | `preview` | main | — | Live preview of the output size. It shows "—" for random options, because their size is only known at run time. |
-| `seed` | main | `0` | Seed for the random options. It changes after each run (`control_after_generate`), so every run gets a new random ratio. |
+| `seed` | main | `0` | Seed for the random options. By default it is randomized after each run (*control after generate*), so every run gets a new random ratio. Set it to *fixed* to repeat a result. |
 | `multiple` | Advanced | `8` | Rounds width and height to the nearest multiple of this value (8–128). Use 64 for SDXL training sizes. |
 | `batch` | Advanced | `1` | Passed through to the `batch` output (1–32). |
 | `max_aspect` | Advanced | `2.0` | Random Chaos only: the most stretched ratio allowed (1.0–4.0). 2.0 means up to 2:1 or 1:2. |
