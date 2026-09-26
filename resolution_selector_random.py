@@ -29,11 +29,11 @@ RANDOM_CHAOS = {
     "Random Chaos Landscape": "landscape",
 }
 # Node schema (V3 / Nodes 2.0): aspect ratio and megapixel target like the core Resolution Selector, plus random aspect ratios. Multiple, batch and max_aspect are shown in the Advanced section.
-class UnifiedSDXLResolution(io.ComfyNode):
+class ResolutionSelectorRandom(io.ComfyNode):
     @classmethod
     def define_schema(cls):
         return io.Schema(
-            node_id="UnifiedSDXLResolution",
+            node_id="ResolutionSelectorRandom",
             display_name="Resolution Selector (Random)",
             category="utils",
             description="Calculate width and height from an aspect ratio and a megapixel target, or pick a random aspect ratio from the seed.",
@@ -127,13 +127,13 @@ class UnifiedSDXLResolution(io.ComfyNode):
         width, height = cls.size_for_ratio(w_ratio, h_ratio, megapixels, multiple)
         # Logging the final resolution, megapixels, seed, and batch size for debugging and verification purposes.
         print(
-            f"[SDXL Resolution] Size: {width}x{height} ({width * height / (1024 * 1024):.2f} MP) | Aspect: {aspect_ratio} | Multiple: {multiple} | Seed: {seed} | Batch: {batch}"
+            f"[Resolution Selector Random] Size: {width}x{height} ({width * height / (1024 * 1024):.2f} MP) | Aspect: {aspect_ratio} | Multiple: {multiple} | Seed: {seed} | Batch: {batch}"
         )
         return io.NodeOutput(width, height, batch)
 # Extension entry point for ComfyUI V3 node registration.
-class UnifiedSDXLResolutionExtension(ComfyExtension):
+class ResolutionSelectorRandomExtension(ComfyExtension):
     @override
     async def get_node_list(self):
-        return [UnifiedSDXLResolution]
+        return [ResolutionSelectorRandom]
 async def comfy_entrypoint():
-    return UnifiedSDXLResolutionExtension()
+    return ResolutionSelectorRandomExtension()
