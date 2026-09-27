@@ -1,33 +1,52 @@
-# ResolutionForge
+# DiceForge
 
-ComfyUI nodes for setting up a generation: two resolution nodes that output an empty latent of the chosen size (both can pick the size at random from a seed), and a prompt encoder that outputs positive and negative conditioning from one node.
+**Controlled randomness for ComfyUI.** Every random pick in these nodes (a prompt choice, a wildcard line, an image size, a number) follows a *seed mode* you choose. Plain random repeats itself: roll 5 skies 5 times and you get about 3 different ones. DiceForge can deal them like cards, shuffle them like a playlist, balance the odds like a game, go through every combination, or change one detail at a time.
 
-The anime prompt builder *Prompt Director* now lives in its own repository: [DeduxOnline/ComfyUI-PromptDirector](https://github.com/DeduxOnline/ComfyUI-PromptDirector).
-
-| Node | File | Use it when |
+| Seed mode | What it does | Same seed, same result |
 |---|---|---|
-| **SDXL Resolution List (Latent)** | `ResolutionForge/sdxl_resolution_list_latent.py` | You want the standard SDXL sizes (1024x1024, 1216x832, ...) from a fixed list. |
-| **Resolution Selector (Random, Latent)** | `ResolutionForge/resolution_selector_random_latent.py` | You want to set an aspect ratio and a megapixel target, like the core *Resolution Selector* node. |
-| **CLIP Dual Text Encode** | `ResolutionForge/clip_text_encode_pos_neg.py` | You want both prompts in one node instead of two *CLIP Text Encode (Prompt)* nodes. |
-| **Random Int** | `ResolutionForge/random_int.py` | You want a random whole number (steps, LoRA strength index, anything) that can go through every value before repeating. |
-| **Random Float** | `ResolutionForge/random_float.py` | You want a random number (CFG, denoise, LoRA strength) spread evenly over a range. |
+| `random` | Every pick is independent, as usual. | Yes |
+| `deck` | The seed deals from a shuffled deck: with *increment*, every option comes once per round. | Yes |
+| `shuffle` | Like shuffle in a music player: remembers what came up and picks from the rest, whatever the seed. | No |
+| `balanced` | Like pseudo-random odds in games: repeats are rare but possible, nothing waits too long. | No |
+| `sequential` | The seed is the position in the list: seeds 0, 1, 2… in order (sizes and numbers). | Yes |
+| `combinations` | Seeds 0, 1, 2… go through every combination of the whole prompt (prompts). | Yes |
+| `mutate` | Keeps the last prompt and changes one choice per run (prompts). | No |
 
-The resolution nodes are in the `model/latent` category, the prompt encoder in `model/conditioning` and the random number nodes in `utils/random`. All nodes use the ComfyUI V3 node schema: in the Nodes 2.0 frontend, the secondary inputs sit in the node's **Advanced** section.
+The remembering modes keep their memory in a small file, so they continue after a restart. Details: [seed modes for prompts](#seed-modes), [seed modes for sizes and numbers](#seed-modes-for-sizes), [memory file](#memory-file).
 
-Earlier versions also had *SDXL Resolution List* and *Resolution Selector (Random)*, which output `width`, `height` and `batch` for **Empty Latent Image**. They were removed: use the *Latent* nodes, which take the same inputs. Workflows saved with the removed nodes need them replaced.
+| Node | Menu | File | Use it when |
+|---|---|---|---|
+| **CLIP Dual Text Encode** | DiceForge/conditioning | `DiceForge/clip_text_encode_pos_neg.py` | You want positive and negative prompts in one node, with wildcards, `{a\|b}` choices, variables and locked choices that follow the seed modes. |
+| **SDXL Resolution List (Latent)** | DiceForge/latent | `DiceForge/sdxl_resolution_list_latent.py` | You want the standard SDXL sizes (1024x1024, 1216x832, ...) from a fixed list, or picked at random. |
+| **Resolution Selector (Random, Latent)** | DiceForge/latent | `DiceForge/resolution_selector_random_latent.py` | You want to set an aspect ratio and a megapixel target, like the core *Resolution Selector* node, or pick the ratio at random. |
+| **Random Int** | DiceForge/random | `DiceForge/random_int.py` | You want a random whole number (steps, an index, anything) that can go through every value before repeating. |
+| **Random Float** | DiceForge/random | `DiceForge/random_float.py` | You want a random number (CFG, denoise, LoRA strength) spread evenly over a range. |
+
+All nodes use the ComfyUI V3 node schema: in the Nodes 2.0 frontend, the secondary inputs (including `seed_mode`) sit in the node's **Advanced** section.
+
+The anime prompt builder *Prompt Director* lives in its own repository: [DeduxOnline/ComfyUI-PromptDirector](https://github.com/DeduxOnline/ComfyUI-PromptDirector).
+
+### Coming from ResolutionForge
+
+DiceForge was called *ResolutionForge* while it was a resolution pack. To update, delete `ComfyUI/custom_nodes/ResolutionForge` and install the `DiceForge` folder (having both loads the nodes twice).
+
+- Saved workflows keep working: the nodes keep their ids, only their menu moved to **DiceForge**.
+- *Random Int* and *Random Float* got new ids (`DiceForgeRandomInt`, `DiceForgeRandomFloat`): add them again in workflows saved with the first version.
+- The memory file moves by itself from `ComfyUI/user/ResolutionForge` to `ComfyUI/user/DiceForge` on the first run.
+- Earlier versions also had *SDXL Resolution List* and *Resolution Selector (Random)*, which output `width`, `height` and `batch` for **Empty Latent Image**. They were removed: use the *Latent* nodes, which take the same inputs.
 
 ## Installation
 
-Copy the `ResolutionForge` folder into `ComfyUI/custom_nodes` and restart ComfyUI:
+Copy the `DiceForge` folder into `ComfyUI/custom_nodes` and restart ComfyUI:
 
 ```sh
 git clone https://github.com/DeduxOnline/unified_sdxl_res.git
-cp -r unified_sdxl_res/ResolutionForge ComfyUI/custom_nodes/
+cp -r unified_sdxl_res/DiceForge ComfyUI/custom_nodes/
 ```
 
-Cloning the whole repository straight into `custom_nodes` does not work: the nodes are in the `ResolutionForge` subfolder, so ComfyUI does not find them.
+Cloning the whole repository straight into `custom_nodes` does not work: the nodes are in the `DiceForge` subfolder, so ComfyUI does not find them.
 
-`ResolutionForge/__init__.py` registers all the nodes. Each node is one file, and all of them share `ResolutionForge/seed_modes.py` (the seed modes and their memory file), so install the whole folder. The live previews also use the small frontend extension in `ResolutionForge/web`, which only loads with the whole folder: without it, *SDXL Resolution List (Latent)* shows "—" and *Resolution Selector (Random, Latent)* shows fixed ratios only, like the core node.
+`DiceForge/__init__.py` registers all the nodes. Each node is one file, and all of them share `DiceForge/seed_modes.py` (the seed modes and their memory file), so install the whole folder. The live previews also use the small frontend extension in `DiceForge/web`, which only loads with the whole folder: without it, *SDXL Resolution List (Latent)* shows "—" and *Resolution Selector (Random, Latent)* shows fixed ratios only, like the core node.
 
 **Requirements:** a recent ComfyUI that includes `comfy_api.latest` (the V3 node API). *Resolution Selector (Random, Latent)* also needs the resolution preview widget, which ships with the core *Resolution Selector* node. Older ComfyUI versions will not load these nodes.
 
@@ -36,6 +55,8 @@ Cloning the whole repository straight into `custom_nodes` does not work: the nod
 - Connect the `latent` output of a resolution node to the `latent_image` input of **KSampler**.
 - Connect the `CLIP` output of your checkpoint loader to **CLIP Dual Text Encode**, then its `positive` and `negative` outputs to the matching inputs of **KSampler**.
 - To drive the image and the canvas size from one seed, connect the `seed` output of a resolution node to the `seed` input of **KSampler**.
+- To try a range of values, convert a KSampler input such as `cfg` to an input and connect **Random Float** (`min` 4, `max` 8, `step` 0.5) to it.
+- For a series of images without repeats, set `seed_mode` to `deck` and *control after generate* to *increment* on each DiceForge node (reproducible), or use `shuffle` with any seed (not reproducible, continues after a restart).
 
 ## SDXL Resolution List (Latent)
 
@@ -257,7 +278,7 @@ In `deck` and `shuffle` modes:
 
 ### Memory file
 
-`shuffle`, `balanced` and `mutate` remember what came up before in `ComfyUI/user/ResolutionForge/seed_memory.sqlite`, so they continue where they stopped after ComfyUI restarts, and the memory doesn't take RAM: only the list being picked from is read, when it is picked from.
+`shuffle`, `balanced` and `mutate` remember what came up before in `ComfyUI/user/DiceForge/seed_memory.sqlite`, so they continue where they stopped after ComfyUI restarts, and the memory doesn't take RAM: only the list being picked from is read, when it is picked from.
 
 - One entry per list of options (a `{a|b}` choice or a wildcard file) and mode, plus one per prompt for `mutate`. Editing a list or a wildcard file starts that list over.
 - `shuffle` stores just its place in the shuffled order, a few bytes even for a wildcard file with thousands of lines. `balanced` stores a number per option (about 7 bytes each).

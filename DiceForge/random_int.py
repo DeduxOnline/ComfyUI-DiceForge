@@ -10,14 +10,14 @@ SEED_MODE_TOOLTIP = ("How the value changes from run to run.\n"
     "sequential: the seed is the position, so seeds 0, 1, 2... give min, min + step, min + 2 x step... then start over. Reproducible.\n"
     "Past 1000 possible values, deck, shuffle and balanced take turns between 100 equal parts of the range instead, with a random value inside each part.")
 # Node schema (V3 / Nodes 2.0): a random whole number between min and max (in steps of step), picked from the seed with the same seed modes as the
-# ResolutionForge resolution nodes, so values can go through the range without repeats instead of clustering.
+# DiceForge resolution nodes, so values can go through the range without repeats instead of clustering.
 class RandomIntSeedModes(io.ComfyNode):
     @classmethod
     def define_schema(cls):
         return io.Schema(
-            node_id="ResolutionForgeRandomInt",
+            node_id="DiceForgeRandomInt",
             display_name="Random Int",
-            category="utils/random",
+            category="DiceForge/random",
             description="A random whole number between min and max, picked from the seed. Seed modes can go through every value before repeating one.",
             search_aliases=["random", "random number", "integer", "int", "randint", "random int", "seed modes"],
             inputs=[
@@ -74,7 +74,7 @@ class RandomIntSeedModes(io.ComfyNode):
         count = (high - low) // step + 1
         value = low + pick_index(count, make_picker(seed_mode, seed), seed, f"Int {low} {high} {step}") * step
         MEMORY.save()
-        logging.info(f"[ResolutionForge] Random Int | Value: {value} | Range: {low} to {high}, step {step} | Seed: {seed} ({seed_mode})")
+        logging.info(f"[DiceForge] Random Int | Value: {value} | Range: {low} to {high}, step {step} | Seed: {seed} ({seed_mode})")
         return io.NodeOutput(value)
 # Extension entry point for ComfyUI V3 node registration.
 class RandomIntSeedModesExtension(ComfyExtension):

@@ -1,6 +1,6 @@
 import { app } from "../../scripts/app.js";
 
-// Live size preview for the ResolutionForge resolution nodes. Both use the core resolution preview widget; this extension feeds it through two hidden
+// Live size preview for the DiceForge resolution nodes. Both use the core resolution preview widget; this extension feeds it through two hidden
 // helper widgets: a size or aspect ratio as the ratio ("1216:832") and the megapixels, so the core preview math gives exactly the size to show.
 // Fixed sizes and ratios show their size live; random options show the size of the last run, as long as the settings (other than the seed) are the same.
 
@@ -74,7 +74,7 @@ function addHelper(node, name, value) {
 }
 
 app.registerExtension({
-  name: "ResolutionForge.ResolutionPreview",
+  name: "DiceForge.ResolutionPreview",
   nodeCreated(node) {
     const config = NODES[node.comfyClass];
     if (!config) return;
@@ -94,7 +94,7 @@ app.registerExtension({
     // The node sends the size of each run with the settings it came from.
     const onExecuted = node.onExecuted;
     node.onExecuted = function (output) {
-      last = output?.resolution_forge_last_size?.[0] ?? last;
+      last = output?.dice_forge_last_size?.[0] ?? last;
       return onExecuted?.apply(this, arguments);
     };
     // Widget values change through several paths (the nested list swaps its inputs), so the helpers are refreshed on a short timer while the node exists.

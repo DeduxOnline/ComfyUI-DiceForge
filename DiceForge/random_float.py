@@ -10,14 +10,14 @@ SEED_MODE_TOOLTIP = ("How the value changes from run to run.\n"
     "sequential: with a step, seeds 0, 1, 2... give min, min + step, min + 2 x step...; without, the middle of each part in order. Reproducible.\n"
     "Without a step (0), deck, shuffle and balanced split the range into `parts` equal parts that take turns, with a random value inside each part.")
 # Node schema (V3 / Nodes 2.0): a random number between min and max (any value, or in steps of step), picked from the seed with the same seed modes as
-# the ResolutionForge resolution nodes, so values spread over the range run after run instead of clustering.
+# the DiceForge resolution nodes, so values spread over the range run after run instead of clustering.
 class RandomFloatSeedModes(io.ComfyNode):
     @classmethod
     def define_schema(cls):
         return io.Schema(
-            node_id="ResolutionForgeRandomFloat",
+            node_id="DiceForgeRandomFloat",
             display_name="Random Float",
-            category="utils/random",
+            category="DiceForge/random",
             description="A random number between min and max, picked from the seed. Seed modes spread the values over the whole range before repeating.",
             search_aliases=["random", "random number", "float", "decimal", "uniform", "random float", "seed modes"],
             inputs=[
@@ -88,7 +88,7 @@ class RandomFloatSeedModes(io.ComfyNode):
         else:
             value = pick_in_range(low, high, parts, picker, seed, f"Float {low} {high}")
         MEMORY.save()
-        logging.info(f"[ResolutionForge] Random Float | Value: {value} | Range: {low} to {high}, step {step} | Seed: {seed} ({seed_mode})")
+        logging.info(f"[DiceForge] Random Float | Value: {value} | Range: {low} to {high}, step {step} | Seed: {seed} ({seed_mode})")
         return io.NodeOutput(value)
 # Extension entry point for ComfyUI V3 node registration.
 class RandomFloatSeedModesExtension(ComfyExtension):

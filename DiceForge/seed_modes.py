@@ -3,11 +3,12 @@ import json
 import math
 import os
 import random
+import shutil
 import sqlite3
 import threading
 import time
 import folder_paths
-# Seed modes shared by the ResolutionForge nodes: how random picks change from one run to the next. Each picker picks from weighted options and
+# Seed modes shared by the DiceForge nodes: how random picks change from one run to the next. Each picker picks from weighted options and
 # returns the picked options, each with the picker to go on with inside it (for nested choices in CLIP Dual Text Encode).
 class Picker:
     def pick_range(self, weighted, low, high):
@@ -81,7 +82,8 @@ class DeckPicker(Picker):
         return super().lock(weighted, count_range, plain, locked)
 # Memory for shuffle, balanced and mutate: kept in a SQLite file in the ComfyUI user folder, so it survives restarts and doesn't fill up RAM (only the
 # list being picked from is read). Delete the file to start over. The least recently used entries are forgotten past MEMORY_LIMIT.
-MEMORY_FILE = os.path.join(folder_paths.get_user_directory(), "ResolutionForge", "seed_memory.sqlite")
+MEMORY_FILE = os.path.join(folder_paths.get_user_directory(), "DiceForge", "seed_memory.sqlite")
+OLD_MEMORY_FILE = os.path.join(folder_paths.get_user_directory(), "ResolutionForge", "seed_memory.sqlite") # Where it was before the rename to DiceForge.
 MEMORY_LIMIT = 20000
 class SeedMemory:
     def __init__(self, path):
@@ -92,6 +94,8 @@ class SeedMemory:
             self.connection = None
         if self.connection is None:
             os.makedirs(os.path.dirname(self.path), exist_ok=True)
+            if self.path == MEMORY_FILE and not os.path.exists(self.path) and os.path.exists(OLD_MEMORY_FILE):
+                shutil.move(OLD_MEMORY_FILE, self.path) # Keeps the memory from before the rename.
             self.connection = sqlite3.connect(self.path, check_same_thread=False)
             self.connection.execute("CREATE TABLE IF NOT EXISTS memory (mode TEXT, key TEXT, value TEXT, used REAL, PRIMARY KEY (mode, key))")
         return self.connection

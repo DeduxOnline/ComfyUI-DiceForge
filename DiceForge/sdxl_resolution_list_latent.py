@@ -43,7 +43,7 @@ class SDXLResolutionListLatent(io.ComfyNode):
         return io.Schema(
             node_id="SDXLResolutionListLatent",
             display_name="SDXL Resolution List (Latent)",
-            category="model/latent",
+            category="DiceForge/latent",
             description="Pick a resolution from the SDXL list (or at random from the seed) and output an empty latent of that size.",
             inputs=[
                 io.DynamicCombo.Input(
@@ -168,12 +168,12 @@ class SDXLResolutionListLatent(io.ComfyNode):
         MEMORY.save()
         # Logging the final resolution, scale, multiple, seed, and batch size for debugging and verification purposes.
         logging.info(
-            f"[ResolutionForge] SDXL Resolution List (Latent) | {group}: {size} | Size: {width}x{height} | Scale: {scale} | Multiple: {multiple} | Seed: {seed} ({seed_mode}) | Batch: {batch}"
+            f"[DiceForge] SDXL Resolution List (Latent) | {group}: {size} | Size: {width}x{height} | Scale: {scale} | Multiple: {multiple} | Seed: {seed} ({seed_mode}) | Batch: {batch}"
         )
         latent = nodes.EmptyLatentImage().generate(width, height, batch)[0]
         # The size of this run, with the settings it came from, for the preview of random sizes in the frontend extension.
         last_size = {"width": width, "height": height, "group": group, "size": size, "max_aspect": resolution.get("max_aspect"), "scale": scale, "multiple": multiple}
-        return io.NodeOutput(latent, width, height, seed, ui={"resolution_forge_last_size": [last_size]})
+        return io.NodeOutput(latent, width, height, seed, ui={"dice_forge_last_size": [last_size]})
 # Extension entry point for ComfyUI V3 node registration.
 class SDXLResolutionListLatentExtension(ComfyExtension):
     @override
