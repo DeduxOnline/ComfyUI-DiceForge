@@ -142,7 +142,7 @@ class CLIPTextEncodePositiveNegative(io.ComfyNode):
         negative_text = resolve_prompt(negative, rng)
         # Logging the prompts when choices or wildcards changed them, for debugging and verification purposes.
         if (positive_text, negative_text) != (positive, negative):
-            print(f"[CLIP Text Encode] Seed: {seed} | Positive: {positive_text} | Negative: {negative_text}")
+            print(f"[ResolutionForge] CLIP Text Encode (Positive/Negative) | Seed: {seed} | Positive: {positive_text} | Negative: {negative_text}")
         return io.NodeOutput(cls.encode(clip, positive_text), cls.encode(clip, negative_text), positive_text, negative_text)
 # Extension entry point for ComfyUI V3 node registration.
 class CLIPTextEncodePositiveNegativeExtension(ComfyExtension):

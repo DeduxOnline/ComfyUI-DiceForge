@@ -70,11 +70,11 @@ RANDOM_CHAOS = {
     "Random Large (up to 1536^2 pixels)": (1536, 1536),
 }
 # Node schema (V3 / Nodes 2.0) for SDXL resolution selection, including randomization and VAE alignment. Multiply, VAE alignment and batch are shown in the Advanced section.
-class UnifiedSDXLResolution(io.ComfyNode):
+class SDXLResolutionList(io.ComfyNode):
     @classmethod
     def define_schema(cls):
         return io.Schema(
-            node_id="UnifiedSDXLResolution",
+            node_id="UnifiedSDXLResolution", # Kept from the first version of this node, so saved workflows still find it.
             display_name="SDXL Resolution List",
             category="utils",
             inputs=[
@@ -163,13 +163,13 @@ class UnifiedSDXLResolution(io.ComfyNode):
         )
         # Logging the final resolution, VAE alignment, seed, and batch size for debugging and verification purposes.
         print(
-            f"[SDXL Resolution] Size: {width}x{height} | VAE Alignment: {vae_alignment} | Seed: {seed} | Batch: {batch}"
+            f"[ResolutionForge] SDXL Resolution List | Size: {width}x{height} | VAE Alignment: {vae_alignment} | Seed: {seed} | Batch: {batch}"
         )
         return io.NodeOutput(width, height, batch, seed)
 # Extension entry point for ComfyUI V3 node registration.
 class SDXLResolutionListExtension(ComfyExtension):
     @override
     async def get_node_list(self):
-        return [UnifiedSDXLResolution]
+        return [SDXLResolutionList]
 async def comfy_entrypoint():
     return SDXLResolutionListExtension()

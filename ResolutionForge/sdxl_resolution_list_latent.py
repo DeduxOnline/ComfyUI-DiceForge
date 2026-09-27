@@ -1,12 +1,12 @@
 import nodes
 from typing_extensions import override
 from comfy_api.latest import ComfyExtension, io
-from .sdxl_resolution_list import UnifiedSDXLResolution
+from .sdxl_resolution_list import SDXLResolutionList
 # Node schema (V3 / Nodes 2.0): same inputs as SDXL Resolution List, but outputs an empty latent (like Empty Latent Image) plus its width and height.
 class SDXLResolutionListLatent(io.ComfyNode):
     @classmethod
     def define_schema(cls):
-        schema = UnifiedSDXLResolution.define_schema() # Reusing the inputs of SDXL Resolution List.
+        schema = SDXLResolutionList.define_schema() # Reusing the inputs of SDXL Resolution List.
         schema.node_id = "SDXLResolutionListLatent"
         schema.display_name = "SDXL Resolution List (Latent)"
         schema.category = "model/latent"
@@ -22,7 +22,7 @@ class SDXLResolutionListLatent(io.ComfyNode):
     # Main method to get the size from SDXL Resolution List, then build the empty latent with Empty Latent Image.
     @classmethod
     def execute(cls, **kwargs):
-        width, height, batch, seed = UnifiedSDXLResolution.execute(**kwargs).args
+        width, height, batch, seed = SDXLResolutionList.execute(**kwargs).args
         latent = nodes.EmptyLatentImage().generate(width, height, batch)[0]
         return io.NodeOutput(latent, width, height, seed)
 # Extension entry point for ComfyUI V3 node registration.

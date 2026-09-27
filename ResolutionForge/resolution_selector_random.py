@@ -128,7 +128,7 @@ class ResolutionSelectorRandom(io.ComfyNode):
         width, height = cls.size_for_ratio(w_ratio, h_ratio, megapixels, multiple)
         # Logging the final resolution, megapixels, seed, and batch size for debugging and verification purposes.
         print(
-            f"[Resolution Selector Random] Size: {width}x{height} ({width * height / (1024 * 1024):.2f} MP) | Aspect: {aspect_ratio} | Multiple: {multiple} | Seed: {seed} | Batch: {batch}"
+            f"[ResolutionForge] Resolution Selector (Random) | Size: {width}x{height} ({width * height / (1024 * 1024):.2f} MP) | Aspect: {aspect_ratio} | Multiple: {multiple} | Seed: {seed} | Batch: {batch}"
         )
         return io.NodeOutput(width, height, batch, seed)
 # Extension entry point for ComfyUI V3 node registration.
