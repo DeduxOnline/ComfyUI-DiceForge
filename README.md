@@ -24,6 +24,7 @@ The remembering modes keep their memory in a small file, so they continue after 
 | **Random LoRA** | DiceForge/loaders | `DiceForge/random_lora.py` | You want to try the LoRAs of a folder one after another, like **Load LoRA** with the file picked for you. |
 | **Random Checkpoint** | DiceForge/loaders | `DiceForge/random_checkpoint.py` | You want to compare the checkpoints of a folder, like **Load Checkpoint** with the file picked for you. |
 | **Random Image** | DiceForge/loaders | `DiceForge/random_image.py` | You want an input image (img2img, ControlNet pose, IP-Adapter reference) picked from a folder, like **Load Image** with the file picked for you. |
+| **Dice Grid** | DiceForge/image | `DiceForge/dice_grid.py` | You want the images of a series side by side with labels: a LoRA, checkpoint or setting comparison, or an XY grid. |
 | **Random Diffusion Model** | DiceForge/loaders | `DiceForge/random_diffusion_model.py` | The same for diffusion models (`models/diffusion_models`, Flux and the like), like **Load Diffusion Model**. |
 
 All nodes use the ComfyUI V3 node schema: in the Nodes 2.0 frontend, the secondary inputs (including `seed_mode`) sit in the node's **Advanced** section.
@@ -61,6 +62,7 @@ Cloning the whole repository straight into `custom_nodes` does not work: the nod
 - To drive the image and the canvas size from one seed, connect the `seed` output of a resolution node to the `seed` input of **KSampler**.
 - To compare LoRAs or checkpoints, use **Random LoRA** or **Random Checkpoint** with `seed_mode` `deck` and *increment*: every file of the folder comes once before any repeats.
 - For img2img or ControlNet over a folder of images, use **Random Image** the same way.
+- To see a series side by side, connect the image and the loader's file name output to **Dice Grid**: it saves a labeled grid after each round.
 - To try a range of values, convert a KSampler input such as `cfg` to an input and connect **Random Float** (`min` 4, `max` 8, `step` 0.5) to it.
 - For a series of images without repeats, set `seed_mode` to `deck` and *control after generate* to *increment* on each DiceForge node (reproducible), or use `shuffle` with any seed (not reproducible, continues after a restart).
 
@@ -246,6 +248,31 @@ Like **Load Image**, but the image is picked from a folder with the [seed modes]
 - Supported files: png, jpg, jpeg, webp, bmp, gif, tif, tiff.
 - The image is loaded with the same steps as Load Image, and gives the same result. When ComfyUI's video reader fails on a file (it does on some WebP files, and then Load Image fails too), Random Image reads it with Pillow instead.
 - Adding, removing or editing images in the folder makes the node pick again.
+
+## Dice Grid
+
+Collects the image of each run into a grid with labels, and saves the grid to the output folder when it is finished. Made for DiceForge series: connect the `lora_name`, `ckpt_name` or `file_name` output of a random loader to `label`, set the loader to `deck` with *increment*, and queue: after one round the grid holds every file once, with its name under it.
+
+| Input | Where | Default | Description |
+|---|---|---|---|
+| `image` | main | | The image of this run. Every image of a batch (or frame of an animation) becomes a cell. |
+| `label` | input | | Caption of the image. Model and image file names are shown without folder and extension (`anime/ink.safetensors` → `ink`). In an XY grid, the column. |
+| `row_label` | input | | Connect it to make an XY grid: rows by `row_label`, columns by `label`, with headers. For example checkpoint × LoRA with `combinations`, or two loaders in `sequential`. |
+| `count` | main | `0` | Images in a finished grid. `0`: the grid is finished when a label (or label pair) comes again, which is the end of a `deck` or `shuffle` round. |
+| `columns` | main | `0` | Images per row; `0` makes the grid about square. XY grids take their columns from the labels. |
+| `save` | main | on | Save each finished grid as a PNG in the output folder, with the workflow in it like **Save Image**. |
+| `cell_width` | Advanced | `384` | Width of each cell. Heights follow the aspect ratio, so images of different sizes (from the random resolution nodes) fit side by side. |
+| `filename_prefix` | Advanced | `DiceForge/grid` | File name prefix of saved grids. |
+| `name` | Advanced | `grid` | Grids are kept per node and name; another name starts a separate grid. |
+| `new_grid` | Advanced | off | Starts a new grid with this image, dropping the unfinished one. Turn it off again for the next runs. |
+
+| Output | Description |
+|---|---|
+| `grid` | The grid so far, this run's image included (also shown on the node). |
+| `cells` | Images in the grid so far. |
+
+- The cells wait between runs as small PNG files in `ComfyUI/user/DiceForge/grids`, not in RAM, so an unfinished grid survives a restart.
+- The node adds a cell on every run, even if nothing else changed, so queueing the same image twice adds it twice (and, with `count` 0 and a label, finishes the grid).
 
 ## About the latent
 

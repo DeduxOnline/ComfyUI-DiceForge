@@ -232,4 +232,4 @@ def pick_index(count, picker, seed, name):
 # Modes that remember earlier runs instead of using the seed: nodes using them run every time instead of using ComfyUI's cache.
 REMEMBERING_MODES = ("shuffle", "balanced", "mutate")
 def fingerprint(seed_mode):
-    return os.urandom(8) if seed_mode in REMEMBERING_MODES else None
+    return os.urandom(8).hex() if seed_mode in REMEMBERING_MODES else None # A string: the value ends up in the prompt that saved images store as JSON.
