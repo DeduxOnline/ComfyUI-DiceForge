@@ -56,6 +56,14 @@ class SDXLResolutionList(io.ComfyNode):
                     ],
                     tooltip="Resolution group: fixed sizes, or random sizes picked from the seed.",
                 ),
+                # The core resolution preview, fed by the frontend extension (web/sdxl_resolution_preview.js) through two hidden helper widgets.
+                io.ResolutionPreview.Input(
+                    "preview",
+                    tooltip="Live preview of the output size (not shown for random sizes).",
+                    ratio_widget="preview_ratio",
+                    megapixels_widget="preview_megapixels",
+                    multiple_widget="multiple",
+                ),
                 io.Int.Input(
                     "seed",
                     default=0,
@@ -116,7 +124,7 @@ class SDXLResolutionList(io.ComfyNode):
         return math.sqrt(pixels * ratio), math.sqrt(pixels / ratio)
     # Main method to get the resolution based on the selected option, applying randomization and VAE alignment as needed, and returning the final width, height, and batch size.
     @classmethod
-    def execute(cls, resolution, seed=0, scale=1.0, multiple=8, batch=1):
+    def execute(cls, resolution, seed=0, scale=1.0, multiple=8, batch=1, preview=None):
         rng = random.Random(seed) #Seed behavior for reproducibility of random selections.
         group, size = resolution["resolution"], resolution["size"] # Nested list value: the group, and the size picked in it.
         # Switching logic to determine the width and height based on the selected group, handling random picks and chaos sizes appropriately.

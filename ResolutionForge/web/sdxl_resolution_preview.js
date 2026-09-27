@@ -1,8 +1,8 @@
 import { app } from "../../scripts/app.js";
 
-// Live size preview for SDXL Resolution List (Latent): the same size math as the node for fixed sizes; random groups show what they can pick.
+// Live size preview for SDXL Resolution List (Latent). The node declares the core resolution preview widget; this extension feeds it through two hidden
+// helper widgets: the size after `scale` as the ratio ("1216:832") and its megapixels, so the core preview math gives exactly the node's size.
 const NODE_TYPE = "SDXLResolutionListLatent";
-const CHAOS_PIXELS = 1024 * 1024;
 
 // Python round() ties to even; Math.round ties up.
 function roundHalfToEven(value) {
@@ -15,53 +15,36 @@ function widgetValue(node, name) {
   return node.widgets?.find((widget) => widget.name === name)?.value;
 }
 
-// Preview for the node's current inputs: [main text, muted text].
-function previewText(node) {
+// Size after `scale` for fixed sizes (the node rounds it to `multiple` next, as the preview does), or null for random sizes, which the preview shows as "—".
+function scaledSize(node) {
   const group = widgetValue(node, "resolution");
-  const size = String(widgetValue(node, "resolution.size") ?? "");
+  const match = /^(\d+)\s*x\s*(\d+)/.exec(String(widgetValue(node, "resolution.size") ?? ""));
   const scale = Number(widgetValue(node, "scale") ?? 1);
-  const multiple = Number(widgetValue(node, "multiple") ?? 8);
-  if (!(scale > 0) || !(multiple > 0)) return ["—", ""];
-  if (group === "Random") return [`random: ${size}`, ""];
-  if (group === "Random Chaos") {
-    const maxAspect = Number(widgetValue(node, "resolution.max_aspect") ?? 2);
-    const megapixels = (CHAOS_PIXELS * scale * scale) / (1024 * 1024);
-    return [`random ${size.toLowerCase()}, up to ${+maxAspect.toFixed(2)}:1`, `≤ ${megapixels.toFixed(2)} MP`];
-  }
-  const match = /^(\d+)\s*x\s*(\d+)/.exec(size);
-  if (!match) return ["—", ""];
-  const snap = (pixels) => Math.max(multiple, roundHalfToEven(roundHalfToEven(pixels * scale) / multiple) * multiple);
-  const width = snap(Number(match[1]));
-  const height = snap(Number(match[2]));
-  return [`${width} × ${height}`, `${((width * height) / (1024 * 1024)).toFixed(2)} MP`];
+  if ((group !== "Standard" && group !== "High-Res") || !match || !(scale > 0)) return null;
+  return { width: roundHalfToEven(Number(match[1]) * scale), height: roundHalfToEven(Number(match[2]) * scale) };
+}
+
+// Hidden helper widget, added last so saved widget values keep their order.
+function addHelper(node, name, value) {
+  const widget = node.addWidget("text", name, value, () => {}, { serialize: false, hidden: true });
+  widget.hidden = true;
+  widget.computeSize = () => [0, -4];
+  return widget;
 }
 
 app.registerExtension({
   name: "ResolutionForge.SDXLResolutionPreview",
   nodeCreated(node) {
     if (node.comfyClass !== NODE_TYPE) return;
-    // Laid out like the core Resolution Selector preview: the size, then the megapixels in a muted color.
-    const element = document.createElement("div");
-    Object.assign(element.style, {
-      display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", width: "100%", minHeight: "24px",
-      fontSize: "12px", fontVariantNumeric: "tabular-nums", pointerEvents: "none",
-    });
-    const main = element.appendChild(document.createElement("span"));
-    const muted = element.appendChild(document.createElement("span"));
-    muted.style.opacity = "0.6";
-    main.textContent = "—";
-    node.addDOMWidget("size_preview", "resolution_forge_preview", element, {
-      serialize: false,
-      getValue: () => undefined,
-      setValue: () => {},
-      getMinHeight: () => 24,
-      getMaxHeight: () => 24,
-    });
-    // Widget values change through several paths (the nested list swaps its inputs), so the text is refreshed on a short timer while the node exists.
+    const ratio = addHelper(node, "preview_ratio", "");
+    const megapixels = addHelper(node, "preview_megapixels", 0);
+    // Widget values change through several paths (the nested list swaps its inputs), so the helpers are refreshed on a short timer while the node exists.
     const timer = setInterval(() => {
-      const [text, note] = previewText(node);
-      if (main.textContent !== text) main.textContent = text;
-      if (muted.textContent !== note) muted.textContent = note;
+      const size = scaledSize(node);
+      const nextRatio = size ? `${size.width}:${size.height}` : "";
+      const nextMegapixels = size ? (size.width * size.height) / (1024 * 1024) : 0;
+      if (ratio.value !== nextRatio) ratio.value = nextRatio;
+      if (megapixels.value !== nextMegapixels) megapixels.value = nextMegapixels;
     }, 200);
     const onRemoved = node.onRemoved;
     node.onRemoved = function () {

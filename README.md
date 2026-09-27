@@ -27,7 +27,7 @@ Cloning the whole repository straight into `custom_nodes` does not work: the nod
 
 `ResolutionForge/__init__.py` registers all three nodes. `sdxl_resolution_list.py` and `resolution_selector_random.py` hold the size logic of the resolution nodes, so install those with the whole folder. The prompt encoder can also be installed alone: copy `clip_text_encode_pos_neg.py` straight into `ComfyUI/custom_nodes`.
 
-**Requirements:** a recent ComfyUI that includes `comfy_api.latest` (the V3 node API). *Resolution Selector (Random, Latent)* also needs the resolution preview widget, which ships with the core *Resolution Selector* node. Older ComfyUI versions will not load these nodes. The live size preview of *SDXL Resolution List (Latent)* is a small frontend extension in `ResolutionForge/web`, loaded with the folder.
+**Requirements:** a recent ComfyUI that includes `comfy_api.latest` (the V3 node API). *Resolution Selector (Random, Latent)* also needs the resolution preview widget, which ships with the core *Resolution Selector* node. Older ComfyUI versions will not load these nodes. *SDXL Resolution List (Latent)* uses the same preview widget, fed by a small frontend extension in `ResolutionForge/web` that is loaded with the folder.
 
 ## Typical use
 
@@ -48,7 +48,7 @@ The resolution is a nested list: first pick a group in `resolution`, then a size
 | `resolution` | main | `Standard` | Group: `Standard`, `High-Res`, `Random` or `Random Chaos` (see below). |
 | `size` | main | `1024 x 1024` | A size of the chosen group: a fixed size for Standard and High-Res, a list to pick from for Random, an orientation for Random Chaos (`Any`, `Portrait` or `Landscape`). |
 | `max_aspect` | main (Random Chaos only) | `2.0` | The most stretched aspect ratio Random Chaos may pick (1.0–4.0): 2.0 means up to 2:1 or 1:2, 1.0 gives only squares. |
-| size preview | main | — | Live preview of the output size and megapixels. For the random groups it shows what they can pick, because their size is only known at run time. |
+| `preview` | main | — | Live preview of the output size and megapixels, the same widget as in the core *Resolution Selector*. It shows "—" for the random groups, because their size is only known at run time. |
 | `seed` | main | `0` | Seed for the random options. The same seed always gives the same size. |
 | `scale` | Advanced | `1.0` | Scales width and height by this factor (0.1–10), before rounding to `multiple`. Note that 2.0 gives 4x the pixels. |
 | `multiple` | Advanced | `8` | Rounds width and height to the nearest multiple of this value (8–256, in steps of 8). Use 64 for SDXL training sizes. |
