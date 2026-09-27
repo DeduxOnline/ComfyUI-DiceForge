@@ -64,8 +64,8 @@ def parse_choice(text, i):
 # (", " by default), and "2::a" gives an option weight 2 (1 by default). Returns the picked options and the separator.
 CHOICE_COUNT = re.compile(r"^\s*(\d+(?:-\d*)?|-\d+)\$\$(?:(.*?)\$\$)?(.*)$", re.S)
 OPTION_WEIGHT = re.compile(r"^\s*(\d+(?:\.\d+)?)::(.*)$", re.S)
-def pick_choices(options, rng):
-    count, separator = 1, ", "
+def pick_choices(options, picker):
+    rng, count, separator = picker.rng, 1, ", "
     match = CHOICE_COUNT.match(options[0])
     if match:
         low, dash, high = match.group(1).partition("-")
@@ -75,13 +75,94 @@ def pick_choices(options, rng):
         high = (int(high) if high else len(options)) if dash else low
         count = rng.randint(min(low, len(options)), min(max(low, high), len(options)))
     weighted = [(float(found.group(1)), found.group(2)) if (found := OPTION_WEIGHT.match(option)) else (1.0, option) for option in options]
-    if count == 1 and not match and all(weight == 1.0 for weight, _ in weighted):
-        return [rng.choice(options)], separator # Plain {a|b}: the same pick as before weights and counts existed, so saved seeds give the same prompt.
-    picked = []
-    while weighted and len(picked) < count and sum(weight for weight, _ in weighted) > 0:
-        index = rng.choices(range(len(weighted)), weights=[weight for weight, _ in weighted])[0]
-        picked.append(weighted.pop(index)[1]) # Picked without repeats.
-    return picked, separator
+    plain = count == 1 and not match and all(weight == 1.0 for weight, _ in weighted)
+    return picker.pick(weighted, count, plain), separator
+# Seed modes: how choices and wildcards are picked from one run to the next. Each picker returns the picked options, each with the picker to expand it with.
+SEED_MODES = ["random", "cycle", "no repeats"]
+def stable_seed(*parts):
+    return int.from_bytes(hashlib.sha256(repr(parts).encode()).digest()[:8], "big") # Unlike hash(), the same in every ComfyUI run.
+def deck_cards(weighted):
+    return [option for weight, option in weighted for _ in range(max(1, round(weight)) if weight > 0 else 0)] # Weight = copies of the option in the deck.
+def avoid_first(deck, last):
+    if deck and deck[0] == last:
+        swap = next((index for index in range(1, len(deck) - 1) if deck[index] != last), None) # Never the last card, so the next deck can still check it.
+        if swap is not None:
+            deck[0], deck[swap] = deck[swap], deck[0]
+    return deck
+# random: every pick independent, from the seed (the same pick as before seed modes existed, so saved seeds give the same prompt).
+class RandomPicker:
+    def __init__(self, rng):
+        self.rng = rng
+    def pick(self, weighted, count, plain):
+        if plain:
+            return [(self.rng.choice([option for _, option in weighted]), self)]
+        weighted, picked = list(weighted), []
+        while weighted and len(picked) < count and sum(weight for weight, _ in weighted) > 0:
+            index = self.rng.choices(range(len(weighted)), weights=[weight for weight, _ in weighted])[0]
+            picked.append((weighted.pop(index)[1], self)) # Picked without repeats.
+        return picked
+# cycle: the seed is a position in a shuffled deck of the options, so with control after generate on increment every option comes once before any repeats,
+# and a new shuffle each round. Options inside a picked option move one step each time that option comes up. Fully reproducible from the seed.
+class CyclePicker:
+    def __init__(self, rng, position, draws):
+        self.rng, self.position, self.draws = rng, position, draws
+    @staticmethod
+    def deck(cards, round_number):
+        if len(cards) <= 2:
+            round_number = 0 # Two options simply alternate.
+        deck = list(cards)
+        random.Random(stable_seed(cards, round_number)).shuffle(deck)
+        if round_number:
+            last = list(cards)
+            random.Random(stable_seed(cards, round_number - 1)).shuffle(last)
+            avoid_first(deck, last[-1]) # No repeat across the end of one round and the start of the next.
+        return deck
+    def pick(self, weighted, count, plain):
+        cards = tuple(deck_cards(weighted))
+        if not cards:
+            return []
+        key = (cards, self.position)
+        position = self.position + self.draws.get(key, 0) # The same deck again in this run takes the next cards, so it doesn't repeat within the prompt.
+        picked, seen = [], set()
+        for _ in range(2 * len(cards)):
+            if len(picked) == count:
+                break
+            round_number, index = divmod(position, len(cards))
+            card = self.deck(cards, round_number)[index]
+            position += 1
+            if card not in seen:
+                seen.add(card)
+                picked.append((card, CyclePicker(self.rng, round_number, self.draws)))
+        self.draws[key] = position - self.position
+        return picked
+# no repeats: the node remembers the options not used yet (until ComfyUI restarts) and picks from them, so every option comes once before any repeats,
+# whatever the seed does. Not reproducible: the same seed gives a different prompt each run.
+MEMORY_DECKS = {}
+MEMORY_LIMIT = 1000 # Decks remembered at most; the oldest are forgotten first.
+class MemoryPicker:
+    def __init__(self):
+        self.rng = random.Random()
+    def pick(self, weighted, count, plain):
+        cards = deck_cards(weighted)
+        key = tuple(cards)
+        picked, skipped = [], []
+        for _ in range(2 * len(cards)):
+            if len(picked) == count:
+                break
+            deck, last = MEMORY_DECKS.pop(key, ([], None))
+            if not deck:
+                deck = list(cards)
+                self.rng.shuffle(deck)
+                avoid_first(deck, last)
+            card = deck.pop(0)
+            MEMORY_DECKS[key] = (deck, card)
+            (skipped if card in picked else picked).append(card)
+        if skipped:
+            deck, last = MEMORY_DECKS[key]
+            MEMORY_DECKS[key] = (skipped + deck, last) # Skipped duplicates of a multi-pick come first next time.
+        while len(MEMORY_DECKS) > MEMORY_LIMIT:
+            MEMORY_DECKS.pop(next(iter(MEMORY_DECKS)))
+        return [(card, self) for card in picked]
 # Comma cleanup after filling in: an empty option leaves "a, , b" or a trailing comma; this makes it "a, b".
 def tidy_commas(text):
     text = re.sub(r"[ \t]*,(?:[ \t]*,)+", ",", text)
@@ -90,7 +171,7 @@ def tidy_commas(text):
     text = re.sub(r"[ \t]{2,}", " ", text)
     return re.sub(r"^[\s,]+|[\s,]+$", "", text)
 # Prompt expansion: picks {a|b} choices, then replaces __name__ wildcards, expanding the picked text again so choices and wildcards can nest.
-def expand(text, rng, depth=0):
+def expand(text, picker, depth=0):
     if depth > MAX_DEPTH:
         raise ValueError("Wildcards are nested too deep: check for wildcard files that include each other.")
     result, i = "", 0
@@ -102,15 +183,15 @@ def expand(text, rng, depth=0):
             i += 1
         elif char == "{":
             options, i = parse_choice(text, i)
-            picked, separator = pick_choices(options, rng)
-            result += separator.join(expand(option, rng, depth + 1) for option in picked)
+            picked, separator = pick_choices(options, picker)
+            result += separator.join(expand(option, child, depth + 1) for option, child in picked)
         else:
             result += char
-    return WILDCARD_PATTERN.sub(lambda match: expand(rng.choice(read_wildcard(match.group(1))), rng, depth + 1), result)
+    return WILDCARD_PATTERN.sub(lambda match: expand(*picker.pick([(1.0, line) for line in read_wildcard(match.group(1))], 1, True)[0], depth + 1), result)
 # Full prompt processing: strips // and /* */ comments like the frontend, expands choices and wildcards, unescapes \{ \} \|, then tidies commas.
-def resolve_prompt(text, rng):
+def resolve_prompt(text, picker):
     text = re.sub(r"/\*[\s\S]*?\*/|//.*", "", text)
-    return tidy_commas(re.sub(r"\\([{}|])", r"\1", expand(text, rng)))
+    return tidy_commas(re.sub(r"\\([{}|])", r"\1", expand(text, picker)))
 # Node schema (V3 / Nodes 2.0) like CLIP Text Encode (Prompt), but with a positive prompt on top, a negative prompt below, and one conditioning output for each. Both prompts support {a|b} choices and __name__ wildcards, picked from the seed.
 class CLIPTextEncodePositiveNegative(io.ComfyNode):
     @classmethod
@@ -142,7 +223,17 @@ class CLIPTextEncodePositiveNegative(io.ComfyNode):
                     min=0,
                     max=0xFFFFFFFFFFFFFFFF,
                     control_after_generate=True,
-                    tooltip="Seed for {a|b} choices and __name__ wildcards. The same seed always gives the same prompts.",
+                    tooltip="Seed for {a|b} choices and __name__ wildcards. The same seed always gives the same prompts (except in no repeats mode).",
+                    advanced=True,
+                ),
+                io.Combo.Input(
+                    "seed_mode",
+                    options=SEED_MODES,
+                    default="random",
+                    tooltip="How choices and wildcards change from run to run.\n"
+                    "random: every pick is independent, so the same option can come up again soon.\n"
+                    "cycle: the seed steps through a shuffled order of the options; with control after generate on increment, every option comes once before any repeats. Reproducible.\n"
+                    "no repeats: the node remembers the options already used and picks from the rest, whatever the seed; resets when ComfyUI restarts. Not reproducible.",
                     advanced=True,
                 ),
             ],
@@ -154,8 +245,8 @@ class CLIPTextEncodePositiveNegative(io.ComfyNode):
         )
     # Method to run the node again when a wildcard file changes, even if the inputs are the same.
     @classmethod
-    def fingerprint_inputs(cls, **kwargs):
-        return wildcards_signature()
+    def fingerprint_inputs(cls, seed_mode="random", **kwargs):
+        return wildcards_signature(), os.urandom(8) if seed_mode == "no repeats" else None # no repeats gives a new prompt every run, so it never uses the cache.
     # Encoding method, same as CLIP Text Encode (Prompt).
     @staticmethod
     def encode(clip, text):
@@ -163,15 +254,20 @@ class CLIPTextEncodePositiveNegative(io.ComfyNode):
         return clip.encode_from_tokens_scheduled(tokens)
     # Main method to fill in choices and wildcards from the seed, encode both prompts, and return the conditioning and the final prompts.
     @classmethod
-    def execute(cls, positive, negative, clip, seed=0):
+    def execute(cls, positive, negative, clip, seed=0, seed_mode="random"):
         if clip is None:
             raise RuntimeError("ERROR: clip input is invalid: None\n\nIf the clip is from a checkpoint loader node your checkpoint does not contain a valid clip or text encoder model.")
-        rng = random.Random(seed) #Seed behavior for reproducible choices and wildcards.
-        positive_text = resolve_prompt(positive, rng)
-        negative_text = resolve_prompt(negative, rng)
+        if seed_mode == "no repeats":
+            picker = MemoryPicker()
+        elif seed_mode == "cycle":
+            picker = CyclePicker(random.Random(seed), seed, {})
+        else:
+            picker = RandomPicker(random.Random(seed)) # Seed behavior for reproducible choices and wildcards.
+        positive_text = resolve_prompt(positive, picker)
+        negative_text = resolve_prompt(negative, picker)
         # Logging the prompts when choices or wildcards changed them, for debugging and verification purposes.
         if (positive_text, negative_text) != (positive, negative):
-            logging.info(f"[ResolutionForge] CLIP Dual Text Encode | Seed: {seed} | Positive: {positive_text} | Negative: {negative_text}")
+            logging.info(f"[ResolutionForge] CLIP Dual Text Encode | Seed: {seed} ({seed_mode}) | Positive: {positive_text} | Negative: {negative_text}")
         return io.NodeOutput(cls.encode(clip, positive_text), cls.encode(clip, negative_text))
 # Extension entry point for ComfyUI V3 node registration.
 class CLIPTextEncodePositiveNegativeExtension(ComfyExtension):
