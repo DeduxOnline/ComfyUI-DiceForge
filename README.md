@@ -148,8 +148,8 @@ Works like two core *CLIP Text Encode (Prompt)* nodes sharing one CLIP model: ea
 | `clip` | main | The CLIP model used for encoding both prompts. |
 | `positive` | main | The positive prompt (top text field): what the image should contain. |
 | `negative` | main | The negative prompt (bottom text field): what the image should avoid. |
-| `seed` | Advanced | Seed for choices and wildcards. The same seed always gives the same prompts (except in *no repeats* and *balanced* modes). By default it is randomized after each run (*control after generate*); set it to *fixed* to repeat a result. |
-| `seed_mode` | Advanced | How choices and wildcards change from run to run: `random` (default), `shuffle`, `no repeats` or `balanced`. See [Seed modes](#seed-modes). |
+| `seed` | Advanced | Seed for choices and wildcards. The same seed always gives the same prompts (except in *shuffle* and *balanced* modes). By default it is randomized after each run (*control after generate*); set it to *fixed* to repeat a result. |
+| `seed_mode` | Advanced | How choices and wildcards change from run to run: `random` (default), `deck`, `shuffle` or `balanced`. See [Seed modes](#seed-modes). |
 
 ### Outputs
 
@@ -185,16 +185,16 @@ Lines picked from a wildcard file can themselves contain wildcards and `{a|b}` c
 
 ### Seed modes
 
-In `random` mode every pick is independent, so `blue sky` can come up twice in a row while other options wait. `shuffle` and `no repeats` go through all the options before repeating one, like a shuffled playlist; `balanced` makes repeats rare instead of impossible.
+In `random` mode every pick is independent, so `blue sky` can come up twice in a row while other options wait. `deck` and `shuffle` go through all the options before repeating one; `balanced` makes repeats rare instead of impossible.
 
 | Mode | How it works | Seed |
 |---|---|---|
 | `random` | Every pick is random. Same as before seed modes existed. | The same seed gives the same prompt. |
-| `shuffle` | The seed is a position in a shuffled order of the options. Set *control after generate* to *increment*: each run takes the next option, every option comes once per round, then a new shuffle starts (never with the option that just came). Options inside a picked option (`{cat {small\|big}\|dog}`, lines of a wildcard inside a wildcard) also take turns. | The same seed gives the same prompt, so a good result can be repeated. |
-| `no repeats` | The node remembers which options were already used and picks from the rest; when all were used, it starts over. Works with any *control after generate*, even *fixed*. The memory resets when ComfyUI restarts. | Not used: the prompt is different every run and cannot be repeated from the seed (the filled-in prompt is in the console). |
-| `balanced` | Like the pseudo-random distribution in games: an option that just came up gets a low chance, and the longer an option is missed, the higher its chance grows. Repeats are rare but possible (with 5 options: about 4% in a row instead of 20% in `random`, and no option waits more than about 13 runs instead of 40+). In the long run every option comes exactly as often as its weight says (`{3::cat\|dog}`: 75% / 25%). Works with any *control after generate*; the memory resets when ComfyUI restarts. | Not used, as in `no repeats`. |
+| `deck` | Like dealing cards: the seed is a position in a shuffled deck of the options. Set *control after generate* to *increment*: each run takes the next card, every option comes once per round, then the deck is reshuffled (never starting with the option that just came). Rounds start at seeds that are multiples of the number of options (0, 5, 10… for 5 options), so start from such a seed (for example 0) to get no repeats from the first run. Options inside a picked option (`{cat {small\|big}\|dog}`, lines of a wildcard inside a wildcard) also take turns. | The same seed gives the same prompt, so a good result can be repeated. |
+| `shuffle` | Like shuffle in a music player: the node remembers which options were already used and picks from the rest; when all were used, it starts over. Works with any *control after generate*, even *fixed*. The memory resets when ComfyUI restarts. | Not used: the prompt is different every run and cannot be repeated from the seed (the filled-in prompt is in the console). |
+| `balanced` | Like the pseudo-random distribution in games: an option that just came up gets a low chance, and the longer an option is missed, the higher its chance grows. Repeats are rare but possible (with 5 options: about 4% in a row instead of 20% in `random`, and no option waits more than about 13 runs instead of 40+). In the long run every option comes exactly as often as its weight says (`{3::cat\|dog}`: 75% / 25%). Works with any *control after generate*; the memory resets when ComfyUI restarts. | Not used, as in `shuffle`. |
 
-In `shuffle` and `no repeats` modes:
+In `deck` and `shuffle` modes:
 
 - The same wildcard or choice used more than once in a prompt gives different options: `__color__ hair, __color__ eyes` never gives `red hair, red eyes` (unless the file has only one line).
 - A weight is the number of times the option comes per round: `{3::cat|dog}` gives `cat` 3 times and `dog` once. Weights are rounded to whole numbers, at least 1.

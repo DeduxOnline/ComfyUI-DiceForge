@@ -79,7 +79,7 @@ def pick_choices(options, picker):
     plain = count == 1 and not match and all(weight == 1.0 for weight, _ in weighted)
     return picker.pick(weighted, count, plain), separator
 # Seed modes: how choices and wildcards are picked from one run to the next. Each picker returns the picked options, each with the picker to expand it with.
-SEED_MODES = ["random", "shuffle", "no repeats", "balanced"]
+SEED_MODES = ["random", "deck", "shuffle", "balanced"]
 def stable_seed(*parts):
     return int.from_bytes(hashlib.sha256(repr(parts).encode()).digest()[:8], "big") # Unlike hash(), the same in every ComfyUI run.
 def deck_cards(weighted):
@@ -102,9 +102,9 @@ class RandomPicker:
             index = self.rng.choices(range(len(weighted)), weights=[weight for weight, _ in weighted])[0]
             picked.append((weighted.pop(index)[1], self)) # Picked without repeats.
         return picked
-# shuffle: the seed is a position in a shuffled deck of the options, so with control after generate on increment every option comes once before any repeats,
-# and a new shuffle each round. Options inside a picked option move one step each time that option comes up. Fully reproducible from the seed.
-class ShufflePicker:
+# deck: the seed is a position in a shuffled deck of the options, so with control after generate on increment every option comes once before any repeats,
+# and a new shuffle each round, like dealing from a deck. Options inside a picked option move one step each time that option comes up. Fully reproducible from the seed.
+class DeckPicker:
     def __init__(self, rng, position, draws):
         self.rng, self.position, self.draws = rng, position, draws
     @staticmethod
@@ -133,19 +133,19 @@ class ShufflePicker:
             position += 1
             if card not in seen:
                 seen.add(card)
-                picked.append((card, ShufflePicker(self.rng, round_number, self.draws)))
+                picked.append((card, DeckPicker(self.rng, round_number, self.draws)))
         self.draws[key] = position - self.position
         return picked
-# no repeats: the node remembers the options not used yet (until ComfyUI restarts) and picks from them, so every option comes once before any repeats,
+# shuffle: like shuffle in a music player. The node remembers the options not used yet (until ComfyUI restarts) and picks from them, so every option comes once before any repeats,
 # whatever the seed does. Not reproducible: the same seed gives a different prompt each run.
-MEMORY_DECKS = {}
+SHUFFLE_DECKS = {}
 MEMORY_LIMIT = 1000 # Decks remembered at most (per mode); the oldest are forgotten first.
 def remember(memory, key, value):
     memory.pop(key, None)
     memory[key] = value # Most recently used last.
     while len(memory) > MEMORY_LIMIT:
         memory.pop(next(iter(memory)))
-class MemoryPicker:
+class ShufflePicker:
     def __init__(self):
         self.rng = random.Random()
     def pick(self, weighted, count, plain):
@@ -155,17 +155,17 @@ class MemoryPicker:
         for _ in range(2 * len(cards)):
             if len(picked) == count:
                 break
-            deck, last = MEMORY_DECKS.pop(key, ([], None))
+            deck, last = SHUFFLE_DECKS.pop(key, ([], None))
             if not deck:
                 deck = list(cards)
                 self.rng.shuffle(deck)
                 avoid_first(deck, last)
             card = deck.pop(0)
-            remember(MEMORY_DECKS, key, (deck, card))
+            remember(SHUFFLE_DECKS, key, (deck, card))
             (skipped if card in picked else picked).append(card)
         if skipped:
-            deck, last = MEMORY_DECKS[key]
-            MEMORY_DECKS[key] = (skipped + deck, last) # Skipped duplicates of a multi-pick come first next time.
+            deck, last = SHUFFLE_DECKS[key]
+            SHUFFLE_DECKS[key] = (skipped + deck, last) # Skipped duplicates of a multi-pick come first next time.
         return [(card, self) for card in picked]
 # balanced: like the pseudo-random distribution in games. Each option earns credit for every pick (its share of the weights) and spends 1 when picked;
 # its chance is its weight x e^(5 x credit). An option just picked gets a low chance, one missed for a while a higher one, so repeats are rare but
@@ -250,7 +250,7 @@ class CLIPTextEncodePositiveNegative(io.ComfyNode):
                     min=0,
                     max=0xFFFFFFFFFFFFFFFF,
                     control_after_generate=True,
-                    tooltip="Seed for {a|b} choices and __name__ wildcards. The same seed always gives the same prompts (except in no repeats and balanced modes).",
+                    tooltip="Seed for {a|b} choices and __name__ wildcards. The same seed always gives the same prompts (except in shuffle and balanced modes).",
                     advanced=True,
                 ),
                 io.Combo.Input(
@@ -259,8 +259,8 @@ class CLIPTextEncodePositiveNegative(io.ComfyNode):
                     default="random",
                     tooltip="How choices and wildcards change from run to run.\n"
                     "random: every pick is independent, so the same option can come up again soon.\n"
-                    "shuffle: the seed steps through a shuffled order of the options; with control after generate on increment, every option comes once before any repeats. Reproducible.\n"
-                    "no repeats: the node remembers the options already used and picks from the rest, whatever the seed; resets when ComfyUI restarts. Not reproducible.\n"
+                    "deck: the seed steps through a shuffled order of the options; with control after generate on increment, every option comes once before any repeats. Reproducible.\n"
+                    "shuffle: like shuffle in a music player, the node remembers the options already used and picks from the rest, whatever the seed; resets when ComfyUI restarts. Not reproducible.\n"
                     "balanced: an option just picked gets a low chance, and options not picked for a while get a higher one, so repeats are rare but possible. Remembered until ComfyUI restarts. Not reproducible.",
                     advanced=True,
                 ),
@@ -274,7 +274,7 @@ class CLIPTextEncodePositiveNegative(io.ComfyNode):
     # Method to run the node again when a wildcard file changes, even if the inputs are the same.
     @classmethod
     def fingerprint_inputs(cls, seed_mode="random", **kwargs):
-        return wildcards_signature(), os.urandom(8) if seed_mode in ("no repeats", "balanced") else None # no repeats and balanced give a new prompt every run, so it never uses the cache.
+        return wildcards_signature(), os.urandom(8) if seed_mode in ("shuffle", "balanced") else None # shuffle and balanced give a new prompt every run, so it never uses the cache.
     # Encoding method, same as CLIP Text Encode (Prompt).
     @staticmethod
     def encode(clip, text):
@@ -285,12 +285,12 @@ class CLIPTextEncodePositiveNegative(io.ComfyNode):
     def execute(cls, positive, negative, clip, seed=0, seed_mode="random"):
         if clip is None:
             raise RuntimeError("ERROR: clip input is invalid: None\n\nIf the clip is from a checkpoint loader node your checkpoint does not contain a valid clip or text encoder model.")
-        if seed_mode == "no repeats":
-            picker = MemoryPicker()
+        if seed_mode == "shuffle":
+            picker = ShufflePicker()
         elif seed_mode == "balanced":
             picker = BalancedPicker()
-        elif seed_mode == "shuffle":
-            picker = ShufflePicker(random.Random(seed), seed, {})
+        elif seed_mode == "deck":
+            picker = DeckPicker(random.Random(seed), seed, {})
         else:
             picker = RandomPicker(random.Random(seed)) # Seed behavior for reproducible choices and wildcards.
         positive_text = resolve_prompt(positive, picker)
