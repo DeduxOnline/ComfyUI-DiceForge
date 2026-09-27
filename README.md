@@ -40,8 +40,8 @@ DiceForge was called *ResolutionForge* while it was a resolution pack. To update
 Copy the `DiceForge` folder into `ComfyUI/custom_nodes` and restart ComfyUI:
 
 ```sh
-git clone https://github.com/DeduxOnline/unified_sdxl_res.git
-cp -r unified_sdxl_res/DiceForge ComfyUI/custom_nodes/
+git clone https://github.com/DeduxOnline/ComfyUI-DiceForge.git
+cp -r ComfyUI-DiceForge/DiceForge ComfyUI/custom_nodes/
 ```
 
 Cloning the whole repository straight into `custom_nodes` does not work: the nodes are in the `DiceForge` subfolder, so ComfyUI does not find them.
