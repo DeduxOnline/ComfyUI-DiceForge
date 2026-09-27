@@ -55,7 +55,7 @@ class ResolutionSelectorRandomLatent(io.ComfyNode):
                 ),
                 io.ResolutionPreview.Input(
                     "preview",
-                    tooltip="Live preview of the calculated output resolution (not shown for random options).",
+                    tooltip="Live preview of the calculated output resolution. Random options show the size of the last run, until the settings change.",
                 ),
                 io.Int.Input(
                     "seed",
@@ -140,7 +140,9 @@ class ResolutionSelectorRandomLatent(io.ComfyNode):
             f"[ResolutionForge] Resolution Selector (Random, Latent) | Size: {width}x{height} ({width * height / (1024 * 1024):.2f} MP) | Aspect: {aspect_ratio} | Multiple: {multiple} | Seed: {seed} | Batch: {batch}"
         )
         latent = nodes.EmptyLatentImage().generate(width, height, batch)[0]
-        return io.NodeOutput(latent, width, height, seed)
+        # The size of this run, with the settings it came from, for the preview of random options in the frontend extension.
+        last_size = {"width": width, "height": height, "aspect_ratio": aspect_ratio, "megapixels": megapixels, "multiple": multiple, "max_aspect": max_aspect}
+        return io.NodeOutput(latent, width, height, seed, ui={"resolution_forge_last_size": [last_size]})
 # Extension entry point for ComfyUI V3 node registration.
 class ResolutionSelectorRandomLatentExtension(ComfyExtension):
     @override

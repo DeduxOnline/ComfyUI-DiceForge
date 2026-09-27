@@ -25,7 +25,7 @@ cp -r unified_sdxl_res/ResolutionForge ComfyUI/custom_nodes/
 
 Cloning the whole repository straight into `custom_nodes` does not work: the nodes are in the `ResolutionForge` subfolder, so ComfyUI does not find them.
 
-`ResolutionForge/__init__.py` registers all three nodes. Each node is a single file, so any of them can also be installed alone: copy its `.py` file straight into `ComfyUI/custom_nodes`. The live preview of *SDXL Resolution List (Latent)* also needs the small frontend extension in `ResolutionForge/web`, which only loads with the whole folder; without it that preview shows "—".
+`ResolutionForge/__init__.py` registers all three nodes. Each node is a single file, so any of them can also be installed alone: copy its `.py` file straight into `ComfyUI/custom_nodes`. The live previews also use the small frontend extension in `ResolutionForge/web`, which only loads with the whole folder: without it, *SDXL Resolution List (Latent)* shows "—" and *Resolution Selector (Random, Latent)* shows fixed ratios only, like the core node.
 
 **Requirements:** a recent ComfyUI that includes `comfy_api.latest` (the V3 node API). *Resolution Selector (Random, Latent)* also needs the resolution preview widget, which ships with the core *Resolution Selector* node. Older ComfyUI versions will not load these nodes.
 
@@ -102,7 +102,7 @@ It works like the core ComfyUI *Resolution Selector* followed by **Empty Latent 
 |---|---|---|---|
 | `aspect_ratio` | main | `1:1 (Square)` | A fixed ratio, or one of the random options below. |
 | `megapixels` | main | `1.0` | Target total size (0.1–16). 1.0 MP = 1024x1024 for a square. |
-| `preview` | main | — | Live preview of the output size and megapixels. It shows "—" for random options, because their size is only known at run time. |
+| `preview` | main | — | Live preview of the output size and megapixels. For random options it shows the size of the last run, as long as the settings other than `seed` stay the same, and "—" before a run or after a change. |
 | `seed` | main | `0` | Seed for the random options. By default it is randomized after each run (*control after generate*), so every run gets a new random ratio. Set it to *fixed* to repeat a result. |
 | `multiple` | Advanced | `8` | Rounds width and height to the nearest multiple of this value (8–256, in steps of 8). Use 64 for SDXL training sizes. Random Chaos rounds down. |
 | `batch` | Advanced | `1` | Number of latents in the batch (1–32). |

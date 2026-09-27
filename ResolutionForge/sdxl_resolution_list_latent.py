@@ -58,7 +58,7 @@ class SDXLResolutionListLatent(io.ComfyNode):
                     ],
                     tooltip="Resolution group: fixed sizes, or random sizes picked from the seed.",
                 ),
-                # The core resolution preview, fed by the frontend extension (web/sdxl_resolution_preview.js) through two hidden helper widgets.
+                # The core resolution preview, fed by the frontend extension (web/resolution_preview.js) through two hidden helper widgets.
                 io.ResolutionPreview.Input(
                     "preview",
                     tooltip="Live preview of the output size. Random sizes show the size of the last run, until the settings change.",
