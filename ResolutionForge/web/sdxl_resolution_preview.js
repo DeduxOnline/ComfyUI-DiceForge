@@ -3,6 +3,8 @@ import { app } from "../../scripts/app.js";
 // Live size preview for SDXL Resolution List (Latent). The node declares the core resolution preview widget; this extension feeds it through two hidden
 // helper widgets: the size after `scale` as the ratio ("1216:832") and its megapixels, so the core preview math gives exactly the node's size.
 const NODE_TYPE = "SDXLResolutionListLatent";
+// The list node shows only width × height: the megapixels next to the size are hidden (the "—" of random sizes stays, it has no size next to it).
+const STYLE = `[data-widget-name="preview"][node-type="${NODE_TYPE}"] [data-testid="resolution-preview-value"] + .text-muted-foreground { display: none; }`;
 
 // Python round() ties to even; Math.round ties up.
 function roundHalfToEven(value) {
@@ -34,6 +36,11 @@ function addHelper(node, name, value) {
 
 app.registerExtension({
   name: "ResolutionForge.SDXLResolutionPreview",
+  setup() {
+    const style = document.createElement("style");
+    style.textContent = STYLE;
+    document.head.appendChild(style);
+  },
   nodeCreated(node) {
     if (node.comfyClass !== NODE_TYPE) return;
     const ratio = addHelper(node, "preview_ratio", "");
