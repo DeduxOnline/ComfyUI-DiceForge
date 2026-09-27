@@ -1,0 +1,186 @@
+{
+  "1": {
+    "inputs": {
+      "ckpt_name": "noobai_vpred.safetensors"
+    },
+    "class_type": "CheckpointLoaderSimple",
+    "_meta": {
+      "title": "Load Checkpoint"
+    }
+  },
+  "2": {
+    "inputs": {
+      "sampling": "v_prediction",
+      "zsnr": true,
+      "model": [
+        "1",
+        0
+      ]
+    },
+    "class_type": "ModelSamplingDiscrete",
+    "_meta": {
+      "title": "v-pred + ZTSNR (forced, like v_pred/ztsnr keys)"
+    }
+  },
+  "3": {
+    "inputs": {
+      "multiplier": 0,
+      "model": [
+        "2",
+        0
+      ]
+    },
+    "class_type": "RescaleCFG",
+    "_meta": {
+      "title": "RescaleCFG (Forge default 0 = off)"
+    }
+  },
+  "4": {
+    "inputs": {
+      "resolution": "Any Listed",
+      "seed": 0,
+      "multiply": 1,
+      "vae_alignment": 64,
+      "batch": 1
+    },
+    "class_type": "UnifiedSDXLResolution",
+    "_meta": {
+      "title": "SDXL Resolution List"
+    }
+  },
+  "5": {
+    "inputs": {
+      "width": [
+        "4",
+        0
+      ],
+      "height": [
+        "4",
+        1
+      ],
+      "batch_size": [
+        "4",
+        2
+      ]
+    },
+    "class_type": "EmptyLatentImage",
+    "_meta": {
+      "title": "Empty Latent Image"
+    }
+  },
+  "6": {
+    "inputs": {
+      "text": "masterpiece, best quality, newest, absurdres, highres, 1girl, black background",
+      "parser": "A1111",
+      "mean_normalization": true,
+      "multi_conditioning": true,
+      "use_old_emphasis_implementation": false,
+      "with_SDXL": false,
+      "ascore": 6,
+      "width": 1024,
+      "height": 1024,
+      "crop_w": 0,
+      "crop_h": 0,
+      "target_width": 1024,
+      "target_height": 1024,
+      "text_g": "",
+      "text_l": "",
+      "smZ_steps": 24,
+      "clip": [
+        "1",
+        1
+      ]
+    },
+    "class_type": "smZ CLIPTextEncode",
+    "_meta": {
+      "title": "Positive (A1111 parser, like Forge)"
+    }
+  },
+  "7": {
+    "inputs": {
+      "text": "worst quality, low quality, lowres, bad anatomy, bad hands, jpeg artifacts, signature, watermark, username",
+      "parser": "A1111",
+      "mean_normalization": true,
+      "multi_conditioning": true,
+      "use_old_emphasis_implementation": false,
+      "with_SDXL": false,
+      "ascore": 6,
+      "width": 1024,
+      "height": 1024,
+      "crop_w": 0,
+      "crop_h": 0,
+      "target_width": 1024,
+      "target_height": 1024,
+      "text_g": "",
+      "text_l": "",
+      "smZ_steps": 24,
+      "clip": [
+        "1",
+        1
+      ]
+    },
+    "class_type": "smZ CLIPTextEncode",
+    "_meta": {
+      "title": "Negative (A1111 parser, like Forge)"
+    }
+  },
+  "8": {
+    "inputs": {
+      "seed": 222111379118228,
+      "steps": 24,
+      "cfg": 4.5,
+      "sampler_name": "euler_ancestral",
+      "scheduler": "normal",
+      "denoise": 1,
+      "model": [
+        "3",
+        0
+      ],
+      "positive": [
+        "6",
+        0
+      ],
+      "negative": [
+        "7",
+        0
+      ],
+      "latent_image": [
+        "5",
+        0
+      ]
+    },
+    "class_type": "KSampler",
+    "_meta": {
+      "title": "KSampler (Forge Neo XL preset)"
+    }
+  },
+  "9": {
+    "inputs": {
+      "samples": [
+        "8",
+        0
+      ],
+      "vae": [
+        "1",
+        2
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE Decode"
+    }
+  },
+  "10": {
+    "inputs": {
+      "filename_prefix": "SDXL/forge_vpred",
+      "images": [
+        "9",
+        0
+      ]
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "Save Image"
+    }
+  }
+}
