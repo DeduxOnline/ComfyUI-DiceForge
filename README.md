@@ -148,8 +148,8 @@ Works like two core *CLIP Text Encode (Prompt)* nodes sharing one CLIP model: ea
 | `clip` | main | The CLIP model used for encoding both prompts. |
 | `positive` | main | The positive prompt (top text field): what the image should contain. |
 | `negative` | main | The negative prompt (bottom text field): what the image should avoid. |
-| `seed` | Advanced | Seed for choices and wildcards. The same seed always gives the same prompts (except in *shuffle* and *balanced* modes). By default it is randomized after each run (*control after generate*); set it to *fixed* to repeat a result. |
-| `seed_mode` | Advanced | How choices and wildcards change from run to run: `random` (default), `deck`, `shuffle` or `balanced`. See [Seed modes](#seed-modes). |
+| `seed` | Advanced | Seed for choices and wildcards. The same seed always gives the same prompts (except in *shuffle*, *balanced* and *mutate* modes). By default it is randomized after each run (*control after generate*); set it to *fixed* to repeat a result. |
+| `seed_mode` | Advanced | How choices and wildcards change from run to run: `random` (default), `deck`, `shuffle`, `balanced`, `combinations` or `mutate`. See [Seed modes](#seed-modes). |
 
 ### Outputs
 
@@ -171,6 +171,8 @@ When choices or wildcards change a prompt, the filled-in prompts and the seed ar
 | `{2$$a\|b\|c}` | Two different options, joined with `, `. |
 | `{1-3$$a\|b\|c}` | From 1 to 3 different options. `-2$$` means 0 to 2, and `2-$$` means 2 up to all of them. |
 | `{2$$ and $$a\|b\|c}` | Two options joined with ` and ` instead of `, `. |
+| `${hair=__color__}` | Sets the variable `hair`: its value is filled in once (choices and wildcards included) and outputs nothing. `${hair=!...}` (sd-dynamic-prompts style) works the same. |
+| `${hair}` | The value of `hair`, anywhere in the positive or negative prompt: `${hair=__color__}${hair} hair, ${hair} ribbon` gives `red hair, red ribbon`. |
 | `// ...`, `/* ... */` | Comments, removed before encoding. |
 
 To write `{`, `}` or `|` literally, put a backslash before it: `\{`, `\}`, `\|`.
@@ -179,13 +181,15 @@ Weights and counts can be combined, for example `{2$$3::hat|scarf|bow}`. Plain `
 
 Commas left behind by empty options are cleaned up: `a girl, {|cat}, smile` becomes `a girl, smile` rather than `a girl, , smile`. Doubled commas, spaces before commas and commas at the start or end of the prompt are removed too.
 
+Variables are shared by both prompts and can be set in a wildcard file line too (for example a character file that sets `${hair=...}`). A variable can be used before or after it is set; if it is set twice, the last value is used everywhere. Using a variable that is never set stops the run with an error that names it.
+
 Prompt weights such as `(word:1.2)` and embeddings work as in the core node.
 
 Lines picked from a wildcard file can themselves contain wildcards and `{a|b}` choices; they are filled in too, up to 50 levels deep (a wildcard that includes itself stops with an error instead of looping forever).
 
 ### Seed modes
 
-In `random` mode every pick is independent, so `blue sky` can come up twice in a row while other options wait. `deck` and `shuffle` go through all the options before repeating one; `balanced` makes repeats rare instead of impossible.
+In `random` mode every pick is independent, so `blue sky` can come up twice in a row while other options wait. `deck` and `shuffle` go through all the options before repeating one; `balanced` makes repeats rare instead of impossible. `combinations` goes through every combination of the whole prompt, and `mutate` changes one choice at a time.
 
 | Mode | How it works | Seed |
 |---|---|---|
@@ -193,6 +197,8 @@ In `random` mode every pick is independent, so `blue sky` can come up twice in a
 | `deck` | Like dealing cards: the seed is a position in a shuffled deck of the options. Set *control after generate* to *increment*: each run takes the next card, every option comes once per round, then the deck is reshuffled (never starting with the option that just came). Rounds start at seeds that are multiples of the number of options (0, 5, 10… for 5 options), so start from such a seed (for example 0) to get no repeats from the first run. Options inside a picked option (`{cat {small\|big}\|dog}`, lines of a wildcard inside a wildcard) also take turns. | The same seed gives the same prompt, so a good result can be repeated. |
 | `shuffle` | Like shuffle in a music player: the node remembers which options were already used and picks from the rest; when all were used, it starts over. Works with any *control after generate*, even *fixed*. The memory resets when ComfyUI restarts. | Not used: the prompt is different every run and cannot be repeated from the seed (the filled-in prompt is in the console). |
 | `balanced` | Like the pseudo-random distribution in games: an option that just came up gets a low chance, and the longer an option is missed, the higher its chance grows. Repeats are rare but possible (with 5 options: about 4% in a row instead of 20% in `random`, and no option waits more than about 13 runs instead of 40+). In the long run every option comes exactly as often as its weight says (`{3::cat\|dog}`: 75% / 25%). Works with any *control after generate*; the memory resets when ComfyUI restarts. | Not used, as in `shuffle`. |
+| `combinations` | The seed numbers every combination of all the choices, wildcards and variables in both prompts, so seeds 0, 1, 2… go through each combination exactly once, then start over (the seed is taken modulo the number of combinations). For example `{sky\|sea}, __color__ hair` with 3 colors has 6 combinations: seeds 0–5. The first choice changes fastest. The console shows the number, for example *combination 4 of 6*. Weights only matter as `0::` (never used); `{2$$a\|b\|c}` counts every set of 2 options once. Good for trying every character in every style: set *control after generate* to *increment* and start from 0. | The same seed gives the same prompt. |
+| `mutate` | The first run picks at random; every next run keeps the last prompt and changes just one choice to a different option (a choice inside a newly picked option is picked fresh). Good for exploring variations of a result you like: keep running, and every image differs from the one before in one detail. The node remembers the last picks for these prompts until ComfyUI restarts; editing the prompt starts from a fresh random pick. | Not used, as in `shuffle`. |
 
 In `deck` and `shuffle` modes:
 
