@@ -94,3 +94,20 @@ It works like the core ComfyUI *Resolution Selector*, using the same size calcul
 
 - The output always stays close to `megapixels`: at 1.0 MP it varies between about 0.94 and 1.06 MP because of rounding to `multiple`.
 - With a large `multiple` such as 64, Random Chaos Portrait/Landscape can return a square: ratios very close to 1:1 round to one.
+
+## Example workflows
+
+The `workflows` folder has two Anima workflows that reproduce the Anima defaults of [Forge Neo](https://github.com/Haoming02/sd-webui-forge-classic/tree/neo): `er_sde` sampler, `beta` scheduler, 32 steps, CFG 4, shift 3. Shift 3 is already the Anima default in ComfyUI, so there is no ModelSampling node. The negative prompt is encoded as text, not zeroed out. The files are in API format: drag one onto the ComfyUI canvas to load it.
+
+| File | What it does | Extra requirements |
+|---|---|---|
+| `anima_forge_neo_base.json` | Text to image. The size comes from **SDXL Resolution List** (`Any Listed`, about 1 MP). | None |
+| `anima_forge_neo_edit.json` | Edits an image with an Anima Edit LoRA, like Forge Neo's *[Anima] Enable Reference* option. | [ComfyUI-Anima-Edit-LoRA](https://github.com/wochenlong/ComfyUI-Anima-Edit-LoRA) and an Anima Edit LoRA |
+
+After loading, select your own model, text encoder, VAE and LoRA files, and your own image in **Load Image**.
+
+In the edit workflow:
+
+- The source image is scaled to about 1 MP, with each side a multiple of 64, as Forge Neo does.
+- The encoded image is used twice. It goes into **Set Reference Latent** on **both** the positive and the negative prompt, because Forge Neo also gives the reference to both. It is also the sampler's `latent_image`.
+- At `denoise` 1.0 the sampler starts from pure noise, so the output simply has the same size as the reference. Lower `denoise` (for example 0.8) keeps more of the source composition, like the denoising strength in Forge Neo img2img.
