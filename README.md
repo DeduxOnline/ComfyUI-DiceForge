@@ -1,14 +1,16 @@
 # ResolutionForge
 
-ComfyUI nodes for setting up a generation: two resolution nodes that output `width`, `height` and `batch` for an empty latent (both can pick the canvas size at random from a seed), and a prompt encoder that outputs positive and negative conditioning from one node.
+ComfyUI nodes for setting up a generation: two resolution nodes that output `width`, `height` and `batch` for an empty latent (both can pick the canvas size at random from a seed), their *Latent* versions that output the empty latent directly, and a prompt encoder that outputs positive and negative conditioning from one node.
 
 | Node | File | Use it when |
 |---|---|---|
 | **SDXL Resolution List** | `ResolutionForge/sdxl_resolution_list.py` | You want the standard SDXL sizes (1024x1024, 1216x832, ...) from a fixed list. |
 | **Resolution Selector (Random)** | `ResolutionForge/resolution_selector_random.py` | You want to set an aspect ratio and a megapixel target, like the core *Resolution Selector* node. |
+| **SDXL Resolution List (Latent)** | `ResolutionForge/sdxl_resolution_list_latent.py` | Same as *SDXL Resolution List*, but you want the empty latent itself instead of connecting **Empty Latent Image**. |
+| **Resolution Selector (Random, Latent)** | `ResolutionForge/resolution_selector_random_latent.py` | Same as *Resolution Selector (Random)*, but you want the empty latent itself. |
 | **CLIP Text Encode (Positive/Negative)** | `ResolutionForge/clip_text_encode_pos_neg.py` | You want both prompts in one node instead of two *CLIP Text Encode (Prompt)* nodes. |
 
-The resolution nodes are in the `utils` category, the prompt encoder in `model/conditioning`. All nodes use the ComfyUI V3 node schema: in the Nodes 2.0 frontend, the secondary inputs of the resolution nodes sit in the node's **Advanced** section.
+The resolution nodes are in the `utils` category, their *Latent* versions in `model/latent`, and the prompt encoder in `model/conditioning`. All nodes use the ComfyUI V3 node schema: in the Nodes 2.0 frontend, the secondary inputs of the resolution nodes sit in the node's **Advanced** section.
 
 ## Installation
 
@@ -21,13 +23,14 @@ cp -r unified_sdxl_res/ResolutionForge ComfyUI/custom_nodes/
 
 Cloning the whole repository straight into `custom_nodes` does not work: the nodes are in the `ResolutionForge` subfolder, so ComfyUI does not find them.
 
-`ResolutionForge/__init__.py` registers all three nodes. To install only one of them, copy that `.py` file from `ResolutionForge` straight into `ComfyUI/custom_nodes` instead.
+`ResolutionForge/__init__.py` registers all five nodes. To install only one of them, copy that `.py` file from `ResolutionForge` straight into `ComfyUI/custom_nodes` instead. This does not work for the *Latent* nodes: they reuse the code of their base resolution node, so install them with the whole folder.
 
 **Requirements:** a recent ComfyUI that includes `comfy_api.latest` (the V3 node API). *Resolution Selector (Random)* also needs the resolution preview widget, which ships with the core *Resolution Selector* node. Older ComfyUI versions will not load these nodes.
 
 ## Typical use
 
 - Connect `width`, `height` and `batch` of a resolution node to the `width`, `height` and `batch_size` inputs of **Empty Latent Image**.
+- Or use a *Latent* version and connect its `latent` output straight to the `latent_image` input of **KSampler**.
 - Connect the `CLIP` output of your checkpoint loader to **CLIP Text Encode (Positive/Negative)**, then its `positive` and `negative` outputs to the matching inputs of **KSampler**.
 
 ## SDXL Resolution List
@@ -96,6 +99,20 @@ It works like the core ComfyUI *Resolution Selector*, using the same size calcul
 
 - The output always stays close to `megapixels`: at 1.0 MP it varies between about 0.94 and 1.06 MP because of rounding to `multiple`.
 - With a large `multiple` such as 64, Random Chaos Portrait/Landscape can return a square: ratios very close to 1:1 round to one.
+
+## Latent versions
+
+**SDXL Resolution List (Latent)** (node id `SDXLResolutionListLatent`) and **Resolution Selector (Random, Latent)** (node id `ResolutionSelectorRandomLatent`) have exactly the same inputs as their base nodes, including the Advanced section and, for the selector, the live preview. The size is chosen the same way; `batch` sets the number of latents in the batch.
+
+### Outputs
+
+| Output | Description |
+|---|---|
+| `latent` | Empty latent batch, identical to what **Empty Latent Image** makes for this size and batch. |
+| `width` | Width in pixels, for example for an upscale or hires-fix step. |
+| `height` | Height in pixels. |
+
+Like the output of **Empty Latent Image**, the latent works with any model you would use that node with: the core samplers adapt an empty latent to the model's latent format.
 
 ## CLIP Text Encode (Positive/Negative)
 
