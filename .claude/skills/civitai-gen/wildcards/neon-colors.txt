@@ -1,0 +1,10 @@
+neon blue
+neon red
+neon green
+neon purple
+neon orange
+neon pink
+neon cyan
+neon magenta
+neon lime
+neon gold

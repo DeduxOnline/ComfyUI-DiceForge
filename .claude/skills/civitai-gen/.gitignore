@@ -1,0 +1,8 @@
+.env
+
+# Generated media (default --output, and the ./out used in SKILL.md examples)
+output/
+out/
+
+# Civitai MCP CLI, downloaded on demand for posting (see SKILL.md)
+mcp-cli.mjs
