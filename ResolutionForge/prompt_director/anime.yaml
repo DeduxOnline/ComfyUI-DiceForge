@@ -1,0 +1,320 @@
+# Prompt Director data for anime models that use Danbooru tags (Illustrious, Pony).
+#
+# Slots are filled in the order below; each slot picks one option at random (by seed)
+# among the options whose conditions match what was already picked.
+#
+# Slot fields:
+#   name:   slot name, used in conditions and in the node's override inputs
+#   group:  how the slot is used: structure (always kept as is), character, outfit,
+#           expression, pose, location, details (rewritten by the LLM when one is connected)
+#   when:   the slot is only used when these conditions match (same form as for options)
+#
+# Option fields:
+#   id:     name other options refer to (defaults to the tags)
+#   tags:   Danbooru tags added to the prompt (can be empty)
+#   attrs:  extra names other options can refer to (for example indoor, outdoor, winter)
+#   when:   {slot: [names]}: every slot listed must have picked one of the names (its id or attrs)
+#   unless: {slot: [names]}: the option is skipped if any slot listed picked one of the names
+#   weight: how likely it is picked compared to the others (default 1)
+#
+# More files with the same layout can be added to ComfyUI/models/prompt_director:
+# their options are added to the slots with the same name.
+
+slots:
+  - name: theme
+    group: structure
+    options:
+      - {id: fantasy, tags: ""}
+      - {id: modern, tags: ""}
+      - {id: school, tags: ""}
+      - {id: cyberpunk, tags: "cyberpunk"}
+      - {id: japanese, tags: ""}
+
+  - name: scene
+    group: structure
+    options:
+      - {id: 1girl, tags: "1girl, solo", attrs: [character, female], weight: 3}
+      - {id: 1boy, tags: "1boy, solo", attrs: [character, male]}
+      - {id: scenery, tags: "scenery, no humans", weight: 0.7}
+
+  - name: location
+    group: location
+    options:
+      # fantasy
+      - {id: castle, tags: "castle, courtyard, stone floor, banner", attrs: [outdoor, stone], when: {theme: [fantasy]}}
+      - {id: forest, tags: "forest, tree, nature, grass", attrs: [outdoor, nature], when: {theme: [fantasy]}}
+      - {id: medieval_town, tags: "medieval, town, cobblestone, building", attrs: [outdoor, city], when: {theme: [fantasy]}}
+      - {id: fantasy_library, tags: "library, bookshelf, book, candle, indoors", attrs: [indoor, library], when: {theme: [fantasy]}}
+      - {id: throne_room, tags: "throne room, pillar, red carpet, indoors", attrs: [indoor], when: {theme: [fantasy]}}
+      - {id: mountain, tags: "mountain, cliff, sky, cloud", attrs: [outdoor, nature], when: {theme: [fantasy]}}
+      - {id: flower_field, tags: "flower field, meadow, flower", attrs: [outdoor, nature, summer], when: {theme: [fantasy]}}
+      # modern
+      - {id: city_street, tags: "city, street, building, crosswalk", attrs: [outdoor, city], when: {theme: [modern]}}
+      - {id: cafe, tags: "cafe, indoors, table, window, cup", attrs: [indoor, cafe], when: {theme: [modern]}}
+      - {id: bedroom, tags: "bedroom, indoors, bed, pillow", attrs: [indoor, bedroom], when: {theme: [modern]}}
+      - {id: beach, tags: "beach, ocean, sand, horizon", attrs: [outdoor, water, summer], when: {theme: [modern]}}
+      - {id: park, tags: "park, tree, bench, grass", attrs: [outdoor, nature, park], when: {theme: [modern]}}
+      - {id: city_rooftop, tags: "rooftop, cityscape, railing", attrs: [outdoor, city, rooftop], when: {theme: [modern]}}
+      - {id: train_station, tags: "train station, railroad tracks, platform", attrs: [outdoor, city], when: {theme: [modern]}}
+      # school
+      - {id: classroom, tags: "classroom, school desk, chalkboard, window, indoors", attrs: [indoor, desk], when: {theme: [school]}}
+      - {id: school_hallway, tags: "school, hallway, window, indoors", attrs: [indoor, wall], when: {theme: [school]}}
+      - {id: school_rooftop, tags: "school, rooftop, fence, sky", attrs: [outdoor, rooftop], when: {theme: [school]}}
+      - {id: school_library, tags: "library, bookshelf, book, indoors", attrs: [indoor, library, desk], when: {theme: [school]}}
+      - {id: school_courtyard, tags: "school, courtyard, tree, building", attrs: [outdoor, nature], when: {theme: [school]}}
+      # cyberpunk
+      - {id: neon_street, tags: "city, street, neon lights, sign, crowd", attrs: [outdoor, city], when: {theme: [cyberpunk]}}
+      - {id: alley, tags: "alley, neon lights, wall, cable", attrs: [outdoor, city, wall], when: {theme: [cyberpunk]}}
+      - {id: megacity_rooftop, tags: "rooftop, cityscape, skyscraper, railing", attrs: [outdoor, city, rooftop], when: {theme: [cyberpunk]}}
+      - {id: neon_bar, tags: "bar, indoors, counter, neon lights, bottle", attrs: [indoor, bar], when: {theme: [cyberpunk]}}
+      - {id: laboratory, tags: "laboratory, indoors, monitor, cable, screen", attrs: [indoor, desk], when: {theme: [cyberpunk]}}
+      # japanese
+      - {id: shrine, tags: "shrine, torii, stone lantern, stairs", attrs: [outdoor, shrine], when: {theme: [japanese]}}
+      - {id: japanese_garden, tags: "japanese garden, pond, stone lantern, bridge", attrs: [outdoor, nature], when: {theme: [japanese]}}
+      - {id: tatami_room, tags: "tatami, shouji, indoors, japanese architecture", attrs: [indoor], when: {theme: [japanese]}}
+      - {id: festival, tags: "summer festival, paper lantern, food stand, crowd", attrs: [outdoor, festival, summer], when: {theme: [japanese]}}
+      - {id: bamboo_forest, tags: "bamboo forest, bamboo, nature", attrs: [outdoor, nature], when: {theme: [japanese]}}
+
+  - name: time
+    group: structure
+    options:
+      - {id: day, tags: "day", weight: 3}
+      - {id: sunset, tags: "sunset", weight: 1.5}
+      - {id: night, tags: "night", weight: 2}
+
+  - name: weather
+    group: structure
+    when: {location: [outdoor]}
+    options:
+      - {id: clear, tags: "blue sky, cloud", when: {time: [day]}, weight: 3}
+      - {id: clear, tags: "orange sky, cloud", when: {time: [sunset]}, weight: 3}
+      - {id: clear, tags: "night sky, starry sky, moon", when: {time: [night]}, weight: 3}
+      - {id: cloudy, tags: "cloudy sky, overcast", unless: {time: [night]}}
+      - {id: rain, tags: "rain, wet, puddle", attrs: [wet], unless: {location: [festival]}}
+      - {id: snow, tags: "snow, snowing", attrs: [cold, winter], unless: {location: [summer]}}
+      - {id: cherry_blossoms, tags: "cherry blossoms, falling petals", attrs: [spring], when: {theme: [school, modern, japanese], location: [nature, park, shrine, rooftop]}, unless: {time: [night]}}
+
+  - name: framing
+    group: structure
+    when: {scene: [character]}
+    options:
+      - {id: portrait, tags: "portrait, close-up", attrs: [close]}
+      - {id: upper_body, tags: "upper body", attrs: [close], weight: 2}
+      - {id: cowboy_shot, tags: "cowboy shot", attrs: [body], weight: 2}
+      - {id: full_body, tags: "full body", attrs: [body, feet], weight: 1.5}
+
+  - name: hair_color
+    group: character
+    when: {scene: [character]}
+    options:
+      - {tags: "black hair", weight: 2}
+      - {tags: "brown hair", weight: 2}
+      - {tags: "blonde hair", weight: 1.5}
+      - {tags: "silver hair"}
+      - {tags: "white hair"}
+      - {tags: "pink hair"}
+      - {tags: "blue hair"}
+      - {tags: "red hair"}
+      - {tags: "purple hair"}
+      - {tags: "green hair", weight: 0.5}
+      - {tags: "multicolored hair, streaked hair", when: {theme: [cyberpunk]}, weight: 2}
+      - {tags: "gradient hair", weight: 0.5}
+
+  - name: hair_style
+    group: character
+    when: {scene: [character]}
+    options:
+      - {tags: "long hair", when: {scene: [female]}, weight: 3}
+      - {tags: "very long hair", when: {scene: [female]}}
+      - {tags: "medium hair", weight: 1.5}
+      - {tags: "short hair", weight: 1.5}
+      - {tags: "short hair", when: {scene: [male]}, weight: 3}
+      - {tags: "long hair, twintails", when: {scene: [female]}}
+      - {tags: "long hair, ponytail", when: {scene: [female]}}
+      - {tags: "long hair, braid", when: {scene: [female]}}
+      - {tags: "bob cut", when: {scene: [female]}}
+      - {tags: "hair bun", when: {scene: [female]}, weight: 0.7}
+      - {tags: "messy hair", when: {scene: [male]}}
+      - {tags: "spiked hair", when: {scene: [male]}, weight: 0.5}
+
+  - name: eye_color
+    group: character
+    when: {scene: [character]}
+    options:
+      - {tags: "blue eyes", weight: 2}
+      - {tags: "red eyes", weight: 1.5}
+      - {tags: "green eyes"}
+      - {tags: "purple eyes"}
+      - {tags: "yellow eyes"}
+      - {tags: "brown eyes", weight: 1.5}
+      - {tags: "aqua eyes"}
+      - {tags: "heterochromia", weight: 0.3}
+
+  - name: outfit
+    group: outfit
+    when: {scene: [character]}
+    options:
+      # fantasy
+      - {id: knight, tags: "armor, breastplate, gauntlets, cape", attrs: [armor, combat], when: {theme: [fantasy]}, weight: 1.5}
+      - {id: mage, tags: "robe, hooded cloak, wizard hat, holding staff", attrs: [magic], when: {theme: [fantasy]}}
+      - {id: adventurer, tags: "leather armor, belt pouch, tunic, gloves", attrs: [combat], when: {theme: [fantasy]}}
+      - {id: princess, tags: "princess, tiara, ball gown, frills", attrs: [formal], when: {theme: [fantasy], scene: [female]}}
+      - {id: prince, tags: "prince, royal clothes, cape, epaulettes", attrs: [formal], when: {theme: [fantasy], scene: [male]}}
+      - {id: priestess, tags: "white robe, veil, holding staff", attrs: [magic], when: {theme: [fantasy], scene: [female]}}
+      - {id: fantasy_winter, tags: "fur-trimmed cloak, winter clothes, scarf", attrs: [winter], when: {theme: [fantasy], weather: [snow]}, weight: 3}
+      # modern
+      - {id: casual, tags: "white shirt, denim jacket, jeans", attrs: [casual], when: {theme: [modern]}}
+      - {id: hoodie, tags: "hoodie, shorts", attrs: [casual], when: {theme: [modern]}, unless: {weather: [snow]}}
+      - {id: sundress, tags: "sundress, sun hat", attrs: [summer], when: {theme: [modern], scene: [female], location: [outdoor]}, unless: {weather: [snow, rain], time: [night]}}
+      - {id: tshirt_shorts, tags: "t-shirt, shorts", attrs: [summer, casual], when: {theme: [modern], location: [summer, park]}, unless: {weather: [snow]}, weight: 2}
+      - {id: swimsuit, tags: "swimsuit", attrs: [swimsuit], when: {theme: [modern], location: [water], rating: [sensitive]}, unless: {weather: [snow, rain]}, weight: 3}
+      - {id: office, tags: "suit, white shirt, necktie", attrs: [formal], when: {theme: [modern], location: [city, cafe]}}
+      - {id: office_lady, tags: "office lady, suit, pencil skirt", attrs: [formal], when: {theme: [modern], scene: [female], location: [city, cafe]}}
+      - {id: pajamas, tags: "pajamas", attrs: [sleep], when: {theme: [modern], location: [bedroom]}, weight: 3}
+      - {id: winter_coat, tags: "coat, scarf, turtleneck sweater", attrs: [winter], when: {theme: [modern, school], weather: [snow]}, weight: 3}
+      - {id: raincoat, tags: "raincoat, hood up", attrs: [rain], when: {theme: [modern, school], weather: [rain]}, weight: 2}
+      - {id: sweater, tags: "sweater, skirt", attrs: [casual], when: {theme: [modern], scene: [female]}, unless: {location: [beach]}}
+      # school
+      - {id: serafuku, tags: "school uniform, serafuku, pleated skirt, neckerchief", attrs: [school_uniform], when: {theme: [school], scene: [female]}, weight: 3}
+      - {id: blazer_girl, tags: "school uniform, blazer, plaid skirt, necktie", attrs: [school_uniform], when: {theme: [school], scene: [female]}, weight: 2}
+      - {id: gakuran, tags: "school uniform, gakuran", attrs: [school_uniform], when: {theme: [school], scene: [male]}, weight: 2}
+      - {id: blazer_boy, tags: "school uniform, blazer, necktie, pants", attrs: [school_uniform], when: {theme: [school], scene: [male]}, weight: 2}
+      - {id: school_cardigan, tags: "school uniform, cardigan, scarf", attrs: [school_uniform, winter], when: {theme: [school], weather: [snow]}, weight: 3}
+      - {id: gym_uniform, tags: "gym uniform, track jacket", attrs: [casual], when: {theme: [school]}, unless: {location: [library]}, weight: 0.5}
+      # cyberpunk
+      - {id: techwear, tags: "techwear, black jacket, cropped jacket, headphones", attrs: [tech], when: {theme: [cyberpunk]}, weight: 2}
+      - {id: cyborg, tags: "cyborg, mechanical arm, jacket", attrs: [tech], when: {theme: [cyberpunk]}}
+      - {id: street, tags: "leather jacket, fingerless gloves, choker", attrs: [tech], when: {theme: [cyberpunk]}}
+      - {id: hooded_mask, tags: "hooded jacket, hood up, mouth mask", attrs: [tech], when: {theme: [cyberpunk]}}
+      - {id: bodysuit, tags: "bodysuit, glowing", attrs: [tech], when: {theme: [cyberpunk], scene: [female]}, weight: 0.7}
+      - {id: trench_coat, tags: "trench coat, visor", attrs: [tech], when: {theme: [cyberpunk]}, weight: 0.7}
+      # japanese
+      - {id: kimono, tags: "kimono, obi, hair flower", attrs: [traditional], when: {theme: [japanese], scene: [female]}, weight: 2}
+      - {id: kimono_male, tags: "kimono, haori", attrs: [traditional], when: {theme: [japanese], scene: [male]}, weight: 2}
+      - {id: yukata, tags: "yukata, obi, holding fan", attrs: [traditional, summer], when: {theme: [japanese]}, unless: {weather: [snow]}, weight: 1.5}
+      - {id: yukata_festival, tags: "yukata, obi", attrs: [traditional, summer], when: {theme: [japanese], location: [festival]}, weight: 4}
+      - {id: miko, tags: "miko, hakama, red hakama, wide sleeves", attrs: [traditional], when: {theme: [japanese], scene: [female], location: [shrine]}, weight: 4}
+      - {id: samurai, tags: "samurai, hakama, katana, sheathed", attrs: [traditional, combat], when: {theme: [japanese], scene: [male]}}
+
+  - name: footwear
+    group: outfit
+    when: {framing: [feet]}
+    options:
+      - {tags: "armored boots", when: {outfit: [armor]}, weight: 3}
+      - {tags: "boots", when: {theme: [fantasy]}, unless: {outfit: [armor, formal]}}
+      - {tags: "high heels", when: {outfit: [formal], scene: [female]}, weight: 2}
+      - {tags: "boots", when: {outfit: [formal], scene: [male]}}
+      - {tags: "sneakers", when: {outfit: [casual, summer]}}
+      - {tags: "sandals", when: {outfit: [summer]}, unless: {outfit: [traditional]}}
+      - {tags: "barefoot", when: {outfit: [sleep, swimsuit]}, weight: 3}
+      - {tags: "loafers, socks", when: {outfit: [school_uniform]}, weight: 2}
+      - {tags: "boots", when: {weather: [snow]}, weight: 2}
+      - {tags: "rain boots", when: {outfit: [rain]}, weight: 2}
+      - {tags: "combat boots", when: {outfit: [tech]}}
+      - {tags: "geta", when: {outfit: [traditional]}}
+      - {tags: "tabi, zouri", when: {outfit: [traditional]}}
+
+  - name: expression
+    group: expression
+    when: {scene: [character]}
+    options:
+      - {id: smile, tags: "smile", attrs: [happy], weight: 3}
+      - {id: open_smile, tags: "smile, open mouth", attrs: [happy], weight: 2}
+      - {id: grin, tags: "grin", attrs: [happy]}
+      - {id: calm, tags: "light smile, closed mouth", attrs: [calm], weight: 2}
+      - {id: expressionless, tags: "expressionless", attrs: [calm]}
+      - {id: shy, tags: "blush, embarrassed", attrs: [shy]}
+      - {id: sad, tags: "sad, frown", attrs: [sad], weight: 0.7}
+      - {id: crying, tags: "crying, tears", attrs: [sad], weight: 0.4}
+      - {id: angry, tags: "angry, frown, clenched teeth", attrs: [angry], weight: 0.5}
+      - {id: serious, tags: "serious, closed mouth", attrs: [determined], when: {outfit: [combat, tech]}, weight: 2}
+      - {id: surprised, tags: "surprised, open mouth", attrs: [surprised], weight: 0.6}
+      - {id: sleepy, tags: "sleepy, half-closed eyes", attrs: [calm], when: {outfit: [sleep]}, weight: 3}
+
+  - name: pose
+    group: pose
+    when: {scene: [character]}
+    options:
+      # close framings: upper body only
+      - {tags: "hand on own cheek", when: {framing: [close]}, unless: {expression: [angry]}}
+      - {tags: "waving, hand up", when: {framing: [close], expression: [happy]}}
+      - {tags: "peace sign, v", when: {expression: [happy]}}
+      - {tags: "arms crossed", when: {expression: [angry, determined, calm]}}
+      - {tags: "head tilt", when: {expression: [happy, calm, shy]}}
+      - {tags: "hands on own chest", when: {framing: [close], expression: [shy, sad]}}
+      - {tags: "covering mouth", when: {expression: [surprised, shy]}}
+      - {tags: "wiping tears", when: {expression: [sad]}}
+      - {tags: "hand in own hair", when: {framing: [close]}, unless: {expression: [sad, angry]}}
+      - {tags: "looking back", unless: {expression: [angry]}}
+      # body framings
+      - {tags: "standing", when: {framing: [body]}, weight: 2}
+      - {tags: "walking", when: {framing: [body], location: [outdoor]}, unless: {expression: [sad]}}
+      - {tags: "running", when: {framing: [body], location: [outdoor], expression: [happy, determined]}}
+      - {tags: "jumping", when: {framing: [body], location: [outdoor], expression: [happy]}}
+      - {tags: "sitting, sitting on bench", when: {framing: [body], location: [park]}, weight: 2}
+      - {tags: "sitting, school desk", when: {framing: [body], location: [desk]}, weight: 2}
+      - {tags: "sitting, chair, holding cup", when: {framing: [body], location: [cafe]}, weight: 2}
+      - {tags: "sitting, on bed", when: {framing: [body], location: [bedroom]}, weight: 3}
+      - {tags: "sitting, hugging own legs", when: {framing: [body], expression: [sad, calm]}}
+      - {tags: "leaning against wall", when: {framing: [body], location: [wall, city]}}
+      - {tags: "leaning on railing", when: {location: [rooftop]}, weight: 2}
+      - {tags: "hands in pockets", when: {outfit: [casual, tech]}}
+      - {tags: "fighting stance, holding sword", when: {framing: [body], outfit: [armor, combat], expression: [determined, angry, calm]}, weight: 3}
+      - {tags: "casting spell, magic, glowing hand", when: {outfit: [magic]}, weight: 3}
+      - {tags: "holding umbrella", when: {weather: [rain]}, weight: 3}
+      - {tags: "reading, holding book", when: {location: [library]}, weight: 3}
+      - {tags: "holding drink, bottle", when: {location: [bar]}, weight: 2}
+      - {tags: "holding sword, katana", when: {outfit: [combat], theme: [japanese]}, weight: 2}
+      - {tags: "holding fan", when: {outfit: [traditional]}}
+      - {tags: "praying, own hands together", when: {location: [shrine]}}
+
+  - name: gaze
+    group: pose
+    when: {scene: [character]}
+    options:
+      - {tags: "looking at viewer", weight: 4}
+      - {tags: "looking away"}
+      - {tags: "looking to the side"}
+      - {tags: "looking up", when: {weather: [snow, rain, cherry_blossoms]}, weight: 2}
+      - {tags: "from below", when: {framing: [body]}, weight: 0.5}
+      - {tags: "from above", weight: 0.5}
+      - {tags: "dutch angle", when: {theme: [cyberpunk]}}
+
+  - name: lighting
+    group: details
+    options:
+      - {tags: "sunlight, light rays", when: {time: [day], location: [outdoor]}, unless: {weather: [cloudy, rain, snow]}, weight: 2}
+      - {tags: "dappled sunlight", when: {time: [day], location: [nature]}, unless: {weather: [cloudy, rain, snow]}, weight: 2}
+      - {tags: "soft lighting", when: {weather: [cloudy, snow]}}
+      - {tags: "window, sunlight", when: {time: [day], location: [indoor]}, weight: 2}
+      - {tags: "backlighting, lens flare", when: {time: [sunset], location: [outdoor]}, unless: {weather: [rain, cloudy]}, weight: 2}
+      - {tags: "window, orange theme", when: {time: [sunset], location: [indoor]}, weight: 2}
+      - {tags: "moonlight", when: {time: [night], location: [outdoor]}, unless: {weather: [rain, cloudy], location: [city]}}
+      - {tags: "city lights, bokeh", when: {time: [night], location: [city]}, weight: 2}
+      - {tags: "neon lights, glowing", when: {theme: [cyberpunk]}, weight: 2}
+      - {tags: "paper lantern, light particles", when: {time: [night], theme: [japanese]}, weight: 2}
+      - {tags: "lamp, dark", when: {time: [night], location: [indoor]}, unless: {theme: [cyberpunk]}}
+      - {tags: "reflection, wet floor", when: {weather: [rain]}}
+      - {tags: "depth of field", weight: 0.5}
+      - {tags: "", weight: 0.5}
+
+# Quality, rating and negative tags per model family, added around the scene.
+models:
+  Illustrious:
+    quality: "masterpiece, best quality, amazing quality, very aesthetic, absurdres, newest"
+    rating:
+      general: "general"
+      sensitive: "sensitive"
+    negative: "lowres, worst quality, bad quality, bad anatomy, bad hands, extra digits, fewer digits, jpeg artifacts, signature, watermark, username, text, blurry, sketch"
+    negative_rating:
+      general: "nsfw"
+      sensitive: ""
+  Pony:
+    quality: "score_9, score_8_up, score_7_up, source_anime"
+    rating:
+      general: "rating_safe"
+      sensitive: "rating_questionable"
+    negative: "score_6, score_5, score_4, source_pony, source_furry, source_cartoon, lowres, bad anatomy, bad hands, jpeg artifacts, signature, watermark, text"
+    negative_rating:
+      general: "nsfw, rating_questionable, rating_explicit"
+      sensitive: "rating_explicit"

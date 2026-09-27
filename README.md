@@ -1,6 +1,6 @@
 # ResolutionForge
 
-ComfyUI nodes for setting up a generation: two resolution nodes that output `width`, `height`, `batch` and `seed` for an empty latent (both can pick the canvas size at random from a seed), their *Latent* versions that output the empty latent directly, and a prompt encoder that outputs positive and negative conditioning from one node.
+ComfyUI nodes for setting up a generation: two resolution nodes that output `width`, `height`, `batch` and `seed` for an empty latent (both can pick the canvas size at random from a seed), their *Latent* versions that output the empty latent directly, a prompt encoder that outputs positive and negative conditioning from one node, and a prompt builder that writes consistent anime scenes as Danbooru tags.
 
 | Node | File | Use it when |
 |---|---|---|
@@ -9,8 +9,9 @@ ComfyUI nodes for setting up a generation: two resolution nodes that output `wid
 | **SDXL Resolution List (Latent)** | `ResolutionForge/sdxl_resolution_list_latent.py` | Same as *SDXL Resolution List*, but you want the empty latent itself instead of connecting **Empty Latent Image**. |
 | **Resolution Selector (Random, Latent)** | `ResolutionForge/resolution_selector_random_latent.py` | Same as *Resolution Selector (Random)*, but you want the empty latent itself. |
 | **CLIP Text Encode (Positive/Negative)** | `ResolutionForge/clip_text_encode_pos_neg.py` | You want both prompts in one node instead of two *CLIP Text Encode (Prompt)* nodes. |
+| **Prompt Director (Anime)** | `ResolutionForge/prompt_director.py` | You want a random but logical anime scene (outfit fits the place and weather, pose fits the framing, ...) as Danbooru tags for Illustrious or Pony, optionally written in more detail by an LLM such as Qwen3-VL. |
 
-The resolution nodes are in the `utils` category, their *Latent* versions in `model/latent`, and the prompt encoder in `model/conditioning`. All nodes use the ComfyUI V3 node schema: in the Nodes 2.0 frontend, the secondary inputs of the resolution nodes sit in the node's **Advanced** section.
+The resolution nodes are in the `utils` category, their *Latent* versions in `model/latent`, the prompt encoder in `model/conditioning`, and the prompt builder in `text`. All nodes use the ComfyUI V3 node schema: in the Nodes 2.0 frontend, the secondary inputs of the resolution nodes sit in the node's **Advanced** section.
 
 ## Installation
 
@@ -23,7 +24,7 @@ cp -r unified_sdxl_res/ResolutionForge ComfyUI/custom_nodes/
 
 Cloning the whole repository straight into `custom_nodes` does not work: the nodes are in the `ResolutionForge` subfolder, so ComfyUI does not find them.
 
-`ResolutionForge/__init__.py` registers all five nodes. To install only one of them, copy that `.py` file from `ResolutionForge` straight into `ComfyUI/custom_nodes` instead. This does not work for the *Latent* nodes: they reuse the code of their base resolution node, so install them with the whole folder.
+`ResolutionForge/__init__.py` registers all six nodes. To install only one of them, copy that `.py` file from `ResolutionForge` straight into `ComfyUI/custom_nodes` instead. This does not work for the *Latent* nodes (they reuse the code of their base resolution node) or for *Prompt Director* (it needs its `prompt_director` data folder): install them with the whole folder.
 
 **Requirements:** a recent ComfyUI that includes `comfy_api.latest` (the V3 node API). *Resolution Selector (Random)* also needs the resolution preview widget, which ships with the core *Resolution Selector* node. Older ComfyUI versions will not load these nodes.
 
@@ -194,3 +195,50 @@ emerald green
 
 - Choices and wildcards are filled in by the node, from its `seed`, not by the ComfyUI frontend. The saved workflow keeps the prompts with `__name__` and `{a|b}`, and the same seed gives the same result again.
 - Positive and negative are filled in from the same seed, one after the other, so the same wildcard can pick different lines in each.
+
+## Prompt Director (Anime)
+
+Node id: `PromptDirector`.
+
+Builds a random anime scene that makes sense, as Danbooru tags for Illustrious or Pony. The scene is filled in slot by slot, and every slot follows the ones before it:
+
+theme → scene (1girl, 1boy or scenery) → location → time → weather → framing → hair and eyes → outfit → shoes → expression → pose → gaze → lighting
+
+For example: at the beach the outfit is summery, in snow it is warm; weather is only added outdoors; with a portrait or upper-body framing there are no shoes and no full-body poses; the pose fits the expression and the place (reading in a library, holding an umbrella in the rain); the lighting fits the time of day and the weather.
+
+### Inputs
+
+| Input | Section | Description |
+|---|---|---|
+| `idea` | main | Optional idea, as tags or words (for example `valkyrie before a battle`). The LLM builds the scene around it; without an LLM it is added as tags. |
+| `theme` | main | `fantasy`, `modern`, `school`, `cyberpunk`, `japanese`, or `random`. |
+| `scene` | main | `1girl`, `1boy`, `scenery` (no people), or `random`. |
+| `framing` | main | `portrait`, `upper_body`, `cowboy_shot`, `full_body`, or `random`. |
+| `model` | main | `Illustrious` or `Pony`: sets the quality, rating and negative tags. |
+| `rating` | main | `general` or `sensitive` (sensitive also allows outfits like swimsuits). |
+| `seed` | main | Seed for every random pick and for the LLM. The same seed gives the same prompt. By default it is randomized after each run; set it to *fixed* to repeat a result. |
+| `clip` | main (optional) | An LLM loaded with **Load CLIP**, such as Qwen3-VL. Without it, the prompt is built from the rules only. |
+| `time`, `weather` | Advanced | Fix the time of day or the weather (`none` for no weather). Earlier slots follow: with `snow`, the location is always outdoors and not a summer place. |
+| `character`, `outfit`, `expression`, `pose`, `location` | Advanced | Your own tags for that part of the scene; empty lets the node pick. Setting a character part always gives a character scene. |
+| `max_length`, `temperature` | Advanced | LLM answer length (tokens) and creativity. |
+
+### Outputs
+
+| Output | Description |
+|---|---|
+| `positive_text` | Quality and rating tags, then the scene. Connect it to the `positive` text of **CLIP Text Encode (Positive/Negative)** (or any text input). |
+| `negative_text` | Negative tags for the chosen model and rating. |
+| `scene` | What was picked for each slot, and whether the LLM was used. Connect it to **Preview as Text** to see the logic. |
+| `seed` | The seed used for this run. |
+
+### With an LLM (Qwen3-VL)
+
+1. Load the model with **Load CLIP** (for Qwen3-VL-4B, any `type` without its own Qwen3-VL handling works, for example `stable_diffusion`) and connect it to `clip`.
+2. The node sends the LLM the scene plan: fixed parts (scene, framing, time, weather and your own tags), the rule-based picks as suggestions, and your idea. The LLM answers with JSON and adds concrete details that fit.
+3. Fixed parts are always kept as they are. The other parts come from the LLM answer; if the answer has no valid JSON, the node uses the rule-based scene instead, prints the answer to the console, and says so in `scene`.
+
+The LLM is called the same way as the core **Generate Text** node, with thinking off.
+
+### Scene data
+
+The rules live in `ResolutionForge/prompt_director/anime.yaml`: slots, options with their Danbooru tags, and the conditions between them (`when`, `unless`, `weight`; the file explains the fields). To add your own options without editing the bundled file, put YAML files with the same layout in `ComfyUI/models/prompt_director`: their options are added to the slots with the same name. The node runs again when a data file changes; new choices in the node's dropdowns (such as a new theme) appear after restarting ComfyUI.
