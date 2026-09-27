@@ -59,6 +59,35 @@ def parse_choice(text, i):
         choice += char
     options.append(choice)
     return options, i
+# Choice options with the sd-dynamic-prompts extras: "{2$$a|b|c}" picks 2 different options (also "1-3", "-2", "2-"), "{2$$ and $$a|b}" sets the separator
+# (", " by default), and "2::a" gives an option weight 2 (1 by default). Returns the picked options and the separator.
+CHOICE_COUNT = re.compile(r"^\s*(\d+(?:-\d*)?|-\d+)\$\$(?:(.*?)\$\$)?(.*)$", re.S)
+OPTION_WEIGHT = re.compile(r"^\s*(\d+(?:\.\d+)?)::(.*)$", re.S)
+def pick_choices(options, rng):
+    count, separator = 1, ", "
+    match = CHOICE_COUNT.match(options[0])
+    if match:
+        low, dash, high = match.group(1).partition("-")
+        options = [match.group(3), *options[1:]]
+        separator = match.group(2) if match.group(2) is not None else separator
+        low = int(low or 0)
+        high = (int(high) if high else len(options)) if dash else low
+        count = rng.randint(min(low, len(options)), min(max(low, high), len(options)))
+    weighted = [(float(found.group(1)), found.group(2)) if (found := OPTION_WEIGHT.match(option)) else (1.0, option) for option in options]
+    if count == 1 and not match and all(weight == 1.0 for weight, _ in weighted):
+        return [rng.choice(options)], separator # Plain {a|b}: the same pick as before weights and counts existed, so saved seeds give the same prompt.
+    picked = []
+    while weighted and len(picked) < count and sum(weight for weight, _ in weighted) > 0:
+        index = rng.choices(range(len(weighted)), weights=[weight for weight, _ in weighted])[0]
+        picked.append(weighted.pop(index)[1]) # Picked without repeats.
+    return picked, separator
+# Comma cleanup after filling in: an empty option leaves "a, , b" or a trailing comma; this makes it "a, b".
+def tidy_commas(text):
+    text = re.sub(r"[ \t]*,(?:[ \t]*,)+", ",", text)
+    text = re.sub(r"[ \t]+,", ",", text)
+    text = re.sub(r"(^|\n)[ \t]*,[ \t]*", r"\1", text)
+    text = re.sub(r"[ \t]{2,}", " ", text)
+    return re.sub(r"^[\s,]+|[\s,]+$", "", text)
 # Prompt expansion: picks {a|b} choices, then replaces __name__ wildcards, expanding the picked text again so choices and wildcards can nest.
 def expand(text, rng, depth=0):
     if depth > MAX_DEPTH:
@@ -72,14 +101,15 @@ def expand(text, rng, depth=0):
             i += 1
         elif char == "{":
             options, i = parse_choice(text, i)
-            result += expand(rng.choice(options), rng, depth + 1)
+            picked, separator = pick_choices(options, rng)
+            result += separator.join(expand(option, rng, depth + 1) for option in picked)
         else:
             result += char
     return WILDCARD_PATTERN.sub(lambda match: expand(rng.choice(read_wildcard(match.group(1))), rng, depth + 1), result)
-# Full prompt processing: strips // and /* */ comments like the frontend, expands choices and wildcards, then unescapes \{ \} \|.
+# Full prompt processing: strips // and /* */ comments like the frontend, expands choices and wildcards, unescapes \{ \} \|, then tidies commas.
 def resolve_prompt(text, rng):
     text = re.sub(r"/\*[\s\S]*?\*/|//.*", "", text)
-    return re.sub(r"\\([{}|])", r"\1", expand(text, rng))
+    return tidy_commas(re.sub(r"\\([{}|])", r"\1", expand(text, rng)))
 # Node schema (V3 / Nodes 2.0) like CLIP Text Encode (Prompt), but with a positive prompt on top, a negative prompt below, and one conditioning output for each. Both prompts support {a|b} choices and __name__ wildcards, picked from the seed.
 class CLIPTextEncodePositiveNegative(io.ComfyNode):
     @classmethod

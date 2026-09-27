@@ -166,9 +166,17 @@ Works like two core *CLIP Text Encode (Prompt)* nodes sharing one CLIP model: ea
 | `__name__` | A random line from the wildcard file `name.txt`. |
 | `__folder/name__` | A random line from `folder/name.txt` inside a wildcards folder. |
 | `{red\|green\|blue}` | One of the options at random. Options can be empty (`{big\|}`) and can nest (`{a\|{b\|c}}`). |
+| `{3::cat\|dog}` | Weighted choice: `cat` is 3 times as likely as `dog`. Options without a weight count as 1. |
+| `{2$$a\|b\|c}` | Two different options, joined with `, `. |
+| `{1-3$$a\|b\|c}` | From 1 to 3 different options. `-2$$` means 0 to 2, and `2-$$` means 2 up to all of them. |
+| `{2$$ and $$a\|b\|c}` | Two options joined with ` and ` instead of `, `. |
 | `// ...`, `/* ... */` | Comments, removed before encoding. |
 
 To write `{`, `}` or `|` literally, put a backslash before it: `\{`, `\}`, `\|`.
+
+Weights and counts can be combined, for example `{2$$3::hat|scarf|bow}`. Plain `{a|b}` choices give the same result for the same seed as before these options were added.
+
+Commas left behind by empty options are cleaned up: `a girl, {|cat}, smile` becomes `a girl, smile` rather than `a girl, , smile`. Doubled commas, spaces before commas and commas at the start or end of the prompt are removed too.
 
 Prompt weights such as `(word:1.2)` and embeddings work as in the core node.
 
