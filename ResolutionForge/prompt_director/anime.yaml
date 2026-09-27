@@ -16,6 +16,12 @@
 #   when:   {slot: [names]}: every slot listed must have picked one of the names (its id or attrs)
 #   unless: {slot: [names]}: the option is skipped if any slot listed picked one of the names
 #   weight: how likely it is picked compared to the others (default 1)
+#   pool:   Danbooru tag group sections (as in prompt_director/tag_groups.json, for example
+#           "Holding Tags > Food and Drink"): the option adds one tag picked from them at random,
+#           popular tags more likely, skipping tags the rating does not allow
+#
+# hints (at the end): which Danbooru sections the LLM gets tag ideas from, per part of the scene,
+# with the same when/unless conditions. Parts without a matching rule use the whole library pool.
 #
 # More files with the same layout can be added to ComfyUI/models/prompt_director:
 # their options are added to the slots with the same name.
@@ -41,7 +47,7 @@ slots:
     group: location
     options:
       # fantasy
-      - {id: castle, tags: "castle, courtyard, stone floor, banner", attrs: [outdoor, stone], when: {theme: [fantasy]}}
+      - {id: castle, tags: "castle, outdoors, stone floor, banner", attrs: [outdoor, stone], when: {theme: [fantasy]}}
       - {id: forest, tags: "forest, tree, nature, grass", attrs: [outdoor, nature], when: {theme: [fantasy]}}
       - {id: medieval_town, tags: "medieval, town, cobblestone, building", attrs: [outdoor, city], when: {theme: [fantasy]}}
       - {id: fantasy_library, tags: "library, bookshelf, book, candle, indoors", attrs: [indoor, library], when: {theme: [fantasy]}}
@@ -55,23 +61,23 @@ slots:
       - {id: beach, tags: "beach, ocean, sand, horizon", attrs: [outdoor, water, summer], when: {theme: [modern]}}
       - {id: park, tags: "park, tree, bench, grass", attrs: [outdoor, nature, park], when: {theme: [modern]}}
       - {id: city_rooftop, tags: "rooftop, cityscape, railing", attrs: [outdoor, city, rooftop], when: {theme: [modern]}}
-      - {id: train_station, tags: "train station, railroad tracks, platform", attrs: [outdoor, city], when: {theme: [modern]}}
+      - {id: train_station, tags: "train station, railroad tracks, train", attrs: [outdoor, city], when: {theme: [modern]}}
       # school
       - {id: classroom, tags: "classroom, school desk, chalkboard, window, indoors", attrs: [indoor, desk], when: {theme: [school]}}
       - {id: school_hallway, tags: "school, hallway, window, indoors", attrs: [indoor, wall], when: {theme: [school]}}
       - {id: school_rooftop, tags: "school, rooftop, fence, sky", attrs: [outdoor, rooftop], when: {theme: [school]}}
       - {id: school_library, tags: "library, bookshelf, book, indoors", attrs: [indoor, library, desk], when: {theme: [school]}}
-      - {id: school_courtyard, tags: "school, courtyard, tree, building", attrs: [outdoor, nature], when: {theme: [school]}}
+      - {id: school_courtyard, tags: "school, outdoors, tree, building", attrs: [outdoor, nature], when: {theme: [school]}}
       # cyberpunk
       - {id: neon_street, tags: "city, street, neon lights, sign, crowd", attrs: [outdoor, city], when: {theme: [cyberpunk]}}
-      - {id: alley, tags: "alley, neon lights, wall, cable", attrs: [outdoor, city, wall], when: {theme: [cyberpunk]}}
+      - {id: alley, tags: "alley, neon lights, graffiti, cable", attrs: [outdoor, city, wall], when: {theme: [cyberpunk]}}
       - {id: megacity_rooftop, tags: "rooftop, cityscape, skyscraper, railing", attrs: [outdoor, city, rooftop], when: {theme: [cyberpunk]}}
-      - {id: neon_bar, tags: "bar, indoors, counter, neon lights, bottle", attrs: [indoor, bar], when: {theme: [cyberpunk]}}
+      - {id: neon_bar, tags: "bar (place), indoors, counter, neon lights, bottle", attrs: [indoor, bar], when: {theme: [cyberpunk]}}
       - {id: laboratory, tags: "laboratory, indoors, monitor, cable, screen", attrs: [indoor, desk], when: {theme: [cyberpunk]}}
       # japanese
       - {id: shrine, tags: "shrine, torii, stone lantern, stairs", attrs: [outdoor, shrine], when: {theme: [japanese]}}
-      - {id: japanese_garden, tags: "japanese garden, pond, stone lantern, bridge", attrs: [outdoor, nature], when: {theme: [japanese]}}
-      - {id: tatami_room, tags: "tatami, shouji, indoors, japanese architecture", attrs: [indoor], when: {theme: [japanese]}}
+      - {id: japanese_garden, tags: "garden, pond, stone lantern, bridge, east asian architecture", attrs: [outdoor, nature], when: {theme: [japanese]}}
+      - {id: tatami_room, tags: "tatami, shouji, indoors, east asian architecture", attrs: [indoor], when: {theme: [japanese]}}
       - {id: festival, tags: "summer festival, paper lantern, food stand, crowd", attrs: [outdoor, festival, summer], when: {theme: [japanese]}}
       - {id: bamboo_forest, tags: "bamboo forest, bamboo, nature", attrs: [outdoor, nature], when: {theme: [japanese]}}
 
@@ -110,7 +116,7 @@ slots:
       - {tags: "black hair", weight: 2}
       - {tags: "brown hair", weight: 2}
       - {tags: "blonde hair", weight: 1.5}
-      - {tags: "silver hair"}
+      - {tags: "grey hair"}
       - {tags: "white hair"}
       - {tags: "pink hair"}
       - {tags: "blue hair"}
@@ -137,6 +143,16 @@ slots:
       - {tags: "messy hair", when: {scene: [male]}}
       - {tags: "spiked hair", when: {scene: [male]}, weight: 0.5}
 
+  - name: hair_detail
+    group: character
+    when: {scene: [character]}
+    options:
+      - {tags: "", weight: 2}
+      - {pool: "Hair Styles > Hairstyles > Front of the head (incl. bangs)", weight: 2}
+      - {pool: "Hair Styles > Hairstyles > Top of the head"}
+      - {pool: "Hair Styles > Hairstyles > Hair texture", unless: {scene: [male]}}
+      - {pool: "Hair > Objects > Accessories for the hair", when: {scene: [female]}, weight: 1.5}
+
   - name: eye_color
     group: character
     when: {scene: [character]}
@@ -157,9 +173,9 @@ slots:
       # fantasy
       - {id: knight, tags: "armor, breastplate, gauntlets, cape", attrs: [armor, combat], when: {theme: [fantasy]}, weight: 1.5}
       - {id: mage, tags: "robe, hooded cloak, wizard hat, holding staff", attrs: [magic], when: {theme: [fantasy]}}
-      - {id: adventurer, tags: "leather armor, belt pouch, tunic, gloves", attrs: [combat], when: {theme: [fantasy]}}
-      - {id: princess, tags: "princess, tiara, ball gown, frills", attrs: [formal], when: {theme: [fantasy], scene: [female]}}
-      - {id: prince, tags: "prince, royal clothes, cape, epaulettes", attrs: [formal], when: {theme: [fantasy], scene: [male]}}
+      - {id: adventurer, tags: "leather armor, belt pouch, gloves, cape", attrs: [combat], when: {theme: [fantasy]}}
+      - {id: princess, tags: "princess, tiara, gown, frilled dress", attrs: [formal], when: {theme: [fantasy], scene: [female]}}
+      - {id: prince, tags: "prince, military uniform, cape, epaulettes", attrs: [formal], when: {theme: [fantasy], scene: [male]}}
       - {id: priestess, tags: "white robe, veil, holding staff", attrs: [magic], when: {theme: [fantasy], scene: [female]}}
       - {id: fantasy_winter, tags: "fur-trimmed cloak, winter clothes, scarf", attrs: [winter], when: {theme: [fantasy], weather: [snow]}, weight: 3}
       # modern
@@ -183,11 +199,11 @@ slots:
       - {id: gym_uniform, tags: "gym uniform, track jacket", attrs: [casual], when: {theme: [school]}, unless: {location: [library]}, weight: 0.5}
       # cyberpunk
       - {id: techwear, tags: "techwear, black jacket, cropped jacket, headphones", attrs: [tech], when: {theme: [cyberpunk]}, weight: 2}
-      - {id: cyborg, tags: "cyborg, mechanical arm, jacket", attrs: [tech], when: {theme: [cyberpunk]}}
+      - {id: cyborg, tags: "cyborg, single mechanical arm, jacket", attrs: [tech], when: {theme: [cyberpunk]}}
       - {id: street, tags: "leather jacket, fingerless gloves, choker", attrs: [tech], when: {theme: [cyberpunk]}}
       - {id: hooded_mask, tags: "hooded jacket, hood up, mouth mask", attrs: [tech], when: {theme: [cyberpunk]}}
-      - {id: bodysuit, tags: "bodysuit, glowing", attrs: [tech], when: {theme: [cyberpunk], scene: [female]}, weight: 0.7}
-      - {id: trench_coat, tags: "trench coat, visor", attrs: [tech], when: {theme: [cyberpunk]}, weight: 0.7}
+      - {id: bodysuit, tags: "bodysuit, glowing", attrs: [tech], when: {theme: [cyberpunk], scene: [female], rating: [sensitive]}, weight: 0.7}
+      - {id: trench_coat, tags: "trench coat, sunglasses", attrs: [tech], when: {theme: [cyberpunk]}, weight: 0.7}
       # japanese
       - {id: kimono, tags: "kimono, obi, hair flower", attrs: [traditional], when: {theme: [japanese], scene: [female]}, weight: 2}
       - {id: kimono_male, tags: "kimono, haori", attrs: [traditional], when: {theme: [japanese], scene: [male]}, weight: 2}
@@ -209,10 +225,24 @@ slots:
       - {tags: "barefoot", when: {outfit: [sleep, swimsuit]}, weight: 3}
       - {tags: "loafers, socks", when: {outfit: [school_uniform]}, weight: 2}
       - {tags: "boots", when: {weather: [snow]}, weight: 2}
-      - {tags: "rain boots", when: {outfit: [rain]}, weight: 2}
+      - {tags: "rubber boots", when: {outfit: [rain]}, weight: 2}
       - {tags: "combat boots", when: {outfit: [tech]}}
       - {tags: "geta", when: {outfit: [traditional]}}
       - {tags: "tabi, zouri", when: {outfit: [traditional]}}
+
+  - name: accessory
+    group: outfit
+    when: {scene: [character]}
+    options:
+      - {tags: "", weight: 3}
+      - {pool: "Accessories > Jewelry", unless: {outfit: [armor, sleep]}, weight: 1.5}
+      - {pool: ["Headwear > Hats > With visor", "Headwear > Hats > Brimless"], when: {theme: [modern, school], location: [outdoor]}, unless: {outfit: [formal, sleep, swimsuit]}}
+      - {pool: "Headwear > Hats > With brim", when: {theme: [modern], location: [outdoor], time: [day]}, unless: {weather: [rain, snow]}}
+      - {pool: "Headwear > Crowns", when: {theme: [fantasy], outfit: [formal, magic]}, weight: 2}
+      - {pool: "Headwear > Helmets", when: {theme: [fantasy], outfit: [armor]}}
+      - {pool: "Accessories > Bags", when: {theme: [modern, school], location: [outdoor]}, unless: {outfit: [swimsuit]}}
+      - {pool: "Attire > Jewelry and Accessories > Head and Face", when: {theme: [cyberpunk]}, weight: 3}
+      - {pool: "Accessories > By body part > Arms", when: {theme: [fantasy, cyberpunk]}, unless: {outfit: [armor]}}
 
   - name: expression
     group: expression
@@ -238,11 +268,11 @@ slots:
       # close framings: upper body only
       - {tags: "hand on own cheek", when: {framing: [close]}, unless: {expression: [angry]}}
       - {tags: "waving, hand up", when: {framing: [close], expression: [happy]}}
-      - {tags: "peace sign, v", when: {expression: [happy]}}
-      - {tags: "arms crossed", when: {expression: [angry, determined, calm]}}
+      - {tags: "v", when: {expression: [happy]}}
+      - {tags: "crossed arms", when: {expression: [angry, determined, calm]}}
       - {tags: "head tilt", when: {expression: [happy, calm, shy]}}
       - {tags: "hands on own chest", when: {framing: [close], expression: [shy, sad]}}
-      - {tags: "covering mouth", when: {expression: [surprised, shy]}}
+      - {tags: "covering own mouth", when: {expression: [surprised, shy]}}
       - {tags: "wiping tears", when: {expression: [sad]}}
       - {tags: "hand in own hair", when: {framing: [close]}, unless: {expression: [sad, angry]}}
       - {tags: "looking back", unless: {expression: [angry]}}
@@ -251,13 +281,13 @@ slots:
       - {tags: "walking", when: {framing: [body], location: [outdoor]}, unless: {expression: [sad]}}
       - {tags: "running", when: {framing: [body], location: [outdoor], expression: [happy, determined]}}
       - {tags: "jumping", when: {framing: [body], location: [outdoor], expression: [happy]}}
-      - {tags: "sitting, sitting on bench", when: {framing: [body], location: [park]}, weight: 2}
+      - {tags: "sitting, bench", when: {framing: [body], location: [park]}, weight: 2}
       - {tags: "sitting, school desk", when: {framing: [body], location: [desk]}, weight: 2}
       - {tags: "sitting, chair, holding cup", when: {framing: [body], location: [cafe]}, weight: 2}
       - {tags: "sitting, on bed", when: {framing: [body], location: [bedroom]}, weight: 3}
       - {tags: "sitting, hugging own legs", when: {framing: [body], expression: [sad, calm]}}
-      - {tags: "leaning against wall", when: {framing: [body], location: [wall, city]}}
-      - {tags: "leaning on railing", when: {location: [rooftop]}, weight: 2}
+      - {tags: "against wall, leaning back", when: {framing: [body], location: [wall, city]}}
+      - {tags: "railing, leaning forward", when: {location: [rooftop]}, weight: 2}
       - {tags: "hands in pockets", when: {outfit: [casual, tech]}}
       - {tags: "fighting stance, holding sword", when: {framing: [body], outfit: [armor, combat], expression: [determined, angry, calm]}, weight: 3}
       - {tags: "casting spell, magic, glowing hand", when: {outfit: [magic]}, weight: 3}
@@ -267,13 +297,24 @@ slots:
       - {tags: "holding sword, katana", when: {outfit: [combat], theme: [japanese]}, weight: 2}
       - {tags: "holding fan", when: {outfit: [traditional]}}
       - {tags: "praying, own hands together", when: {location: [shrine]}}
+      # held items and gestures from the Danbooru tag groups
+      - {pool: ["Holding Tags > Food and Drink > Sweets and Desserts", "Holding Tags > Food and Drink > Drink Containers"], when: {location: [cafe, festival, park]}, weight: 2}
+      - {pool: "Holding Tags > Food and Drink > Fast food and Savory", when: {location: [festival, park, city]}}
+      - {pool: "Holding Tags > Electronics and Tech > Audio and Communication", when: {theme: [modern, school, cyberpunk]}}
+      - {pool: "Holding Tags > Paper and Documents > Books and Reading", when: {theme: [school, fantasy, japanese]}, unless: {outfit: [combat]}}
+      - {pool: "Holding Tags > Nature > Flora", when: {location: [nature, park, shrine]}, unless: {weather: [snow]}}
+      - {pool: "Holding Tags > Music", when: {theme: [modern, school]}, unless: {location: [library]}, weight: 0.5}
+      - {pool: "Holding Tags > Weapons > Melee", when: {outfit: [combat]}, weight: 1.5}
+      - {pool: "Holding Tags > Weapons > Ranged", when: {theme: [cyberpunk], expression: [determined, angry, calm]}}
+      - {tags: "holding lantern", when: {time: [night], theme: [fantasy, japanese]}}
+      - {pool: ["Gestures > Gestures encompassing only one hand > Two open fingers", "Gestures > Gestures encompassing at least two hands"], when: {expression: [happy]}}
 
   - name: gaze
     group: pose
     when: {scene: [character]}
     options:
       - {tags: "looking at viewer", weight: 4}
-      - {tags: "looking away"}
+      - {tags: "looking afar"}
       - {tags: "looking to the side"}
       - {tags: "looking up", when: {weather: [snow, rain, cherry_blossoms]}, weight: 2}
       - {tags: "from below", when: {framing: [body]}, weight: 0.5}
@@ -285,7 +326,6 @@ slots:
     options:
       - {tags: "sunlight, light rays", when: {time: [day], location: [outdoor]}, unless: {weather: [cloudy, rain, snow]}, weight: 2}
       - {tags: "dappled sunlight", when: {time: [day], location: [nature]}, unless: {weather: [cloudy, rain, snow]}, weight: 2}
-      - {tags: "soft lighting", when: {weather: [cloudy, snow]}}
       - {tags: "window, sunlight", when: {time: [day], location: [indoor]}, weight: 2}
       - {tags: "backlighting, lens flare", when: {time: [sunset], location: [outdoor]}, unless: {weather: [rain, cloudy]}, weight: 2}
       - {tags: "window, orange theme", when: {time: [sunset], location: [indoor]}, weight: 2}
@@ -296,7 +336,35 @@ slots:
       - {tags: "lamp, dark", when: {time: [night], location: [indoor]}, unless: {theme: [cyberpunk]}}
       - {tags: "reflection, wet floor", when: {weather: [rain]}}
       - {tags: "depth of field", weight: 0.5}
+      - {pool: "Flowers > Species of flower", when: {location: [nature, park]}, unless: {weather: [snow], time: [night]}}
       - {tags: "", weight: 0.5}
+
+# Sections the LLM gets tag ideas from (tag_hints), per part of the scene.
+hints:
+  character:
+    - {pool: ["Hair Styles > Hairstyles > Front of the head (incl. bangs)", "Hair Styles > Hairstyles > Hair texture", "Eyes Tags > Iris"]}
+    - {pool: ["Hair Styles > Hairstyles > Ponytails", "Hair Styles > Hairstyles > Braids", "Hair Styles > Hairstyles > Hair buns", "Hair > Objects > Accessories for the hair"], when: {scene: [female]}}
+    - {pool: ["Hair Styles > Hairstyles > Short hair", "Hair Styles > Hairstyles > Very short hair"], when: {scene: [male]}}
+  outfit:
+    - {pool: "Attire > Traditional Clothing", when: {theme: [japanese]}}
+    - {pool: ["Attire > Uniforms and Costumes", "Accessories > By body part > Torso", "Headwear > Helmets", "Headwear > Crowns"], when: {theme: [fantasy]}}
+    - {pool: ["Attire > Uniforms and Costumes", "Attire > Shirts and Topwear", "Attire > Pants and Bottomwear", "Headwear > Hats"], when: {theme: [modern, school, cyberpunk]}}
+    - {pool: ["Attire > Jewelry and Accessories", "Legwear"]}
+    - {pool: "Attire > Shoes and Footwear", when: {framing: [feet]}}
+    - {pool: "Attire > Swimsuits and Bodysuits", when: {location: [water]}}
+  expression:
+    - {pool: ["Face Tags > Emotions", "Face Tags > Smile", "Face Tags > Smug", "Face Tags > Surprised / Scared / Sad"]}
+  pose:
+    - {pool: ["Posture > Arms", "Posture > Posture of the head", "Gestures"]}
+    - {pool: ["Posture > Basic positions", "Posture > Movement of the body", "Posture > Torso inclination"], when: {framing: [body]}}
+    - {pool: "Holding Tags > Weapons", when: {outfit: [combat]}}
+    - {pool: ["Holding Tags > Food and Drink", "Holding Tags > Electronics and Tech", "Holding Tags > Paper and Documents", "Holding Tags > Music"], when: {theme: [modern, school, cyberpunk]}}
+    - {pool: ["Holding Tags > Nature", "Holding Tags > Lighting", "Holding Tags > Paper and Documents > Books and Reading"], when: {theme: [fantasy, japanese]}}
+  location:
+    - {pool: []} # The place comes from the rules; Danbooru's location list is not sorted by theme, so ideas from it mostly mislead.
+  details:
+    - {pool: ["Lighting > Types", "Lighting > Directional", "Lighting > Light sources"]}
+    - {pool: "Flowers > Species of flower", when: {location: [nature, park]}}
 
 # Quality, rating and negative tags per model family, added around the scene.
 models:

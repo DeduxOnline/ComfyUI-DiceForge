@@ -202,7 +202,7 @@ Node id: `PromptDirector`.
 
 Builds a random anime scene that makes sense, as Danbooru tags for Illustrious or Pony. The scene is filled in slot by slot, and every slot follows the ones before it:
 
-theme → scene (1girl, 1boy or scenery) → location → time → weather → framing → hair and eyes → outfit → shoes → expression → pose → gaze → lighting
+theme → scene (1girl, 1boy or scenery) → location → time → weather → framing → hair and eyes → outfit → shoes → accessory → expression → pose → gaze → lighting
 
 For example: at the beach the outfit is summery, in snow it is warm; weather is only added outdoors; with a portrait or upper-body framing there are no shoes and no full-body poses; the pose fits the expression and the place (reading in a library, holding an umbrella in the rain); the lighting fits the time of day and the weather.
 
@@ -243,7 +243,11 @@ The LLM is called the same way as the core **Generate Text** node, with thinking
 
 ### Tag library
 
-With an LLM connected, the node uses a Danbooru tag library to keep its tags real:
+The node uses a Danbooru tag library for more variety and to keep tags real:
+
+- **Variety without an LLM:** some options in the scene data pick a tag from a whole Danbooru section (`pool`, see *Scene data*), for example hair details and accessories, or what the character holds (a drink at a cafe, a phone in a modern scene, a weapon with a combat outfit). Popular tags are picked more often, and only tags the rating allows.
+
+With an LLM connected:
 
 - **Tag ideas:** for each part of the scene, the request lists real Danbooru tags (`tag_hints`, popular tags more likely), so a small LLM picks tags the image model knows instead of inventing them.
 - **Tag check** (`tag_check`) on the LLM answer:
@@ -253,11 +257,11 @@ With an LLM connected, the node uses a Danbooru tag library to keep its tags rea
   - with `drop unknown`, tags the image model does not know are removed: tags that are not on Danbooru, or have fewer posts than the model preset's `min_post_count` (100 for Illustrious, 500 for Pony).
 - The `scene` output lists every removed tag with the reason.
 
-The library has two parts:
+The library has two parts (the known tags are downloaded the first time the node needs them: when a `pool` option is picked or an LLM is connected):
 
 - **Known tags:** Danbooru tags with post counts and aliases, up to the Illustrious v1.0 cutoff (June 2024), from [BetaDoggo/danbooru-tag-list](https://github.com/BetaDoggo/danbooru-tag-list). It is **downloaded once**, on the first run with an LLM, to `ComfyUI/models/prompt_director/library/danbooru_tags_illustrious_v1.0.csv` (2.5 MB). Without internet access, put that file there yourself; until then only the content and contradiction checks run.
 - **Tag groups:** `ResolutionForge/prompt_director/tag_groups.json`, built from the Danbooru wiki's tag groups by [PBandDev/danbooru-tag-groups-scraper](https://github.com/PBandDev/danbooru-tag-groups-scraper) (MIT license, Copyright (c) 2026 PBandDev). It sorts tags into scene parts and marks sensitive and explicit tags. To rebuild it from a newer release: `python tools/build_tag_library.py tag_groups_flat.jsonl data-YYYY-MM`.
 
 ### Scene data
 
-The rules live in `ResolutionForge/prompt_director/anime.yaml`: slots, options with their Danbooru tags, and the conditions between them (`when`, `unless`, `weight`; the file explains the fields). To add your own options without editing the bundled file, put YAML files with the same layout in `ComfyUI/models/prompt_director`: their options are added to the slots with the same name. The node runs again when a data file changes; new choices in the node's dropdowns (such as a new theme) appear after restarting ComfyUI.
+The rules live in `ResolutionForge/prompt_director/anime.yaml`: slots, options with their Danbooru tags, and the conditions between them (`when`, `unless`, `weight`; the file explains the fields). An option can also use `pool` to add one tag from Danbooru tag group sections (such as `"Holding Tags > Food and Drink"`; the section names are the keys of `sections` in `tag_groups.json`), and the `hints` part at the end says which sections the LLM gets tag ideas from, with the same conditions. To add your own options without editing the bundled file, put YAML files with the same layout in `ComfyUI/models/prompt_director`: their options are added to the slots with the same name. The node runs again when a data file changes; new choices in the node's dropdowns (such as a new theme) appear after restarting ComfyUI.

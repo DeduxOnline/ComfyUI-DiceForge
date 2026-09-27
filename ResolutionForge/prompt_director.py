@@ -23,9 +23,9 @@ def data_files():
     for folder in folder_paths.get_folder_paths("prompt_director"):
         files += sorted(glob.glob(os.path.join(folder, "*.yaml")))
     return files
-# Data loading: merges the slots (by name, keeping the first file's order) and the model presets of all data files.
+# Data loading: merges the slots (by name, keeping the first file's order), the model presets and the LLM hint rules of all data files.
 def load_data():
-    slots, models = {}, {}
+    slots, models, hints = {}, {}, {}
     for path in data_files():
         with open(path, encoding="utf-8") as file:
             data = yaml.safe_load(file) or {}
@@ -35,12 +35,16 @@ def load_data():
             else:
                 slots[slot["name"]] = {"group": "details", "when": {}, **slot, "options": list(slot.get("options", []))}
         models.update(data.get("models", {}))
+        for group, rules in (data.get("hints") or {}).items():
+            hints.setdefault(group, []).extend(rules)
     for slot in slots.values():
         for option in slot["options"]:
-            option.setdefault("id", option.get("tags", ""))
+            if isinstance(option.get("pool"), str):
+                option["pool"] = [option["pool"]]
+            option.setdefault("id", option.get("tags") or " + ".join(option.get("pool", [])))
             option.setdefault("tags", "")
             option["names"] = {option["id"], *option.get("attrs", [])}
-    return list(slots.values()), models
+    return list(slots.values()), models, hints
 # Data files signature (paths and modification times), so the node runs again when a data file changes.
 def data_signature():
     return hashlib.sha256(repr([(path, os.path.getmtime(path)) for path in data_files()]).encode()).hexdigest()
@@ -67,8 +71,8 @@ def clean_tags(*parts):
     return ", ".join(tags)
 # Scene building: fills the slots in order, each option chosen at random (by seed) among those whose conditions match the slots picked before.
 class Scene:
-    def __init__(self, slots, forced, custom, rng):
-        self.slots, self.forced, self.custom, self.rng = slots, forced, custom, rng
+    def __init__(self, slots, forced, custom, rng, pick_pool=None):
+        self.slots, self.forced, self.custom, self.rng, self.pick_pool = slots, forced, custom, rng, pick_pool
         self.picked = {} # slot name -> option dict, CUSTOM, or None when the slot is skipped
     # Condition check: every slot in `when` must have picked one of the names; slots not decided yet only fail when `strict` is set, override texts only when `custom_fails` is set.
     def matches(self, when, strict=True, custom_fails=True):
@@ -131,7 +135,10 @@ class Scene:
             if not candidates:
                 self.picked[name] = None
                 continue
-            self.picked[name] = self.rng.choices(candidates, weights=[option.get("weight", 1) for option in candidates])[0]
+            option = self.rng.choices(candidates, weights=[option.get("weight", 1) for option in candidates])[0]
+            if option.get("pool") and self.pick_pool:
+                option = {**option, "tags": clean_tags(option["tags"], self.pick_pool(option["pool"], self.rng))} # A pool option adds one tag picked from its Danbooru sections.
+            self.picked[name] = option
         return self
     # Tags of a slot, or of every slot in a group (override text for overridden groups).
     def tags(self, name):
@@ -143,7 +150,15 @@ class Scene:
         return clean_tags(*(self.tags(slot["name"]) for slot in self.slots if slot["group"] == group))
     def value(self, name):
         option = self.picked.get(name)
-        return "custom" if option is CUSTOM else (option["id"] if option else NONE)
+        if option is CUSTOM or not option:
+            return "custom" if option is CUSTOM else NONE
+        return f"{option['id']} ({option['tags'] or 'nothing fitting'})" if option.get("pool") else (option["id"] or NONE)
+    # Sections the data's hint rules give for a slot group in this scene: None when no rule matches (the whole library pool is used), empty when the matching rules turn the hints off.
+    def hint_sections(self, rules):
+        matching = [rule for rule in rules if self.matches(rule.get("when")) and not self.excluded(rule.get("unless"))]
+        if not matching:
+            return None
+        return [name for rule in matching for name in ([rule["pool"]] if isinstance(rule["pool"], str) else rule["pool"])]
     @property
     def has_character(self):
         option = self.picked.get("scene")
@@ -200,7 +215,7 @@ def parse_llm_answer(text):
     if not isinstance(data, dict):
         return None
     return {key: clean_tags(", ".join(map(str, value)) if isinstance(value, list) else value) for key, value in data.items()}
-SLOTS, MODELS = load_data()
+SLOTS, MODELS, _ = load_data()
 # Node schema (V3 / Nodes 2.0): builds a consistent anime scene prompt (Danbooru tags) from rules, optionally rewritten by an LLM such as Qwen3-VL.
 class PromptDirector(io.ComfyNode):
     @classmethod
@@ -256,22 +271,23 @@ class PromptDirector(io.ComfyNode):
     @classmethod
     def execute(cls, idea="", theme=RANDOM, scene=RANDOM, framing=RANDOM, model=None, rating="general", seed=0, clip=None, time=RANDOM, weather=RANDOM,
                 character="", outfit="", expression="", pose="", location="", max_length=400, temperature=0.8, tag_check=TAG_CHECKS[0], tag_hints=20):
-        slots, models = load_data()
+        slots, models, hint_rules = load_data()
+        preset = models.get(model, {})
+        min_count = preset.get("min_post_count", 100) # Tags with fewer Danbooru posts than this count as unknown to the image model.
         forced = {"theme": theme, "scene": scene, "framing": framing, "time": time, "weather": weather}
         custom = {group: clean_tags(text) for group, text in [("character", character), ("outfit", outfit), ("expression", expression), ("pose", pose), ("location", location)] if text.strip()}
         rng = random.Random(seed) #Seed behavior for reproducible scenes.
-        built = Scene(slots, forced, custom, rng)
+        pick_pool = lambda sections, pool_rng: get_library().pick(sections, rating, min_count, pool_rng) # Loaded (and the known tags downloaded) only when a pool option is picked.
+        built = Scene(slots, forced, custom, rng, pick_pool)
         built.picked["rating"] = {"names": {rating}, "id": rating, "tags": ""} # Rating is a condition for some options (swimsuit).
         built.build()
         groups = GROUP_ORDER if built.has_character else ["location", "details"]
         parts = {group: built.group_tags(group) for group in groups}
-        preset = models.get(model, {})
-        min_count = preset.get("min_post_count", 100) # Tags with fewer Danbooru posts than this count as unknown to the image model.
         status, library, dropped = "not connected", None, []
         if clip is not None:
             library = get_library() if tag_check != "off" or tag_hints > 0 else None
             hint_rng = random.Random(f"{seed}-hints") # Separate random stream, so the hints do not change the scene picks.
-            hints = {group: library.hints(group, tag_hints, rating, min_count, hint_rng) for group in groups if group not in custom} if library and tag_hints > 0 else None
+            hints = {group: library.hints(group, tag_hints, rating, min_count, hint_rng, built.hint_sections(hint_rules.get(group, []))) for group in groups if group not in custom} if library and tag_hints > 0 else None
             answer = cls.generate(clip, llm_request(built, idea, hints), seed, max_length, temperature)
             data = parse_llm_answer(answer)
             if data is None:

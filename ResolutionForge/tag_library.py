@@ -47,7 +47,7 @@ class TagLibrary:
     def __init__(self):
         with open(TAG_GROUPS_FILE, encoding="utf-8") as file:
             groups = json.load(file)
-        self.pools = groups["pools"]
+        self.pools, self.sections = groups["pools"], groups["sections"]
         self.sensitive, self.explicit = set(groups["sensitive"]), set(groups["explicit"])
         self.exclusive = [set(tags) for tags in groups["exclusive"].values()]
         self.counts, self.aliases = {}, {}
@@ -90,14 +90,24 @@ class TagLibrary:
             taken.add(key)
             kept.append(f"({prompt_form(key)}:{match.group(2)})" if match else prompt_form(key))
         return kept, dropped
-    # Tag ideas for the LLM: real, allowed tags of a slot group, picked at random with popular tags more likely.
-    def hints(self, group, count, rating, min_count, rng):
-        pool = [key for key in self.pools.get(group, []) if self.allowed(key, rating) and (not self.counts or self.counts.get(key, 0) >= min_count)]
-        weights = [math.sqrt(self.counts.get(key, 1)) for key in pool]
+    # Allowed tags of some sections (or of a slot group's pool): known to the image model when the known tags list is there, and fitting the rating.
+    def pool(self, sections=None, group=None, rating="general", min_count=100):
+        keys = set(self.pools.get(group, [])) if sections is None else set().union(*(self.sections.get(name, []) for name in sections))
+        return sorted(key for key in keys if self.allowed(key, rating) and (not self.counts or self.counts.get(key, 0) >= min_count))
+    # Random tags from a pool, popular tags more likely (by the square root of their post count).
+    def sample(self, keys, count, rng):
+        weights = [math.sqrt(self.counts.get(key, 1)) for key in keys]
         picked = set()
-        while pool and len(picked) < min(count, len(pool)):
-            picked.add(rng.choices(pool, weights=weights)[0])
+        while keys and len(picked) < min(count, len(keys)):
+            picked.add(rng.choices(keys, weights=weights)[0])
         return [prompt_form(key) for key in sorted(picked, key=lambda key: -self.counts.get(key, 0))]
+    # One random tag from some sections, for `pool` options in the scene data ("" when none fits).
+    def pick(self, sections, rating, min_count, rng):
+        tags = self.sample(self.pool(sections, rating=rating, min_count=min_count), 1, rng)
+        return tags[0] if tags else ""
+    # Tag ideas for the LLM: real, allowed tags from the given sections (or the slot group's pool), popular tags more likely, without emoticons like ^^^.
+    def hints(self, group, count, rating, min_count, rng, sections=None):
+        return self.sample([key for key in self.pool(sections, group, rating, min_count) if re.search(r"[a-z]{3}", key)], count, rng)
 # Shared library instance, loaded on first use.
 def get_library():
     global _library
