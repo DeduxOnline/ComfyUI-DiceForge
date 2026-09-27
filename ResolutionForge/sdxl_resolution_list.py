@@ -1,6 +1,6 @@
+# Base of SDXL Resolution List (Latent): the resolution list and size logic. It is not registered as a node of its own.
 import random
-from typing_extensions import override
-from comfy_api.latest import ComfyExtension, io
+from comfy_api.latest import io
 # List of valid resolutions for SDXL canvas sizes, including random options for dynamic selection.
 RESOLUTIONS = {
     "1024 x 1024 (1:1 Square)": (1024, 1024),
@@ -163,13 +163,6 @@ class SDXLResolutionList(io.ComfyNode):
         )
         # Logging the final resolution, VAE alignment, seed, and batch size for debugging and verification purposes.
         print(
-            f"[ResolutionForge] SDXL Resolution List | Size: {width}x{height} | VAE Alignment: {vae_alignment} | Seed: {seed} | Batch: {batch}"
+            f"[ResolutionForge] SDXL Resolution List (Latent) | Size: {width}x{height} | VAE Alignment: {vae_alignment} | Seed: {seed} | Batch: {batch}"
         )
         return io.NodeOutput(width, height, batch, seed)
-# Extension entry point for ComfyUI V3 node registration.
-class SDXLResolutionListExtension(ComfyExtension):
-    @override
-    async def get_node_list(self):
-        return [SDXLResolutionList]
-async def comfy_entrypoint():
-    return SDXLResolutionListExtension()

@@ -1,7 +1,7 @@
+# Base of Resolution Selector (Random, Latent): the aspect ratios and size logic. It is not registered as a node of its own.
 import math
 import random
-from typing_extensions import override
-from comfy_api.latest import ComfyExtension, io
+from comfy_api.latest import io
 # Aspect ratios for the canvas, in the "W:H (Name)" form the frontend resolution preview reads.
 ASPECT_RATIOS = {
     "1:1 (Square)": (1, 1),
@@ -128,13 +128,6 @@ class ResolutionSelectorRandom(io.ComfyNode):
         width, height = cls.size_for_ratio(w_ratio, h_ratio, megapixels, multiple)
         # Logging the final resolution, megapixels, seed, and batch size for debugging and verification purposes.
         print(
-            f"[ResolutionForge] Resolution Selector (Random) | Size: {width}x{height} ({width * height / (1024 * 1024):.2f} MP) | Aspect: {aspect_ratio} | Multiple: {multiple} | Seed: {seed} | Batch: {batch}"
+            f"[ResolutionForge] Resolution Selector (Random, Latent) | Size: {width}x{height} ({width * height / (1024 * 1024):.2f} MP) | Aspect: {aspect_ratio} | Multiple: {multiple} | Seed: {seed} | Batch: {batch}"
         )
         return io.NodeOutput(width, height, batch, seed)
-# Extension entry point for ComfyUI V3 node registration.
-class ResolutionSelectorRandomExtension(ComfyExtension):
-    @override
-    async def get_node_list(self):
-        return [ResolutionSelectorRandom]
-async def comfy_entrypoint():
-    return ResolutionSelectorRandomExtension()
