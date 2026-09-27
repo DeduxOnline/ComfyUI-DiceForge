@@ -27,7 +27,7 @@ Cloning the whole repository straight into `custom_nodes` does not work: the nod
 
 `ResolutionForge/__init__.py` registers all three nodes. `sdxl_resolution_list.py` and `resolution_selector_random.py` hold the size logic of the resolution nodes, so install those with the whole folder. The prompt encoder can also be installed alone: copy `clip_text_encode_pos_neg.py` straight into `ComfyUI/custom_nodes`.
 
-**Requirements:** a recent ComfyUI that includes `comfy_api.latest` (the V3 node API). *Resolution Selector (Random, Latent)* also needs the resolution preview widget, which ships with the core *Resolution Selector* node. Older ComfyUI versions will not load these nodes.
+**Requirements:** a recent ComfyUI that includes `comfy_api.latest` (the V3 node API). *Resolution Selector (Random, Latent)* also needs the resolution preview widget, which ships with the core *Resolution Selector* node. Older ComfyUI versions will not load these nodes. The live size preview of *SDXL Resolution List (Latent)* is a small frontend extension in `ResolutionForge/web`, loaded with the folder.
 
 ## Typical use
 
@@ -48,9 +48,10 @@ The resolution is a nested list: first pick a group in `resolution`, then a size
 | `resolution` | main | `Standard` | Group: `Standard`, `High-Res`, `Random` or `Random Chaos` (see below). |
 | `size` | main | `1024 x 1024` | A size of the chosen group: a fixed size for Standard and High-Res, a list to pick from for Random, an orientation for Random Chaos (`Any`, `Portrait` or `Landscape`). |
 | `max_aspect` | main (Random Chaos only) | `2.0` | The most stretched aspect ratio Random Chaos may pick (1.0–4.0): 2.0 means up to 2:1 or 1:2, 1.0 gives only squares. |
+| size preview | main | — | Live preview of the output size and megapixels. For the random groups it shows what they can pick, because their size is only known at run time. |
 | `seed` | main | `0` | Seed for the random options. The same seed always gives the same size. |
-| `multiply` | Advanced | `1.0` | Scales width and height by this factor (0.1–10). Note that 2.0 gives 4x the pixels. |
-| `vae_alignment` | Advanced | `64` | Rounds width and height to the nearest multiple of this value (8–256). |
+| `scale` | Advanced | `1.0` | Scales width and height by this factor (0.1–10), before rounding to `multiple`. Note that 2.0 gives 4x the pixels. |
+| `multiple` | Advanced | `8` | Rounds width and height to the nearest multiple of this value (8–256, in steps of 8). Use 64 for SDXL training sizes. |
 | `batch` | Advanced | `1` | Number of latents in the batch (1–32). |
 
 ### Outputs
@@ -79,14 +80,14 @@ The `size` list shows width x height; the aspect ratios are given here for refer
 - **Random**: picks one of the listed sizes at random from the seed.
   - **Any Listed / Any High-Res Listed**: one of the Standard or High-Res sizes above.
   - **Vertical Listed / Horizontal Listed** (and their **High-Res** versions): only portrait or only landscape sizes.
-- **Random Chaos**: a random aspect ratio up to `max_aspect`, at about 1024x1024 pixels (the SDXL native size; use `multiply` for larger or smaller images).
+- **Random Chaos**: a random aspect ratio up to `max_aspect`, at about 1024x1024 pixels (the SDXL native size; use `scale` for larger or smaller images).
   - **Any**: wide or tall, equally likely (the ratio is picked evenly in log scale).
   - **Portrait / Landscape**: only taller than wide, or only wider than tall; never a square.
-  - The size rounds down to `vae_alignment`, so it never exceeds 1024x1024 pixels before `multiply` (it lands at about 0.9–1.0 of that).
+  - The size rounds down to `multiple`, so it never exceeds 1024x1024 pixels before `scale` (it lands at about 0.9–1.0 of that).
 
 ### Notes
 
-- Rounding to `vae_alignment` applies to fixed sizes too: with the default 64, 864 becomes 896. Set `vae_alignment` to 32 or lower to keep 864 exactly.
+- Rounding to `multiple` applies to fixed sizes too. With the default 8 every listed size stays exact; with 64, 864 becomes 896.
 - Like any `seed` input, it gets the frontend's *control after generate* option, which is *randomize* by default, so the random options give a new size on each run. Set it to *fixed* to keep the same size.
 
 ## Resolution Selector (Random, Latent)
@@ -101,9 +102,9 @@ It works like the core ComfyUI *Resolution Selector* followed by **Empty Latent 
 |---|---|---|---|
 | `aspect_ratio` | main | `1:1 (Square)` | A fixed ratio, or one of the random options below. |
 | `megapixels` | main | `1.0` | Target total size (0.1–16). 1.0 MP = 1024x1024 for a square. |
-| `preview` | main | — | Live preview of the output size. It shows "—" for random options, because their size is only known at run time. |
+| `preview` | main | — | Live preview of the output size and megapixels. It shows "—" for random options, because their size is only known at run time. |
 | `seed` | main | `0` | Seed for the random options. By default it is randomized after each run (*control after generate*), so every run gets a new random ratio. Set it to *fixed* to repeat a result. |
-| `multiple` | Advanced | `8` | Rounds width and height to the nearest multiple of this value (8–128). Use 64 for SDXL training sizes. |
+| `multiple` | Advanced | `8` | Rounds width and height to the nearest multiple of this value (8–256, in steps of 8). Use 64 for SDXL training sizes. Random Chaos rounds down. |
 | `batch` | Advanced | `1` | Number of latents in the batch (1–32). |
 | `max_aspect` | Advanced | `2.0` | Random Chaos only: the most stretched ratio allowed (1.0–4.0). 2.0 means up to 2:1 or 1:2. |
 
@@ -127,8 +128,8 @@ It works like the core ComfyUI *Resolution Selector* followed by **Empty Latent 
 
 ### Notes
 
-- The output always stays close to `megapixels`: at 1.0 MP it varies between about 0.94 and 1.06 MP because of rounding to `multiple`.
-- With a large `multiple` such as 64, Random Chaos Portrait/Landscape can return a square: ratios very close to 1:1 round to one.
+- Fixed and Random ratios round to the nearest `multiple`, like the core node, so the size can be slightly above or below `megapixels` (about 0.94–1.06 at 1.0 MP).
+- Random Chaos rounds down, so it never exceeds `megapixels` (it lands at about 0.9–1.0 of it), and Random Chaos Portrait/Landscape never return a square.
 
 ## About the latent
 

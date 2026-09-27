@@ -68,9 +68,9 @@ class ResolutionSelectorRandom(io.ComfyNode):
                     "multiple",
                     default=8,
                     min=8,
-                    max=128,
-                    step=4,
-                    tooltip="Round width and height to the nearest multiple of this value (8 for the VAE, 64 for SDXL training buckets).",
+                    max=256,
+                    step=8,
+                    tooltip="Round width and height to a multiple of this value (8 for the VAE, 64 for SDXL training buckets). Random Chaos sizes round down.",
                     advanced=True,
                 ),
                 io.Int.Input(
@@ -102,11 +102,12 @@ class ResolutionSelectorRandom(io.ComfyNode):
         )
     # Megapixel sizing method, same math as the core Resolution Selector so the frontend preview matches the output.
     @staticmethod
-    def size_for_ratio(w_ratio, h_ratio, megapixels, multiple=8):
+    def size_for_ratio(w_ratio, h_ratio, megapixels, multiple=8, round_down=False):
         scale = math.sqrt(megapixels * 1024 * 1024 / (w_ratio * h_ratio))
+        snap = math.floor if round_down else round # Random Chaos rounds down from the exact size, so it never exceeds the megapixels.
         return (
-            max(multiple, round(w_ratio * scale / multiple) * multiple),
-            max(multiple, round(h_ratio * scale / multiple) * multiple),
+            max(multiple, snap(w_ratio * scale / multiple) * multiple),
+            max(multiple, snap(h_ratio * scale / multiple) * multiple),
         )
     # Chaos-based random aspect ratio, uniform in log scale so wide and tall ratios are equally likely.
     @staticmethod
@@ -125,7 +126,14 @@ class ResolutionSelectorRandom(io.ComfyNode):
             w_ratio, h_ratio = cls.chaos_ratio(rng, max_aspect, RANDOM_CHAOS[aspect_ratio])#Returning any aspect ratio up to max_aspect for chaos options.
         else:
             w_ratio, h_ratio = ASPECT_RATIOS[aspect_ratio]#Returning the fixed aspect ratio for standard options.
-        width, height = cls.size_for_ratio(w_ratio, h_ratio, megapixels, multiple)
+        chaos = aspect_ratio in RANDOM_CHAOS
+        width, height = cls.size_for_ratio(w_ratio, h_ratio, megapixels, multiple, round_down=chaos)
+        # Chaos Portrait and Landscape stay non-square after rounding (a ratio close to 1:1 can round to a square): the shorter side steps down, keeping the megapixels.
+        if chaos and RANDOM_CHAOS[aspect_ratio] != "any" and width == height and max_aspect > 1.0 and width > multiple:
+            if RANDOM_CHAOS[aspect_ratio] == "portrait":
+                width -= multiple
+            else:
+                height -= multiple
         # Logging the final resolution, megapixels, seed, and batch size for debugging and verification purposes.
         print(
             f"[ResolutionForge] Resolution Selector (Random, Latent) | Size: {width}x{height} ({width * height / (1024 * 1024):.2f} MP) | Aspect: {aspect_ratio} | Multiple: {multiple} | Seed: {seed} | Batch: {batch}"
