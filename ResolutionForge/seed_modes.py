@@ -202,6 +202,21 @@ def pick_in_range(low, high, parts, picker, seed, name):
     if picker is None:
         return low + width * (part + 0.5)
     return picker.rng.uniform(low + width * part, low + width * (part + 1))
+# One of `count` positions (0 to count - 1). random: uniform; sequential: the seed is the position. The other modes treat each position as an option
+# up to INDEX_LIMIT positions, so every one comes once before any repeats; past that they take turns between INDEX_PARTS equal parts of the range
+# (like Random Chaos), with a random position inside the part.
+INDEX_LIMIT = 1000
+INDEX_PARTS = 100
+def pick_index(count, picker, seed, name):
+    if isinstance(picker, RandomPicker):
+        return picker.rng.randrange(count)
+    if picker is None:
+        return seed % count
+    if count <= INDEX_LIMIT:
+        return int(pick_label([f"{name} #{index}" for index in range(count)], picker, seed).rpartition("#")[2])
+    labels = [f"{name} {part + 1}/{INDEX_PARTS}" for part in range(INDEX_PARTS)]
+    part = labels.index(pick_label(labels, picker, seed))
+    return picker.rng.randrange(part * count // INDEX_PARTS, (part + 1) * count // INDEX_PARTS)
 # Modes that remember earlier runs instead of using the seed: nodes using them run every time instead of using ComfyUI's cache.
 REMEMBERING_MODES = ("shuffle", "balanced", "mutate")
 def fingerprint(seed_mode):
