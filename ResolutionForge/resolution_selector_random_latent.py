@@ -1,8 +1,9 @@
+import logging
 import math
-import random
 import nodes
 from typing_extensions import override
 from comfy_api.latest import ComfyExtension, io
+from .seed_modes import MEMORY, SEED_MODES, SEED_MODE_TOOLTIP, make_picker, pick_label, pick_in_range, fingerprint
 # Aspect ratios for the canvas, in the "W:H (Name)" form the frontend resolution preview reads.
 ASPECT_RATIOS = {
     "1:1 (Square)": (1, 1),
@@ -92,6 +93,13 @@ class ResolutionSelectorRandomLatent(io.ComfyNode):
                     tooltip="Random Chaos options only: the most stretched aspect ratio allowed (2.0 = up to 2:1 or 1:2).",
                     advanced=True,
                 ),
+                io.Combo.Input(
+                    "seed_mode",
+                    options=SEED_MODES,
+                    default="random",
+                    tooltip=SEED_MODE_TOOLTIP,
+                    advanced=True,
+                ),
             ],
             # Outputs for the node: the empty latent batch, its width and height in pixels, and the seed.
             outputs=[
@@ -110,21 +118,26 @@ class ResolutionSelectorRandomLatent(io.ComfyNode):
             max(multiple, snap(w_ratio * scale / multiple) * multiple),
             max(multiple, snap(h_ratio * scale / multiple) * multiple),
         )
-    # Chaos-based random aspect ratio, uniform in log scale so wide and tall ratios are equally likely.
+    # Chaos-based random aspect ratio, uniform in log scale so wide and tall ratios are equally likely. Seed modes other than random take turns between
+    # 8 equal parts of the range (4 for one orientation).
     @staticmethod
-    def chaos_ratio(rng, max_aspect=2.0, orientation="any"):
+    def chaos_ratio(picker, seed, max_aspect=2.0, orientation="any"):
         low = 0.0 if orientation == "landscape" else -math.log(max_aspect)
         high = 0.0 if orientation == "portrait" else math.log(max_aspect)
-        return math.exp(rng.uniform(low, high)), 1.0
+        return math.exp(pick_in_range(low, high, 8 if orientation == "any" else 4, picker, seed, f"Chaos {orientation} {max_aspect}")), 1.0
+    # Method to run the node every time for random options in the modes that remember earlier runs, instead of using ComfyUI's cache.
+    @classmethod
+    def fingerprint_inputs(cls, aspect_ratio="", seed_mode="random", **kwargs):
+        return fingerprint(seed_mode) if str(aspect_ratio).startswith("Random") else None
     # Main method to get the resolution based on the selected option, applying randomization as needed, then building the empty latent with Empty Latent Image.
     @classmethod
-    def execute(cls, aspect_ratio, megapixels=1.0, seed=0, multiple=8, batch=1, max_aspect=2.0, preview=None):
-        rng = random.Random(seed) #Seed behavior for reproducibility of random selections.
+    def execute(cls, aspect_ratio, megapixels=1.0, seed=0, multiple=8, batch=1, max_aspect=2.0, seed_mode="random", preview=None):
+        picker = make_picker(seed_mode, seed) # How random picks follow the seed (random: reproducible, same picks as before seed modes existed).
         # Switching logic to determine the aspect ratio based on the selected option, handling listed random and chaos options appropriately.
         if aspect_ratio in RANDOM_LISTED:
-            w_ratio, h_ratio = rng.choice(RANDOM_LISTED[aspect_ratio])#Returning a random aspect ratio from the list.
+            w_ratio, h_ratio = ASPECT_RATIOS[pick_label([name for name, ratio in ASPECT_RATIOS.items() if ratio in RANDOM_LISTED[aspect_ratio]], picker, seed)]#Returning a random aspect ratio from the list.
         elif aspect_ratio in RANDOM_CHAOS:
-            w_ratio, h_ratio = cls.chaos_ratio(rng, max_aspect, RANDOM_CHAOS[aspect_ratio])#Returning any aspect ratio up to max_aspect for chaos options.
+            w_ratio, h_ratio = cls.chaos_ratio(picker, seed, max_aspect, RANDOM_CHAOS[aspect_ratio])#Returning any aspect ratio up to max_aspect for chaos options.
         else:
             w_ratio, h_ratio = ASPECT_RATIOS[aspect_ratio]#Returning the fixed aspect ratio for standard options.
         chaos = aspect_ratio in RANDOM_CHAOS
@@ -135,9 +148,10 @@ class ResolutionSelectorRandomLatent(io.ComfyNode):
                 width -= multiple
             else:
                 height -= multiple
+        MEMORY.save()
         # Logging the final resolution, megapixels, seed, and batch size for debugging and verification purposes.
-        print(
-            f"[ResolutionForge] Resolution Selector (Random, Latent) | Size: {width}x{height} ({width * height / (1024 * 1024):.2f} MP) | Aspect: {aspect_ratio} | Multiple: {multiple} | Seed: {seed} | Batch: {batch}"
+        logging.info(
+            f"[ResolutionForge] Resolution Selector (Random, Latent) | Size: {width}x{height} ({width * height / (1024 * 1024):.2f} MP) | Aspect: {aspect_ratio} | Multiple: {multiple} | Seed: {seed} ({seed_mode}) | Batch: {batch}"
         )
         latent = nodes.EmptyLatentImage().generate(width, height, batch)[0]
         # The size of this run, with the settings it came from, for the preview of random options in the frontend extension.

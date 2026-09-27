@@ -1,8 +1,9 @@
+import logging
 import math
-import random
 import nodes
 from typing_extensions import override
 from comfy_api.latest import ComfyExtension, io
+from .seed_modes import MEMORY, SEED_MODES, SEED_MODE_TOOLTIP, make_picker, pick_label, pick_in_range, fingerprint
 # Resolution groups for the nested list: fixed SDXL sizes, high-res sizes, random picks from those lists, and random chaos sizes.
 STANDARD = {
     "1024 x 1024": (1024, 1024),
@@ -100,6 +101,13 @@ class SDXLResolutionListLatent(io.ComfyNode):
                     tooltip="Number of images to generate in a batch.",
                     advanced=True,
                 ),
+                io.Combo.Input(
+                    "seed_mode",
+                    options=SEED_MODES,
+                    default="random",
+                    tooltip=SEED_MODE_TOOLTIP,
+                    advanced=True,
+                ),
             ],
             # Outputs for the node: the empty latent batch, its width and height in pixels, and the seed.
             outputs=[
@@ -118,22 +126,28 @@ class SDXLResolutionListLatent(io.ComfyNode):
             max(multiple, snap(height) * multiple),
         )
     # Chaos-based random size: an aspect ratio picked uniformly in log scale up to max_aspect (wide and tall equally likely), in the chosen orientation, sized to the pixel budget.
+    # Seed modes other than random take turns between 8 equal parts of the range (4 for one orientation).
     @staticmethod
-    def chaos_size(rng, orientation="Any", max_aspect=2.0, pixels=CHAOS_PIXELS):
+    def chaos_size(picker, seed, orientation="Any", max_aspect=2.0, pixels=CHAOS_PIXELS):
         low = 0.0 if orientation == "Landscape" else -math.log(max_aspect)
         high = 0.0 if orientation == "Portrait" else math.log(max_aspect)
-        ratio = math.exp(rng.uniform(low, high))
+        ratio = math.exp(pick_in_range(low, high, 8 if orientation == "Any" else 4, picker, seed, f"Chaos {orientation} {max_aspect}"))
         return math.sqrt(pixels * ratio), math.sqrt(pixels / ratio)
+    # Method to run the node every time for random sizes in the modes that remember earlier runs, instead of using ComfyUI's cache.
+    @classmethod
+    def fingerprint_inputs(cls, resolution=None, seed_mode="random", **kwargs):
+        group = resolution.get("resolution") if isinstance(resolution, dict) else None
+        return fingerprint(seed_mode) if group in ("Random", "Random Chaos") else None
     # Main method to get the resolution based on the selected option, applying randomization and rounding as needed, then building the empty latent with Empty Latent Image.
     @classmethod
-    def execute(cls, resolution, seed=0, scale=1.0, multiple=8, batch=1, preview=None):
-        rng = random.Random(seed) #Seed behavior for reproducibility of random selections.
+    def execute(cls, resolution, seed=0, scale=1.0, multiple=8, batch=1, seed_mode="random", preview=None):
+        picker = make_picker(seed_mode, seed) # How random picks follow the seed (random: reproducible, same picks as before seed modes existed).
         group, size = resolution["resolution"], resolution["size"] # Nested list value: the group, and the size picked in it.
         # Switching logic to determine the width and height based on the selected group, handling random picks and chaos sizes appropriately.
         if group == "Random":
-            width, height = rng.choice(RANDOM_LISTED[size])#Returning a random resolution from the listed sizes.
+            width, height = map(int, pick_label([f"{w} x {h}" for w, h in RANDOM_LISTED[size]], picker, seed).split(" x "))#Returning a random resolution from the listed sizes.
         elif group == "Random Chaos":
-            width, height = cls.chaos_size(rng, size, resolution.get("max_aspect", 2.0))#Returning a random aspect ratio within the pixel budget for chaos sizes.
+            width, height = cls.chaos_size(picker, seed, size, resolution.get("max_aspect", 2.0))#Returning a random aspect ratio within the pixel budget for chaos sizes.
         else:
             width, height = (HIGH_RES if group == "High-Res" else STANDARD)[size]#Returning the fixed resolution for standard and high-res sizes.
         # Applying the scale factor to the width and height, followed by rounding to multiple to ensure compatibility with the model's requirements.
@@ -151,9 +165,10 @@ class SDXLResolutionListLatent(io.ComfyNode):
                 width -= multiple
             else:
                 height -= multiple
+        MEMORY.save()
         # Logging the final resolution, scale, multiple, seed, and batch size for debugging and verification purposes.
-        print(
-            f"[ResolutionForge] SDXL Resolution List (Latent) | {group}: {size} | Size: {width}x{height} | Scale: {scale} | Multiple: {multiple} | Seed: {seed} | Batch: {batch}"
+        logging.info(
+            f"[ResolutionForge] SDXL Resolution List (Latent) | {group}: {size} | Size: {width}x{height} | Scale: {scale} | Multiple: {multiple} | Seed: {seed} ({seed_mode}) | Batch: {batch}"
         )
         latent = nodes.EmptyLatentImage().generate(width, height, batch)[0]
         # The size of this run, with the settings it came from, for the preview of random sizes in the frontend extension.

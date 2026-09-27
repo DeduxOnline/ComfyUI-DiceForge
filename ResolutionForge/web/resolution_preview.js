@@ -83,6 +83,13 @@ app.registerExtension({
     // The preview reads the helpers (Resolution Selector's preview reads its own inputs when this extension is not loaded).
     const preview = node.widgets.find((widget) => widget.name === "preview");
     if (preview?.options) Object.assign(preview.options, { ratio_widget: "preview_ratio", megapixels_widget: "preview_megapixels", multiple_widget: "multiple" });
+    // Workflows saved before seed_mode existed have a helper's value where seed_mode now is: fall back to the default.
+    const onConfigure = node.onConfigure;
+    node.onConfigure = function () {
+      const seedMode = node.widgets?.find((widget) => widget.name === "seed_mode");
+      if (seedMode && !seedMode.options?.values?.includes(seedMode.value)) seedMode.value = "random";
+      return onConfigure?.apply(this, arguments);
+    };
     let last = null;
     // The node sends the size of each run with the settings it came from.
     const onExecuted = node.onExecuted;
