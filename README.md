@@ -221,6 +221,8 @@ For example: at the beach the outfit is summery, in snow it is warm; weather is 
 | `time`, `weather` | Advanced | Fix the time of day or the weather (`none` for no weather). Earlier slots follow: with `snow`, the location is always outdoors and not a summer place. |
 | `character`, `outfit`, `expression`, `pose`, `location` | Advanced | Your own tags for that part of the scene; empty lets the node pick. Setting a character part always gives a character scene. |
 | `max_length`, `temperature` | Advanced | LLM answer length (tokens) and creativity. |
+| `tag_check` | Advanced | How the LLM's tags are checked against the tag library (see below): `drop unknown` (default), `keep unknown`, or `off`. |
+| `tag_hints` | Advanced | Number of real Danbooru tags suggested to the LLM for each part of the scene (default 20, 0 turns it off). |
 
 ### Outputs
 
@@ -228,7 +230,7 @@ For example: at the beach the outfit is summery, in snow it is warm; weather is 
 |---|---|
 | `positive_text` | Quality and rating tags, then the scene. Connect it to the `positive` text of **CLIP Text Encode (Positive/Negative)** (or any text input). |
 | `negative_text` | Negative tags for the chosen model and rating. |
-| `scene` | What was picked for each slot, and whether the LLM was used. Connect it to **Preview as Text** to see the logic. |
+| `scene` | What was picked for each slot, whether the LLM was used, and which of its tags the tag check removed and why. Connect it to **Preview as Text** to see the logic. |
 | `seed` | The seed used for this run. |
 
 ### With an LLM (Qwen3-VL)
@@ -238,6 +240,23 @@ For example: at the beach the outfit is summery, in snow it is warm; weather is 
 3. Fixed parts are always kept as they are. The other parts come from the LLM answer; if the answer has no valid JSON, the node uses the rule-based scene instead, prints the answer to the console, and says so in `scene`.
 
 The LLM is called the same way as the core **Generate Text** node, with thinking off.
+
+### Tag library
+
+With an LLM connected, the node uses a Danbooru tag library to keep its tags real:
+
+- **Tag ideas:** for each part of the scene, the request lists real Danbooru tags (`tag_hints`, popular tags more likely), so a small LLM picks tags the image model knows instead of inventing them.
+- **Tag check** (`tag_check`) on the LLM answer:
+  - aliases become the real tag (`blond hair` → `blonde hair`);
+  - explicit tags are always removed, sensitive ones (swimsuits, lingerie, ...) when the rating is `general`;
+  - a tag that contradicts a fixed or earlier one is removed (a second framing or hair length);
+  - with `drop unknown`, tags the image model does not know are removed: tags that are not on Danbooru, or have fewer posts than the model preset's `min_post_count` (100 for Illustrious, 500 for Pony).
+- The `scene` output lists every removed tag with the reason.
+
+The library has two parts:
+
+- **Known tags:** Danbooru tags with post counts and aliases, up to the Illustrious v1.0 cutoff (June 2024), from [BetaDoggo/danbooru-tag-list](https://github.com/BetaDoggo/danbooru-tag-list). It is **downloaded once**, on the first run with an LLM, to `ComfyUI/models/prompt_director/library/danbooru_tags_illustrious_v1.0.csv` (2.5 MB). Without internet access, put that file there yourself; until then only the content and contradiction checks run.
+- **Tag groups:** `ResolutionForge/prompt_director/tag_groups.json`, built from the Danbooru wiki's tag groups by [PBandDev/danbooru-tag-groups-scraper](https://github.com/PBandDev/danbooru-tag-groups-scraper) (MIT license, Copyright (c) 2026 PBandDev). It sorts tags into scene parts and marks sensitive and explicit tags. To rebuild it from a newer release: `python tools/build_tag_library.py tag_groups_flat.jsonl data-YYYY-MM`.
 
 ### Scene data
 

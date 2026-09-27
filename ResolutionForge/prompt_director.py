@@ -8,6 +8,7 @@ import folder_paths
 import yaml
 from typing_extensions import override
 from comfy_api.latest import ComfyExtension, io
+from .tag_library import get_library, tag_key
 # Scene data: the YAML files next to this node, plus any YAML files in ComfyUI/models/prompt_director (their options are added to the slots with the same name).
 DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "prompt_director")
 folder_paths.add_model_folder_path("prompt_director", os.path.join(folder_paths.models_dir, "prompt_director"), is_default=True)
@@ -15,6 +16,7 @@ RANDOM = "random"
 NONE = "none"
 CUSTOM = object() # Marks a slot filled from an override text input: conditions that require it never match, conditions that exclude it never trigger.
 GROUP_ORDER = ["character", "outfit", "expression", "pose", "location", "details"] # Slot groups the LLM rewrites, in prompt order.
+TAG_CHECKS = ["drop unknown", "keep unknown", "off"]
 # Data file lookup: bundled files first, then user files.
 def data_files():
     files = sorted(glob.glob(os.path.join(DATA_DIR, "*.yaml")))
@@ -166,8 +168,8 @@ CHARACTER_KEYS = """{"character": "appearance tags: hair, eyes, body, accessorie
  "details": "extra consistent details: props, background details, lighting, effects"}"""
 SCENERY_KEYS = """{"location": "place and background tags",
  "details": "extra consistent details: background details, lighting, effects"}"""
-# LLM request: the scene plan as text, with the fixed parts, suggestions and the JSON layout to answer with.
-def llm_request(scene, idea):
+# LLM request: the scene plan as text, with the fixed parts, suggestions, tag ideas and the JSON layout to answer with.
+def llm_request(scene, idea, hints=None):
     lines = [f"Theme: {scene.value('theme')}"]
     fixed = [f"scene: {scene.tags('scene')}"]
     for name in ("framing", "time", "weather"):
@@ -181,6 +183,8 @@ def llm_request(scene, idea):
         lines.append("Suggestions:\n" + "\n".join(f"- {line}" for line in suggested))
     if idea.strip():
         lines.append(f"Idea: {idea.strip()}")
+    if hints:
+        lines.append("Tag ideas (real Danbooru tags; use only the ones that fit the scene, or none):\n" + "\n".join(f"- {group}: {', '.join(tags)}" for group, tags in hints.items() if tags))
     lines.append("Answer with this JSON layout:\n" + (CHARACTER_KEYS if scene.has_character else SCENERY_KEYS))
     return "\n\n".join(lines)
 # LLM answer parsing: takes the first {...} block after any thinking, and returns its values as tag strings (None when there is no valid JSON).
@@ -227,6 +231,8 @@ class PromptDirector(io.ComfyNode):
                 override("location", "location"),
                 io.Int.Input("max_length", default=400, min=64, max=4096, advanced=True, tooltip="Maximum number of tokens the LLM writes."),
                 io.Float.Input("temperature", default=0.8, min=0.01, max=2.0, step=0.01, advanced=True, tooltip="LLM creativity: higher gives more varied details."),
+                io.Combo.Input("tag_check", options=TAG_CHECKS, default=TAG_CHECKS[0], advanced=True, tooltip="Checks the LLM's tags against the Danbooru tag library: fixes aliases, removes explicit tags (and sensitive ones when the rating is general) and tags that contradict each other; 'drop unknown' also removes tags the image model does not know."),
+                io.Int.Input("tag_hints", default=20, min=0, max=100, advanced=True, tooltip="Number of real Danbooru tags suggested to the LLM for each part of the scene (0 to turn off)."),
             ],
             # Outputs for the node: the prompts, a readable breakdown of the scene, and the seed.
             outputs=[
@@ -249,7 +255,7 @@ class PromptDirector(io.ComfyNode):
     # Main method: builds the scene from the rules, lets the LLM rewrite it when connected, and assembles the prompts.
     @classmethod
     def execute(cls, idea="", theme=RANDOM, scene=RANDOM, framing=RANDOM, model=None, rating="general", seed=0, clip=None, time=RANDOM, weather=RANDOM,
-                character="", outfit="", expression="", pose="", location="", max_length=400, temperature=0.8):
+                character="", outfit="", expression="", pose="", location="", max_length=400, temperature=0.8, tag_check=TAG_CHECKS[0], tag_hints=20):
         slots, models = load_data()
         forced = {"theme": theme, "scene": scene, "framing": framing, "time": time, "weather": weather}
         custom = {group: clean_tags(text) for group, text in [("character", character), ("outfit", outfit), ("expression", expression), ("pose", pose), ("location", location)] if text.strip()}
@@ -259,25 +265,40 @@ class PromptDirector(io.ComfyNode):
         built.build()
         groups = GROUP_ORDER if built.has_character else ["location", "details"]
         parts = {group: built.group_tags(group) for group in groups}
-        status = "not connected"
+        preset = models.get(model, {})
+        min_count = preset.get("min_post_count", 100) # Tags with fewer Danbooru posts than this count as unknown to the image model.
+        status, library, dropped = "not connected", None, []
         if clip is not None:
-            answer = cls.generate(clip, llm_request(built, idea), seed, max_length, temperature)
+            library = get_library() if tag_check != "off" or tag_hints > 0 else None
+            hint_rng = random.Random(f"{seed}-hints") # Separate random stream, so the hints do not change the scene picks.
+            hints = {group: library.hints(group, tag_hints, rating, min_count, hint_rng) for group in groups if group not in custom} if library and tag_hints > 0 else None
+            answer = cls.generate(clip, llm_request(built, idea, hints), seed, max_length, temperature)
             data = parse_llm_answer(answer)
             if data is None:
                 status = "failed (no valid JSON in the answer), rules used instead"
                 print(f"[Prompt Director] LLM answer was not valid JSON, using the rule-based scene. Answer: {answer[:500]}")
             else:
                 status = "used"
+                # Tag check: fixed tags come first, so an LLM tag that contradicts them (another framing, another hair length) is the one removed.
+                taken = {tag_key(tag) for tag in clean_tags(built.tags("scene"), built.tags("framing"), *custom.values()).split(", ") if tag}
                 for group in groups:
-                    if group not in custom and data.get(group):
-                        parts[group] = data[group] # The LLM answer replaces the suggestion, so details like lighting follow the place it chose.
+                    if group in custom or not data.get(group):
+                        taken |= {tag_key(tag) for tag in parts[group].split(", ") if tag}
+                        continue
+                    tags = [tag for tag in data[group].split(", ") if tag]
+                    if library and tag_check != "off":
+                        tags, removed = library.check(tags, rating, min_count, tag_check == "drop unknown", taken)
+                        dropped += removed
+                    parts[group] = ", ".join(tags) or parts[group] # The LLM answer replaces the suggestion, so details like lighting follow the place it chose.
         # Prompt assembly: quality and rating first (Pony needs its score tags first), then the scene in Danbooru order.
-        preset = models.get(model, {})
         structure = [built.tags("scene"), idea if status != "used" else ""] # Without the LLM, the idea is added as tags.
         scene_tags = [parts.get("character"), parts.get("outfit"), parts.get("expression"), parts.get("pose"), built.tags("framing"), built.tags("theme"), parts.get("location"), built.tags("time"), built.tags("weather"), parts.get("details")]
         positive_text = clean_tags(preset.get("quality"), preset.get("rating", {}).get(rating), *structure, *scene_tags)
         negative_text = clean_tags(preset.get("negative"), preset.get("negative_rating", {}).get(rating))
-        breakdown = "\n".join([f"{slot['name']}: {built.value(slot['name'])}" for slot in slots] + [f"llm: {status}"])
+        breakdown = [f"{slot['name']}: {built.value(slot['name'])}" for slot in slots] + [f"llm: {status}"]
+        if library:
+            breakdown += [f"tag library: {library.status}", f"removed tags: {', '.join(dropped) or 'none'}"]
+        breakdown = "\n".join(breakdown)
         # Logging the scene for debugging and verification purposes.
         print(f"[Prompt Director] Seed: {seed} | LLM: {status} | {positive_text}")
         return io.NodeOutput(positive_text, negative_text, breakdown, seed)

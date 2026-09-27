@@ -301,6 +301,7 @@ slots:
 # Quality, rating and negative tags per model family, added around the scene.
 models:
   Illustrious:
+    min_post_count: 100 # LLM tags with fewer Danbooru posts count as unknown to the model (tag_check).
     quality: "masterpiece, best quality, amazing quality, very aesthetic, absurdres, newest"
     rating:
       general: "general"
@@ -310,6 +311,7 @@ models:
       general: "nsfw"
       sensitive: ""
   Pony:
+    min_post_count: 500 # Pony was not trained on Danbooru alone, so only well-known tags are kept.
     quality: "score_9, score_8_up, score_7_up, source_anime"
     rating:
       general: "rating_safe"
