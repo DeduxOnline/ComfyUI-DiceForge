@@ -39,11 +39,15 @@ Cloning the whole repository straight into `custom_nodes` does not work: the nod
 
 Node id: `SDXLResolutionListLatent`.
 
+The resolution is a nested list: first pick a group in `resolution`, then a size of that group in `size`. The Random Chaos group also shows `max_aspect`.
+
 ### Inputs
 
 | Input | Section | Default | Description |
 |---|---|---|---|
-| `resolution` | main | `1024 x 1024 (1:1 Square)` | A fixed size, or one of the random options below. |
+| `resolution` | main | `Standard` | Group: `Standard`, `High-Res`, `Random` or `Random Chaos` (see below). |
+| `size` | main | `1024 x 1024` | A size of the chosen group: a fixed size for Standard and High-Res, a list to pick from for Random, a pixel budget for Random Chaos (`Medium` by default there). |
+| `max_aspect` | main (Random Chaos only) | `2.0` | The most stretched aspect ratio Random Chaos may pick (1.0–4.0): 2.0 means up to 2:1 or 1:2, 1.0 gives only squares. |
 | `seed` | main | `0` | Seed for the random options. The same seed always gives the same size. |
 | `multiply` | Advanced | `1.0` | Scales width and height by this factor (0.1–10). Note that 2.0 gives 4x the pixels. |
 | `vae_alignment` | Advanced | `64` | Rounds width and height to the nearest multiple of this value (8–256). |
@@ -60,7 +64,9 @@ Node id: `SDXLResolutionListLatent`.
 
 ### Fixed sizes
 
-| Standard | High-res |
+The `size` list shows width x height; the aspect ratios are given here for reference.
+
+| Standard | High-Res |
 |---|---|
 | 1024 x 1024 (1:1) | 1536 x 1536 (1:1) |
 | 1152 x 896 (9:7) / 896 x 1152 (7:9) | 1536 x 1152 (4:3) / 1152 x 1536 (3:4) |
@@ -68,11 +74,15 @@ Node id: `SDXLResolutionListLatent`.
 | 1344 x 768 (16:9) / 768 x 1344 (9:16) | 1536 x 864 (16:9) / 864 x 1536 (9:16) |
 | 1536 x 640 (21:9) / 640 x 1536 (9:21) | |
 
-### Random options
+### Random groups
 
-- **Any Listed / Any High-Res Listed**: one of the standard or high-res sizes above.
-- **Vertical Listed / Horizontal Listed** (and their **High-Res** versions): only portrait or only landscape sizes.
-- **Random Small / Medium / Large**: a random size with up to 512², 1024² or 1536² pixels. The width varies by ±30% around the square size and the orientation is random. These options round down, so they never exceed their pixel limit before `multiply`.
+- **Random**: picks one of the listed sizes at random from the seed.
+  - **Any Listed / Any High-Res Listed**: one of the Standard or High-Res sizes above.
+  - **Vertical Listed / Horizontal Listed** (and their **High-Res** versions): only portrait or only landscape sizes.
+- **Random Chaos**: a random aspect ratio up to `max_aspect`, sized to a pixel budget.
+  - **Small / Medium / Large**: up to 512x512, 1024x1024 or 1536x1536 pixels.
+  - Wide and tall ratios are equally likely (the ratio is picked evenly in log scale).
+  - The size rounds down to `vae_alignment`, so it never exceeds the budget before `multiply` (at Medium it lands at about 0.9–1.0 of it).
 
 ### Notes
 
