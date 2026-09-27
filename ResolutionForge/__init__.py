@@ -4,7 +4,6 @@ from comfy_api.latest import ComfyExtension
 from .clip_text_encode_pos_neg import CLIPTextEncodePositiveNegative
 from .sdxl_resolution_list_latent import SDXLResolutionListLatent
 from .resolution_selector_random_latent import ResolutionSelectorRandomLatent
-WEB_DIRECTORY = "./web" # Frontend extension: the live size preview of SDXL Resolution List (Latent).
 class ResolutionForgeExtension(ComfyExtension):
     @override
     async def get_node_list(self):
