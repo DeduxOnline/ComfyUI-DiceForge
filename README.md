@@ -1,6 +1,6 @@
 # ResolutionForge
 
-ComfyUI nodes for setting up a generation: two resolution nodes that output `width`, `height` and `batch` for an empty latent (both can pick the canvas size at random from a seed), their *Latent* versions that output the empty latent directly, and a prompt encoder that outputs positive and negative conditioning from one node.
+ComfyUI nodes for setting up a generation: two resolution nodes that output `width`, `height`, `batch` and `seed` for an empty latent (both can pick the canvas size at random from a seed), their *Latent* versions that output the empty latent directly, and a prompt encoder that outputs positive and negative conditioning from one node.
 
 | Node | File | Use it when |
 |---|---|---|
@@ -32,6 +32,7 @@ Cloning the whole repository straight into `custom_nodes` does not work: the nod
 - Connect `width`, `height` and `batch` of a resolution node to the `width`, `height` and `batch_size` inputs of **Empty Latent Image**.
 - Or use a *Latent* version and connect its `latent` output straight to the `latent_image` input of **KSampler**.
 - Connect the `CLIP` output of your checkpoint loader to **CLIP Text Encode (Positive/Negative)**, then its `positive` and `negative` outputs to the matching inputs of **KSampler**.
+- To drive the image and the canvas size from one seed, connect the `seed` output of a resolution node to the `seed` input of **KSampler**.
 
 ## SDXL Resolution List
 
@@ -46,6 +47,15 @@ Node id: `UnifiedSDXLResolution`. Workflows saved with earlier versions of this 
 | `multiply` | Advanced | `1.0` | Scales width and height by this factor (0.1–10). Note that 2.0 gives 4x the pixels. |
 | `vae_alignment` | Advanced | `64` | Rounds width and height to the nearest multiple of this value (8–256). |
 | `batch` | Advanced | `1` | Passed through to the `batch` output (1–32). |
+
+### Outputs
+
+| Output | Description |
+|---|---|
+| `width` | Width in pixels. |
+| `height` | Height in pixels. |
+| `batch` | The `batch` input, for the `batch_size` input of **Empty Latent Image**. |
+| `seed` | The seed used for this run, the same as the node's `seed` input. For example, connect it to the `seed` input of **KSampler**. |
 
 ### Fixed sizes
 
@@ -86,6 +96,15 @@ It works like the core ComfyUI *Resolution Selector*, using the same size calcul
 | `batch` | Advanced | `1` | Passed through to the `batch` output (1–32). |
 | `max_aspect` | Advanced | `2.0` | Random Chaos only: the most stretched ratio allowed (1.0–4.0). 2.0 means up to 2:1 or 1:2. |
 
+### Outputs
+
+| Output | Description |
+|---|---|
+| `width` | Width in pixels. |
+| `height` | Height in pixels. |
+| `batch` | The `batch` input, for the `batch_size` input of **Empty Latent Image**. |
+| `seed` | The seed used for this run, the same as the node's `seed` input. For example, connect it to the `seed` input of **KSampler**. |
+
 ### Aspect ratios
 
 1:1, 2:3, 3:2, 3:4, 4:3, 7:9, 9:7, 9:16, 16:9, 9:21, 21:9.
@@ -111,6 +130,7 @@ It works like the core ComfyUI *Resolution Selector*, using the same size calcul
 | `latent` | Empty latent batch, identical to what **Empty Latent Image** makes for this size and batch. |
 | `width` | Width in pixels, for example for an upscale or hires-fix step. |
 | `height` | Height in pixels. |
+| `seed` | The seed used for this run, the same as the node's `seed` input. |
 
 Like the output of **Empty Latent Image**, the latent works with any model you would use that node with: the core samplers adapt an empty latent to the model's latent format.
 

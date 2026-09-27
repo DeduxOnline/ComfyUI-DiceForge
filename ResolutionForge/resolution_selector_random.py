@@ -92,11 +92,12 @@ class ResolutionSelectorRandom(io.ComfyNode):
                     advanced=True,
                 ),
             ],
-            # Outputs for the node: width, height, and batch size.
+            # Outputs for the node: width, height, batch size, and the seed.
             outputs=[
                 io.Int.Output(display_name="width"),
                 io.Int.Output(display_name="height"),
                 io.Int.Output(display_name="batch"),
+                io.Int.Output(display_name="seed", tooltip="The seed used for this run, for example to pass on to KSampler."),
             ],
         )
     # Megapixel sizing method, same math as the core Resolution Selector so the frontend preview matches the output.
@@ -129,7 +130,7 @@ class ResolutionSelectorRandom(io.ComfyNode):
         print(
             f"[Resolution Selector Random] Size: {width}x{height} ({width * height / (1024 * 1024):.2f} MP) | Aspect: {aspect_ratio} | Multiple: {multiple} | Seed: {seed} | Batch: {batch}"
         )
-        return io.NodeOutput(width, height, batch)
+        return io.NodeOutput(width, height, batch, seed)
 # Extension entry point for ComfyUI V3 node registration.
 class ResolutionSelectorRandomExtension(ComfyExtension):
     @override
