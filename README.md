@@ -156,8 +156,8 @@ Works like two core *CLIP Text Encode (Prompt)* nodes sharing one CLIP model: ea
 |---|---|
 | `positive` | Conditioning from the positive prompt. |
 | `negative` | Conditioning from the negative prompt. |
-| `positive_text` | The positive prompt as encoded, with choices and wildcards filled in. |
-| `negative_text` | The negative prompt as encoded, with choices and wildcards filled in. |
+
+When choices or wildcards change a prompt, the filled-in prompts and the seed are printed to the ComfyUI console.
 
 ### Prompt syntax
 

@@ -1,4 +1,5 @@
 import hashlib
+import logging
 import os
 import random
 import re
@@ -149,8 +150,6 @@ class CLIPTextEncodePositiveNegative(io.ComfyNode):
             outputs=[
                 io.Conditioning.Output(display_name="positive", tooltip="Conditioning from the positive prompt."),
                 io.Conditioning.Output(display_name="negative", tooltip="Conditioning from the negative prompt."),
-                io.String.Output(display_name="positive_text", tooltip="The positive prompt as encoded, with choices and wildcards filled in."),
-                io.String.Output(display_name="negative_text", tooltip="The negative prompt as encoded, with choices and wildcards filled in."),
             ],
         )
     # Method to run the node again when a wildcard file changes, even if the inputs are the same.
@@ -172,8 +171,8 @@ class CLIPTextEncodePositiveNegative(io.ComfyNode):
         negative_text = resolve_prompt(negative, rng)
         # Logging the prompts when choices or wildcards changed them, for debugging and verification purposes.
         if (positive_text, negative_text) != (positive, negative):
-            print(f"[ResolutionForge] CLIP Text Encode (Positive/Negative) | Seed: {seed} | Positive: {positive_text} | Negative: {negative_text}")
-        return io.NodeOutput(cls.encode(clip, positive_text), cls.encode(clip, negative_text), positive_text, negative_text)
+            logging.info(f"[ResolutionForge] CLIP Text Encode (Positive/Negative) | Seed: {seed} | Positive: {positive_text} | Negative: {negative_text}")
+        return io.NodeOutput(cls.encode(clip, positive_text), cls.encode(clip, negative_text))
 # Extension entry point for ComfyUI V3 node registration.
 class CLIPTextEncodePositiveNegativeExtension(ComfyExtension):
     @override
