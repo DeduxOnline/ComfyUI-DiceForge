@@ -179,6 +179,14 @@ SEED_MODE_TOOLTIP = ("How random sizes change from run to run.\n"
     "balanced: a size just picked gets a low chance, and sizes not picked for a while get a higher one, so repeats are rare but possible. Remembered in a file. Not reproducible.\n"
     "sequential: the seed is the position in the list, so seeds 0, 1, 2... go through the sizes in order. Reproducible.\n"
     "Random Chaos: the aspect range is split into equal parts that take turns (in order for sequential), with a random ratio inside each part.")
+# Seed mode tooltip for a node picking one of a list of things (files for the random loaders).
+def seed_mode_tooltip(things):
+    return (f"How the pick changes from run to run.\n"
+        f"random: every pick is independent, so the same one can come up again soon.\n"
+        f"deck: the seed steps through a shuffled order of the {things}; with control after generate on increment, every one comes once before any repeats. Reproducible.\n"
+        f"shuffle: like shuffle in a music player, the node remembers the {things} already used and picks from the rest, whatever the seed; remembered in a file, so it continues after a restart. Not reproducible.\n"
+        f"balanced: one just picked gets a low chance, and those not picked for a while get a higher one, so repeats are rare but possible. Remembered in a file. Not reproducible.\n"
+        f"sequential: the seed is the position in the list (sorted by name), so seeds 0, 1, 2... go through the {things} in order. Reproducible.")
 # Picker for a seed mode (the modes every node has; CLIP Dual Text Encode adds its own), or None for sequential.
 def make_picker(seed_mode, seed):
     if seed_mode == "deck":

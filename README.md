@@ -21,6 +21,9 @@ The remembering modes keep their memory in a small file, so they continue after 
 | **Resolution Selector (Random, Latent)** | DiceForge/latent | `DiceForge/resolution_selector_random_latent.py` | You want to set an aspect ratio and a megapixel target, like the core *Resolution Selector* node, or pick the ratio at random. |
 | **Random Int** | DiceForge/random | `DiceForge/random_int.py` | You want a random whole number (steps, an index, anything) that can go through every value before repeating. |
 | **Random Float** | DiceForge/random | `DiceForge/random_float.py` | You want a random number (CFG, denoise, LoRA strength) spread evenly over a range. |
+| **Random LoRA** | DiceForge/loaders | `DiceForge/random_lora.py` | You want to try the LoRAs of a folder one after another, like **Load LoRA** with the file picked for you. |
+| **Random Checkpoint** | DiceForge/loaders | `DiceForge/random_checkpoint.py` | You want to compare the checkpoints of a folder, like **Load Checkpoint** with the file picked for you. |
+| **Random Diffusion Model** | DiceForge/loaders | `DiceForge/random_diffusion_model.py` | The same for diffusion models (`models/diffusion_models`, Flux and the like), like **Load Diffusion Model**. |
 
 All nodes use the ComfyUI V3 node schema: in the Nodes 2.0 frontend, the secondary inputs (including `seed_mode`) sit in the node's **Advanced** section.
 
@@ -55,6 +58,7 @@ Cloning the whole repository straight into `custom_nodes` does not work: the nod
 - Connect the `latent` output of a resolution node to the `latent_image` input of **KSampler**.
 - Connect the `CLIP` output of your checkpoint loader to **CLIP Dual Text Encode**, then its `positive` and `negative` outputs to the matching inputs of **KSampler**.
 - To drive the image and the canvas size from one seed, connect the `seed` output of a resolution node to the `seed` input of **KSampler**.
+- To compare LoRAs or checkpoints, use **Random LoRA** or **Random Checkpoint** with `seed_mode` `deck` and *increment*: every file of the folder comes once before any repeats.
 - To try a range of values, convert a KSampler input such as `cfg` to an input and connect **Random Float** (`min` 4, `max` 8, `step` 0.5) to it.
 - For a series of images without repeats, set `seed_mode` to `deck` and *control after generate* to *increment* on each DiceForge node (reproducible), or use `shuffle` with any seed (not reproducible, continues after a restart).
 
@@ -158,7 +162,7 @@ It works like the core ComfyUI *Resolution Selector* followed by **Empty Latent 
 
 ## Seed modes for sizes
 
-Both resolution nodes (and [Random Int and Random Float](#random-int-and-random-float)) have a `seed_mode` input (Advanced) for their random options, with the same modes as [CLIP Dual Text Encode](#seed-modes). Fixed sizes and ratios ignore it.
+Both resolution nodes (and [Random Int and Random Float](#random-int-and-random-float) and the [random loaders](#random-lora-random-checkpoint-and-random-diffusion-model)) have a `seed_mode` input (Advanced) for their random options, with the same modes as [CLIP Dual Text Encode](#seed-modes). Fixed sizes and ratios ignore it.
 
 | Mode | Listed sizes and ratios | Seed |
 |---|---|---|
@@ -199,6 +203,26 @@ A random number between `min` and `max`, picked from the seed with the same [see
 - **More than 1000 possible values** (for example 0 to 1,000,000): `deck`, `shuffle` and `balanced` take turns between 100 equal parts of the range instead, with a random value inside the part, so 100 runs land in 100 different parts. `sequential` still counts up.
 - **Random Float with `step` 0**: the range is split into `parts` equal parts, like Random Chaos: in 10 runs over 0–1, `deck` and `shuffle` hit all 10 tenths (about 7 with `random`). `sequential` gives the middle of each part in order (0.05, 0.15 … 0.95).
 - The value is written to the console on every run.
+
+## Random LoRA, Random Checkpoint and Random Diffusion Model
+
+Loaders that pick the file from a folder with the [seed modes](#seed-modes-for-sizes), then load it with the core loader (**Load LoRA**, **Load Checkpoint**, **Load Diffusion Model**), so the result is the same as picking that file by hand.
+
+| Input | Where | Description |
+|---|---|---|
+| `folder` | main | A folder in `models/loras`, `models/checkpoints` or `models/diffusion_models`, subfolders included; `(all)` for every file. After adding folders, refresh the node definitions (**R**). |
+| `seed` | main | Seed for the pick. With `deck` or `sequential`, set *control after generate* to *increment*. |
+| `seed_mode` | Advanced | `random`, `deck`, `shuffle`, `balanced` or `sequential`, as for the resolution nodes. `sequential` goes through the files sorted by name. |
+| `model`, `clip` | Random LoRA | The model and CLIP to apply the LoRA to. `clip` is optional: leave it unconnected to change only the model. |
+| `strength_model`, `strength_clip` | Random LoRA | As in **Load LoRA**. Connect **Random Float** to them to vary the strength too. |
+| `include_none` | Random LoRA, Advanced | Adds "no LoRA" as one more option, so some runs use the model as it is. |
+| `weight_dtype` | Random Diffusion Model, Advanced | As in **Load Diffusion Model**. |
+
+Each loader outputs what its core loader does (`model`, `clip`, `vae`) plus the picked file name (`lora_name`, `ckpt_name`, `model_name`, empty for "no LoRA"), for example to put it in the image file name. The picked file is also written to the console.
+
+- Adding or removing files in the folder makes the node pick again, and `deck`, `shuffle` and `balanced` start a new round for the new list.
+- An empty folder stops the run with an error that names it.
+- With `deck` and *increment*, a checkpoint comparison shows every checkpoint once before any repeats; with `shuffle` it continues after a restart.
 
 ## About the latent
 
