@@ -25,7 +25,7 @@ cp -r unified_sdxl_res/ResolutionForge ComfyUI/custom_nodes/
 
 Cloning the whole repository straight into `custom_nodes` does not work: the nodes are in the `ResolutionForge` subfolder, so ComfyUI does not find them.
 
-`ResolutionForge/__init__.py` registers all three nodes. Each node is a single file, so any of them can also be installed alone: copy its `.py` file straight into `ComfyUI/custom_nodes`.
+`ResolutionForge/__init__.py` registers all three nodes. Each node is a single file, so any of them can also be installed alone: copy its `.py` file straight into `ComfyUI/custom_nodes`. The live preview of *SDXL Resolution List (Latent)* also needs the small frontend extension in `ResolutionForge/web`, which only loads with the whole folder; without it that preview shows "—".
 
 **Requirements:** a recent ComfyUI that includes `comfy_api.latest` (the V3 node API). *Resolution Selector (Random, Latent)* also needs the resolution preview widget, which ships with the core *Resolution Selector* node. Older ComfyUI versions will not load these nodes.
 
@@ -48,6 +48,7 @@ The resolution is a nested list: first pick a group in `resolution`, then a size
 | `resolution` | main | `Standard` | Group: `Standard`, `High-Res`, `Random` or `Random Chaos` (see below). |
 | `size` | main | `1024 x 1024` | A size of the chosen group: a fixed size for Standard and High-Res, a list to pick from for Random, an orientation for Random Chaos (`Any`, `Portrait` or `Landscape`). |
 | `max_aspect` | main (Random Chaos only) | `2.0` | The most stretched aspect ratio Random Chaos may pick (1.0–4.0): 2.0 means up to 2:1 or 1:2, 1.0 gives only squares. |
+| `preview` | main | — | Live preview of the output size and megapixels, the same widget as in the core *Resolution Selector*. For the Random and Random Chaos groups it shows the size of the last run, as long as the settings other than `seed` stay the same, and "—" before a run or after a change. |
 | `seed` | main | `0` | Seed for the random options. The same seed always gives the same size. |
 | `scale` | Advanced | `1.0` | Scales width and height by this factor (0.1–10), before rounding to `multiple`. Note that 2.0 gives 4x the pixels. |
 | `multiple` | Advanced | `8` | Rounds width and height to the nearest multiple of this value (8–256, in steps of 8). Use 64 for SDXL training sizes. |

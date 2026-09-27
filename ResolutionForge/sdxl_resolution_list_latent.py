@@ -58,6 +58,14 @@ class SDXLResolutionListLatent(io.ComfyNode):
                     ],
                     tooltip="Resolution group: fixed sizes, or random sizes picked from the seed.",
                 ),
+                # The core resolution preview, fed by the frontend extension (web/sdxl_resolution_preview.js) through two hidden helper widgets.
+                io.ResolutionPreview.Input(
+                    "preview",
+                    tooltip="Live preview of the output size. Random sizes show the size of the last run, until the settings change.",
+                    ratio_widget="preview_ratio",
+                    megapixels_widget="preview_megapixels",
+                    multiple_widget="multiple",
+                ),
                 io.Int.Input(
                     "seed",
                     default=0,
@@ -118,7 +126,7 @@ class SDXLResolutionListLatent(io.ComfyNode):
         return math.sqrt(pixels * ratio), math.sqrt(pixels / ratio)
     # Main method to get the resolution based on the selected option, applying randomization and rounding as needed, then building the empty latent with Empty Latent Image.
     @classmethod
-    def execute(cls, resolution, seed=0, scale=1.0, multiple=8, batch=1):
+    def execute(cls, resolution, seed=0, scale=1.0, multiple=8, batch=1, preview=None):
         rng = random.Random(seed) #Seed behavior for reproducibility of random selections.
         group, size = resolution["resolution"], resolution["size"] # Nested list value: the group, and the size picked in it.
         # Switching logic to determine the width and height based on the selected group, handling random picks and chaos sizes appropriately.
@@ -148,7 +156,9 @@ class SDXLResolutionListLatent(io.ComfyNode):
             f"[ResolutionForge] SDXL Resolution List (Latent) | {group}: {size} | Size: {width}x{height} | Scale: {scale} | Multiple: {multiple} | Seed: {seed} | Batch: {batch}"
         )
         latent = nodes.EmptyLatentImage().generate(width, height, batch)[0]
-        return io.NodeOutput(latent, width, height, seed)
+        # The size of this run, with the settings it came from, for the preview of random sizes in the frontend extension.
+        last_size = {"width": width, "height": height, "group": group, "size": size, "max_aspect": resolution.get("max_aspect"), "scale": scale, "multiple": multiple}
+        return io.NodeOutput(latent, width, height, seed, ui={"resolution_forge_last_size": [last_size]})
 # Extension entry point for ComfyUI V3 node registration.
 class SDXLResolutionListLatentExtension(ComfyExtension):
     @override
