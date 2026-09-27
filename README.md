@@ -16,7 +16,7 @@ The remembering modes keep their memory in a small file, so they continue after 
 
 | Node | Menu | File | Use it when |
 |---|---|---|---|
-| **CLIP Dual Text Encode** | DiceForge/conditioning | `DiceForge/clip_text_encode_pos_neg.py` | You want positive and negative prompts in one node, with wildcards, `{a\|b}` choices, variables and locked choices that follow the seed modes. |
+| **CLIP Dual Text Encode** | DiceForge/conditioning | `DiceForge/clip_text_encode_pos_neg.py` | You want positive and negative prompts in one node, with wildcards, `{a\|b}` choices, variables and locked choices that follow the seed modes. It also outputs the filled-in text, and works without a CLIP as a text-only prompt builder for other encoders. |
 | **SDXL Resolution List (Latent)** | DiceForge/latent | `DiceForge/sdxl_resolution_list_latent.py` | You want the standard SDXL sizes (1024x1024, 1216x832, ...) from a fixed list, or picked at random. |
 | **Resolution Selector (Random, Latent)** | DiceForge/latent | `DiceForge/resolution_selector_random_latent.py` | You want to set an aspect ratio and a megapixel target, like the core *Resolution Selector* node, or pick the ratio at random. |
 | **Random Int** | DiceForge/random | `DiceForge/random_int.py` | You want a random whole number (steps, an index, anything) that can go through every value before repeating. |
@@ -288,7 +288,7 @@ Works like two core *CLIP Text Encode (Prompt)* nodes sharing one CLIP model: ea
 
 | Input | Section | Description |
 |---|---|---|
-| `clip` | main | The CLIP model used for encoding both prompts. |
+| `clip` | main | The CLIP model used for encoding both prompts. Optional: without it the node only fills in the prompts, for the text outputs. |
 | `positive` | main | The positive prompt (top text field): what the image should contain. |
 | `negative` | main | The negative prompt (bottom text field): what the image should avoid. |
 | `seed` | Advanced | Seed for choices and wildcards. The same seed always gives the same prompts (except in *shuffle*, *balanced* and *mutate* modes). By default it is randomized after each run (*control after generate*); set it to *fixed* to repeat a result. |
@@ -300,6 +300,10 @@ Works like two core *CLIP Text Encode (Prompt)* nodes sharing one CLIP model: ea
 |---|---|
 | `positive` | Conditioning from the positive prompt. |
 | `negative` | Conditioning from the negative prompt. |
+| `positive_text` | The positive prompt as encoded, with choices, wildcards and variables filled in. |
+| `negative_text` | The negative prompt as encoded, with choices, wildcards and variables filled in. |
+
+The text outputs carry the prompt that was actually used, for example to show it with a preview node, put it in a file name, or feed a text encoder for other models (Flux, SD3, video models): leave `clip` unconnected and the node only fills in the prompts, with every seed mode.
 
 When choices or wildcards change a prompt, the filled-in prompts and the seed are printed to the ComfyUI console.
 

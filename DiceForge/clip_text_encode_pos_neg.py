@@ -290,7 +290,7 @@ class CLIPTextEncodePositiveNegative(io.ComfyNode):
             node_id="CLIPTextEncodePositiveNegative",
             display_name="CLIP Dual Text Encode",
             category="DiceForge/conditioning",
-            description="Encodes a positive and a negative prompt with the same CLIP model, outputting a conditioning for each. Supports {a|b} choices, __name__ wildcards and ${name} variables, picked from the seed.",
+            description="Encodes a positive and a negative prompt with the same CLIP model, outputting a conditioning and the filled-in text for each (without a CLIP, just the text, for other text encoders). Supports {a|b} choices, __name__ wildcards and ${name} variables, picked from the seed.",
             search_aliases=["text", "prompt", "positive prompt", "negative prompt", "encode text", "text encoder", "encode prompt", "wildcards", "dynamic prompts"],
             inputs=[
                 io.String.Input(
@@ -305,7 +305,8 @@ class CLIPTextEncodePositiveNegative(io.ComfyNode):
                 ),
                 io.Clip.Input(
                     "clip",
-                    tooltip="The CLIP model used for encoding both prompts.",
+                    optional=True,
+                    tooltip="The CLIP model used for encoding both prompts. Leave it unconnected to use the node for the text only (positive_text and negative_text), for example with a Flux or SD3 text encoder.",
                 ),
                 io.Int.Input(
                     "seed",
@@ -334,6 +335,8 @@ class CLIPTextEncodePositiveNegative(io.ComfyNode):
             outputs=[
                 io.Conditioning.Output(display_name="positive", tooltip="Conditioning from the positive prompt."),
                 io.Conditioning.Output(display_name="negative", tooltip="Conditioning from the negative prompt."),
+                io.String.Output(display_name="positive_text", tooltip="The positive prompt as encoded: choices, wildcards and variables filled in. Connect it to another text encoder (Flux, SD3...) or a Save Image file name."),
+                io.String.Output(display_name="negative_text", tooltip="The negative prompt as encoded: choices, wildcards and variables filled in."),
             ],
         )
     # Method to run the node again when a wildcard file changes, even if the inputs are the same.
@@ -347,9 +350,7 @@ class CLIPTextEncodePositiveNegative(io.ComfyNode):
         return clip.encode_from_tokens_scheduled(tokens)
     # Main method to fill in choices and wildcards from the seed, encode both prompts, and return the conditioning and the final prompts.
     @classmethod
-    def execute(cls, positive, negative, clip, seed=0, seed_mode="random"):
-        if clip is None:
-            raise RuntimeError("ERROR: clip input is invalid: None\n\nIf the clip is from a checkpoint loader node your checkpoint does not contain a valid clip or text encoder model.")
+    def execute(cls, positive, negative, clip=None, seed=0, seed_mode="random"):
         note = ""
         if seed_mode == "combinations":
             memo = {}
@@ -378,7 +379,9 @@ class CLIPTextEncodePositiveNegative(io.ComfyNode):
         # Logging the prompts when choices or wildcards changed them, for debugging and verification purposes.
         if (positive_text, negative_text) != (positive, negative):
             logging.info(f"[DiceForge] CLIP Dual Text Encode | Seed: {seed} ({seed_mode}{note}) | Positive: {positive_text} | Negative: {negative_text}")
-        return io.NodeOutput(cls.encode(clip, positive_text), cls.encode(clip, negative_text))
+        if clip is None:
+            return io.NodeOutput(None, None, positive_text, negative_text) # No CLIP: only the text, for other text encoders.
+        return io.NodeOutput(cls.encode(clip, positive_text), cls.encode(clip, negative_text), positive_text, negative_text)
 # Extension entry point for ComfyUI V3 node registration.
 class CLIPTextEncodePositiveNegativeExtension(ComfyExtension):
     @override
