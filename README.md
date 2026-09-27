@@ -138,17 +138,16 @@ Like the output of **Empty Latent Image**, the latent works with any model you w
 
 Node id: `CLIPTextEncodePositiveNegative`.
 
-Works like two core *CLIP Text Encode (Prompt)* nodes sharing one CLIP model: each prompt is encoded exactly the same way, so the outputs are identical to the core node's.
+Works like two core *CLIP Text Encode (Prompt)* nodes sharing one CLIP model: each prompt is encoded exactly the same way, so the conditioning is identical to the core node's for the same text. On top of that, both prompts support wildcards and `{a|b}` choices, picked from a seed.
 
 ### Inputs
 
-| Input | Description |
-|---|---|
-| `clip` | The CLIP model used for encoding both prompts. |
-| `positive` | The positive prompt (top text field): what the image should contain. |
-| `negative` | The negative prompt (bottom text field): what the image should avoid. |
-
-Both text fields support prompt weights such as `(word:1.2)` and dynamic prompts, like the core node.
+| Input | Section | Description |
+|---|---|---|
+| `clip` | main | The CLIP model used for encoding both prompts. |
+| `positive` | main | The positive prompt (top text field): what the image should contain. |
+| `negative` | main | The negative prompt (bottom text field): what the image should avoid. |
+| `seed` | Advanced | Seed for choices and wildcards. The same seed always gives the same prompts. By default it is randomized after each run (*control after generate*); set it to *fixed* to repeat a result. |
 
 ### Outputs
 
@@ -156,3 +155,42 @@ Both text fields support prompt weights such as `(word:1.2)` and dynamic prompts
 |---|---|
 | `positive` | Conditioning from the positive prompt. |
 | `negative` | Conditioning from the negative prompt. |
+| `positive_text` | The positive prompt as encoded, with choices and wildcards filled in. |
+| `negative_text` | The negative prompt as encoded, with choices and wildcards filled in. |
+
+### Prompt syntax
+
+| Syntax | Result |
+|---|---|
+| `__name__` | A random line from the wildcard file `name.txt`. |
+| `__folder/name__` | A random line from `folder/name.txt` inside a wildcards folder. |
+| `{red\|green\|blue}` | One of the options at random. Options can be empty (`{big\|}`) and can nest (`{a\|{b\|c}}`). |
+| `// ...`, `/* ... */` | Comments, removed before encoding. |
+
+To write `{`, `}` or `|` literally, put a backslash before it: `\{`, `\}`, `\|`.
+
+Prompt weights such as `(word:1.2)` and embeddings work as in the core node.
+
+Lines picked from a wildcard file can themselves contain wildcards and `{a|b}` choices; they are filled in too, up to 50 levels deep (a wildcard that includes itself stops with an error instead of looping forever).
+
+### Wildcard files
+
+- Put wildcard files in `ComfyUI/models/wildcards`, for example `ComfyUI/models/wildcards/color.txt`. Subfolders work too: `ComfyUI/models/wildcards/styles/photo.txt` is `__styles/photo__`.
+- More folders can be added with a `wildcards:` entry in ComfyUI's `extra_model_paths.yaml`.
+- One option per line. Empty lines and lines starting with `#` are skipped. Files are read as UTF-8.
+- A missing or empty wildcard file stops the run with an error that names the file and the wildcards folders.
+- The node runs again when a wildcard file changes, even if the prompts and the seed stay the same.
+
+Example `color.txt`:
+
+```text
+# colors for __color__
+crimson red
+deep {navy|royal} blue
+emerald green
+```
+
+### Notes
+
+- Choices and wildcards are filled in by the node, from its `seed`, not by the ComfyUI frontend. The saved workflow keeps the prompts with `__name__` and `{a|b}`, and the same seed gives the same result again.
+- Positive and negative are filled in from the same seed, one after the other, so the same wildcard can pick different lines in each.
