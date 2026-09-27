@@ -8,7 +8,7 @@ The anime prompt builder *Prompt Director* now lives in its own repository: [Ded
 |---|---|---|
 | **SDXL Resolution List (Latent)** | `ResolutionForge/sdxl_resolution_list_latent.py` | You want the standard SDXL sizes (1024x1024, 1216x832, ...) from a fixed list. |
 | **Resolution Selector (Random, Latent)** | `ResolutionForge/resolution_selector_random_latent.py` | You want to set an aspect ratio and a megapixel target, like the core *Resolution Selector* node. |
-| **CLIP Text Encode (Positive/Negative)** | `ResolutionForge/clip_text_encode_pos_neg.py` | You want both prompts in one node instead of two *CLIP Text Encode (Prompt)* nodes. |
+| **CLIP Dual Text Encode** | `ResolutionForge/clip_text_encode_pos_neg.py` | You want both prompts in one node instead of two *CLIP Text Encode (Prompt)* nodes. |
 
 The resolution nodes are in the `model/latent` category and the prompt encoder in `model/conditioning`. All nodes use the ComfyUI V3 node schema: in the Nodes 2.0 frontend, the secondary inputs sit in the node's **Advanced** section.
 
@@ -32,7 +32,7 @@ Cloning the whole repository straight into `custom_nodes` does not work: the nod
 ## Typical use
 
 - Connect the `latent` output of a resolution node to the `latent_image` input of **KSampler**.
-- Connect the `CLIP` output of your checkpoint loader to **CLIP Text Encode (Positive/Negative)**, then its `positive` and `negative` outputs to the matching inputs of **KSampler**.
+- Connect the `CLIP` output of your checkpoint loader to **CLIP Dual Text Encode**, then its `positive` and `negative` outputs to the matching inputs of **KSampler**.
 - To drive the image and the canvas size from one seed, connect the `seed` output of a resolution node to the `seed` input of **KSampler**.
 
 ## SDXL Resolution List (Latent)
@@ -135,7 +135,7 @@ It works like the core ComfyUI *Resolution Selector* followed by **Empty Latent 
 
 Like the output of **Empty Latent Image**, the latent works with any model you would use that node with: the core samplers adapt an empty latent to the model's latent format.
 
-## CLIP Text Encode (Positive/Negative)
+## CLIP Dual Text Encode
 
 Node id: `CLIPTextEncodePositiveNegative`.
 

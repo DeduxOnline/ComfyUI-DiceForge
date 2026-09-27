@@ -117,7 +117,7 @@ class CLIPTextEncodePositiveNegative(io.ComfyNode):
     def define_schema(cls):
         return io.Schema(
             node_id="CLIPTextEncodePositiveNegative",
-            display_name="CLIP Text Encode (Positive/Negative)",
+            display_name="CLIP Dual Text Encode",
             category="model/conditioning",
             description="Encodes a positive and a negative prompt with the same CLIP model, outputting a conditioning for each. Supports {a|b} choices and __name__ wildcards, picked from the seed.",
             search_aliases=["text", "prompt", "positive prompt", "negative prompt", "encode text", "text encoder", "encode prompt", "wildcards"],
@@ -171,7 +171,7 @@ class CLIPTextEncodePositiveNegative(io.ComfyNode):
         negative_text = resolve_prompt(negative, rng)
         # Logging the prompts when choices or wildcards changed them, for debugging and verification purposes.
         if (positive_text, negative_text) != (positive, negative):
-            logging.info(f"[ResolutionForge] CLIP Text Encode (Positive/Negative) | Seed: {seed} | Positive: {positive_text} | Negative: {negative_text}")
+            logging.info(f"[ResolutionForge] CLIP Dual Text Encode | Seed: {seed} | Positive: {positive_text} | Negative: {negative_text}")
         return io.NodeOutput(cls.encode(clip, positive_text), cls.encode(clip, negative_text))
 # Extension entry point for ComfyUI V3 node registration.
 class CLIPTextEncodePositiveNegativeExtension(ComfyExtension):
