@@ -24,6 +24,8 @@ The remembering modes keep their memory in a small file, so they continue after 
 | **Random LoRA** | DiceForge/loaders | `DiceForge/random_lora.py` | You want to try the LoRAs of a folder one after another, like **Load LoRA** with the file picked for you. |
 | **Random Checkpoint** | DiceForge/loaders | `DiceForge/random_checkpoint.py` | You want to compare the checkpoints of a folder, like **Load Checkpoint** with the file picked for you. |
 | **Random Image** | DiceForge/loaders | `DiceForge/random_image.py` | You want an input image (img2img, ControlNet pose, IP-Adapter reference) picked from a folder, like **Load Image** with the file picked for you. |
+| **Random Sampler** | DiceForge/sampling | `DiceForge/random_sampler.py` | You want to compare samplers and schedulers: it picks a pair for KSampler from the ones you list. |
+| **Random VAE** | DiceForge/loaders | `DiceForge/random_vae.py` | You want to try the VAEs of a folder, like **Load VAE** with the file picked for you. |
 | **Dice Grid** | DiceForge/image | `DiceForge/dice_grid.py` | You want the images of a series side by side with labels: a LoRA, checkpoint or setting comparison, or an XY grid. |
 | **Random Diffusion Model** | DiceForge/loaders | `DiceForge/random_diffusion_model.py` | The same for diffusion models (`models/diffusion_models`, Flux and the like), like **Load Diffusion Model**. |
 
@@ -62,6 +64,7 @@ Cloning the whole repository straight into `custom_nodes` does not work: the nod
 - To drive the image and the canvas size from one seed, connect the `seed` output of a resolution node to the `seed` input of **KSampler**.
 - To compare LoRAs or checkpoints, use **Random LoRA** or **Random Checkpoint** with `seed_mode` `deck` and *increment*: every file of the folder comes once before any repeats.
 - For img2img or ControlNet over a folder of images, use **Random Image** the same way.
+- To compare samplers, connect **Random Sampler** to KSampler's `sampler_name` and `scheduler`, and its `label` to **Dice Grid**.
 - To see a series side by side, connect the image and the loader's file name output to **Dice Grid**: it saves a labeled grid after each round.
 - To try a range of values, convert a KSampler input such as `cfg` to an input and connect **Random Float** (`min` 4, `max` 8, `step` 0.5) to it.
 - For a series of images without repeats, set `seed_mode` to `deck` and *control after generate* to *increment* on each DiceForge node (reproducible), or use `shuffle` with any seed (not reproducible, continues after a restart).
@@ -166,7 +169,7 @@ It works like the core ComfyUI *Resolution Selector* followed by **Empty Latent 
 
 ## Seed modes for sizes
 
-Both resolution nodes (and [Random Int and Random Float](#random-int-and-random-float) and the [random loaders](#random-lora-random-checkpoint-and-random-diffusion-model)) have a `seed_mode` input (Advanced) for their random options, with the same modes as [CLIP Dual Text Encode](#seed-modes). Fixed sizes and ratios ignore it.
+Both resolution nodes (and [Random Int and Random Float](#random-int-and-random-float) and the [random loaders](#random-lora-random-checkpoint-random-diffusion-model-and-random-vae)) have a `seed_mode` input (Advanced) for their random options, with the same modes as [CLIP Dual Text Encode](#seed-modes). Fixed sizes and ratios ignore it.
 
 | Mode | Listed sizes and ratios | Seed |
 |---|---|---|
@@ -208,13 +211,13 @@ A random number between `min` and `max`, picked from the seed with the same [see
 - **Random Float with `step` 0**: the range is split into `parts` equal parts, like Random Chaos: in 10 runs over 0–1, `deck` and `shuffle` hit all 10 tenths (about 7 with `random`). `sequential` gives the middle of each part in order (0.05, 0.15 … 0.95).
 - The value is written to the console on every run.
 
-## Random LoRA, Random Checkpoint and Random Diffusion Model
+## Random LoRA, Random Checkpoint, Random Diffusion Model and Random VAE
 
-Loaders that pick the file from a folder with the [seed modes](#seed-modes-for-sizes), then load it with the core loader (**Load LoRA**, **Load Checkpoint**, **Load Diffusion Model**), so the result is the same as picking that file by hand.
+Loaders that pick the file from a folder with the [seed modes](#seed-modes-for-sizes), then load it with the core loader (**Load LoRA**, **Load Checkpoint**, **Load Diffusion Model**, **Load VAE**), so the result is the same as picking that file by hand.
 
 | Input | Where | Description |
 |---|---|---|
-| `folder` | main | A folder in `models/loras`, `models/checkpoints` or `models/diffusion_models`, subfolders included; `(all)` for every file. After adding folders, refresh the node definitions (**R**). |
+| `folder` | main | A folder in `models/loras`, `models/checkpoints`, `models/diffusion_models` or `models/vae`, subfolders included; `(all)` for every file. After adding folders, refresh the node definitions (**R**). |
 | `seed` | main | Seed for the pick. With `deck` or `sequential`, set *control after generate* to *increment*. |
 | `seed_mode` | Advanced | `random`, `deck`, `shuffle`, `balanced` or `sequential`, as for the resolution nodes. `sequential` goes through the files sorted by name. |
 | `model`, `clip` | Random LoRA | The model and CLIP to apply the LoRA to. `clip` is optional: leave it unconnected to change only the model. |
@@ -222,7 +225,7 @@ Loaders that pick the file from a folder with the [seed modes](#seed-modes-for-s
 | `include_none` | Random LoRA, Advanced | Adds "no LoRA" as one more option, so some runs use the model as it is. |
 | `weight_dtype` | Random Diffusion Model, Advanced | As in **Load Diffusion Model**. |
 
-Each loader outputs what its core loader does (`model`, `clip`, `vae`) plus the picked file name (`lora_name`, `ckpt_name`, `model_name`, empty for "no LoRA"), for example to put it in the image file name. The picked file is also written to the console.
+Each loader outputs what its core loader does (`model`, `clip`, `vae`) plus the picked file name (`lora_name`, `ckpt_name`, `model_name`, `vae_name`; empty for "no LoRA"), for example to put it in the image file name. The picked file is also written to the console.
 
 - Adding or removing files in the folder makes the node pick again, and `deck`, `shuffle` and `balanced` start a new round for the new list.
 - An empty folder stops the run with an error that names it.
@@ -248,6 +251,26 @@ Like **Load Image**, but the image is picked from a folder with the [seed modes]
 - Supported files: png, jpg, jpeg, webp, bmp, gif, tif, tiff.
 - The image is loaded with the same steps as Load Image, and gives the same result. When ComfyUI's video reader fails on a file (it does on some WebP files, and then Load Image fails too), Random Image reads it with Pillow instead.
 - Adding, removing or editing images in the folder makes the node pick again.
+
+## Random Sampler
+
+Picks a sampler and scheduler pair for **KSampler** (or **KSampler Advanced**) from the ones you list. Every listed sampler is paired with every listed scheduler, and each pair is one option of the [seed modes](#seed-modes-for-sizes): with `deck` or `sequential` and *increment*, a series tries every pair once.
+
+| Input | Where | Description |
+|---|---|---|
+| `samplers` | main | Samplers to pick from, separated by commas or new lines, with the names of KSampler's list (`euler, dpmpp_2m, dpmpp_2m_sde`...). `*` for every sampler. An unknown name stops the run with the list of known ones. |
+| `schedulers` | main | Schedulers to pick from, the same way (`normal, karras`...). `*` for every scheduler. |
+| `seed` | main | Seed for the pick. With `deck` or `sequential`, set *control after generate* to *increment*. |
+| `seed_mode` | Advanced | `random`, `deck`, `shuffle`, `balanced` or `sequential` (each sampler with every scheduler, in the listed order). |
+
+| Output | Description |
+|---|---|
+| `sampler_name` | Connect to KSampler's `sampler_name`. |
+| `scheduler` | Connect to KSampler's `scheduler`. |
+| `label` | `"sampler / scheduler"`, for the `label` of **Dice Grid**. |
+| `sampler_text`, `scheduler_text` | The two names as text, for an XY **Dice Grid** (`row_label` and `label`). |
+
+To vary only the sampler, list one scheduler (and the other way round).
 
 ## Dice Grid
 

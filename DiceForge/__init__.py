@@ -11,10 +11,12 @@ from .random_checkpoint import RandomCheckpointLoader
 from .random_diffusion_model import RandomDiffusionModelLoader
 from .random_image import RandomImageLoader
 from .dice_grid import DiceGrid
+from .random_sampler import RandomSampler
+from .random_vae import RandomVAELoader
 WEB_DIRECTORY = "./web" # Frontend extension: feeds the live size previews of the resolution nodes.
 class DiceForgeExtension(ComfyExtension):
     @override
     async def get_node_list(self):
-        return [SDXLResolutionListLatent, ResolutionSelectorRandomLatent, CLIPTextEncodePositiveNegative, RandomIntSeedModes, RandomFloatSeedModes, RandomLoraLoader, RandomCheckpointLoader, RandomDiffusionModelLoader, RandomImageLoader, DiceGrid]
+        return [SDXLResolutionListLatent, ResolutionSelectorRandomLatent, CLIPTextEncodePositiveNegative, RandomIntSeedModes, RandomFloatSeedModes, RandomLoraLoader, RandomCheckpointLoader, RandomDiffusionModelLoader, RandomImageLoader, DiceGrid, RandomSampler, RandomVAELoader]
 async def comfy_entrypoint():
     return DiceForgeExtension()
