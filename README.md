@@ -1,13 +1,14 @@
 # ResolutionForge
 
-Two ComfyUI nodes that output `width`, `height` and `batch` for an empty latent. Both can pick the canvas size at random from a seed.
+ComfyUI nodes for both ends of a generation. Two of them output `width`, `height` and `batch` for an empty latent, and both can pick the canvas size at random from a seed. The third one decodes the finished latent and saves the image.
 
 | Node | File | Use it when |
 |---|---|---|
 | **SDXL Resolution List** | `ResolutionForge/sdxl_resolution_list.py` | You want the standard SDXL sizes (1024x1024, 1216x832, ...) from a fixed list. |
 | **Resolution Selector (Random)** | `ResolutionForge/resolution_selector_random.py` | You want to set an aspect ratio and a megapixel target, like the core *Resolution Selector* node. |
+| **Load VAE + Decode + Save** | `ResolutionForge/vae_decode_save.py` | You want one node instead of *Load VAE*, *VAE Decode* and *Save Image*. |
 
-Both nodes are in the `utils` category. They use the ComfyUI V3 node schema: in the Nodes 2.0 frontend, the secondary inputs sit in the node's **Advanced** section.
+All nodes are in the `utils` category. They use the ComfyUI V3 node schema: in the Nodes 2.0 frontend, the secondary inputs sit in the node's **Advanced** section.
 
 ## Installation
 
@@ -20,7 +21,7 @@ cp -r unified_sdxl_res/ResolutionForge ComfyUI/custom_nodes/
 
 Cloning the whole repository straight into `custom_nodes` does not work: the nodes are in the `ResolutionForge` subfolder, so ComfyUI does not find them.
 
-`ResolutionForge/__init__.py` registers both nodes. To install only one of them, copy that `.py` file from `ResolutionForge` straight into `ComfyUI/custom_nodes` instead.
+`ResolutionForge/__init__.py` registers all nodes. To install only one of them, copy that `.py` file from `ResolutionForge` straight into `ComfyUI/custom_nodes` instead.
 
 **Requirements:** a recent ComfyUI that includes `comfy_api.latest` (the V3 node API). *Resolution Selector (Random)* also needs the resolution preview widget, which ships with the core *Resolution Selector* node. Older ComfyUI versions will not load these nodes.
 
@@ -94,6 +95,30 @@ It works like the core ComfyUI *Resolution Selector*, using the same size calcul
 
 - The output always stays close to `megapixels`: at 1.0 MP it varies between about 0.94 and 1.06 MP because of rounding to `multiple`.
 - With a large `multiple` such as 64, Random Chaos Portrait/Landscape can return a square: ratios very close to 1:1 round to one.
+
+## Load VAE + Decode + Save
+
+Node id: `LoadVAEDecodeSave`.
+
+It does the work of three core nodes: *Load VAE*, *VAE Decode* and *Save Image*. Connect the sampler's `LATENT` output to it and pick the VAE.
+
+### Inputs
+
+| Input | Default | Description |
+|---|---|---|
+| `samples` | — | The latent to decode, for example the `LATENT` output of *KSampler*. |
+| `vae_name` | — | The VAE to decode with. The list is the same as in the core *Load VAE* node, including `taesd` and `pixel_space`. |
+| `filename_prefix` | `ComfyUI` | The prefix for the saved files, as in *Save Image*. It can include tokens such as `%date:yyyy-MM-dd%`. |
+
+### Output
+
+`images`: the decoded images, for further nodes such as an upscaler or a preview.
+
+### Notes
+
+- The files are PNGs in the ComfyUI output folder, with the prompt and the workflow as metadata, exactly as *Save Image* writes them.
+- The node keeps the last VAE in memory, so it does not load the file again on every run. Picking another VAE replaces it.
+- Decoding works as in *VAE Decode*. If the GPU runs out of memory, ComfyUI retries with tiled decoding by itself.
 
 ## Example workflows
 
