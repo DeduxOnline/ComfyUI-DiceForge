@@ -249,6 +249,15 @@ def tidy_commas(text):
     text = re.sub(r"(^|\n)[ \t]*,[ \t]*", r"\1", text)
     text = re.sub(r"[ \t]{2,}", " ", text)
     return re.sub(r"^[\s,]+|[\s,]+$", "", text)
+# Space cleanup (the trim input): no spaces at the start or end of a line, one space between words, none before , . ; : ! ? ) or after (, and at most
+# one empty line in a row. Only spaces change, so the words and weights stay as written.
+def trim_spaces(text):
+    text = re.sub(r"[ \t]+", " ", text)
+    text = re.sub(r" *\n *", "\n", text)
+    text = re.sub(r" +([,.;:!?)])", r"\1", text)
+    text = re.sub(r"\( +", "(", text)
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    return text.strip()
 # Prompt expansion: picks {a|b} choices and sets ${name=value} variables, then replaces __name__ wildcards, expanding the picked text again so choices
 # and wildcards can nest.
 def expand(text, picker, depth, variables):
@@ -330,6 +339,12 @@ class CLIPTextEncodePositiveNegative(io.ComfyNode):
                     "mutate: keeps the last prompt and changes just one choice each run, to explore variations of a good result. Remembered in a file, so it continues after a restart. Not reproducible.",
                     advanced=True,
                 ),
+                io.Boolean.Input(
+                    "trim",
+                    default=True,
+                    tooltip="Remove extra spaces from both prompts: at the start and end of lines, double spaces, spaces before , . ; : ! ? ) and after (, and extra empty lines.",
+                    advanced=True,
+                ),
             ],
             # Outputs for the node: positive and negative conditioning, then the prompts as encoded (with choices and wildcards filled in).
             outputs=[
@@ -350,7 +365,7 @@ class CLIPTextEncodePositiveNegative(io.ComfyNode):
         return clip.encode_from_tokens_scheduled(tokens)
     # Main method to fill in choices and wildcards from the seed, encode both prompts, and return the conditioning and the final prompts.
     @classmethod
-    def execute(cls, positive, negative, clip=None, seed=0, seed_mode="random"):
+    def execute(cls, positive, negative, clip=None, seed=0, seed_mode="random", trim=True):
         note = ""
         if seed_mode == "combinations":
             memo = {}
@@ -373,6 +388,8 @@ class CLIPTextEncodePositiveNegative(io.ComfyNode):
         else:
             picker = RandomPicker(random.Random(seed)) # Seed behavior for reproducible choices and wildcards.
         positive_text, negative_text = resolve_prompts((positive, negative), picker)
+        if trim:
+            positive_text, negative_text = trim_spaces(positive_text), trim_spaces(negative_text)
         if seed_mode == "mutate":
             MEMORY.set("mutate", key, [[list(address), picked, options] for address, (picked, options) in state["now"].items()])
         MEMORY.save()

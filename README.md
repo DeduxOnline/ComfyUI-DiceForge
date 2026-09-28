@@ -320,6 +320,7 @@ Works like two core *CLIP Text Encode (Prompt)* nodes sharing one CLIP model: ea
 | `negative` | main | The negative prompt (bottom text field): what the image should avoid. |
 | `seed` | Advanced | Seed for choices and wildcards. The same seed always gives the same prompts (except in *shuffle*, *balanced* and *mutate* modes). By default it is randomized after each run (*control after generate*); set it to *fixed* to repeat a result. |
 | `seed_mode` | Advanced | How choices and wildcards change from run to run: `random` (default), `deck`, `shuffle`, `balanced`, `combinations` or `mutate`. See [Seed modes](#seed-modes). |
+| `trim` | Advanced | On by default: removes extra spaces from both prompts, at the start and end of lines, double spaces, spaces before `, . ; : ! ? )` and after `(`, and extra empty lines (`  a  girl , ( smile :1.1 )` becomes `a girl, (smile:1.1)`). Only spaces change. |
 
 ### Outputs
 
