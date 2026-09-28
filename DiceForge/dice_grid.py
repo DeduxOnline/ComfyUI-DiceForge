@@ -54,7 +54,7 @@ def draw_lines(draw, lines, font, x, y, width):
         draw.text((x + (width - draw.textlength(line, font=font)) / 2, y + index * round(font.size * 1.3)), line, font=font, fill=TEXT)
 # Grid rendering. XY grid (some cells have a row label): rows by row label and columns by label, in order of first appearance, with headers.
 # Plain grid: `columns` per row (0: about square), each image with its label under it.
-def render(cells, columns, cell_width, pad=8):
+def render_cells(cells, columns, cell_width, pad=8):
     font = font_for(cell_width)
     probe = ImageDraw.Draw(Image.new("RGB", (1, 1)))
     if any(cell["row"] for cell in cells):
@@ -94,6 +94,30 @@ def render(cells, columns, cell_width, pad=8):
             draw_lines(draw, lines, font, x, y + height + pad, cell_width)
         y += height + caption + (pad if caption else 0) + pad
     return grid
+LEGEND_POSITIONS = ["top", "bottom"]
+# The grid with its legend: a text block above or below it (the legend input), and with numbered cells, the numbers under the images and the full
+# labels listed in the legend ("1. anime/ink"), for labels too long to fit under an image. XY grids keep their headers and aren't numbered.
+def render(cells, columns, cell_width, legend="", position="top", numbered=False, pad=8):
+    entries = []
+    if numbered and not any(cell["row"] for cell in cells):
+        entries = [f"{index + 1}. {cell['label']}" for index, cell in enumerate(cells) if cell["label"]]
+        cells = [{**cell, "label": str(index + 1)} for index, cell in enumerate(cells)]
+    grid = render_cells(cells, columns, cell_width, pad)
+    text = "\n".join(part for part in (legend.strip(), "\n".join(entries)) if part)
+    if not text:
+        return grid
+    font = font_for(cell_width)
+    lines = wrap(ImageDraw.Draw(grid), text, font, grid.width - 4 * pad)
+    height = text_height(lines, font) + 2 * pad
+    framed = Image.new("RGB", (grid.width, grid.height + height), BACKGROUND)
+    top = position != "bottom"
+    framed.paste(grid, (0, height if top else 0))
+    draw = ImageDraw.Draw(framed)
+    y = 0 if top else grid.height
+    draw.rectangle((0, y, grid.width, y + height - 1), fill=HEADER)
+    for index, line in enumerate(lines):
+        draw.text((2 * pad, y + pad + index * round(font.size * 1.3)), line, font=font, fill=TEXT)
+    return framed
 def to_tensor(image):
     return torch.from_numpy(np.array(image).astype(np.float32) / 255.0)[None,]
 def to_pil(tensor, cell_width):
@@ -157,6 +181,9 @@ class DiceGrid(io.ComfyNode):
                 io.String.Input("filename_prefix", default="DiceForge/grid", tooltip="File name prefix of saved grids, in the output folder.", advanced=True),
                 io.String.Input("name", default="grid", tooltip="Grids are kept per node and name: another name starts a separate grid (the old one stays until you come back to its name).", advanced=True),
                 io.Boolean.Input("new_grid", default=False, tooltip="Start a new grid with this image (the unfinished one is dropped). Turn it off again for the next runs.", advanced=True),
+                io.String.Input("legend", multiline=True, default="", tooltip="Text shown in a block above or below the grid: a title, the settings that stay the same, or the prompt (connect positive_text of CLIP Dual Text Encode)."),
+                io.Combo.Input("legend_position", options=LEGEND_POSITIONS, default="top", tooltip="Where the legend goes: above or below the grid.", advanced=True),
+                io.Boolean.Input("numbered", default=False, tooltip="Number the images and list their full labels in the legend (1. anime/ink ...), for labels too long to fit under an image. Not for XY grids, which have headers."),
             ],
             outputs=[
                 io.Image.Output(display_name="grid", tooltip="The grid so far, this run's image included."),
@@ -175,7 +202,8 @@ class DiceGrid(io.ComfyNode):
         return results
     # Main method: adds this run's images, finishes the grid when it is full or a label repeats, and shows the grid on the node.
     @classmethod
-    def execute(cls, image, count=0, columns=0, cell_width=384, save=True, filename_prefix="DiceForge/grid", name="grid", new_grid=False, label=None, row_label=None):
+    def execute(cls, image, count=0, columns=0, cell_width=384, save=True, filename_prefix="DiceForge/grid", name="grid", new_grid=False, legend="", legend_position="top", numbered=False, label=None, row_label=None):
+        layout = (legend or "", legend_position, numbered) # Legend settings for every render of this run.
         store = GridStore(f"{name}-{cls.hidden.unique_id if cls.hidden else ''}")
         if store.state["done"] or new_grid:
             store.clear()
@@ -186,10 +214,10 @@ class DiceGrid(io.ComfyNode):
             repeat = count == 0 and (cell_label or row) and store.has(cell_label, row)
             if repeat or len(store.state["cells"]) >= (count or MAX_CELLS):
                 if save and store.state["cells"]:
-                    saved = cls.save_grid(render(store.cells(cell_width), columns, cell_width), filename_prefix) # A round is over: the grid is finished.
+                    saved = cls.save_grid(render(store.cells(cell_width), columns, cell_width, *layout), filename_prefix) # A round is over: the grid is finished.
                 store.clear()
             store.add(to_pil(image[index], cell_width), cell_label, row)
-        grid = render(store.cells(cell_width), columns, cell_width)
+        grid = render(store.cells(cell_width), columns, cell_width, *layout)
         if count and len(store.state["cells"]) >= count:
             store.state["done"] = True # Full: saved now, and the next run starts a new grid.
             if save:

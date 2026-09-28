@@ -284,10 +284,13 @@ Collects the image of each run into a grid with labels, and saves the grid to th
 | `count` | main | `0` | Images in a finished grid. `0`: the grid is finished when a label (or label pair) comes again, which is the end of a `deck` or `shuffle` round. |
 | `columns` | main | `0` | Images per row; `0` makes the grid about square. XY grids take their columns from the labels. |
 | `save` | main | on | Save each finished grid as a PNG in the output folder, with the workflow in it like **Save Image**. |
+| `legend` | main | | Text in a block above or below the grid: a title, the settings that stay the same, or the prompt (connect `positive_text` of **CLIP Dual Text Encode**, which shows the prompt each grid was made with). |
+| `numbered` | main | off | Numbers the images and lists their full labels in the legend (`1. very_long_style_name_v2`), for labels too long to fit under an image. XY grids keep their headers instead. |
 | `cell_width` | Advanced | `384` | Width of each cell. Heights follow the aspect ratio, so images of different sizes (from the random resolution nodes) fit side by side. |
 | `filename_prefix` | Advanced | `DiceForge/grid` | File name prefix of saved grids. |
 | `name` | Advanced | `grid` | Grids are kept per node and name; another name starts a separate grid. |
 | `new_grid` | Advanced | off | Starts a new grid with this image, dropping the unfinished one. Turn it off again for the next runs. |
+| `legend_position` | Advanced | `top` | Where the legend goes: `top` or `bottom`. |
 
 | Output | Description |
 |---|---|
