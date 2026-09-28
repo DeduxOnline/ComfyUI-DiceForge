@@ -302,6 +302,16 @@ Collects the image of each run into a grid with labels, and saves the grid to th
 - The cells wait between runs as small PNG files in `ComfyUI/user/DiceForge/grids`, not in RAM, so an unfinished grid survives a restart.
 - The node adds a cell on every run, even if nothing else changed, so queueing the same image twice adds it twice (and, with `count` 0 and a label, finishes the grid).
 
+## Model info
+
+Right-click a node with a model file picked in a list (**Load Checkpoint**, **Load Diffusion Model**, **Load LoRA**, **Load VAE**, **Load CLIP**, **Load Diffusion Model + CLIP**, and custom nodes with such lists) and choose **🛈 Model info**. A dialog like rgthree's LoRA info opens, for every model kind:
+
+- the file, its **sha256** and size;
+- what **Civitai** knows about the file, found by its hash: the model and version name, type, base model, trigger words (click one to copy it), a link, and example images (the ones Civitai rates R or higher are blurred until clicked; a click on an image opens it full size);
+- your own **name**, **trigger words**, **recommended settings** and **notes**, saved as you type.
+
+The first time, the hash is computed from the whole file, which takes a few seconds for a large checkpoint; it is kept and only computed again when the file changes. **Refresh from Civitai** asks Civitai again. Everything is stored in `ComfyUI/user/DiceForge/model_info`, one JSON file per model, so the model folders stay untouched. A merged or private model that isn't on Civitai still gets its hash and your notes.
+
 ## About the latent
 
 Like the output of **Empty Latent Image**, the latent works with any model you would use that node with: the core samplers adapt an empty latent to the model's latent format.
