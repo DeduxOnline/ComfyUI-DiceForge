@@ -1,12 +1,13 @@
 # ResolutionForge
 
-ComfyUI nodes for both ends of a generation. Two of them output `width`, `height` and `batch` for an empty latent, and both can pick the canvas size at random from a seed. The third one decodes the finished latent and saves the image.
+ComfyUI nodes for both ends of a generation. Two of them output `width`, `height` and `batch` for an empty latent, and both can pick the canvas size at random from a seed. The other two each replace several core nodes: one loads one or two text encoders, and one decodes the finished latent and saves the image.
 
 | Node | File | Use it when |
 |---|---|---|
 | **SDXL Resolution List** | `ResolutionForge/sdxl_resolution_list.py` | You want the standard SDXL sizes (1024x1024, 1216x832, ...) from a fixed list. |
 | **Resolution Selector (Random)** | `ResolutionForge/resolution_selector_random.py` | You want to set an aspect ratio and a megapixel target, like the core *Resolution Selector* node. |
 | **Load VAE + Decode + Save** | `ResolutionForge/vae_decode_save.py` | You want one node instead of *Load VAE*, *VAE Decode* and *Save Image*. |
+| **Load CLIP (Single / Dual)** | `ResolutionForge/clip_loader_single_dual.py` | You want one node instead of *Load CLIP* and *DualCLIPLoader*. |
 
 All nodes are in the `utils` category. They use the ComfyUI V3 node schema: in the Nodes 2.0 frontend, the secondary inputs sit in the node's **Advanced** section.
 
@@ -120,6 +121,27 @@ It does the work of three core nodes: *Load VAE*, *VAE Decode* and *Save Image*.
 - The node keeps the last VAE in memory, so it does not load the file again on every run. Picking another VAE replaces it.
 - Decoding works as in *VAE Decode*. If the GPU runs out of memory, ComfyUI retries with tiled decoding by itself.
 - `%date:yyyy-MM-dd%` and `%Node.widget%` tokens do not work in this node. The ComfyUI frontend replaces them only for its own save nodes. Use `%year%`, `%month%` and the other tokens above instead.
+
+## Load CLIP (Single / Dual)
+
+Node id: `CLIPLoaderSingleDual`.
+
+It replaces the core *Load CLIP* and *DualCLIPLoader* nodes. With `clip_name2` set to `None` it loads one text encoder, like *Load CLIP*. With a file in `clip_name2` it loads both, like *DualCLIPLoader*.
+
+### Inputs
+
+| Input | Section | Default | Description |
+|---|---|---|---|
+| `clip_name1` | main | — | The text encoder to load. |
+| `clip_name2` | main | `None` | The second text encoder, or `None` for a single one. |
+| `type` | main | `stable_diffusion` | The model the text encoders are for. The list has the types of both core nodes. |
+| `device` | Advanced | `default` | `cpu` keeps the text encoders on the CPU, as in the core nodes. |
+
+### Notes
+
+- The node reads the type lists from *Load CLIP* and *DualCLIPLoader*, so types added to them in a ComfyUI update show up here too. The recipes from both nodes are in the node's description.
+- Some types need one file and some need two. The node stops with an error that names the fix: for example, `sdxl` with `clip_name2` set to `None`, or `stable_diffusion` with two files. In current ComfyUI, `sd3`, `ltxv`, `hidream`, `ace` and `hunyuan_image` work both ways.
+- For Anima, pick the Qwen3 0.6B text encoder in `clip_name1`, leave `clip_name2` at `None` and keep the type `stable_diffusion`. For SDXL checkpoints, pick CLIP-L and CLIP-G and the type `sdxl`.
 
 ## Example workflows
 
