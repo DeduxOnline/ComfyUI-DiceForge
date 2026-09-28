@@ -65,6 +65,37 @@ function previewInput(config, node, last) {
   return { ratio: `${last.width}:${last.height}`, megapixels: (last.width * last.height) / (1024 * 1024) };
 }
 
+// Repairs of nodes saved by older versions. The nested resolution list of SDXL Resolution List can come back with a size where its group belongs
+// ("Any Listed" instead of "Random", and no size list), which the backend can't run: the group whose size list has that value is picked, with it.
+async function repairResolutionGroup(node) {
+  const group = node.widgets?.find((widget) => widget.name === "resolution");
+  const groups = group?.options?.values;
+  if (!group || !Array.isArray(groups) || groups.includes(group.value)) return;
+  const stale = String(group.value);
+  for (const candidate of groups) {
+    group.value = candidate;
+    group.callback?.(candidate);
+    await new Promise((resolve) => setTimeout(resolve, 0)); // The size list of the group is built after the change.
+    const size = node.widgets.find((widget) => widget.name === "resolution.size");
+    if (size?.options?.values?.includes(stale)) {
+      size.value = stale;
+      size.callback?.(stale);
+      console.info(`[DiceForge] ${node.comfyClass} #${node.id}: resolution repaired to ${candidate} / ${stale} (saved by an older version).`);
+      return;
+    }
+  }
+  group.value = groups[0]; // An unknown value: the first group, so the node runs.
+  group.callback?.(groups[0]);
+}
+// Inputs left from older versions (vae_alignment) that the node no longer has: unconnected ones are removed.
+function removeStaleInputs(node) {
+  const names = new Set((node.widgets ?? []).map((widget) => widget.name));
+  for (let index = (node.inputs?.length ?? 0) - 1; index >= 0; index--) {
+    const input = node.inputs[index];
+    if (input.widget && !names.has(input.widget.name) && input.link == null) node.removeInput(index);
+  }
+}
+
 // Hidden helper widget, added last so saved widget values keep their order.
 function addHelper(node, name, value) {
   const widget = node.addWidget("text", name, value, () => {}, { serialize: false, hidden: true });
@@ -88,7 +119,9 @@ app.registerExtension({
     node.onConfigure = function () {
       const seedMode = node.widgets?.find((widget) => widget.name === "seed_mode");
       if (seedMode && !seedMode.options?.values?.includes(seedMode.value)) seedMode.value = "random";
-      return onConfigure?.apply(this, arguments);
+      const result = onConfigure?.apply(this, arguments);
+      repairResolutionGroup(node).then(() => removeStaleInputs(node));
+      return result;
     };
     let last = null;
     // The node sends the size of each run with the settings it came from.

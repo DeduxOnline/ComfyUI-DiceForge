@@ -140,7 +140,9 @@ class SDXLResolutionListLatent(io.ComfyNode):
         return fingerprint(seed_mode) if group in ("Random", "Random Chaos") else None
     # Main method to get the resolution based on the selected option, applying randomization and rounding as needed, then building the empty latent with Empty Latent Image.
     @classmethod
-    def execute(cls, resolution, seed=0, scale=1.0, multiple=8, batch=1, seed_mode="random", preview=None):
+    def execute(cls, resolution=None, seed=0, scale=1.0, multiple=8, batch=1, seed_mode="random", preview=None):
+        if not isinstance(resolution, dict) or "size" not in resolution: # The nested list came without a valid group (a node saved by an older version).
+            raise ValueError("SDXL Resolution List (Latent): the resolution list of this node has no valid group (it was probably saved by an older version). Pick the group and size again, or add the node again.")
         picker = make_picker(seed_mode, seed) # How random picks follow the seed (random: reproducible, same picks as before seed modes existed).
         group, size = resolution["resolution"], resolution["size"] # Nested list value: the group, and the size picked in it.
         # Switching logic to determine the width and height based on the selected group, handling random picks and chaos sizes appropriately.
