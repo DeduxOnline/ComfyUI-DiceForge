@@ -26,6 +26,7 @@ The remembering modes keep their memory in a small file, so they continue after 
 | **Random Image** | DiceForge/loaders | `DiceForge/random_image.py` | You want an input image (img2img, ControlNet pose, IP-Adapter reference) picked from a folder, like **Load Image** with the file picked for you. |
 | **Random Sampler** | DiceForge/sampling | `DiceForge/random_sampler.py` | You want to compare samplers and schedulers: it picks a pair for KSampler from the ones you list. |
 | **Random VAE** | DiceForge/loaders | `DiceForge/random_vae.py` | You want to try the VAEs of a folder, like **Load VAE** with the file picked for you. |
+| **Load VAE + Decode + Save** | utils | `DiceForge/load_vae_decode_save.py` | You want Load VAE, VAE Decode and Save Image in one node: it decodes the latent with the chosen VAE and saves PNG files with the workflow, like Save Image, and passes the images on. The VAE stays loaded between runs while its name stays the same. |
 | **Dice Grid** | DiceForge/image | `DiceForge/dice_grid.py` | You want the images of a series side by side with labels: a LoRA, checkpoint or setting comparison, or an XY grid. |
 | **Random Diffusion Model** | DiceForge/loaders | `DiceForge/random_diffusion_model.py` | The same for diffusion models (`models/diffusion_models`, Flux and the like), like **Load Diffusion Model**. |
 
