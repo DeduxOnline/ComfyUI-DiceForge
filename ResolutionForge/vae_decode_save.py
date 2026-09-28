@@ -21,7 +21,7 @@ class LoadVAEDecodeSave(io.ComfyNode):
                 io.String.Input(
                     "filename_prefix",
                     default="ComfyUI",
-                    tooltip="The prefix for the file to save. May include formatting tokens such as %date:yyyy-MM-dd% or %Empty Latent Image.width%.",
+                    tooltip="The prefix for the file to save. A / makes a subfolder. May include %year%, %month%, %day%, %hour%, %minute%, %second%, %width% and %height%.",
                 ),
             ],
             outputs=[io.Image.Output(display_name="images")],

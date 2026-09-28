@@ -108,7 +108,7 @@ It does the work of three core nodes: *Load VAE*, *VAE Decode* and *Save Image*.
 |---|---|---|
 | `samples` | — | The latent to decode, for example the `LATENT` output of *KSampler*. |
 | `vae_name` | — | The VAE to decode with. The list is the same as in the core *Load VAE* node, including `taesd` and `pixel_space`. |
-| `filename_prefix` | `ComfyUI` | The prefix for the saved files, as in *Save Image*. It can include tokens such as `%date:yyyy-MM-dd%`. |
+| `filename_prefix` | `ComfyUI` | The prefix for the saved files, as in *Save Image*. A `/` makes a subfolder, for example `Anima/img`. It can include `%year%`, `%month%`, `%day%`, `%hour%`, `%minute%`, `%second%`, `%width%` and `%height%`. |
 
 ### Output
 
@@ -119,6 +119,7 @@ It does the work of three core nodes: *Load VAE*, *VAE Decode* and *Save Image*.
 - The files are PNGs in the ComfyUI output folder, with the prompt and the workflow as metadata, exactly as *Save Image* writes them.
 - The node keeps the last VAE in memory, so it does not load the file again on every run. Picking another VAE replaces it.
 - Decoding works as in *VAE Decode*. If the GPU runs out of memory, ComfyUI retries with tiled decoding by itself.
+- `%date:yyyy-MM-dd%` and `%Node.widget%` tokens do not work in this node. The ComfyUI frontend replaces them only for its own save nodes. Use `%year%`, `%month%` and the other tokens above instead.
 
 ## Example workflows
 
