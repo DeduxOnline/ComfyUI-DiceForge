@@ -86,7 +86,7 @@ The resolution is a nested list: first pick a group in `resolution`, then a size
 | `max_aspect` | main (Random Chaos only) | `2.0` | The most stretched aspect ratio Random Chaos may pick (1.0–4.0): 2.0 means up to 2:1 or 1:2, 1.0 gives only squares. |
 | `preview` | main | — | Live preview of the output size and megapixels, the same widget as in the core *Resolution Selector*. For the Random and Random Chaos groups it shows the size of the last run, as long as the settings other than `seed` stay the same, and "—" before a run or after a change. |
 | `seed` | main | `0` | Seed for the random options. The same seed always gives the same size. |
-| `scale` | Advanced | `1.0` | Scales width and height by this factor (0.1–10), before rounding to `multiple`. Note that 2.0 gives 4x the pixels. |
+| `scale` | Advanced | `1.0` | Multiplies the number of pixels (the area) by this factor (0.1–10), keeping the aspect ratio: `2.0` gives twice the pixels (each side about 1.41x), `0.5` half, `4.0` twice each side. Then rounded to `multiple`, taking the nearby multiples closest to the exact aspect ratio. With Random Chaos it multiplies the 1024x1024 pixel budget. Workflows made before this change used a side factor (2.0 gave 4x the pixels): use the square of the old value for the same size. |
 | `multiple` | Advanced | `8` | Rounds width and height to the nearest multiple of this value (8–256, in steps of 8). Use 64 for SDXL training sizes. |
 | `batch` | Advanced | `1` | Number of latents in the batch (1–32). |
 | `seed_mode` | Advanced | `random` | How the random groups change from run to run: `random`, `deck`, `shuffle`, `balanced` or `sequential`. See [Seed modes for sizes](#seed-modes-for-sizes). |
@@ -117,10 +117,10 @@ The `size` list shows width x height; the aspect ratios are given here for refer
 - **Random**: picks one of the listed sizes at random from the seed.
   - **Any Listed / Any High-Res Listed**: one of the Standard or High-Res sizes above.
   - **Vertical Listed / Horizontal Listed** (and their **High-Res** versions): only portrait or only landscape sizes.
-- **Random Chaos**: a random aspect ratio up to `max_aspect`, at about 1024x1024 pixels (the SDXL native size; use `scale` for larger or smaller images).
+- **Random Chaos**: a random aspect ratio up to `max_aspect`, at about 1024x1024 pixels times `scale` (the SDXL native size; `scale` 2.0 gives about 2 MP).
   - **Any**: wide or tall, equally likely (the ratio is picked evenly in log scale).
   - **Portrait / Landscape**: only taller than wide, or only wider than tall; never a square.
-  - The size rounds down to `multiple`, so it never exceeds 1024x1024 pixels before `scale` (it lands at about 0.9–1.0 of that).
+  - The size rounds down to `multiple`, so it never exceeds 1024x1024 pixels times `scale` (it lands at about 0.9–1.0 of that).
 
 ### Notes
 

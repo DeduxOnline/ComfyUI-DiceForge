@@ -34,7 +34,7 @@ RANDOM_LISTED = {
     "Horizontal High-Res Listed": [size for size in HIGH_RES.values() if size[0] > size[1]],
 }
 RANDOM_CHAOS = ["Any", "Portrait", "Landscape"] # Orientations for Random Chaos.
-CHAOS_PIXELS = 1024 * 1024 # Pixel budget of Random Chaos: the SDXL native size (use scale for larger or smaller sizes).
+CHAOS_PIXELS = 1024 * 1024 # Pixel budget of Random Chaos: the SDXL native size, times scale.
 # Node schema (V3 / Nodes 2.0): SDXL resolution selection with a nested list (pick a group, then a size of that group), outputting an empty latent of that size (like Empty Latent Image). Scale, multiple and batch are shown in the Advanced section.
 class SDXLResolutionListLatent(io.ComfyNode):
     @classmethod
@@ -53,7 +53,7 @@ class SDXLResolutionListLatent(io.ComfyNode):
                         io.DynamicCombo.Option("High-Res", [size(HIGH_RES, "High-res size, width x height.")]),
                         io.DynamicCombo.Option("Random", [size(RANDOM_LISTED, "Picks one of the listed sizes at random from the seed: any, only vertical or only horizontal.")]),
                         io.DynamicCombo.Option("Random Chaos", [
-                            size(RANDOM_CHAOS, "Orientation of the random aspect ratio: any, only portrait (taller than wide) or only landscape (wider than tall). The size stays within 1024x1024 pixels before scale."),
+                            size(RANDOM_CHAOS, "Orientation of the random aspect ratio: any, only portrait (taller than wide) or only landscape (wider than tall). The size stays within 1024x1024 pixels times scale."),
                             io.Float.Input("max_aspect", default=2.0, min=1.0, max=4.0, step=0.05, tooltip="The most stretched aspect ratio allowed (2.0 = up to 2:1 or 1:2)."),
                         ]),
                     ],
@@ -80,7 +80,7 @@ class SDXLResolutionListLatent(io.ComfyNode):
                     min=0.1,
                     max=10.0,
                     step=0.05,
-                    tooltip="Scale the width and height by this factor (2.0 gives 4x the pixels), before rounding to multiple.",
+                    tooltip="Multiply the number of pixels (the area) by this factor, keeping the aspect ratio: 2.0 gives twice the pixels (each side about 1.41x), 0.5 half. Then rounded to multiple.",
                     advanced=True,
                 ),
                 io.Int.Input(
@@ -117,14 +117,14 @@ class SDXLResolutionListLatent(io.ComfyNode):
                 io.Int.Output(display_name="seed", tooltip="The seed used for this run, for example to pass on to KSampler."),
             ],
         )
-    # Rounding method to make width and height multiples of `multiple`, with a minimum of `multiple` itself.
+    # Rounding method to make width and height multiples of `multiple` (at least `multiple` itself). Of the multiples just below and above each side,
+    # the pair closest to the exact aspect ratio is taken (then the one closest in pixels), so the ratio doesn't drift. round_down: both below, so the
+    # size never goes over the pixel budget (Random Chaos).
     @staticmethod
     def round_to_multiple(width, height, multiple=8, round_down=False):
-        snap = (lambda v: v // multiple) if round_down else (lambda v: round(v / multiple))
-        return (
-            max(multiple, snap(width) * multiple),
-            max(multiple, snap(height) * multiple),
-        )
+        steps = lambda value: {max(multiple, math.floor(value / multiple) * multiple)} | (set() if round_down else {max(multiple, math.ceil(value / multiple) * multiple)})
+        ratio, pixels = math.log(width / height), width * height
+        return min(((w, h) for w in steps(width) for h in steps(height)), key=lambda size: (round(abs(math.log(size[0] / size[1]) - ratio), 9), abs(size[0] * size[1] - pixels), size))
     # Chaos-based random size: an aspect ratio picked uniformly in log scale up to max_aspect (wide and tall equally likely), in the chosen orientation, sized to the pixel budget.
     # Seed modes other than random take turns between 8 equal parts of the range (4 for one orientation).
     @staticmethod
@@ -149,18 +149,14 @@ class SDXLResolutionListLatent(io.ComfyNode):
         if group == "Random":
             width, height = map(int, pick_label([f"{w} x {h}" for w, h in RANDOM_LISTED[size]], picker, seed).split(" x "))#Returning a random resolution from the listed sizes.
         elif group == "Random Chaos":
-            width, height = cls.chaos_size(picker, seed, size, resolution.get("max_aspect", 2.0))#Returning a random aspect ratio within the pixel budget for chaos sizes.
+            width, height = cls.chaos_size(picker, seed, size, resolution.get("max_aspect", 2.0), CHAOS_PIXELS * scale)#Returning a random aspect ratio within the pixel budget (times scale) for chaos sizes.
         else:
             width, height = (HIGH_RES if group == "High-Res" else STANDARD)[size]#Returning the fixed resolution for standard and high-res sizes.
-        # Applying the scale factor to the width and height, followed by rounding to multiple to ensure compatibility with the model's requirements.
+        # Scale multiplies the area: each side by its square root (Random Chaos has it in its pixel budget already). Then rounding to multiple;
+        # Chaos sizes round down, so they stay within the pixel budget.
         chaos = group == "Random Chaos"
-        to_pixels = math.floor if chaos else round # Chaos sizes round down all the way, so they stay within the pixel budget.
-        width, height = cls.round_to_multiple(
-            to_pixels(width * scale),
-            to_pixels(height * scale),
-            multiple,
-            round_down=chaos,
-        )
+        side = 1.0 if chaos else math.sqrt(scale)
+        width, height = cls.round_to_multiple(width * side, height * side, multiple, round_down=chaos)
         # Portrait and Landscape stay non-square after rounding (a ratio close to 1:1 can round to a square): the shorter side steps down, keeping the budget.
         if chaos and size != "Any" and width == height and max(resolution.get("max_aspect", 2.0), 1.0) > 1.0 and width > multiple:
             if size == "Portrait":

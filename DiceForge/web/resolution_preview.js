@@ -4,11 +4,21 @@ import { app } from "../../scripts/app.js";
 // helper widgets: a size or aspect ratio as the ratio ("1216:832") and the megapixels, so the core preview math gives exactly the size to show.
 // Fixed sizes and ratios show their size live; random options show the size of the last run, as long as the settings (other than the seed) are the same.
 
-// Python round() ties to even; Math.round ties up.
-function roundHalfToEven(value) {
-  const floor = Math.floor(value);
-  if (value - floor !== 0.5) return Math.round(value);
-  return floor % 2 === 0 ? floor : floor + 1;
+// The node's rounding of a fixed size (SDXLResolutionListLatent.round_to_multiple): of the multiples just below and above each side, the pair closest
+// to the exact aspect ratio, then closest in pixels.
+function roundToMultiple(width, height, multiple) {
+  const steps = (value) => [...new Set([Math.max(multiple, Math.floor(value / multiple) * multiple), Math.max(multiple, Math.ceil(value / multiple) * multiple)])];
+  const ratio = Math.log(width / height), pixels = width * height;
+  const key = ([w, h]) => [Math.round(Math.abs(Math.log(w / h) - ratio) * 1e9) / 1e9, Math.abs(w * h - pixels), w, h];
+  let best = null;
+  for (const w of steps(width)) for (const h of steps(height)) {
+    const candidate = [w, h];
+    if (!best) { best = candidate; continue; }
+    const [a, b] = [key(candidate), key(best)];
+    const index = a.findIndex((value, i) => value !== b[i]);
+    if (index >= 0 && a[index] < b[index]) best = candidate;
+  }
+  return best;
 }
 
 function widgetValue(node, name) {
@@ -27,12 +37,13 @@ const NODES = {
     }),
     isRandom: (current) => current.group !== "Standard" && current.group !== "High-Res",
     usesMaxAspect: (current) => current.group === "Random Chaos",
-    // Size after `scale` as the ratio, and its megapixels: the preview then rounds it to `multiple` like the node.
+    // The final size, as the node computes it (scale multiplies the area, then rounding to multiple), given to the preview as ratio and megapixels
+    // of an exact multiple, which the preview keeps as it is.
     fixed: (current) => {
       const match = /^(\d+)\s*x\s*(\d+)/.exec(current.size);
-      if (!match || !(current.scale > 0)) return null;
-      const width = roundHalfToEven(Number(match[1]) * current.scale);
-      const height = roundHalfToEven(Number(match[2]) * current.scale);
+      if (!match || !(current.scale > 0) || !(current.multiple > 0)) return null;
+      const side = Math.sqrt(current.scale);
+      const [width, height] = roundToMultiple(Number(match[1]) * side, Number(match[2]) * side, current.multiple);
       return { ratio: `${width}:${height}`, megapixels: (width * height) / (1024 * 1024) };
     },
   },
