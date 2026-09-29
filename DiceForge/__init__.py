@@ -13,7 +13,7 @@ from .random_image import RandomImageLoader
 from .dice_grid import DiceGrid
 from .random_sampler import RandomSampler
 from .random_vae import RandomVAELoader
-from .load_vae_decode_save import LoadVAEDecodeSave
+from .load_vae_decode_save import LoadVAEDecodeSave, VAEDecodeSave
 from .load_diffusion_model_clip import LoadDiffusionModelCLIP
 from .lora_stack import LoraStack
 from . import model_info # Server routes of the Model info dialog (web/model_info.js).
@@ -22,6 +22,6 @@ WEB_DIRECTORY = "./web" # Frontend extension: feeds the live size previews of th
 class DiceForgeExtension(ComfyExtension):
     @override
     async def get_node_list(self):
-        return [SDXLResolutionListLatent, ResolutionSelectorRandomLatent, CLIPTextEncodePositiveNegative, RandomIntSeedModes, RandomFloatSeedModes, RandomLoraLoader, RandomCheckpointLoader, RandomDiffusionModelLoader, RandomImageLoader, DiceGrid, RandomSampler, RandomVAELoader, LoadVAEDecodeSave, LoadDiffusionModelCLIP, LoraStack]
+        return [SDXLResolutionListLatent, ResolutionSelectorRandomLatent, CLIPTextEncodePositiveNegative, RandomIntSeedModes, RandomFloatSeedModes, RandomLoraLoader, RandomCheckpointLoader, RandomDiffusionModelLoader, RandomImageLoader, DiceGrid, RandomSampler, RandomVAELoader, LoadVAEDecodeSave, VAEDecodeSave, LoadDiffusionModelCLIP, LoraStack]
 async def comfy_entrypoint():
     return DiceForgeExtension()
