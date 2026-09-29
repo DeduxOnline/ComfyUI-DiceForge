@@ -296,3 +296,5 @@ app.registerExtension({
     return node.comfyClass === NODE_TYPE ? [{ content: "🎲 Wildcard Browser", callback: () => openBrowser(node) }] : [];
   },
 });
+
+export { insertIntoNode };

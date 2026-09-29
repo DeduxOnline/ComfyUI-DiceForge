@@ -85,6 +85,48 @@ async def model_info(kind, name, refresh=False):
         info["civitai"] = await civitai_lookup(info["sha256"])
     write_info(kind, name, info)
     return {"kind": kind, "file": name, **info}
+# Model browser (web/model_browser.js): every file of a model kind with what is already known about it, without hashing anything; the dialog looks
+# files up one by one with /diceforge/model-info. A local preview next to the file (name.preview.png, name.png... as Civitai Helper and LoRA Manager
+# save them) is shown first, else the first Civitai image.
+PREVIEW_ENDINGS = (".preview.png", ".preview.jpg", ".preview.jpeg", ".preview.webp", ".png", ".jpg", ".jpeg", ".webp")
+def local_preview(path, folder_files):
+    base = os.path.splitext(path)[0]
+    return next((base + ending for ending in PREVIEW_ENDINGS if os.path.basename(base + ending) in folder_files), None)
+def browser_entry(kind, name, path, folder_files):
+    stat = os.stat(path)
+    info = read_info(kind, name)
+    fresh = info.get("size") == stat.st_size and info.get("mtime") == stat.st_mtime
+    civitai = (info.get("civitai") or {}) if fresh else {}
+    user = info.get("user") or {}
+    images = civitai.get("images") or []
+    image = next((image for image in images if image.get("type") != "video"), images[0] if images else None)
+    found = bool(civitai.get("found"))
+    return {
+        "file": name,
+        "size": stat.st_size,
+        "mtime": stat.st_mtime,
+        "preview": local_preview(path, folder_files) is not None,
+        "checked": bool(civitai.get("checked")) and not civitai.get("error"),
+        "found": found,
+        "name": user.get("name") or (f"{civitai.get('model_name')} - {civitai.get('version_name')}" if found else ""),
+        "base_model": civitai.get("base_model") or "",
+        "trigger_words": [word.strip() for word in (user.get("trigger_words") or "").split(",") if word.strip()] or civitai.get("trigger_words") or [],
+        "image": image and {"url": image.get("url"), "type": image.get("type"), "nsfwLevel": image.get("nsfwLevel")},
+        "url": civitai.get("url") if found else None,
+    }
+def model_list(kind):
+    if kind not in KINDS:
+        raise web.HTTPBadRequest(text=f"Model browser: unknown kind {kind}.")
+    entries, listings = [], {}
+    for name in folder_paths.get_filename_list(kind):
+        path = folder_paths.get_full_path(kind, name)
+        if not path or not os.path.isfile(path):
+            continue
+        folder = os.path.dirname(path)
+        if folder not in listings: # One directory listing per folder instead of a check per preview name.
+            listings[folder] = set(os.listdir(folder))
+        entries.append(browser_entry(kind, name, path, listings[folder]))
+    return {"kind": kind, "files": entries}
 def register_routes():
     try:
         from server import PromptServer
@@ -95,6 +137,19 @@ def register_routes():
     async def get_model_info(request):
         query = request.rel_url.query
         return web.json_response(await model_info(query.get("kind", ""), query.get("file", ""), query.get("refresh") == "1"))
+    @routes.get("/diceforge/model-browser")
+    async def get_model_list(request):
+        kind = request.rel_url.query.get("kind", "")
+        return web.json_response(await asyncio.get_running_loop().run_in_executor(None, model_list, kind))
+    @routes.get("/diceforge/model-preview")
+    async def get_model_preview(request):
+        query = request.rel_url.query
+        kind, name = query.get("kind", ""), query.get("file", "")
+        path = folder_paths.get_full_path(kind, name) if kind in KINDS else None
+        preview = path and local_preview(path, set(os.listdir(os.path.dirname(path))))
+        if not preview:
+            raise web.HTTPNotFound(text="Model browser: no local preview.")
+        return web.FileResponse(preview, headers={"Cache-Control": "max-age=300"})
     @routes.post("/diceforge/model-info")
     async def save_model_info(request):
         body = await request.json()
