@@ -31,12 +31,14 @@ class LoadDiffusionModelCLIP(io.ComfyNode):
                     options=[NONE] + files,
                     default=NONE,
                     tooltip="The second text encoder. None loads only clip_name1, like Load CLIP. A file loads both, like DualCLIPLoader.",
+                    advanced=True,
                 ),
                 io.Combo.Input(
                     "type",
                     options=list(dict.fromkeys(single + dual)),  # Types of both CLIP nodes, without duplicates.
                     default=single[0],
                     tooltip="The model the text encoders are for. Some types need one file, some need two.",
+                    advanced=True,
                 ),
                 io.Combo.Input("weight_dtype", options=weight_dtypes(), default="default", tooltip="Weight precision of the diffusion model, as in Load Diffusion Model.", advanced=True),
                 io.Combo.Input("device", options=["default", "cpu"], default="default", tooltip="Where the text encoders run, as in Load CLIP.", advanced=True),
