@@ -1,5 +1,7 @@
 # DiceForge
 
+[![Tests](https://github.com/DeduxOnline/ComfyUI-DiceForge/actions/workflows/tests.yml/badge.svg)](https://github.com/DeduxOnline/ComfyUI-DiceForge/actions/workflows/tests.yml)
+
 **Controlled randomness for ComfyUI.** Every random pick in these nodes (a prompt choice, a wildcard line, an image size, a number) follows a *seed mode* you choose. Plain random repeats itself: roll 5 skies 5 times and you get about 3 different ones. DiceForge can deal them like cards, shuffle them like a playlist, balance the odds like a game, go through every combination, or change one detail at a time.
 
 | Seed mode | What it does | Same seed, same result |
@@ -417,6 +419,10 @@ COMFYUI_PATH=/path/to/ComfyUI npm test          # PowerShell: $env:COMFYUI_PATH=
 ```
 
 `e2e/server.js` makes a temporary ComfyUI base folder (`--base-directory`, in the system temp folder, deleted afterwards) with a link to this repository's `DiceForge` folder and small test files (stand-in model files, wildcards, images), starts a small stand-in for Civitai on the local machine (the tests never go online; DiceForge reads its address from `DICEFORGE_CIVITAI_URL`), and runs ComfyUI on the CPU at port 8199. `COMFYUI_PYTHON` picks the Python that runs ComfyUI (by default its `venv`/`.venv`, the portable build's `python_embeded`, or `python` from the PATH), `DICEFORGE_E2E_PORT` another port (the Civitai stand-in uses the next one). `npm run test:api` runs only the workflow tests, without a browser. A run takes about 3 minutes; after a failure, `npx playwright show-report report` shows screenshots and traces.
+
+### On GitHub
+
+GitHub Actions (`.github/workflows/tests.yml`) runs both suites on every push to `main` and every pull request, on Linux and the CPU, with the ComfyUI version the tests were written with (pinned in the workflow). A weekly run tests against ComfyUI's latest `master`, to see early when a ComfyUI update breaks something, and *Run workflow* on the Actions page can test any ComfyUI commit, branch or tag. When end-to-end tests fail, the run keeps the Playwright report (screenshots and traces) as the `playwright-report` artifact.
 
 ## About the latent
 

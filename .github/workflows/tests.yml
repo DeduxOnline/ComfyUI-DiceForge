@@ -1,0 +1,113 @@
+# DiceForge tests on GitHub Actions: the unit tests (tests/, pytest) and the end-to-end tests (e2e/, Playwright: a real ComfyUI server and browser),
+# on the CPU, against a pinned ComfyUI version (the one the tests were written with). A weekly run tests against ComfyUI's latest master too, to see
+# early when a ComfyUI update breaks something; a manual run can pick any ComfyUI commit, branch or tag.
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "17 5 * * 1" # Mondays: against ComfyUI master.
+  workflow_dispatch:
+    inputs:
+      comfyui_ref:
+        description: ComfyUI commit, branch or tag to test with
+        default: 79be670e2d9be63e238785af307369d2b9039ed1
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  COMFYUI_REF: ${{ github.event_name == 'schedule' && 'master' || inputs.comfyui_ref || '79be670e2d9be63e238785af307369d2b9039ed1' }}
+  COMFYUI_PATH: ${{ github.workspace }}/ComfyUI
+  PYTHON_VERSION: "3.11"
+
+jobs:
+  unit:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check out ComfyUI (${{ env.COMFYUI_REF }})
+        uses: actions/checkout@v4
+        with:
+          repository: comfyanonymous/ComfyUI
+          ref: ${{ env.COMFYUI_REF }}
+          path: ComfyUI
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: ComfyUI/requirements.txt
+
+      - name: Install ComfyUI's Python packages (CPU PyTorch)
+        run: |
+          python -m pip install --upgrade pip
+          pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+          pip install -r ComfyUI/requirements.txt pytest
+
+      - name: Run the unit tests
+        run: python -m pytest tests -v
+
+  e2e:
+    name: End-to-end tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check out ComfyUI (${{ env.COMFYUI_REF }})
+        uses: actions/checkout@v4
+        with:
+          repository: comfyanonymous/ComfyUI
+          ref: ${{ env.COMFYUI_REF }}
+          path: ComfyUI
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: ComfyUI/requirements.txt
+
+      - name: Install ComfyUI's Python packages (CPU PyTorch)
+        run: |
+          python -m pip install --upgrade pip
+          pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+          pip install -r ComfyUI/requirements.txt
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: e2e/package-lock.json
+
+      - name: Install Playwright and Chromium
+        working-directory: e2e
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Run the end-to-end tests
+        working-directory: e2e
+        env:
+          COMFYUI_PYTHON: python
+        run: npm test
+
+      - name: Keep the Playwright report (screenshots and traces of failures)
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            e2e/report/
+            e2e/results/
+          retention-days: 14
+          if-no-files-found: ignore
