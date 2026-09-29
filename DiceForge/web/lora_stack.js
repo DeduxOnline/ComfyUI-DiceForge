@@ -2,6 +2,7 @@ import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
 import { openModelInfo } from "./model_info.js";
 import { openModelBrowser, BROWSERS, compareBases } from "./model_browser.js";
+import { fitNodeHeight } from "./node_size.js";
 
 // LoRA Stack (lora_stack.py): the rows of LoRAs drawn in the node, like rgthree's Power Lora Loader. The node's "loras" text input holds them as JSON;
 // it is hidden and this panel edits it. Each row: on/off, the LoRA (click to change it in the LoRA Browser), Model info, a group, a fixed strength or
@@ -379,7 +380,7 @@ function setUp(node) {
         })) }, "📂 Presets")),
       modelLine, noteLine);
     checkBases();
-    if (!node.flags?.collapsed && node.size[1] < node.computeSize()[1]) node.setSize([node.size[0], node.computeSize()[1]]);
+    if (!node.flags?.collapsed) fitNodeHeight(node); // Room for the rows (node_size.js).
   }
   const modelLine = element("div", { class: "muted model" });
   const noteLine = element("div", { class: "muted model" });
