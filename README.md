@@ -22,6 +22,7 @@ The remembering modes keep their memory in a small file, so they continue after 
 | **Random Int** | DiceForge/random | `DiceForge/random_int.py` | You want a random whole number (steps, an index, anything) that can go through every value before repeating. |
 | **Random Float** | DiceForge/random | `DiceForge/random_float.py` | You want a random number (CFG, denoise, LoRA strength) spread evenly over a range. |
 | **Random LoRA** | DiceForge/loaders | `DiceForge/random_lora.py` | You want to try the LoRAs of a folder one after another, like **Load LoRA** with the file picked for you. |
+| **LoRA Stack** | DiceForge/loaders | `DiceForge/lora_stack.py` | You want several LoRAs in one node, like rgthree's *Power Lora Loader*, with random strengths, LoRAs that take turns, and their trigger words as text. |
 | **Random Checkpoint** | DiceForge/loaders | `DiceForge/random_checkpoint.py` | You want to compare the checkpoints of a folder, like **Load Checkpoint** with the file picked for you. |
 | **Random Image** | DiceForge/loaders | `DiceForge/random_image.py` | You want an input image (img2img, ControlNet pose, IP-Adapter reference) picked from a folder, like **Load Image** with the file picked for you. |
 | **Random Sampler** | DiceForge/sampling | `DiceForge/random_sampler.py` | You want to compare samplers and schedulers: it picks a pair for KSampler from the ones you list. |
@@ -311,6 +312,31 @@ Right-click a node with a model file picked in a list (**Load Checkpoint**, **Lo
 - your own **name**, **trigger words**, **recommended settings** and **notes**, saved as you type.
 
 The first time, the hash is computed from the whole file, which takes a few seconds for a large checkpoint; it is kept and only computed again when the file changes. **Refresh from Civitai** asks Civitai again. Everything is stored in `ComfyUI/user/DiceForge/model_info`, one JSON file per model, so the model folders stay untouched. A merged or private model that isn't on Civitai still gets its hash and your notes.
+
+## LoRA Stack
+
+Node id: `DiceForgeLoraStack`. Several LoRAs in one node, like rgthree's *Power Lora Loader*, applied in order to the model and CLIP.
+
+Each row: **⋮⋮** (drag to reorder), on/off, the LoRA (click its name to pick another one in the [LoRA Browser](#lora-browser)), **ℹ** ([Model info](#model-info)), a **group**, **🎲**, the strength and **✕** (remove). **＋ Add LoRA** opens the LoRA Browser: **+ Add** adds a row, as many as you like. The mouse wheel over a strength changes it by 0.05. A row whose file is missing is outlined in red.
+
+- **Separate CLIP strength** (under the rows): each row gets a second strength (*C*) for the CLIP; otherwise the same strength is used for both.
+- **🎲 Random strength:** the row gets two values, and each run picks a strength between them (in steps of 0.05) by the seed mode. With `deck` or `sequential` and *control after generate* on *increment*, 0.50–0.90 goes through all 9 strengths before repeating one. With a separate CLIP strength, the range is for the model strength only.
+- **Groups (A–D):** the LoRAs of a group take turns. Under the rows, *Group A: use 1 to 1 of 3* sets how many of them each run uses (0 to all of them). Every set of LoRAs is one option of the seed mode, so `deck` or `shuffle` goes through every combination before repeating one: three style LoRAs with *use 1 to 2* give 6 combinations. LoRAs turned off do not take part.
+
+| Input | Description |
+|---|---|
+| `model` | The diffusion model the LoRAs are applied to. |
+| `clip` | Optional. The CLIP model they are applied to; unconnected, only the model changes. |
+| `seed` | Seed for random strengths and groups. |
+| `seed_mode` | Advanced. `random`, `deck`, `shuffle`, `balanced` or `sequential`, as in [Seed modes](#seed-modes). Without 🎲 and groups the seed changes nothing. |
+
+| Output | Description |
+|---|---|
+| `model`, `clip` | With the LoRAs applied. |
+| `triggers` | The trigger words of the LoRAs that were applied (your own from Model info, else Civitai's; each word once), for example to connect to a text node or to put in CLIP Dual Text Encode. |
+| `lora_info` | What was applied, for example `detail 0.65, style_b 1` (with the CLIP strength after a `/` when it differs), for a file name, a note or Dice Grid. |
+
+The rows are saved in the workflow (in the node's hidden `loras` input, as JSON). The node reads each LoRA file once and keeps it in memory while it is in the stack, and runs again when you change trigger words in Model info.
 
 ## LoRA Browser
 

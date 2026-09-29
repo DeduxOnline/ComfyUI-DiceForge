@@ -83,11 +83,12 @@ async function lookUp(kind, file) {
   return (await fetchList(kind)).find((entry) => entry.file === file);
 }
 
-async function openBrowser(node, spec) {
+// target: what the buttons do (targetOf for a node's menu), or { pick(file), label, hint } from another extension (LoRA Stack): pick returns true
+// to close the browser, or a message to show.
+async function openBrowser(node, spec, target = targetOf(node, spec)) {
   addStyle();
   const { kind } = spec;
   const what = spec.one;
-  const target = targetOf(node, spec);
   let files = [], folder = "", selectedFile = target?.model?.value, stopLookUp = null;
   const search = element("input", { placeholder: "Search by file, name or trigger word…" });
   const base = element("select", {}, element("option", { value: "" }, "All base models"));
@@ -121,6 +122,13 @@ async function openBrowser(node, spec) {
       } }, entry.file === target.model.value ? "In use" : "Use");
       use.disabled = entry.file === target.model.value;
       return [use];
+    }
+    if (target?.pick) {
+      return [element("button", { class: "go", onclick: () => {
+        const result = target.pick(entry.file);
+        if (result === true) close();
+        else if (typeof result === "string") say(result);
+      } }, target.label)];
     }
     if (target?.triggers) {
       return [element("button", { class: "go", title: entry.trigger_words.length ? entry.trigger_words.join(", ") : "No trigger words known: look it up on Civitai or add your own in Info", onclick: () => {
@@ -247,7 +255,7 @@ async function openBrowser(node, spec) {
     }
   });
   for (const input of [search, base, sort]) input.addEventListener(input === search ? "input" : "change", draw);
-  const hint = target?.model ? `Use puts a ${what} in ${target.model.name}.` : target?.folder ? `Use folder sets the folder ${spec.randomName} picks from.` : target?.triggers ? `+ Triggers inserts a ${what}'s trigger words where the cursor was in the prompt.` : "";
+  const hint = target?.pick ? target.hint : target?.model ? `Use puts a ${what} in ${target.model.name}.` : target?.folder ? `Use folder sets the folder ${spec.randomName} picks from.` : target?.triggers ? `+ Triggers inserts a ${what}'s trigger words where the cursor was in the prompt.` : "";
   back.append(element("div", { class: "dflb" },
     element("h2", {}, `${spec.title} Browser`),
     element("div", { class: "top" }, search, base, sort, lookAll, element("button", { onclick: close }, "Close")),
