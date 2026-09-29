@@ -33,16 +33,16 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Check out ComfyUI (${{ env.COMFYUI_REF }})
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: comfyanonymous/ComfyUI
           ref: ${{ env.COMFYUI_REF }}
           path: ComfyUI
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
@@ -62,16 +62,16 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Check out ComfyUI (${{ env.COMFYUI_REF }})
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: comfyanonymous/ComfyUI
           ref: ${{ env.COMFYUI_REF }}
           path: ComfyUI
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
@@ -83,7 +83,7 @@ jobs:
           pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
           pip install -r ComfyUI/requirements.txt
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
@@ -102,8 +102,8 @@ jobs:
         run: npm test
 
       - name: Keep the Playwright report (screenshots and traces of failures)
-        if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v4
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v5
         with:
           name: playwright-report
           path: |
