@@ -111,6 +111,7 @@ def browser_entry(kind, name, path, folder_files):
         "name": user.get("name") or (f"{civitai.get('model_name')} - {civitai.get('version_name')}" if found else ""),
         "base_model": civitai.get("base_model") or "",
         "trigger_words": [word.strip() for word in (user.get("trigger_words") or "").split(",") if word.strip()] or civitai.get("trigger_words") or [],
+        "settings": (user.get("settings") or "").strip(),
         "image": image and {"url": image.get("url"), "type": image.get("type"), "nsfwLevel": image.get("nsfwLevel")},
         "url": civitai.get("url") if found else None,
     }
