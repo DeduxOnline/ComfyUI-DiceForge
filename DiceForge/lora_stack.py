@@ -1,13 +1,16 @@
+import asyncio
 import itertools
 import json
 import logging
 import os
+import re
 import comfy.sd
 import comfy.utils
 import folder_paths
+from aiohttp import web
 from typing_extensions import override
 from comfy_api.latest import ComfyExtension, io
-from .model_info import read_info, info_file
+from .model_info import KINDS, read_info, info_file
 from .seed_modes import MEMORY, SEED_MODES, make_picker, pick_index, seed_mode_tooltip, fingerprint
 # LoRA Stack: several LoRAs in one node, like rgthree's Power Lora Loader, with the DiceForge seed modes. The rows live in the "loras" input as JSON,
 # edited by the frontend (web/lora_stack.js):
@@ -140,6 +143,80 @@ class LoraStack(io.ComfyNode):
         MEMORY.save()
         logging.info(f"[DiceForge] LoRA Stack | {', '.join(info) or 'no LoRA'} | Seed: {seed} ({seed_mode})")
         return io.NodeOutput(model, clip, ", ".join(triggers), ", ".join(info))
+# Presets: a stack saved as a file (ComfyUI/user/DiceForge/lora_presets/name.json), to apply in any LoRA Stack or share. The same file is what
+# Export downloads and Import reads.
+PRESET_FOLDER = os.path.join(folder_paths.get_user_directory(), "DiceForge", "lora_presets")
+PRESET_NAME = re.compile(r"[\w\-. ()]+")
+def preset_path(name):
+    name = (name or "").strip().removesuffix(".json")
+    if not PRESET_NAME.fullmatch(name) or name.startswith("."):
+        raise web.HTTPBadRequest(text=f"LoRA Stack: {name!r} is not a usable preset name (letters, digits, space, - _ . ( )).")
+    return name, os.path.join(PRESET_FOLDER, name + ".json")
+def preset_stack(data):
+    stack = data.get("stack") if isinstance(data, dict) and "stack" in data else data # A preset file, or a bare stack.
+    if not isinstance(stack, dict) or not isinstance(stack.get("rows"), list):
+        raise web.HTTPBadRequest(text="LoRA Stack: this is not a LoRA Stack preset (no rows).")
+    return {"rows": [row for row in stack["rows"] if isinstance(row, dict) and row.get("lora")], "groups": stack.get("groups") or {}, "separate_clip": bool(stack.get("separate_clip"))}
+def list_presets():
+    presets = []
+    if os.path.isdir(PRESET_FOLDER):
+        for file in sorted(os.listdir(PRESET_FOLDER), key=str.lower):
+            if file.endswith(".json"):
+                try:
+                    with open(os.path.join(PRESET_FOLDER, file), encoding="utf-8") as handle:
+                        stack = preset_stack(json.load(handle))
+                except (OSError, ValueError, web.HTTPException):
+                    continue
+                presets.append({"name": file[:-5], "loras": [row["lora"] for row in stack["rows"]], "modified": os.path.getmtime(os.path.join(PRESET_FOLDER, file))})
+    return presets
+# Base models for the mismatch warning: what Model info already knows about each file (nothing is hashed or asked here).
+def cached_base(kind, name):
+    path = folder_paths.get_full_path(kind, name) if kind in KINDS else None
+    if not path:
+        return None
+    info, stat = read_info(kind, name), os.stat(path)
+    if info.get("size") != stat.st_size or info.get("mtime") != stat.st_mtime:
+        return None
+    return (info.get("civitai") or {}).get("base_model")
+def register_routes():
+    try:
+        from server import PromptServer
+        routes = PromptServer.instance.routes
+    except Exception: # Loaded outside the ComfyUI server (tests): no routes.
+        return
+    @routes.get("/diceforge/lora-presets")
+    async def get_presets(request):
+        return web.json_response({"folder": PRESET_FOLDER, "presets": list_presets()})
+    @routes.get("/diceforge/lora-presets/file")
+    async def get_preset(request):
+        name, path = preset_path(request.rel_url.query.get("name"))
+        if not os.path.isfile(path):
+            raise web.HTTPNotFound(text=f"LoRA Stack: no preset {name}.")
+        with open(path, encoding="utf-8") as handle:
+            return web.json_response({"name": name, "stack": preset_stack(json.load(handle))})
+    @routes.post("/diceforge/lora-presets")
+    async def save_preset(request):
+        body = await request.json()
+        name, path = preset_path(body.get("name"))
+        stack = preset_stack(body.get("stack")) # Checked before anything is written.
+        if os.path.isfile(path) and not body.get("overwrite"):
+            raise web.HTTPConflict(text=f"LoRA Stack: a preset named {name} already exists.")
+        os.makedirs(PRESET_FOLDER, exist_ok=True)
+        with open(path, "w", encoding="utf-8") as handle:
+            json.dump({"type": "DiceForge LoRA Stack preset", "version": 1, "stack": stack}, handle, ensure_ascii=False, indent=1)
+        return web.json_response({"saved": name})
+    @routes.delete("/diceforge/lora-presets")
+    async def delete_preset(request):
+        name, path = preset_path(request.rel_url.query.get("name"))
+        if os.path.isfile(path):
+            os.remove(path)
+        return web.json_response({"deleted": name})
+    @routes.post("/diceforge/model-bases")
+    async def model_bases(request):
+        items = (await request.json()).get("items") or []
+        found = await asyncio.get_running_loop().run_in_executor(None, lambda: [cached_base(item.get("kind"), item.get("file")) for item in items[:500]])
+        return web.json_response({"bases": found})
+register_routes()
 # Extension entry point for ComfyUI V3 node registration.
 class LoraStackExtension(ComfyExtension):
     @override

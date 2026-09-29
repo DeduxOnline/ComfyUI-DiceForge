@@ -5,7 +5,8 @@ import { openModelBrowser, BROWSERS } from "./model_browser.js";
 
 // LoRA Stack (lora_stack.py): the rows of LoRAs drawn in the node, like rgthree's Power Lora Loader. The node's "loras" text input holds them as JSON;
 // it is hidden and this panel edits it. Each row: on/off, the LoRA (click to change it in the LoRA Browser), Model info, a group, a fixed strength or
-// a random range (🎲), and the CLIP strength when it is set apart. Groups (A-D) take turns: "use 1 to 2 of these".
+// a random range (🎲), and the CLIP strength when it is set apart. Groups (A-D) take turns: "use 1 to 2 of these". A row made for another base model
+// than the connected model is marked, and the stack can be saved as a preset file and applied in any LoRA Stack.
 const NODE_TYPE = "DiceForgeLoraStack";
 const GROUPS = ["A", "B", "C", "D"];
 const LORAS = BROWSERS.find((spec) => spec.kind === "loras");
@@ -25,6 +26,14 @@ const STYLE = `
 .dfls .add{border-radius:6px;padding:4px;width:100%}.dfls .foot{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .dfls .group{display:flex;gap:4px;align-items:center;padding:1px 6px;color:#bbb}.dfls .tag{font-weight:700;color:#cfe0ff}
 .dfls input[type=checkbox]{margin:0;cursor:pointer}
+.dfls .row.warn{border-color:#c9a13a}.dfls .row.bad{border-color:#d9534f}.dfls .mark{flex:none;cursor:help}.dfls .model{padding:0 4px}
+.dflp-back{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:10000;display:flex;align-items:center;justify-content:center}
+.dflp{background:#353535;color:#ddd;border:1px solid #555;border-radius:10px;width:min(720px,94vw);max-height:84vh;display:flex;flex-direction:column;padding:14px 16px;font:14px system-ui,sans-serif;box-shadow:0 10px 40px #000a;box-sizing:border-box}
+.dflp h2{margin:0 0 10px;font-size:20px;color:#fff}.dflp .top{display:flex;gap:8px;margin-bottom:10px;align-items:center}
+.dflp .list{overflow:auto;display:flex;flex-direction:column;gap:6px}.dflp .item{display:flex;gap:8px;align-items:center;background:#2a2a2a;border:1px solid #474747;border-radius:6px;padding:6px 8px}
+.dflp .item .text{flex:1;min-width:0}.dflp .item b{color:#fff}.dflp .muted{color:#999;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dflp button{background:#222;color:#eee;border:1px solid #666;border-radius:6px;padding:4px 10px;cursor:pointer;font:inherit}.dflp button:hover{background:#2c2c2c}
+.dflp button.go{border-color:#4a7a4a;color:#bfe8bf}.dflp .status{color:#9c9;font-size:13px;min-height:18px;margin-top:8px}
 `;
 function addStyle() {
   if (document.getElementById("dfls-style")) return;
@@ -52,6 +61,123 @@ async function loraList() {
     try { loraFiles = new Set(await (await api.fetchApi("/models/loras")).json()); } catch { loraFiles = new Set(); }
   }
   return loraFiles;
+}
+
+// Base model check: Civitai's base model of each LoRA against the one of the model the stack gets (traced back through the nodes in between to the
+// loader, like Load Checkpoint or Load Diffusion Model). Different families (SDXL / SD 1.5 / Flux...) do not work together; within a family (SDXL,
+// Pony, Illustrious, NoobAI) a LoRA often works on another base's model, but not as well. Unknown bases give no warning.
+function family(base) {
+  const name = base.toLowerCase();
+  const families = [[/pony|illustrious|noob|sdxl|playground/, "SDXL"], [/^sd ?1/, "SD 1"], [/^sd ?2/, "SD 2"], [/^sd ?3\.5/, "SD 3.5"], [/^sd ?3/, "SD 3"],
+    [/^flux\.?1|^flux 1/, "Flux.1"], [/^flux\.?2/, "Flux.2"], [/hunyuan video/, "Hunyuan Video"], [/^wan/, "Wan"]];
+  return families.find(([pattern]) => pattern.test(name))?.[1] ?? name;
+}
+function compareBases(lora, model) {
+  if (!lora || !model || lora.toLowerCase() === model.toLowerCase()) return null;
+  if (family(lora) === family(model)) return { level: "warn", text: `Made for ${lora}, the model is ${model}: it may work, but not as well.` };
+  return { level: "bad", text: `Made for ${lora}, the model is ${model}: a LoRA for another model family does not work on it.` };
+}
+const MODEL_WIDGETS = [[/ckpt|checkpoint/i, "checkpoints"], [/unet|diffusion/i, "diffusion_models"]];
+const MODEL_FILE = /\.(safetensors|ckpt|pt|pth|bin|gguf|sft)$/i;
+function modelSource(node) {
+  const seen = new Set();
+  for (let current = node; current && !seen.has(current.id);) {
+    seen.add(current.id);
+    const slot = current.inputs?.findIndex((input) => input.type === "MODEL") ?? -1;
+    const source = slot >= 0 ? current.getInputNode(slot) : null;
+    if (!source) return null;
+    for (const [pattern, kind] of MODEL_WIDGETS) {
+      const widget = source.widgets?.find((widget) => pattern.test(widget.name) && typeof widget.value === "string" && MODEL_FILE.test(widget.value));
+      if (widget) return { kind, file: widget.value };
+    }
+    current = source; // A node in between (another LoRA loader, Model Sampling...): follow its model input.
+  }
+  return null;
+}
+const bases = new Map(); // "kind|file" -> { base, time }: what Model info knows, asked again after a while when unknown (it may have been looked up since).
+async function fetchBases(items) {
+  const now = Date.now();
+  const missing = items.filter(({ kind, file }) => { const known = bases.get(`${kind}|${file}`); return !known || (!known.base && now - known.time > 15000); });
+  if (!missing.length) return;
+  missing.forEach(({ kind, file }) => bases.set(`${kind}|${file}`, { base: bases.get(`${kind}|${file}`)?.base ?? null, time: now }));
+  try {
+    const response = await api.fetchApi("/diceforge/model-bases", { method: "POST", body: JSON.stringify({ items: missing }) });
+    const found = (await response.json()).bases;
+    missing.forEach(({ kind, file }, index) => bases.set(`${kind}|${file}`, { base: found[index] ?? null, time: now }));
+  } catch { /* No answer: no warnings. */ }
+}
+const baseOf = (kind, file) => bases.get(`${kind}|${file}`)?.base ?? null;
+
+// Presets: saved stacks, as files in ComfyUI/user/DiceForge/lora_presets. Replace puts a preset's rows in the node, + Add adds them to its rows;
+// ⬇ File downloads the preset file (to share it), Import reads one.
+async function presetRequest(path, options) {
+  const response = await api.fetchApi(path, options);
+  if (!response.ok) throw Object.assign(new Error(await response.text()), { status: response.status });
+  return response.json();
+}
+async function savePreset(name, stack) {
+  const body = (overwrite) => ({ method: "POST", body: JSON.stringify({ name, stack, overwrite }) });
+  try {
+    return await presetRequest("/diceforge/lora-presets", body(false));
+  } catch (error) {
+    if (error.status !== 409 || !confirm(`A preset named "${name}" already exists. Replace it?`)) throw error;
+    return presetRequest("/diceforge/lora-presets", body(true));
+  }
+}
+function openPresets(apply) {
+  const back = element("div", { class: "dflp-back" });
+  const list = element("div", { class: "list" });
+  const status = element("div", { class: "status" });
+  const say = (text) => { status.textContent = text; };
+  const onKey = (event) => { if (event.key === "Escape") { event.stopPropagation(); close(); } };
+  function close() { back.remove(); document.removeEventListener("keydown", onKey, true); }
+  back.addEventListener("mousedown", (event) => { if (event.target === back) close(); });
+  document.addEventListener("keydown", onKey, true);
+  const load = (name) => presetRequest(`/diceforge/lora-presets/file?name=${encodeURIComponent(name)}`);
+  async function draw() {
+    let data;
+    try { data = await presetRequest("/diceforge/lora-presets"); } catch (error) { return say(error.message); }
+    list.replaceChildren(...(data.presets.length ? data.presets.map((preset) => element("div", { class: "item" },
+      element("div", { class: "text" }, element("b", {}, preset.name), element("div", { class: "muted", title: preset.loras.join("\n") },
+        `${preset.loras.length} LoRA${preset.loras.length === 1 ? "" : "s"}: ${preset.loras.map(shortName).join(", ")}`)),
+      element("button", { class: "go", title: "Put this preset's rows in the node, instead of its rows", onclick: async () => { apply((await load(preset.name)).stack, "replace"); close(); } }, "Replace"),
+      element("button", { title: "Add this preset's rows after the node's rows", onclick: async () => { apply((await load(preset.name)).stack, "add"); close(); } }, "+ Add"),
+      element("button", { title: "Download the preset file, to share it or keep a copy", onclick: async () => {
+        const blob = new Blob([JSON.stringify({ type: "DiceForge LoRA Stack preset", version: 1, stack: (await load(preset.name)).stack }, null, 1)], { type: "application/json" });
+        const link = element("a", { href: URL.createObjectURL(blob), download: `${preset.name}.json` });
+        document.body.append(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+      } }, "⬇ File"),
+      element("button", { title: "Delete this preset", onclick: async () => {
+        if (!confirm(`Delete the preset "${preset.name}"?`)) return;
+        await presetRequest(`/diceforge/lora-presets?name=${encodeURIComponent(preset.name)}`, { method: "DELETE" });
+        say(`Deleted ${preset.name}.`);
+        draw();
+      } }, "🗑"))) : [element("div", { class: "muted" }, `No presets yet: save a stack with 💾 Save preset in the node, or import a preset file. They are kept in ${data.folder}.`)]));
+  }
+  const picker = element("input", { type: "file", accept: ".json,application/json", multiple: "", style: "display:none" });
+  picker.addEventListener("change", async () => {
+    for (const file of picker.files) {
+      try {
+        const stack = JSON.parse(await file.text());
+        const name = file.name.replace(/\.json$/i, "").replace(/[^\w\-. ()]/g, "_");
+        await savePreset(name, stack.stack ?? stack);
+        say(`Imported ${name}.`);
+      } catch (error) {
+        say(`${file.name}: ${error.message}`);
+      }
+    }
+    picker.value = "";
+    draw();
+  });
+  back.append(element("div", { class: "dflp" },
+    element("h2", {}, "LoRA Stack presets"),
+    element("div", { class: "top" }, element("button", { onclick: () => picker.click() }, "⬆ Import file…"), picker, element("span", { style: "flex:1" }), element("button", { onclick: close }, "Close")),
+    list, status));
+  document.body.append(back);
+  draw();
 }
 
 function numberInput(value, title, onChange) {
@@ -111,13 +237,14 @@ function setUp(node) {
         next.rows[index].group = group.value;
         if (group.value && !next.groups[group.value]) next.groups[group.value] = { min: 1, max: 1 };
       }));
-      const line = element("div", { class: "row" + (row.on === false ? " off" : "") + (missing ? " missing" : ""), title: missing ? `${row.lora} is not in the loras folders` : "" },
+      const line = element("div", { class: "row" + (row.on === false ? " off" : "") + (missing ? " missing" : ""), title: missing ? `${row.lora} is not in the loras folders` : "", "data-lora": row.lora },
         element("span", { class: "grip", title: "Drag to reorder" }, "⋮⋮"),
         toggle,
         element("span", { class: "name", title: `${row.lora}\nClick to pick another LoRA`, onclick: () => browse({
           label: "Choose", hint: `Choose puts a LoRA in this row (instead of ${shortName(row.lora)}).`,
           pick: (file) => { set((r) => { r.lora = file; }); return true; },
         }) }, shortName(row.lora)),
+        element("span", { class: "mark" }),
         element("button", { title: "Model info", onclick: () => openModelInfo("loras", row.lora) }, "ℹ"),
         group,
         element("button", { class: row.random ? "on" : "", title: "Random strength: picked between two values by the seed mode", onclick: () => set((r) => {
@@ -170,10 +297,55 @@ function setUp(node) {
         label: "+ Add", hint: "+ Add adds a LoRA to the stack; add as many as you like, then close.",
         pick: (file) => { update((next) => { next.rows.push({ on: true, lora: file, strength: 1, clip: 1, random: false, group: "" }); }); return `${shortName(file)} added to the stack.`; },
       }) }, "＋ Add LoRA"),
-      element("label", { class: "foot muted" }, separate, "Separate CLIP strength"));
+      element("div", { class: "foot" },
+        element("label", { class: "foot muted" }, separate, "Separate CLIP strength"),
+        element("span", { style: "flex:1" }),
+        element("button", { title: "Save the rows as a preset file, to apply in any LoRA Stack", onclick: async () => {
+          const name = prompt("Preset name:", "");
+          if (!name) return;
+          try { await savePreset(name.trim(), read()); note(`Saved the preset ${name.trim()}.`); } catch (error) { note(error.message); }
+        } }, "💾 Save preset"),
+        element("button", { title: "Apply, export, import or delete presets", onclick: () => openPresets((preset, how) => update((next) => {
+          if (how === "replace") Object.assign(next, { rows: preset.rows, groups: preset.groups ?? {}, separate_clip: !!preset.separate_clip });
+          else {
+            next.rows.push(...preset.rows);
+            next.groups = { ...(preset.groups ?? {}), ...next.groups };
+            next.separate_clip = next.separate_clip || !!preset.separate_clip;
+          }
+        })) }, "📂 Presets")),
+      modelLine, noteLine);
+    checkBases();
     if (!node.flags?.collapsed && node.size[1] < node.computeSize()[1]) node.setSize([node.size[0], node.computeSize()[1]]);
   }
-  node.diceforgeStack = { render };
+  const modelLine = element("div", { class: "muted model" });
+  const noteLine = element("div", { class: "muted model" });
+  let noteTimer = null;
+  const note = (text) => { noteLine.textContent = text; clearTimeout(noteTimer); noteTimer = setTimeout(() => { noteLine.textContent = ""; }, 5000); };
+  // Marks rows made for another base model than the connected model's; runs after each render and every few seconds (the model can change upstream).
+  async function checkBases() {
+    if (!panel.isConnected) return;
+    const source = modelSource(node);
+    await fetchBases([...(source ? [source] : []), ...read().rows.map((row) => ({ kind: "loras", file: row.lora }))]);
+    const modelBase = source ? baseOf(source.kind, source.file) : null;
+    modelLine.textContent = !source ? "" : modelBase ? `Model: ${shortName(source.file)} · ${modelBase}`
+      : `Model: ${shortName(source.file)} · base unknown (look it up in its browser or Model info to check the LoRAs against it)`;
+    for (const line of panel.querySelectorAll(".row[data-lora]")) {
+      const loraBase = baseOf("loras", line.dataset.lora);
+      const result = compareBases(loraBase, modelBase);
+      line.classList.toggle("warn", result?.level === "warn");
+      line.classList.toggle("bad", result?.level === "bad");
+      const mark = line.querySelector(".mark");
+      mark.textContent = result ? (result.level === "bad" ? "⛔" : "⚠️") : "";
+      mark.title = result?.text ?? "";
+    }
+  }
+  const timer = setInterval(checkBases, 3000);
+  const onRemoved = node.onRemoved;
+  node.onRemoved = function (...args) {
+    clearInterval(timer);
+    return onRemoved?.apply(this, args);
+  };
+  node.diceforgeStack = { render, checkBases };
   if (node.size[0] < 460) node.setSize([460, node.size[1]]); // Room for a row: name, info, group, 🎲, strengths. A loaded workflow's size wins (onConfigure).
   const onConfigure = node.onConfigure;
   node.onConfigure = function (...args) {
