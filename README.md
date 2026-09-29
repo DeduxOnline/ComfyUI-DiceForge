@@ -358,8 +358,10 @@ When choices or wildcards change a prompt, the filled-in prompts and the seed ar
 | `{2$$a\|b\|c}` | Two different options, joined with `, `. |
 | `{1-3$$a\|b\|c}` | From 1 to 3 different options. `-2$$` means 0 to 2, and `2-$$` means 2 up to all of them. |
 | `{2$$ and $$a\|b\|c}` | Two options joined with ` and ` instead of `, `. |
+| `{2$$__color__}` | Two different lines of `color.txt` (sd-dynamic-prompts style): a multi-pick whose only option is a wildcard picks from its lines. All the forms above work: `{1-3$$ and $$__accessory__}`, `{2$$__hair/*__}`. |
 | `${hair=__color__}` | Sets the variable `hair`: its value is filled in once (choices and wildcards included) and outputs nothing. `${hair=!...}` (sd-dynamic-prompts style) works the same. |
 | `${hair}` | The value of `hair`, anywhere in the positive or negative prompt: `${hair=__color__}${hair} hair, ${hair} ribbon` gives `red hair, red ribbon`. |
+| `__outfit/${g}__` | A variable in a wildcard name: `${g={male\|female}}1person, __outfit/${g}__` reads `outfit/male.txt` or `outfit/female.txt`, whichever `g` got, so related parts of a prompt match. The variable can be set anywhere in the same prompt, or in the positive prompt for the negative. Not available in the `combinations` seed mode (it cannot know in advance which file will be read). |
 | `{sky\|!sea\|forest}` | Locked choice: always `sea`, in every seed mode, without rewriting the prompt. Remove the `!` to unlock. With several `!` options all of them are used. In `random` and `deck` the other choices keep their picks for the same seed; in `combinations` a locked choice counts once; in `mutate` it is never the one that changes. `3::!sea` works like `!3::sea`. |
 | `// ...`, `/* ... */` | Comments, removed before encoding. |
 
@@ -408,6 +410,8 @@ In `deck` and `shuffle` modes:
 - Put wildcard files in `ComfyUI/models/wildcards`, for example `ComfyUI/models/wildcards/color.txt`. Subfolders work too: `ComfyUI/models/wildcards/styles/photo.txt` is `__styles/photo__`.
 - More folders can be added with a `wildcards:` entry in ComfyUI's `extra_model_paths.yaml`.
 - One option per line. Empty lines and lines starting with `#` are skipped. Files are read as UTF-8.
+- A line can have a weight, as in choices: `3::blonde hair` comes 3 times as often as a line without a weight, `0::` turns a line off. In `deck` and `shuffle` a weight is the number of copies of the line in the deck; `combinations` counts every line once (except `0::`).
+- **YAML files** (the format of Dynamic Prompts and Impact Pack wildcard packs, `.yaml` or `.yml`) work too: nested keys are the folders and each list is one wildcard. See the example below. In a subfolder of the wildcards folder, the subfolder comes first (`styles/pack.yaml` with a `photo` key is `__styles/photo__`). A `.txt` file hides a yaml key with the same name. A yaml file that cannot be read is skipped with a warning in the console. In the Wildcard Browser yaml wildcards show *yaml* and are read-only: edit the yaml file to change them.
 - A missing or empty wildcard file stops the run with an error that names the file and the wildcards folders.
 - The node runs again when a wildcard file changes, even if the prompts and the seed stay the same.
 - A `*` or `?` name (`__hair/*__`) joins the lines of every file it matches, in name order, so all seed modes (deck, shuffle, combinations…) treat them as one list. Empty files among them are skipped; a name that matches nothing stops the run with an error.
@@ -427,7 +431,23 @@ Example `color.txt`:
 crimson red
 deep {navy|royal} blue
 emerald green
+3::black
 ```
+
+Example `characters.yaml`, giving `__characters/alice/outfit__`, `__characters/alice/hair__` and `__characters/bob/outfit__` (and `__characters/*/outfit__` for both outfits):
+
+```yaml
+characters:
+  alice:
+    outfit:
+      - blue dress
+      - "3::white apron"
+    hair: [blonde hair, "{long|short} hair"]
+  bob:
+    outfit: [jeans, hoodie]
+```
+
+In YAML, put quotes around a line that starts with `{`, `[`, `!` or contains `: ` or ` #`, as above; otherwise YAML reads it as something else.
 
 ### Notes
 

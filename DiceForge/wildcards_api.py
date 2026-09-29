@@ -2,8 +2,9 @@ import os
 import re
 import folder_paths
 from aiohttp import web
-from .clip_text_encode_pos_neg import find_wildcard, wildcard_names
-# Server side of the Wildcard Browser and the __ autocomplete (web/wildcards.js): the list of wildcard files, reading one, and saving one.
+from .clip_text_encode_pos_neg import entry_lines, find_wildcard, wildcard_index
+# Server side of the Wildcard Browser and the __ autocomplete (web/wildcards.js): the list of wildcards, reading one, and saving one. Wildcards from
+# yaml files are listed and shown too, but read-only: they are edited in their yaml file.
 NAME = re.compile(r"[\w\-. ]+(/[\w\-. ]+)*")
 def checked_name(name):
     name = (name or "").strip().replace("\\", "/").removesuffix(".txt")
@@ -22,23 +23,27 @@ def register_routes():
     @routes.get("/diceforge/wildcards")
     async def list_wildcards(request):
         files = []
-        for name in wildcard_names():
-            lines = [line.strip() for line in read_lines(find_wildcard(name))]
-            options = [line for line in lines if line and not line.startswith("#")]
-            files.append({"name": name, "lines": len(options), "preview": options[:3]})
+        for name, entry in sorted(wildcard_index(refresh=True).items(), key=lambda item: item[0].lower()):
+            options = entry_lines(entry)
+            files.append({"name": name, "lines": len(options), "preview": options[:3], **({"yaml": os.path.basename(entry["path"])} if "lines" in entry else {})})
         return web.json_response({"folders": folder_paths.get_folder_paths("wildcards"), "files": files})
     @routes.get("/diceforge/wildcards/file")
     async def read_wildcard_file(request):
         name = checked_name(request.rel_url.query.get("name"))
-        path = find_wildcard(name)
-        if path is None:
-            raise web.HTTPNotFound(text=f"Wildcards: no file {name}.txt.")
-        return web.json_response({"name": name, "path": path, "text": "\n".join(read_lines(path))})
+        entry = wildcard_index(refresh=True).get(name)
+        if entry is None:
+            raise web.HTTPNotFound(text=f"Wildcards: no wildcard {name}.")
+        if "lines" in entry:
+            return web.json_response({"name": name, "path": entry["path"], "text": "\n".join(entry["lines"]), "readonly": True})
+        return web.json_response({"name": name, "path": entry["path"], "text": "\n".join(read_lines(entry["path"]))})
     @routes.post("/diceforge/wildcards/file")
     async def save_wildcard_file(request):
         body = await request.json()
         name = checked_name(body.get("name"))
         path = find_wildcard(name) # An existing file is saved in place; a new one goes to the first wildcards folder.
+        entry = wildcard_index(refresh=True).get(name)
+        if path is None and entry is not None:
+            raise web.HTTPBadRequest(text=f"Wildcards: {name} comes from {entry['path']}: edit it in that yaml file.")
         if path is None:
             root = os.path.abspath(folder_paths.get_folder_paths("wildcards")[0])
             path = os.path.abspath(os.path.join(root, *name.split("/")) + ".txt")

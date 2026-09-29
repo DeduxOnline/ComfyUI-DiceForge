@@ -104,7 +104,7 @@ const STYLE = `
 .dfwc .row .name{flex:1;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dfwc .row.sel{background:#2f3f55}
 .dfwc .folder>.row .name{font-weight:600}.dfwc .kids{margin-left:16px}.dfwc .muted{color:#999;font-size:12px}
 .dfwc button{background:#222;color:#eee;border:1px solid #666;border-radius:6px;padding:5px 12px;cursor:pointer;font:inherit}.dfwc button:hover{background:#2c2c2c}
-.dfwc button.add{padding:1px 8px;font-size:12px;border-color:#4a7a4a;color:#bfe8bf}.dfwc .status{color:#9c9;min-height:18px;font-size:13px}
+.dfwc button:disabled{opacity:.5;cursor:default}.dfwc textarea[readonly]{color:#aaa}.dfwc button.add{padding:1px 8px;font-size:12px;border-color:#4a7a4a;color:#bfe8bf}.dfwc .status{color:#9c9;min-height:18px;font-size:13px}
 `;
 function addStyle() {
   if (document.getElementById("dfwc-style")) return;
@@ -232,7 +232,9 @@ async function openBrowser(node) {
     selected = name;
     title.replaceChildren(element("b", {}, `__${name}__`), " ", element("span", { class: "muted" }, file.path));
     editor.value = file.text;
-    say("");
+    editor.readOnly = !!file.readonly; // A yaml wildcard is one key of a yaml file: edited in that file.
+    save.disabled = !!file.readonly;
+    say(file.readonly ? "From a yaml file: read-only here, edit the yaml file to change it." : "");
     draw();
   }
   save.addEventListener("click", async () => {
@@ -271,7 +273,7 @@ async function openBrowser(node) {
         element("div", { class: "kids" }, ...drawLevel(folder)))),
       ...level.files.map((file) => element("div", { class: "row" + (file.name === selected ? " sel" : ""), title: file.preview.join("\n") },
         element("span", { class: "name", onclick: () => open(file.name) }, file.name.split("/").pop()),
-        element("span", { class: "muted" }, `${file.lines} ${file.lines === 1 ? "line" : "lines"}`),
+        element("span", { class: "muted", title: file.yaml ? `From ${file.yaml}` : "" }, `${file.yaml ? "yaml · " : ""}${file.lines} ${file.lines === 1 ? "line" : "lines"}`),
         element("button", { class: "add", title: `Insert __${file.name}__`, onclick: () => add(file.name) }, "+ Add"))),
     ];
     const items = drawLevel(root);
