@@ -24,6 +24,19 @@ function targetOf(node, spec) {
   const model = node.widgets?.find((widget) => spec.widget.test(widget.name) && combo(widget) && widget.options.values.some((value) => /\.(safetensors|ckpt|pt|pth|bin|gguf|sft)$/i.test(value)));
   return model ? { model } : null;
 }
+// Base model families of Civitai's names: LoRAs of another family do not work on the model; within a family (SDXL, Pony, Illustrious, NoobAI) a LoRA
+// often works on another base's model, but not as well. Unknown bases compare as nothing.
+function family(base) {
+  const name = base.toLowerCase();
+  const families = [[/pony|illustrious|noob|sdxl|playground/, "SDXL"], [/^sd ?1/, "SD 1"], [/^sd ?2/, "SD 2"], [/^sd ?3\.5/, "SD 3.5"], [/^sd ?3/, "SD 3"],
+    [/^flux\.?1|^flux 1/, "Flux.1"], [/^flux\.?2/, "Flux.2"], [/hunyuan video/, "Hunyuan Video"], [/^wan/, "Wan"]];
+  return families.find(([pattern]) => pattern.test(name))?.[1] ?? name;
+}
+function compareBases(lora, model) {
+  if (!lora || !model || lora.toLowerCase() === model.toLowerCase()) return null;
+  if (family(lora) === family(model)) return { level: "warn", text: `Made for ${lora}, the model is ${model}: it may work, but not as well.` };
+  return { level: "bad", text: `Made for ${lora}, the model is ${model}: a LoRA for another model family does not work on it.` };
+}
 function setWidget(node, widget, value) {
   widget.value = value;
   widget.callback?.(value, app.canvas, node);
@@ -83,8 +96,8 @@ async function lookUp(kind, file) {
   return (await fetchList(kind)).find((entry) => entry.file === file);
 }
 
-// target: what the buttons do (targetOf for a node's menu), or { pick(file), label, hint } from another extension (LoRA Stack): pick returns true
-// to close the browser, or a message to show.
+// target: what the buttons do (targetOf for a node's menu), or { pick(file), label, hint, base } from another extension (LoRA Stack): pick returns
+// true to close the browser, or a message to show; base (the connected model's base model) starts the list on the files that fit it.
 async function openBrowser(node, spec, target = targetOf(node, spec)) {
   addStyle();
   const { kind } = spec;
@@ -92,6 +105,7 @@ async function openBrowser(node, spec, target = targetOf(node, spec)) {
   let files = [], folder = "", selectedFile = target?.model?.value, stopLookUp = null;
   const search = element("input", { placeholder: "Search by file, name or trigger word…" });
   const base = element("select", {}, element("option", { value: "" }, "All base models"));
+  const FITS = "\u0001fits";
   const sort = element("select", {}, ...[["name", "Name"], ["new", "Newest first"], ["base", "Base model"]].map(([value, label]) => element("option", { value }, label)));
   const status = element("div", { class: "status" });
   const tree = element("div", { class: "tree" });
@@ -154,7 +168,10 @@ async function openBrowser(node, spec, target = targetOf(node, spec)) {
       media.addEventListener("error", () => media.replaceWith(element("span", { class: "none", title: "The preview could not be loaded" }, spec.icon)));
       box.append(media);
     }
-    if (entry.base_model) box.append(element("span", { class: "base" }, entry.base_model));
+    if (entry.base_model) {
+      const fit = target?.base ? compareBases(entry.base_model, target.base) : null;
+      box.append(element("span", { class: "base", title: fit?.text ?? "" }, `${fit ? (fit.level === "bad" ? "⛔ " : "⚠️ ") : ""}${entry.base_model}`));
+    }
     return box;
   }
   function card(entry) {
@@ -196,7 +213,8 @@ async function openBrowser(node, spec, target = targetOf(node, spec)) {
     const query = search.value.trim().toLowerCase();
     const text = [entry.file, entry.name, entry.base_model, ...entry.trigger_words].join(" ").toLowerCase();
     const inFolder = !folder || folderOf(entry.file) === folder || folderOf(entry.file).startsWith(folder + "/");
-    return inFolder && (!base.value || entry.base_model === base.value) && (!query || query.split(/\s+/).every((word) => text.includes(word)));
+    const baseOk = !base.value || (base.value === FITS ? compareBases(entry.base_model, target.base)?.level !== "bad" : entry.base_model === base.value);
+    return inFolder && baseOk && (!query || query.split(/\s+/).every((word) => text.includes(word)));
   }
   function drawTree() {
     const counts = new Map([["", files.length]]);
@@ -222,8 +240,10 @@ async function openBrowser(node, spec, target = targetOf(node, spec)) {
   function draw() {
     const bases = [...new Set(files.map((entry) => entry.base_model).filter(Boolean))].sort();
     const chosen = base.value;
-    base.replaceChildren(element("option", { value: "" }, "All base models"), ...bases.map((name) => element("option", { value: name }, name)));
-    base.value = bases.includes(chosen) ? chosen : "";
+    base.replaceChildren(element("option", { value: "" }, "All base models"),
+      ...(target?.base ? [element("option", { value: FITS, title: "The same base, the same family (⚠) and the ones not looked up yet" }, `Fits the model (${target.base})`)] : []),
+      ...bases.map((name) => element("option", { value: name }, name)));
+    base.value = chosen === FITS || bases.includes(chosen) ? chosen : "";
     const order = {
       name: (a, b) => (a.name || shortName(a.file)).localeCompare(b.name || shortName(b.file)),
       new: (a, b) => b.mtime - a.mtime,
@@ -270,6 +290,10 @@ async function openBrowser(node, spec, target = targetOf(node, spec)) {
     say(`Could not list the ${spec.plural}: ${error.message}`);
   }
   draw();
+  if (target?.base) { // Starts on the files that fit the model; All base models shows every one.
+    base.value = FITS;
+    draw();
+  }
   search.focus();
   grid.querySelector(".card.sel")?.scrollIntoView({ block: "center" });
 }
@@ -281,4 +305,4 @@ app.registerExtension({
   },
 });
 
-export { openBrowser as openModelBrowser, BROWSERS };
+export { openBrowser as openModelBrowser, BROWSERS, family, compareBases };

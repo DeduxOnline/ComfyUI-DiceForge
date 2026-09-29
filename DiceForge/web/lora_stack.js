@@ -1,7 +1,7 @@
 import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
 import { openModelInfo } from "./model_info.js";
-import { openModelBrowser, BROWSERS } from "./model_browser.js";
+import { openModelBrowser, BROWSERS, compareBases } from "./model_browser.js";
 
 // LoRA Stack (lora_stack.py): the rows of LoRAs drawn in the node, like rgthree's Power Lora Loader. The node's "loras" text input holds them as JSON;
 // it is hidden and this panel edits it. Each row: on/off, the LoRA (click to change it in the LoRA Browser), Model info, a group, a fixed strength or
@@ -26,6 +26,12 @@ const STYLE = `
 .dfls .add{border-radius:6px;padding:4px;width:100%}.dfls .foot{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .dfls .group{display:flex;gap:4px;align-items:center;padding:1px 6px;color:#bbb}.dfls .tag{font-weight:700;color:#cfe0ff}
 .dfls input[type=checkbox]{margin:0;cursor:pointer}
+.dfls button.none{opacity:.45;text-decoration:line-through}
+.dflt{position:fixed;z-index:10001;background:#262626;border:1px solid #555;border-radius:8px;box-shadow:0 6px 20px #000a;font:13px system-ui,sans-serif;color:#ddd;padding:8px 10px;width:280px;max-height:60vh;overflow:auto;display:flex;flex-direction:column;gap:6px}
+.dflt b{color:#fff}.dflt label{display:flex;gap:6px;align-items:center;cursor:pointer}.dflt .src{color:#888;font-size:11px;margin-left:auto}
+.dflt input[type=text]{background:#1e1e1e;color:#eee;border:1px solid #555;border-radius:4px;padding:3px 6px;font:inherit;flex:1;min-width:0}
+.dflt .line{display:flex;gap:6px;align-items:center}.dflt button{background:#222;color:#eee;border:1px solid #666;border-radius:5px;padding:2px 8px;cursor:pointer;font:inherit}
+.dflt button.on{background:#3a5a8a;border-color:#6a9ad8}.dflt .muted{color:#999;font-size:12px}
 .dfls .row.warn{border-color:#c9a13a}.dfls .row.bad{border-color:#d9534f}.dfls .mark{flex:none;cursor:help}.dfls .model{padding:0 4px}
 .dflp-back{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:10000;display:flex;align-items:center;justify-content:center}
 .dflp{background:#353535;color:#ddd;border:1px solid #555;border-radius:10px;width:min(720px,94vw);max-height:84vh;display:flex;flex-direction:column;padding:14px 16px;font:14px system-ui,sans-serif;box-shadow:0 10px 40px #000a;box-sizing:border-box}
@@ -65,18 +71,8 @@ async function loraList() {
 
 // Base model check: Civitai's base model of each LoRA against the one of the model the stack gets (traced back through the nodes in between to the
 // loader, like Load Checkpoint or Load Diffusion Model). Different families (SDXL / SD 1.5 / Flux...) do not work together; within a family (SDXL,
-// Pony, Illustrious, NoobAI) a LoRA often works on another base's model, but not as well. Unknown bases give no warning.
-function family(base) {
-  const name = base.toLowerCase();
-  const families = [[/pony|illustrious|noob|sdxl|playground/, "SDXL"], [/^sd ?1/, "SD 1"], [/^sd ?2/, "SD 2"], [/^sd ?3\.5/, "SD 3.5"], [/^sd ?3/, "SD 3"],
-    [/^flux\.?1|^flux 1/, "Flux.1"], [/^flux\.?2/, "Flux.2"], [/hunyuan video/, "Hunyuan Video"], [/^wan/, "Wan"]];
-  return families.find(([pattern]) => pattern.test(name))?.[1] ?? name;
-}
-function compareBases(lora, model) {
-  if (!lora || !model || lora.toLowerCase() === model.toLowerCase()) return null;
-  if (family(lora) === family(model)) return { level: "warn", text: `Made for ${lora}, the model is ${model}: it may work, but not as well.` };
-  return { level: "bad", text: `Made for ${lora}, the model is ${model}: a LoRA for another model family does not work on it.` };
-}
+// Pony, Illustrious, NoobAI) a LoRA often works on another base's model, but not as well. Unknown bases give no warning. The comparison itself
+// (family, compareBases) is in model_browser.js, which also uses it for the "Fits the model" filter.
 const MODEL_WIDGETS = [[/ckpt|checkpoint/i, "checkpoints"], [/unet|diffusion/i, "diffusion_models"]];
 const MODEL_FILE = /\.(safetensors|ckpt|pt|pth|bin|gguf|sft)$/i;
 function modelSource(node) {
@@ -180,6 +176,68 @@ function openPresets(apply) {
   draw();
 }
 
+// Trigger words of a row (🏷): which of the LoRA's trigger words go to the triggers output. Default: all of them (yours from Model info, else
+// Civitai's); None; or the words ticked in the list, plus your own, kept in the row (mode "custom", so presets keep them too).
+async function knownTriggers(lora) {
+  try {
+    const response = await api.fetchApi("/diceforge/lora-triggers", { method: "POST", body: JSON.stringify({ loras: [lora] }) });
+    return (await response.json()).triggers[0];
+  } catch {
+    return { user: [], civitai: [] };
+  }
+}
+let openList = null;
+async function openTriggers(anchor, row, save) {
+  openList?.close();
+  const known = await knownTriggers(row.lora);
+  const defaults = known.user.length ? known.user : known.civitai;
+  let mode = row.triggers || "all";
+  let picked = mode === "custom" ? [...(row.trigger_words ?? [])] : mode === "none" ? [] : [...defaults];
+  const extra = () => picked.filter((word) => !known.user.includes(word) && !known.civitai.includes(word));
+  const box = element("div", { class: "dflt" });
+  const close = () => { box.remove(); document.removeEventListener("pointerdown", outside, true); document.removeEventListener("keydown", onKey, true); openList = null; };
+  const outside = (event) => { if (!box.contains(event.target) && event.target !== anchor) close(); };
+  const onKey = (event) => { if (event.key === "Escape") { event.stopPropagation(); close(); } };
+  const apply = (nextMode) => { mode = nextMode; save(mode, mode === "custom" ? picked : []); draw(); };
+  function draw() {
+    const words = [...new Set([...known.user, ...known.civitai, ...extra()])];
+    const source = (word) => (known.user.includes(word) ? "yours" : known.civitai.includes(word) ? "Civitai" : "added");
+    const input = element("input", { type: "text", placeholder: "Your own words, comma separated" });
+    const addWords = () => {
+      const added = input.value.split(",").map((word) => word.trim()).filter((word) => word && !picked.includes(word));
+      if (!added.length) return;
+      picked.push(...added);
+      apply("custom");
+    };
+    input.addEventListener("keydown", (event) => { event.stopPropagation(); if (event.key === "Enter") addWords(); });
+    box.replaceChildren(
+      element("b", {}, `Trigger words: ${shortName(row.lora)}`),
+      ...(words.length ? words.map((word) => {
+        const check = element("input", { type: "checkbox" });
+        check.checked = picked.includes(word);
+        check.addEventListener("change", () => {
+          picked = check.checked ? [...picked, word] : picked.filter((item) => item !== word);
+          apply("custom");
+        });
+        return element("label", { title: word }, check, word, element("span", { class: "src" }, source(word)));
+      }) : [element("div", { class: "muted" }, "No trigger words known: look the LoRA up on Civitai (🛈 Info or the LoRA Browser), or add your own below.")]),
+      element("div", { class: "line" }, input, element("button", { onclick: addWords }, "Add")),
+      element("div", { class: "line" },
+        element("button", { class: mode === "all" ? "on" : "", title: "All the LoRA's trigger words (yours from Model info, else Civitai's)", onclick: () => { picked = [...defaults]; apply("all"); } }, "Default"),
+        element("button", { class: mode === "none" ? "on" : "", title: "No trigger words from this LoRA", onclick: () => { picked = []; apply("none"); } }, "None"),
+        element("span", { style: "flex:1" }),
+        element("button", { onclick: close }, "Close")),
+      element("div", { class: "muted" }, mode === "all" ? "Default: follows the LoRA's trigger words, also when they change." : mode === "none" ? "None: this LoRA adds no words." : `Custom: ${picked.length} word${picked.length === 1 ? "" : "s"}.`));
+  }
+  draw();
+  document.body.append(box);
+  const rect = anchor.getBoundingClientRect();
+  Object.assign(box.style, { left: `${Math.max(8, Math.min(rect.left, innerWidth - 300))}px`, top: `${Math.min(rect.bottom + 4, innerHeight - box.offsetHeight - 8)}px` });
+  document.addEventListener("pointerdown", outside, true); // pointerdown: the canvas cancels mousedown.
+  document.addEventListener("keydown", onKey, true);
+  openList = { close };
+}
+
 function numberInput(value, title, onChange) {
   const input = element("input", { type: "number", step: "0.05", title });
   input.value = round(value).toFixed(2);
@@ -213,7 +271,8 @@ function setUp(node) {
     node.setDirtyCanvas?.(true, true);
   };
   const update = (change) => { const stack = read(); change(stack); write(stack); };
-  const browse = (target) => openModelBrowser(node, LORAS, target);
+  const connectedBase = () => { const source = modelSource(node); return source ? baseOf(source.kind, source.file) : null; };
+  const browse = (target) => openModelBrowser(node, LORAS, { ...target, base: connectedBase() }); // The browser starts on the LoRAs that fit the model.
   let dragged = null;
 
   async function render() {
@@ -246,6 +305,11 @@ function setUp(node) {
         }) }, shortName(row.lora)),
         element("span", { class: "mark" }),
         element("button", { title: "Model info", onclick: () => openModelInfo("loras", row.lora) }, "ℹ"),
+        element("button", {
+          class: row.triggers === "none" ? "none" : row.triggers === "custom" ? "on" : "",
+          title: row.triggers === "none" ? "Trigger words: none" : row.triggers === "custom" ? `Trigger words: ${(row.trigger_words ?? []).join(", ") || "none picked"}` : "Trigger words: the LoRA's own (click to pick)",
+          onclick: (event) => openTriggers(event.currentTarget, row, (mode, words) => set((r) => { r.triggers = mode; r.trigger_words = words; })),
+        }, row.triggers === "custom" ? `🏷${(row.trigger_words ?? []).length}` : "🏷"),
         group,
         element("button", { class: row.random ? "on" : "", title: "Random strength: picked between two values by the seed mode", onclick: () => set((r) => {
           r.random = !r.random;

@@ -108,7 +108,7 @@ def browser_entry(kind, name, path, folder_files):
         "preview": local_preview(path, folder_files) is not None,
         "checked": bool(civitai.get("checked")) and not civitai.get("error"),
         "found": found,
-        "name": user.get("name") or (f"{civitai.get('model_name')} - {civitai.get('version_name')}" if found else ""),
+        "name": user.get("name") or (" - ".join(part for part in (civitai.get("model_name"), civitai.get("version_name")) if part) if found else ""),
         "base_model": civitai.get("base_model") or "",
         "trigger_words": [word.strip() for word in (user.get("trigger_words") or "").split(",") if word.strip()] or civitai.get("trigger_words") or [],
         "settings": (user.get("settings") or "").strip(),

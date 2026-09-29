@@ -55,10 +55,22 @@ def group_pick(name, rows, settings, picker, seed):
     chosen = subsets[pick_index(len(subsets), picker, seed, f"LoRA Stack group {labels} {low}-{high}")]
     return [rows[index] for index in chosen]
 # Trigger words of a LoRA: yours from Model info, else Civitai's (what the LoRA Browser shows).
-def trigger_words(name):
+def known_triggers(name):
     info = read_info("loras", name)
-    words = [word.strip() for word in ((info.get("user") or {}).get("trigger_words") or "").split(",") if word.strip()]
-    return words or list((info.get("civitai") or {}).get("trigger_words") or [])
+    user = [word.strip() for word in ((info.get("user") or {}).get("trigger_words") or "").split(",") if word.strip()]
+    return user, [str(word).strip() for word in (info.get("civitai") or {}).get("trigger_words") or [] if str(word).strip()]
+def trigger_words(name):
+    user, civitai = known_triggers(name)
+    return user or civitai
+# The trigger words a row puts in the triggers output: "all" (default: the LoRA's trigger words), "none", or "custom" (the words picked in the
+# row's 🏷 list, kept in the row).
+def row_triggers(row):
+    mode = row.get("triggers") or "all"
+    if mode == "none":
+        return []
+    if mode == "custom":
+        return [str(word).strip() for word in row.get("trigger_words") or [] if str(word).strip()]
+    return trigger_words(row["lora"])
 def short_name(name):
     return os.path.splitext(os.path.basename(name.replace("\\", "/")))[0]
 # Node schema (V3 / Nodes 2.0).
@@ -136,7 +148,7 @@ class LoraStack(io.ComfyNode):
             paths.add(path)
             applied.append((row["lora"], strength, strength_clip))
             info.append(f"{short_name(row['lora'])} {strength:g}" + (f"/{strength_clip:g}" if separate_clip and clip is not None and strength_clip != strength else ""))
-            triggers += [word for word in trigger_words(row["lora"]) if word not in triggers]
+            triggers += [word for word in row_triggers(row) if word not in triggers]
         for path in list(cls.cache):
             if path not in paths:
                 del cls.cache[path] # LoRAs no longer in the stack leave memory.
@@ -211,6 +223,11 @@ def register_routes():
         if os.path.isfile(path):
             os.remove(path)
         return web.json_response({"deleted": name})
+    @routes.post("/diceforge/lora-triggers")
+    async def lora_triggers(request):
+        names = (await request.json()).get("loras") or []
+        found = await asyncio.get_running_loop().run_in_executor(None, lambda: [known_triggers(name) for name in names[:500]])
+        return web.json_response({"triggers": [{"user": user, "civitai": civitai} for user, civitai in found]})
     @routes.post("/diceforge/model-bases")
     async def model_bases(request):
         items = (await request.json()).get("items") or []
