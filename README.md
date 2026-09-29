@@ -352,6 +352,7 @@ When choices or wildcards change a prompt, the filled-in prompts and the seed ar
 |---|---|
 | `__name__` | A random line from the wildcard file `name.txt`. |
 | `__folder/name__` | A random line from `folder/name.txt` inside a wildcards folder. |
+| `__hair/*__` | A random line from all the files in the `hair` folder and its subfolders, as if they were one file. `*` matches any text (including `/`), `?` one character: `__*/color__` uses every `color.txt` in a subfolder, `__style_*__` every file starting with `style_`. |
 | `{red\|green\|blue}` | One of the options at random. Options can be empty (`{big\|}`) and can nest (`{a\|{b\|c}}`). |
 | `{3::cat\|dog}` | Weighted choice: `cat` is 3 times as likely as `dog`. Options without a weight count as 1. |
 | `{2$$a\|b\|c}` | Two different options, joined with `, `. |
@@ -409,6 +410,15 @@ In `deck` and `shuffle` modes:
 - One option per line. Empty lines and lines starting with `#` are skipped. Files are read as UTF-8.
 - A missing or empty wildcard file stops the run with an error that names the file and the wildcards folders.
 - The node runs again when a wildcard file changes, even if the prompts and the seed stay the same.
+- A `*` or `?` name (`__hair/*__`) joins the lines of every file it matches, in name order, so all seed modes (deck, shuffle, combinations…) treat them as one list. Empty files among them are skipped; a name that matches nothing stops the run with an error.
+
+### Autocomplete and the Wildcard Browser
+
+- **Autocomplete:** type `__` in the positive or negative field and a list of the wildcard files (with their number of lines) and folders (`folder/*`) opens at the cursor. Keep typing to filter it; ↑/↓ to move, Enter or Tab to insert, Esc to close. The last entry, *📂 Browse wildcards…*, opens the browser.
+- **Wildcard Browser:** right-click the node → *🎲 Wildcard Browser*. It shows the wildcard folders as a tree, with the number of lines of each file and its first lines as a tooltip, and a search box.
+  - **+ Add** next to a file inserts `__name__`, next to a folder `__folder/*__`, where the cursor was last in the node's positive or negative field (at the end of the positive prompt if you have not clicked in one yet). Commas are added when the name would touch other text.
+  - Click a file name to open it in the editor on the right, change its lines and **Save**. **+ New file** creates a file (`hair/color` makes the `hair` folder too) in the first wildcards folder.
+- Both work in the Nodes 2.0 and the classic node design.
 
 Example `color.txt`:
 

@@ -1,3 +1,4 @@
+import fnmatch
 import hashlib
 import itertools
 import logging
@@ -11,7 +12,7 @@ from comfy_api.latest import ComfyExtension, io
 from .seed_modes import MEMORY, Picker, RandomPicker, DeckPicker, ShufflePicker, BalancedPicker, fingerprint
 # Wildcards: __name__ in a prompt is replaced by a random line of name.txt from the wildcards folders (ComfyUI/models/wildcards by default, more can be added in extra_model_paths.yaml).
 folder_paths.add_model_folder_path("wildcards", os.path.join(folder_paths.models_dir, "wildcards"), is_default=True)
-WILDCARD_PATTERN = re.compile(r"__([\w\-./]+?)__")
+WILDCARD_PATTERN = re.compile(r"__([\w\-./*?]+?)__") # * and ? match several files: __hair/*__, __*/color__.
 MAX_DEPTH = 50 # Nesting limit for wildcards and {a|b} choices, to stop wildcards that include each other forever.
 # Wildcard file lookup: name may contain subfolders (__colors/warm__ -> colors/warm.txt), and must stay inside a wildcards folder.
 def find_wildcard(name):
@@ -21,8 +22,30 @@ def find_wildcard(name):
         if path.startswith(folder + os.sep) and os.path.isfile(path):
             return path
     return None
-# Wildcard file reading: one option per line, skipping empty lines and # comments.
+# Every wildcard name in the wildcards folders ("hair/color" for hair/color.txt), sorted; a name in an earlier folder hides the same name in a later one.
+def wildcard_names():
+    names = set()
+    for folder in folder_paths.get_folder_paths("wildcards"):
+        for root, _dirs, files in os.walk(folder):
+            relative = os.path.relpath(root, folder).replace("\\", "/")
+            names.update((name[:-4] if relative == "." else f"{relative}/{name[:-4]}") for name in files if name.endswith(".txt"))
+    return sorted(names, key=str.lower)
+# Wildcard file reading: one option per line, skipping empty lines and # comments. A name with * or ? (__hair/*__: every file in hair and its
+# subfolders; __*/color__: every color file) joins the lines of all the files it matches, in name order.
 def read_wildcard(name):
+    if "*" in name or "?" in name:
+        matches = [match for match in wildcard_names() if fnmatch.fnmatchcase(match, name)]
+        if not matches:
+            raise ValueError(f"Wildcard __{name}__ matches no wildcard files.")
+        options = []
+        for match in matches:
+            try:
+                options += read_wildcard(match)
+            except ValueError:
+                pass # An empty file among the matches adds nothing.
+        if not options:
+            raise ValueError(f"Wildcard __{name}__: the files it matches ({', '.join(matches)}) have no lines to choose from.")
+        return options
     path = find_wildcard(name)
     if path is None:
         folders = ", ".join(folder_paths.get_folder_paths("wildcards"))
@@ -284,9 +307,9 @@ def expand(text, picker, depth, variables):
             result += char
     return WILDCARD_PATTERN.sub(lambda match: expand(*picker.pick([(1.0, line) for line in read_wildcard(match.group(1))], 1, True)[0], depth + 1, variables), result)
 # Full prompt processing: strips // and /* */ comments like the frontend, expands choices and wildcards, fills in variables (shared by both prompts),
-# unescapes \{ \} \| \!, then tidies commas.
+# unescapes \{ \} \| \!, then tidies commas. Wildcard names are kept whole: the /* of __hair/*__ does not start a comment.
 def strip_comments(text):
-    return re.sub(r"/\*[\s\S]*?\*/|//.*", "", text)
+    return re.sub(r"(" + WILDCARD_PATTERN.pattern + r")|/\*[\s\S]*?\*/|//.*", lambda match: match.group(1) or "", text)
 def resolve_prompts(prompts, picker):
     variables = {}
     expanded = [expand(strip_comments(text), picker, 0, variables) for text in prompts]

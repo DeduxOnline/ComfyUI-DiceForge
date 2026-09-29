@@ -16,6 +16,7 @@ from .random_vae import RandomVAELoader
 from .load_vae_decode_save import LoadVAEDecodeSave
 from .load_diffusion_model_clip import LoadDiffusionModelCLIP
 from . import model_info # Server routes of the Model info dialog (web/model_info.js).
+from . import wildcards_api # Server routes of the Wildcard Browser and the __ autocomplete (web/wildcards.js).
 WEB_DIRECTORY = "./web" # Frontend extension: feeds the live size previews of the resolution nodes.
 class DiceForgeExtension(ComfyExtension):
     @override
