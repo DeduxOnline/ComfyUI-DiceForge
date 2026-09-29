@@ -10,7 +10,7 @@ def test_checked_name_accepts(name, expected):
     assert checked_name(name) == expected
 
 
-@pytest.mark.parametrize("name", ["../x", "a/../b", "", "a//b", "bad|name", "/abs"])
+@pytest.mark.parametrize("name", ["../x", "a/../b", "", "a//b", "bad|name", "/abs", "two  spaces", "a /b"])
 def test_checked_name_refuses(name):
     with pytest.raises(web.HTTPBadRequest):
         checked_name(name)

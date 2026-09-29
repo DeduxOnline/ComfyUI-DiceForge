@@ -12,7 +12,7 @@ from aiohttp import web
 # so model folders stay untouched; the hash is only computed again when the file's size or date changes.
 KINDS = ("checkpoints", "diffusion_models", "loras", "vae", "text_encoders", "embeddings")
 INFO_FOLDER = os.path.join(folder_paths.get_user_directory(), "DiceForge", "model_info")
-CIVITAI_BY_HASH = "https://civitai.com/api/v1/model-versions/by-hash/{}"
+CIVITAI_BY_HASH = os.environ.get("DICEFORGE_CIVITAI_URL", "https://civitai.com/api/v1/model-versions/by-hash/{}") # Another server for tests (e2e/server.js).
 USER_FIELDS = ("name", "trigger_words", "settings", "notes")
 def info_file(kind, name):
     root = os.path.abspath(os.path.join(INFO_FOLDER, kind))

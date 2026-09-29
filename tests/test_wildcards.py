@@ -60,6 +60,13 @@ def test_globs_join_the_lines_of_every_matching_file(wildcards):
         resolve("__nothing/*__")
 
 
+def test_names_with_spaces_inside(wildcards):
+    wildcards("hair color.txt", "auburn\n")
+    wildcards("my styles/soft light.txt", "golden hour\n")
+    assert resolve("__hair color__, __my styles/soft light__")[0] == "auburn, golden hour"
+    assert resolve("a __ b__ c")[0] == "a __ b__ c" # Spaces at the edges: not a wildcard.
+
+
 def test_a_glob_is_not_mistaken_for_a_comment(wildcards):
     wildcards("hair/style.txt", "bob cut\n")
     assert resolve("__hair/*__ /* note */ ok")[0] == "bob cut ok"

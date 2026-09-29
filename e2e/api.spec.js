@@ -1,0 +1,180 @@
+// End-to-end through ComfyUI's own queue and server: workflows in the API format run by the real server with DiceForge loaded, and the DiceForge
+// server routes. No browser.
+const fs = require("fs");
+const path = require("path");
+const { test, expect, runPrompt, shown, basePath, writeFile } = require("./helpers");
+const { MODELS } = require("./fixtures");
+
+const NODES = ["SDXLResolutionListLatent", "ResolutionSelectorRandomLatent", "CLIPTextEncodePositiveNegative", "DiceForgeRandomInt", "DiceForgeRandomFloat",
+  "DiceForgeRandomLora", "DiceForgeRandomCheckpoint", "DiceForgeRandomDiffusionModel", "DiceForgeRandomImage", "DiceForgeGrid", "DiceForgeRandomSampler",
+  "DiceForgeRandomVAE", "LoadVAEDecodeSave", "VAEDecodeSave", "LoadDiffusionModelCLIP", "DiceForgeLoraStack"];
+const clip = (positive, negative = "", { seed = 0, mode = "random" } = {}) => ({
+  1: { class_type: "CLIPTextEncodePositiveNegative", inputs: { positive, negative, seed, seed_mode: mode, trim: true } },
+  2: { class_type: "PreviewAny", inputs: { source: ["1", 2] } },
+  3: { class_type: "PreviewAny", inputs: { source: ["1", 3] } },
+});
+const randomInt = (inputs) => ({
+  1: { class_type: "DiceForgeRandomInt", inputs: { min: 1, max: 5, step: 1, seed: 0, seed_mode: "random", ...inputs } },
+  2: { class_type: "PreviewAny", inputs: { source: ["1", 0] } },
+});
+const pixelSpace = { 10: { class_type: "EmptyImage", inputs: { width: 64, height: 48, batch_size: 2, color: 0xff0000 } }, 11: { class_type: "VAELoader", inputs: { vae_name: "pixel_space" } },
+  12: { class_type: "VAEEncode", inputs: { pixels: ["10", 0], vae: ["11", 0] } } };
+const outputFiles = (subfolder, prefix) => fs.readdirSync(basePath("output", subfolder)).filter((name) => name.startsWith(prefix));
+
+test.describe("@api workflows and routes", () => {
+  test("ComfyUI loads every DiceForge node", async ({ request }) => {
+    const info = await (await request.get("/object_info")).json();
+    for (const node of NODES) expect(info[node]?.python_module, node).toContain("DiceForge");
+  });
+
+  test("CLIP Dual Text Encode fills in wildcards, yaml keys, weights and variables", async ({ request }) => {
+    const prompt = "${g={male|female}}__color__ hair, __hair/*__, {2$$__characters/*/outfit__}, __weighted__, __outfit/${g}__";
+    for (let seed = 0; seed < 8; seed++) {
+      const result = await runPrompt(request, clip(prompt, "not __outfit/${g}__", { seed }));
+      expect(result.status).toBe("success");
+      const [color, hair, outfitA, outfitB, weighted, outfit] = shown(result, "2").split(", ");
+      expect(["red hair", "blue hair", "green hair", "white hair"]).toContain(color);
+      expect(["bob cut", "long hair", "blonde hair"]).toContain(hair);
+      expect(outfitA).not.toBe(outfitB);
+      expect(["blue dress", "white apron", "jeans"]).toEqual(expect.arrayContaining([outfitA, outfitB]));
+      expect(["common", "rare"]).toContain(weighted);
+      expect(shown(result, "3")).toBe(`not ${outfit}`);
+    }
+  });
+
+  test("deck deals every wildcard line over runs, combinations counts through all", async ({ request }) => {
+    const deck = [];
+    for (let seed = 0; seed < 4; seed++) deck.push(shown(await runPrompt(request, clip("__color__", "", { seed, mode: "deck" })), "2"));
+    expect(deck.sort()).toEqual(["blue", "green", "red", "white"]);
+    const combinations = new Set();
+    for (let seed = 0; seed < 8; seed++) combinations.add(shown(await runPrompt(request, clip("__color__ {cat|dog}", "", { seed, mode: "combinations" })), "2"));
+    expect(combinations.size).toBe(8);
+  });
+
+  test("the same inputs come from the cache, until a wildcard file changes", async ({ request }) => {
+    const prompt = clip("__hair/style__", "", { seed: 42 });
+    await runPrompt(request, prompt);
+    expect((await runPrompt(request, prompt)).cached).toContain("1");
+    writeFile("models/wildcards/hair/style.txt", "pixie cut\n");
+    const changed = await runPrompt(request, prompt);
+    expect(changed.cached).not.toContain("1");
+    expect(shown(changed, "2")).toBe("pixie cut");
+    writeFile("models/wildcards/hair/style.txt", "bob cut\nlong hair\n");
+  });
+
+  test("shuffle runs every time and remembers between runs on the server", async ({ request }) => {
+    const values = [];
+    for (let run = 0; run < 5; run++) {
+      const result = await runPrompt(request, randomInt({ seed_mode: "shuffle" }));
+      expect(result.cached).not.toContain("1");
+      values.push(shown(result, "2"));
+    }
+    expect(values.sort()).toEqual(["1", "2", "3", "4", "5"]);
+  });
+
+  test("a missing wildcard stops the run with a clear message", async ({ request }) => {
+    const result = await runPrompt(request, clip("__nope__"));
+    expect(result.status).toBe("error");
+    expect(result.error).toContain("Wildcard __nope__ not found");
+  });
+
+  test("SDXL Resolution List and Resolution Selector make latents of the right size", async ({ request }) => {
+    const size = (node) => ({ ...node, 2: { class_type: "PreviewAny", inputs: { source: ["1", 1] } }, 3: { class_type: "PreviewAny", inputs: { source: ["1", 2] } } });
+    let result = await runPrompt(request, size({ 1: { class_type: "SDXLResolutionListLatent", inputs: { resolution: "Standard", "resolution.size": "1216 x 832", seed: 0, scale: 1.0, multiple: 8, batch: 1, seed_mode: "random" } } }));
+    expect([shown(result, "2"), shown(result, "3")]).toEqual(["1216", "832"]);
+    result = await runPrompt(request, size({ 1: { class_type: "SDXLResolutionListLatent", inputs: { resolution: "Standard", "resolution.size": "1024 x 1024", seed: 0, scale: 2.0, multiple: 8, batch: 1, seed_mode: "random" } } }));
+    expect([shown(result, "2"), shown(result, "3")]).toEqual(["1448", "1448"]);
+    const listed = new Set();
+    for (let seed = 0; seed < 4; seed++) {
+      result = await runPrompt(request, size({ 1: { class_type: "SDXLResolutionListLatent", inputs: { resolution: "Random", "resolution.size": "Vertical Listed", seed, scale: 1.0, multiple: 8, batch: 1, seed_mode: "deck" } } }));
+      listed.add(`${shown(result, "2")}x${shown(result, "3")}`);
+      expect(result.outputs["1"].dice_forge_last_size[0].group).toBe("Random");
+    }
+    expect([...listed].sort()).toEqual(["640x1536", "768x1344", "832x1216", "896x1152"]);
+    result = await runPrompt(request, size({ 1: { class_type: "ResolutionSelectorRandomLatent", inputs: { aspect_ratio: "Random Chaos Portrait", megapixels: 1.0, seed: 3, multiple: 64, batch: 1, max_aspect: 2.0, seed_mode: "random" } } }));
+    const [width, height] = [Number(shown(result, "2")), Number(shown(result, "3"))];
+    expect(width % 64).toBe(0);
+    expect(height).toBeGreaterThan(width);
+    expect(width * height).toBeLessThanOrEqual(1024 * 1024);
+  });
+
+  test("VAE Decode + Save and Load VAE + Decode + Save write PNG files with the workflow", async ({ request }) => {
+    let result = await runPrompt(request, { ...pixelSpace, 1: { class_type: "VAEDecodeSave", inputs: { samples: ["12", 0], vae: ["11", 0], filename_prefix: "e2e/vds_%width%x%height%" } } });
+    expect(result.status).toBe("success");
+    expect(result.outputs["1"].images.map((image) => image.filename)).toEqual(["vds_64x48_00001_.png", "vds_64x48_00002_.png"]);
+    const png = fs.readFileSync(basePath("output", "e2e", "vds_64x48_00001_.png"));
+    expect(png.includes(Buffer.from("workflow"))).toBe(true);
+    expect(png.includes(Buffer.from("diceforge_e2e"))).toBe(true);
+    result = await runPrompt(request, { ...pixelSpace, 1: { class_type: "LoadVAEDecodeSave", inputs: { samples: ["12", 0], vae_name: "pixel_space", filename_prefix: "e2e/load_vds" } } });
+    expect(result.status).toBe("success");
+    expect(outputFiles("e2e", "load_vds_")).toHaveLength(2);
+  });
+
+  test("Dice Grid collects runs and saves the finished grid", async ({ request }) => {
+    const grid = (label) => ({ 1: { class_type: "EmptyImage", inputs: { width: 64, height: 64, batch_size: 1, color: 0x3366cc } },
+      2: { class_type: "DiceForgeGrid", inputs: { image: ["1", 0], label, count: 3, columns: 0, cell_width: 64, save: true, filename_prefix: "e2e/grid", name: "e2e", new_grid: false, legend: "E2E grid", legend_position: "top", numbered: false } },
+      3: { class_type: "PreviewAny", inputs: { source: ["2", 1] } } });
+    const cells = [];
+    for (const label of ["a", "b", "c"]) cells.push(shown(await runPrompt(request, grid(label)), "3"));
+    expect(cells).toEqual(["1", "2", "3"]);
+    expect(outputFiles("e2e", "grid_")).toHaveLength(1);
+  });
+
+  test("Random Image loads the images of a folder like Load Image", async ({ request }) => {
+    const names = [];
+    for (let seed = 0; seed < 2; seed++) {
+      const result = await runPrompt(request, { 1: { class_type: "DiceForgeRandomImage", inputs: { folder: "e2e", seed, seed_mode: "deck", path: "" } },
+        2: { class_type: "PreviewAny", inputs: { source: ["1", 2] } }, 3: { class_type: "GetImageSize", inputs: { image: ["1", 0] } }, 4: { class_type: "PreviewAny", inputs: { source: ["3", 0] } } });
+      expect(result.status).toBe("success");
+      names.push(`${shown(result, "2")}:${shown(result, "4")}`);
+    }
+    expect(names.sort()).toEqual(["e2e/blue.png:16", "e2e/red.png:32"]);
+  });
+
+  test("Random Sampler's outputs are accepted by KSampler's lists", async ({ request }) => {
+    const result = await runPrompt(request, { 1: { class_type: "DiceForgeRandomSampler", inputs: { samplers: "euler", schedulers: "karras", seed: 0, seed_mode: "random" } },
+      2: { class_type: "KSampler", inputs: { sampler_name: ["1", 0], scheduler: ["1", 1], seed: 0, steps: 1, cfg: 1, denoise: 1 } },
+      3: { class_type: "PreviewAny", inputs: { source: ["2", 0] } } });
+    const errors = result.rejected.node_errors["2"].errors.map((error) => `${error.type} ${error.extra_info?.input_name ?? ""}`);
+    expect(errors.join()).toContain("required_input_missing model"); // No model in this test: only the links are checked.
+    expect(errors.join()).not.toContain("return_type_mismatch");
+  });
+
+  test("Wildcard Browser routes", async ({ request }) => {
+    const list = await (await request.get("/diceforge/wildcards")).json();
+    const names = list.files.map((file) => file.name);
+    expect(names).toEqual(expect.arrayContaining(["color", "hair/style", "characters/alice/outfit", "outfit/male"]));
+    expect(list.files.find((file) => file.name === "characters/alice/outfit").yaml).toBe("pack.yaml");
+    expect((await request.post("/diceforge/wildcards/file", { data: { name: "e2e/new list", text: "one\ntwo" } })).ok()).toBe(true);
+    expect(fs.readFileSync(basePath("models", "wildcards", "e2e", "new list.txt"), "utf8")).toBe("one\ntwo\n");
+    const result = await runPrompt(request, clip("__e2e/new list__"));
+    expect(["one", "two"]).toContain(shown(result, "2"));
+    expect((await request.post("/diceforge/wildcards/file", { data: { name: "../escape", text: "x" } })).status()).toBe(400);
+  });
+
+  test("Model info looks the file up on Civitai (the stand-in) and the browser shows it", async ({ request }) => {
+    const info = await (await request.get("/diceforge/model-info?kind=loras&file=style/ink.safetensors")).json();
+    expect(info.civitai).toMatchObject({ found: true, model_name: "Ink", base_model: "Illustrious", trigger_words: ["ink style", "lineart"] });
+    expect(info.sha256).toHaveLength(64);
+    const unknown = await (await request.get("/diceforge/model-info?kind=loras&file=detail.safetensors")).json();
+    expect(unknown.civitai.found).toBe(false);
+    const browser = await (await request.get("/diceforge/model-browser?kind=loras")).json();
+    const cards = Object.fromEntries(browser.files.map((entry) => [entry.file.replace(/\\/g, "/"), entry]));
+    expect(Object.keys(cards).sort()).toEqual(Object.keys(MODELS).filter((file) => file.startsWith("loras/")).map((file) => file.slice(6)).sort());
+    expect(cards["style/ink.safetensors"]).toMatchObject({ checked: true, found: true, name: "Ink - v2", base_model: "Illustrious" });
+    expect(cards["detail.safetensors"].preview).toBe(true);
+    expect((await request.get("/diceforge/model-preview?kind=loras&file=detail.safetensors")).headers()["content-type"]).toContain("image/png");
+    const bases = await (await request.post("/diceforge/model-bases", { data: { items: [{ kind: "loras", file: "style/ink.safetensors" }, { kind: "loras", file: "style/pony_glow.safetensors" }] } })).json();
+    expect(bases.bases).toEqual(["Illustrious", null]); // Pony not looked up yet.
+  });
+
+  test("LoRA Stack presets are saved as files and listed", async ({ request }) => {
+    const stack = { rows: [{ lora: "style/ink.safetensors", strength: 0.8, random: true, min: 0.5, max: 0.9 }], groups: {}, separate_clip: false };
+    expect((await request.post("/diceforge/lora-presets", { data: { name: "e2e set", stack } })).ok()).toBe(true);
+    expect(fs.existsSync(basePath("user", "DiceForge", "lora_presets", "e2e set.json"))).toBe(true);
+    const listing = await (await request.get("/diceforge/lora-presets")).json();
+    expect(listing.presets.map((preset) => preset.name)).toContain("e2e set");
+    expect((await request.post("/diceforge/lora-presets", { data: { name: "e2e set", stack } })).status()).toBe(409);
+    expect((await request.delete("/diceforge/lora-presets?name=e2e%20set")).ok()).toBe(true);
+  });
+});

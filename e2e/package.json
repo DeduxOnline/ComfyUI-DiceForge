@@ -1,0 +1,13 @@
+{
+  "name": "diceforge-e2e",
+  "private": true,
+  "description": "End-to-end tests of DiceForge in a real ComfyUI server and browser.",
+  "scripts": {
+    "test": "playwright test",
+    "test:api": "playwright test api.spec.js",
+    "test:ui": "playwright test --grep-invert @api"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.56.1"
+  }
+}

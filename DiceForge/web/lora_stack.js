@@ -33,7 +33,7 @@ const STYLE = `
 .dflt input[type=text]{background:#1e1e1e;color:#eee;border:1px solid #555;border-radius:4px;padding:3px 6px;font:inherit;flex:1;min-width:0}
 .dflt .line{display:flex;gap:6px;align-items:center}.dflt button{background:#222;color:#eee;border:1px solid #666;border-radius:5px;padding:2px 8px;cursor:pointer;font:inherit}
 .dflt button.on{background:#3a5a8a;border-color:#6a9ad8}.dflt .muted{color:#999;font-size:12px}
-.dfls .row.warn{border-color:#c9a13a}.dfls .row.bad{border-color:#d9534f}.dfls .mark{flex:none;cursor:help}.dfls .model{padding:0 4px}
+.dfls .row.warn{border-color:#c9a13a}.dfls .row.bad{border-color:#d9534f}.dfls .mark{flex:none;cursor:help}.dfls .model,.dfls .note{padding:0 4px}
 .dflp-back{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:10000;display:flex;align-items:center;justify-content:center}
 .dflp{background:#353535;color:#ddd;border:1px solid #555;border-radius:10px;width:min(720px,94vw);max-height:84vh;display:flex;flex-direction:column;padding:14px 16px;font:14px system-ui,sans-serif;box-shadow:0 10px 40px #000a;box-sizing:border-box}
 .dflp h2{margin:0 0 10px;font-size:20px;color:#fff}.dflp .top{display:flex;gap:8px;margin-bottom:10px;align-items:center}
@@ -383,7 +383,7 @@ function setUp(node) {
     if (!node.flags?.collapsed) fitNodeHeight(node); // Room for the rows (node_size.js).
   }
   const modelLine = element("div", { class: "muted model" });
-  const noteLine = element("div", { class: "muted model" });
+  const noteLine = element("div", { class: "muted note" });
   let noteTimer = null;
   const note = (text) => { noteLine.textContent = text; clearTimeout(noteTimer); noteTimer = setTimeout(() => { noteLine.textContent = ""; }, 5000); };
   // Marks rows made for another base model than the connected model's; runs after each render and every few seconds (the model can change upstream).

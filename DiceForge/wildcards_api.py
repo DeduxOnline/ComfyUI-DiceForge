@@ -5,11 +5,12 @@ from aiohttp import web
 from .clip_text_encode_pos_neg import entry_lines, find_wildcard, wildcard_index
 # Server side of the Wildcard Browser and the __ autocomplete (web/wildcards.js): the list of wildcards, reading one, and saving one. Wildcards from
 # yaml files are listed and shown too, but read-only: they are edited in their yaml file.
-NAME = re.compile(r"[\w\-. ]+(/[\w\-. ]+)*")
+PART = r"[\w\-.]+(?: [\w\-.]+)*" # Single spaces inside a name, as __hair color__ reads them (clip_text_encode_pos_neg.WILDCARD_PATTERN).
+NAME = re.compile(rf"{PART}(/{PART})*")
 def checked_name(name):
     name = (name or "").strip().replace("\\", "/").removesuffix(".txt")
     if not NAME.fullmatch(name) or ".." in name.split("/"):
-        raise web.HTTPBadRequest(text=f"Wildcards: {name!r} is not a usable name (letters, digits, - _ . space, and / for folders).")
+        raise web.HTTPBadRequest(text=f"Wildcards: {name!r} is not a usable name (letters, digits, - _ ., single spaces inside, and / for folders).")
     return name
 def read_lines(path):
     with open(path, encoding="utf-8") as file:

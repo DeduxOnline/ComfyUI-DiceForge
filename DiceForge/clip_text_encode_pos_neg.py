@@ -14,7 +14,9 @@ from .seed_modes import MEMORY, Picker, RandomPicker, DeckPicker, ShufflePicker,
 # Wildcards: __name__ in a prompt is replaced by a random line of name.txt from the wildcards folders (ComfyUI/models/wildcards by default, more can be added in extra_model_paths.yaml).
 folder_paths.add_model_folder_path("wildcards", os.path.join(folder_paths.models_dir, "wildcards"), is_default=True)
 # * and ? match several files (__hair/*__, __*/color__); ${name} takes a variable's value (__outfit/${gender}__; \x00name\x00 once the prompt is scanned).
-WILDCARD_PATTERN = re.compile(r"__((?:[\w\-./*?]|\$\{\w+\}|\x00\w+\x00)+?)__")
+# Names can have single spaces inside, like file names (__hair color__), but not at the start or end, so "__ text__" stays text.
+NAME_PART = r"(?:[\w\-./*?]|\$\{\w+\}|\x00\w+\x00)+?"
+WILDCARD_PATTERN = re.compile(rf"__({NAME_PART}(?: {NAME_PART})*?)__")
 NAME_VARIABLE = re.compile(r"\$\{(\w+)\}|\x00(\w+)\x00")
 MAX_DEPTH = 50 # Nesting limit for wildcards and {a|b} choices, to stop wildcards that include each other forever.
 WILDCARD_FILES = (".txt", ".yaml", ".yml")

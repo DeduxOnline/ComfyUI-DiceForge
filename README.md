@@ -386,7 +386,11 @@ Your **recommended settings** from Model info (steps, CFG, sampler…) are shown
 
 ## Tests
 
-The `tests` folder (next to `DiceForge`, not copied into ComfyUI) has unit tests for the nodes and their server routes: seed modes, prompt syntax and wildcards (txt, yaml, globs, weights, variables), the resolution nodes (including the preview's rounding against the node's), the random nodes and loaders, LoRA Stack (strengths, groups, trigger words, presets), Model info and the model browsers, the Wildcard Browser routes, VAE Decode + Save and Dice Grid.
+Two test suites, next to `DiceForge` (not copied into ComfyUI). Both need a ComfyUI checkout with its Python packages installed, and never touch your own ComfyUI folders.
+
+### Unit tests
+
+The `tests` folder has unit tests for the nodes and their server routes: seed modes, prompt syntax and wildcards (txt, yaml, globs, weights, variables), the resolution nodes (including the preview's rounding against the node's), the random nodes and loaders, LoRA Stack (strengths, groups, trigger words, presets), Model info and the model browsers, the Wildcard Browser routes, VAE Decode + Save and Dice Grid.
 
 They run inside a real ComfyUI checkout, on the CPU, with [pytest](https://pytest.org):
 
@@ -397,6 +401,22 @@ COMFYUI_PATH=/path/to/ComfyUI python -m pytest tests
 ```
 
 Without `COMFYUI_PATH`, the tests look for `ComfyUI` next to this repository. They never touch your ComfyUI: seed memory, model info, presets, grids and saved images go to a temporary folder that is deleted afterwards, the model and wildcard files they need are made in temporary folders, the core model loaders and LoRA patching are replaced by stand-ins (no real model is loaded), and Civitai is not contacted. The rounding check against the frontend preview runs when [Node.js](https://nodejs.org) is installed and is skipped otherwise.
+
+### End-to-end tests
+
+The `e2e` folder has end-to-end tests with [Playwright](https://playwright.dev): they start a real ComfyUI with DiceForge and drive it like a user would.
+
+- **Workflows** (`api.spec.js`, no browser): workflows queued through ComfyUI's own queue, as the Run button does: every node is loaded, CLIP Dual Text Encode fills in wildcards, yaml keys, weights and variables; deck and combinations deal every option over runs; the same inputs come from ComfyUI's cache until a wildcard file changes; shuffle remembers between runs; the resolution nodes make latents of the right size; VAE Decode + Save writes PNG files with the workflow; Dice Grid saves a finished grid; Random Image loads a folder; Random Sampler's outputs are accepted by KSampler; and the server routes of the Wildcard Browser, Model info, the model browsers and LoRA Stack presets.
+- **Browser** (`ui.spec.js`, in both node designs, Nodes 2.0 and classic): every node can be added, the resolution preview, the `__` autocomplete, the Wildcard Browser (adding and editing), Model info, the LoRA and Checkpoint Browsers, LoRA Stack (adding from the browser, 🎲, groups, 🏷 trigger words, the base model marks, presets, reloading the workflow), a workflow run from the page, and node heights with advanced inputs. Any error in the page fails the test.
+
+```sh
+cd ComfyUI-DiceForge/e2e
+npm install
+npx playwright install chromium
+COMFYUI_PATH=/path/to/ComfyUI npm test          # PowerShell: $env:COMFYUI_PATH="C:\ComfyUI"; npm test
+```
+
+`e2e/server.js` makes a temporary ComfyUI base folder (`--base-directory`, in the system temp folder, deleted afterwards) with a link to this repository's `DiceForge` folder and small test files (stand-in model files, wildcards, images), starts a small stand-in for Civitai on the local machine (the tests never go online; DiceForge reads its address from `DICEFORGE_CIVITAI_URL`), and runs ComfyUI on the CPU at port 8199. `COMFYUI_PYTHON` picks the Python that runs ComfyUI (by default its `venv`/`.venv`, the portable build's `python_embeded`, or `python` from the PATH), `DICEFORGE_E2E_PORT` another port (the Civitai stand-in uses the next one). `npm run test:api` runs only the workflow tests, without a browser. A run takes about 3 minutes; after a failure, `npx playwright show-report report` shows screenshots and traces.
 
 ## About the latent
 
@@ -495,6 +515,7 @@ In `deck` and `shuffle` modes:
 
 - Put wildcard files in `ComfyUI/models/wildcards`, for example `ComfyUI/models/wildcards/color.txt`. Subfolders work too: `ComfyUI/models/wildcards/styles/photo.txt` is `__styles/photo__`.
 - More folders can be added with a `wildcards:` entry in ComfyUI's `extra_model_paths.yaml`.
+- Names can have single spaces inside, like file names: `hair color.txt` is `__hair color__`. A `__` followed or preceded by a space (`__ text__`) stays plain text.
 - One option per line. Empty lines and lines starting with `#` are skipped. Files are read as UTF-8.
 - A line can have a weight, as in choices: `3::blonde hair` comes 3 times as often as a line without a weight, `0::` turns a line off. In `deck` and `shuffle` a weight is the number of copies of the line in the deck; `combinations` counts every line once (except `0::`).
 - **YAML files** (the format of Dynamic Prompts and Impact Pack wildcard packs, `.yaml` or `.yml`) work too: nested keys are the folders and each list is one wildcard. See the example below. In a subfolder of the wildcards folder, the subfolder comes first (`styles/pack.yaml` with a `photo` key is `__styles/photo__`). A `.txt` file hides a yaml key with the same name. A yaml file that cannot be read is skipped with a warning in the console. In the Wildcard Browser yaml wildcards show *yaml* and are read-only: edit the yaml file to change them.
