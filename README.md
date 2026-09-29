@@ -384,6 +384,20 @@ The same browser for checkpoints: right-click **Load Checkpoint** (or another no
 
 Your **recommended settings** from Model info (steps, CFG, sampler…) are shown on the card (⚙), so you can see how to use a checkpoint while picking it; LoRA cards show them too. A checkpoint is several GB, so its first Civitai lookup takes longer (the hash is read from the whole file); the browser stays usable while **Look up all** runs, and closing it stops the lookups (the ones already done are kept).
 
+## Tests
+
+The `tests` folder (next to `DiceForge`, not copied into ComfyUI) has unit tests for the nodes and their server routes: seed modes, prompt syntax and wildcards (txt, yaml, globs, weights, variables), the resolution nodes (including the preview's rounding against the node's), the random nodes and loaders, LoRA Stack (strengths, groups, trigger words, presets), Model info and the model browsers, the Wildcard Browser routes, VAE Decode + Save and Dice Grid.
+
+They run inside a real ComfyUI checkout, on the CPU, with [pytest](https://pytest.org):
+
+```sh
+cd ComfyUI-DiceForge
+pip install pytest   # in ComfyUI's Python environment
+COMFYUI_PATH=/path/to/ComfyUI python -m pytest tests
+```
+
+Without `COMFYUI_PATH`, the tests look for `ComfyUI` next to this repository. They never touch your ComfyUI: seed memory, model info, presets, grids and saved images go to a temporary folder that is deleted afterwards, the model and wildcard files they need are made in temporary folders, the core model loaders and LoRA patching are replaced by stand-ins (no real model is loaded), and Civitai is not contacted. The rounding check against the frontend preview runs when [Node.js](https://nodejs.org) is installed and is skipped otherwise.
+
 ## About the latent
 
 Like the output of **Empty Latent Image**, the latent works with any model you would use that node with: the core samplers adapt an empty latent to the model's latent format.
