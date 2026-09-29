@@ -40,11 +40,12 @@ def test_standard_size_makes_the_latent():
     assert tuple(latent["samples"].shape) == (2, 4, 104, 152)
 
 
-def test_scale_multiplies_the_area():
-    _, width, height, _ = sdxl("Standard", "1024 x 1024", scale=2.0)
-    assert (width, height) == (1448, 1448)
-    _, width, height, _ = sdxl("Standard", "768 x 1344", scale=1.69, multiple=16)
-    assert width % 16 == 0 and height % 16 == 0 and abs(width * height / (768 * 1344) - 1.69) < 0.05
+def test_scale_sides_by_multiplies_each_side():
+    assert sdxl("Standard", "1024 x 1024", scale=1.5, multiple=16)[1:3] == (1536, 1536)
+    assert sdxl("Standard", "1024 x 1024", scale=2.0)[1:3] == (2048, 2048) # Four times the pixels.
+    assert sdxl("Standard", "1216 x 832", scale=0.5)[1:3] == (608, 416)
+    _, width, height, _ = sdxl("Standard", "768 x 1344", scale=1.3, multiple=16)
+    assert width % 16 == 0 and height % 16 == 0 and abs(width * height / (768 * 1344) - 1.69) < 0.05 # The pixels grow by the square.
     assert abs(width / height - 768 / 1344) < 0.01
 
 
@@ -71,7 +72,7 @@ def test_random_chaos_stays_in_budget_orientation_and_aspect(orientation, scale,
     for seed in range(60):
         _, width, height, _ = sdxl("Random Chaos", orientation, seed=seed, scale=scale, multiple=multiple, max_aspect=max_aspect)
         assert width % multiple == 0 and height % multiple == 0
-        assert width * height <= CHAOS_PIXELS * scale
+        assert width * height <= CHAOS_PIXELS * scale ** 2
         assert max(width, height) / min(width, height) <= max_aspect * 1.15 # Rounding down can stretch a little.
         if orientation == "Portrait":
             assert height > width

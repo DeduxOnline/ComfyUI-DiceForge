@@ -34,7 +34,7 @@ RANDOM_LISTED = {
     "Horizontal High-Res Listed": [size for size in HIGH_RES.values() if size[0] > size[1]],
 }
 RANDOM_CHAOS = ["Any", "Portrait", "Landscape"] # Orientations for Random Chaos.
-CHAOS_PIXELS = 1024 * 1024 # Pixel budget of Random Chaos: the SDXL native size, times scale.
+CHAOS_PIXELS = 1024 * 1024 # Pixel budget of Random Chaos: the SDXL native size, times the square of scale sides by.
 # Node schema (V3 / Nodes 2.0): SDXL resolution selection with a nested list (pick a group, then a size of that group), outputting an empty latent of that size (like Empty Latent Image). Scale, multiple and batch are shown in the Advanced section.
 class SDXLResolutionListLatent(io.ComfyNode):
     @classmethod
@@ -53,7 +53,7 @@ class SDXLResolutionListLatent(io.ComfyNode):
                         io.DynamicCombo.Option("High-Res", [size(HIGH_RES, "High-res size, width x height.")]),
                         io.DynamicCombo.Option("Random", [size(RANDOM_LISTED, "Picks one of the listed sizes at random from the seed: any, only vertical or only horizontal.")]),
                         io.DynamicCombo.Option("Random Chaos", [
-                            size(RANDOM_CHAOS, "Orientation of the random aspect ratio: any, only portrait (taller than wide) or only landscape (wider than tall). The size stays within 1024x1024 pixels times scale."),
+                            size(RANDOM_CHAOS, "Orientation of the random aspect ratio: any, only portrait (taller than wide) or only landscape (wider than tall). The size stays within 1024x1024 pixels with each side times scale sides by (1.5: up to 1536x1536 pixels)."),
                             io.Float.Input("max_aspect", default=2.0, min=1.0, max=4.0, step=0.05, tooltip="The most stretched aspect ratio allowed (2.0 = up to 2:1 or 1:2)."),
                         ]),
                     ],
@@ -76,11 +76,12 @@ class SDXLResolutionListLatent(io.ComfyNode):
                 ),
                 io.Float.Input(
                     "scale",
+                    display_name="scale sides by",
                     default=1.0,
                     min=0.1,
                     max=10.0,
                     step=0.05,
-                    tooltip="Multiply the number of pixels (the area) by this factor, keeping the aspect ratio: 2.0 gives twice the pixels (each side about 1.41x), 0.5 half. Then rounded to multiple.",
+                    tooltip="Multiply the width and the height by this factor, keeping the aspect ratio: 1.5 turns 1024x1024 into 1536x1536, 0.5 into 512x512. The number of pixels grows by its square (1.5: 2.25 times the pixels, 2.0: 4 times). Then rounded to multiple.",
                     advanced=True,
                 ),
                 io.Int.Input(
@@ -149,13 +150,13 @@ class SDXLResolutionListLatent(io.ComfyNode):
         if group == "Random":
             width, height = map(int, pick_label([f"{w} x {h}" for w, h in RANDOM_LISTED[size]], picker, seed).split(" x "))#Returning a random resolution from the listed sizes.
         elif group == "Random Chaos":
-            width, height = cls.chaos_size(picker, seed, size, resolution.get("max_aspect", 2.0), CHAOS_PIXELS * scale)#Returning a random aspect ratio within the pixel budget (times scale) for chaos sizes.
+            width, height = cls.chaos_size(picker, seed, size, resolution.get("max_aspect", 2.0), CHAOS_PIXELS * scale ** 2)#Returning a random aspect ratio within the pixel budget (each side times scale) for chaos sizes.
         else:
             width, height = (HIGH_RES if group == "High-Res" else STANDARD)[size]#Returning the fixed resolution for standard and high-res sizes.
-        # Scale multiplies the area: each side by its square root (Random Chaos has it in its pixel budget already). Then rounding to multiple;
-        # Chaos sizes round down, so they stay within the pixel budget.
+        # Scale sides by: each side times scale, so the pixels (megapixels) times its square (Random Chaos has it in its pixel budget already). Then
+        # rounding to multiple; Chaos sizes round down, so they stay within the pixel budget.
         chaos = group == "Random Chaos"
-        side = 1.0 if chaos else math.sqrt(scale)
+        side = 1.0 if chaos else scale
         width, height = cls.round_to_multiple(width * side, height * side, multiple, round_down=chaos)
         # Portrait and Landscape stay non-square after rounding (a ratio close to 1:1 can round to a square): the shorter side steps down, keeping the budget.
         if chaos and size != "Any" and width == height and max(resolution.get("max_aspect", 2.0), 1.0) > 1.0 and width > multiple:
@@ -166,7 +167,7 @@ class SDXLResolutionListLatent(io.ComfyNode):
         MEMORY.save()
         # Logging the final resolution, scale, multiple, seed, and batch size for debugging and verification purposes.
         logging.info(
-            f"[DiceForge] SDXL Resolution List (Latent) | {group}: {size} | Size: {width}x{height} | Scale: {scale} | Multiple: {multiple} | Seed: {seed} ({seed_mode}) | Batch: {batch}"
+            f"[DiceForge] SDXL Resolution List (Latent) | {group}: {size} | Size: {width}x{height} | Scale sides by: {scale} | Multiple: {multiple} | Seed: {seed} ({seed_mode}) | Batch: {batch}"
         )
         latent = nodes.EmptyLatentImage().generate(width, height, batch)[0]
         # The size of this run, with the settings it came from, for the preview of random sizes in the frontend extension.

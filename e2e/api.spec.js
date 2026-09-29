@@ -25,6 +25,7 @@ test.describe("@api workflows and routes", () => {
   test("ComfyUI loads every DiceForge node", async ({ request }) => {
     const info = await (await request.get("/object_info")).json();
     for (const node of NODES) expect(info[node]?.python_module, node).toContain("DiceForge");
+    expect(info.SDXLResolutionListLatent.input.required.scale[1].display_name).toBe("scale sides by");
   });
 
   test("CLIP Dual Text Encode fills in wildcards, yaml keys, weights and variables", async ({ request }) => {
@@ -82,8 +83,8 @@ test.describe("@api workflows and routes", () => {
     const size = (node) => ({ ...node, 2: { class_type: "PreviewAny", inputs: { source: ["1", 1] } }, 3: { class_type: "PreviewAny", inputs: { source: ["1", 2] } } });
     let result = await runPrompt(request, size({ 1: { class_type: "SDXLResolutionListLatent", inputs: { resolution: "Standard", "resolution.size": "1216 x 832", seed: 0, scale: 1.0, multiple: 8, batch: 1, seed_mode: "random" } } }));
     expect([shown(result, "2"), shown(result, "3")]).toEqual(["1216", "832"]);
-    result = await runPrompt(request, size({ 1: { class_type: "SDXLResolutionListLatent", inputs: { resolution: "Standard", "resolution.size": "1024 x 1024", seed: 0, scale: 2.0, multiple: 8, batch: 1, seed_mode: "random" } } }));
-    expect([shown(result, "2"), shown(result, "3")]).toEqual(["1448", "1448"]);
+    result = await runPrompt(request, size({ 1: { class_type: "SDXLResolutionListLatent", inputs: { resolution: "Standard", "resolution.size": "1024 x 1024", seed: 0, scale: 1.5, multiple: 16, batch: 1, seed_mode: "random" } } }));
+    expect([shown(result, "2"), shown(result, "3")]).toEqual(["1536", "1536"]); // scale sides by 1.5: each side, 2.25 times the pixels.
     const listed = new Set();
     for (let seed = 0; seed < 4; seed++) {
       result = await runPrompt(request, size({ 1: { class_type: "SDXLResolutionListLatent", inputs: { resolution: "Random", "resolution.size": "Vertical Listed", seed, scale: 1.0, multiple: 8, batch: 1, seed_mode: "deck" } } }));

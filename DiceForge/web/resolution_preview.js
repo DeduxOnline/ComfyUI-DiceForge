@@ -37,12 +37,12 @@ const NODES = {
     }),
     isRandom: (current) => current.group !== "Standard" && current.group !== "High-Res",
     usesMaxAspect: (current) => current.group === "Random Chaos",
-    // The final size, as the node computes it (scale multiplies the area, then rounding to multiple), given to the preview as ratio and megapixels
+    // The final size, as the node computes it (each side times scale sides by, then rounding to multiple), given to the preview as ratio and megapixels
     // of an exact multiple, which the preview keeps as it is.
     fixed: (current) => {
       const match = /^(\d+)\s*x\s*(\d+)/.exec(current.size);
       if (!match || !(current.scale > 0) || !(current.multiple > 0)) return null;
-      const side = Math.sqrt(current.scale);
+      const side = current.scale;
       const [width, height] = roundToMultiple(Number(match[1]) * side, Number(match[2]) * side, current.multiple);
       return { ratio: `${width}:${height}`, megapixels: (width * height) / (1024 * 1024) };
     },

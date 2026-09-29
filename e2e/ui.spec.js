@@ -36,8 +36,8 @@ for (const vue of [true, false]) {
       const [id, preview] = await addNodes(page, [{ type: "SDXLResolutionListLatent", widgets: { "resolution.size": "1216 x 832" } }, { type: "PreviewAny", pos: [500, 40] }]);
       await connect(page, id, 1, preview, 0); // An output, so the workflow can run.
       await expect.poll(() => widgetValue(page, id, "preview_ratio")).toBe("1216:832");
-      await setWidget(page, id, "scale", 2.0);
-      await expect.poll(() => widgetValue(page, id, "preview_ratio")).toBe("1720:1176");
+      await setWidget(page, id, "scale", 1.5); // scale sides by: 1216 x 832 becomes 1824 x 1248.
+      await expect.poll(() => widgetValue(page, id, "preview_ratio")).toBe("1824:1248");
       await setWidget(page, id, "scale", 1.0);
       await setWidget(page, id, "resolution", "Random");
       await expect.poll(() => widgetValue(page, id, "preview_ratio")).toBe(""); // Not run yet: "—".
