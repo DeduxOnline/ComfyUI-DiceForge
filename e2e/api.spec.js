@@ -26,6 +26,8 @@ test.describe("@api workflows and routes", () => {
     const info = await (await request.get("/object_info")).json();
     for (const node of NODES) expect(info[node]?.python_module, node).toContain("DiceForge");
     expect(info.SDXLResolutionListLatent.input.required.scale[1].display_name).toBe("scale sides by");
+    expect(info.SDXLResolutionListLatent.input.required.scale[1].advanced).toBeFalsy(); // In view, not under the advanced inputs.
+    expect(info.CLIPTextEncodePositiveNegative.input.required.negative[1].advanced).toBe(true);
   });
 
   test("CLIP Dual Text Encode fills in wildcards, yaml keys, weights and variables", async ({ request }) => {

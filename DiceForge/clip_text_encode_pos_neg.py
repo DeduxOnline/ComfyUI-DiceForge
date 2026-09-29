@@ -405,6 +405,7 @@ class CLIPTextEncodePositiveNegative(io.ComfyNode):
                     "negative",
                     multiline=True,
                     tooltip="The negative prompt: what the image should avoid. Supports {a|b} choices, __name__ wildcards and ${name=value} / ${name} variables.",
+                    advanced=True, # Usually set once: under Show advanced inputs, with the positive prompt in view.
                 ),
                 io.Clip.Input(
                     "clip",

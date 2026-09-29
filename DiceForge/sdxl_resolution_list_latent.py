@@ -82,7 +82,6 @@ class SDXLResolutionListLatent(io.ComfyNode):
                     max=10.0,
                     step=0.05,
                     tooltip="Multiply the width and the height by this factor, keeping the aspect ratio: 1.5 turns 1024x1024 into 1536x1536, 0.5 into 512x512. The number of pixels grows by its square (1.5: 2.25 times the pixels, 2.0: 4 times). Then rounded to multiple.",
-                    advanced=True,
                 ),
                 io.Int.Input(
                     "multiple",
