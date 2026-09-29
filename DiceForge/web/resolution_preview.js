@@ -21,6 +21,23 @@ function roundToMultiple(width, height, multiple) {
   return best;
 }
 
+// The node's rescale (sdxl_resolution_list_latent.rescaled): by percentage of each side, to a width and/or height, or to a longest side.
+function rescaled(width, height, current) {
+  if (current.rescale === "to Width/Height") {
+    const targetWidth = Number(current.rescale_width) || 0, targetHeight = Number(current.rescale_height) || 0;
+    if (targetWidth && targetHeight) return [targetWidth, targetHeight];
+    if (targetWidth) return [targetWidth, (height * targetWidth) / width];
+    if (targetHeight) return [(width * targetHeight) / height, targetHeight];
+    return [width, height];
+  }
+  if (current.rescale === "to longest side") {
+    const side = Number(current.longer_side ?? 1024);
+    return width >= height ? [side, (height * side) / width] : [(width * side) / height, side];
+  }
+  const factor = Number(current.percent ?? 100) / 100;
+  return [width * factor, height * factor];
+}
+
 function widgetValue(node, name) {
   return node.widgets?.find((widget) => widget.name === name)?.value;
 }
@@ -32,18 +49,23 @@ const NODES = {
       group: widgetValue(node, "resolution"),
       size: String(widgetValue(node, "resolution.size") ?? ""),
       max_aspect: widgetValue(node, "resolution.max_aspect") ?? null,
-      scale: Number(widgetValue(node, "scale") ?? 1),
+      rescale: String(widgetValue(node, "rescale") ?? "by percentage"),
+      percent: widgetValue(node, "rescale.percent") ?? null,
+      rescale_width: widgetValue(node, "rescale.width") ?? null,
+      rescale_height: widgetValue(node, "rescale.height") ?? null,
+      longer_side: widgetValue(node, "rescale.longer_side") ?? null,
       multiple: Number(widgetValue(node, "multiple") ?? 8),
     }),
     isRandom: (current) => current.group !== "Standard" && current.group !== "High-Res",
     usesMaxAspect: (current) => current.group === "Random Chaos",
-    // The final size, as the node computes it (each side times scale sides by, then rounding to multiple), given to the preview as ratio and megapixels
-    // of an exact multiple, which the preview keeps as it is.
+    // The final size, as the node computes it (rescale, then rounding to multiple), given to the preview as ratio and megapixels of an exact
+    // multiple, which the preview keeps as it is.
     fixed: (current) => {
       const match = /^(\d+)\s*x\s*(\d+)/.exec(current.size);
-      if (!match || !(current.scale > 0) || !(current.multiple > 0)) return null;
-      const side = current.scale;
-      const [width, height] = roundToMultiple(Number(match[1]) * side, Number(match[2]) * side, current.multiple);
+      if (!match || !(current.multiple > 0)) return null;
+      const [exactWidth, exactHeight] = rescaled(Number(match[1]), Number(match[2]), current);
+      if (!(exactWidth > 0) || !(exactHeight > 0)) return null;
+      const [width, height] = roundToMultiple(exactWidth, exactHeight, current.multiple);
       return { ratio: `${width}:${height}`, megapixels: (width * height) / (1024 * 1024) };
     },
   },
@@ -98,6 +120,30 @@ async function repairResolutionGroup(node) {
   group.value = groups[0]; // An unknown value: the first group, so the node runs.
   group.callback?.(groups[0]);
 }
+// Workflows saved while SDXL Resolution List had a scale number (before the rescale list) have that number where rescale now is, and the values
+// after it (multiple, batch, seed_mode) one place off: they are put back, with scale as by percentage (1.5: 150).
+const CONTROL_MODES = ["fixed", "increment", "decrement", "randomize"];
+function savedScale(info) {
+  const values = info?.widgets_values;
+  if (!Array.isArray(values)) return null;
+  const at = values.findIndex((value, index) => CONTROL_MODES.includes(value) && [1, 2, 3].every((offset) => typeof values[index + offset] === "number"));
+  return at < 0 ? null : { scale: values[at + 1], multiple: values[at + 2], batch: values[at + 3], seedMode: values[at + 4] };
+}
+async function migrateScale(node, saved) {
+  const set = (name, value) => {
+    const widget = node.widgets?.find((widget) => widget.name === name);
+    if (!widget || value === undefined) return;
+    widget.value = value;
+    widget.callback?.(value);
+  };
+  set("rescale", "by percentage");
+  await new Promise((resolve) => setTimeout(resolve, 0)); // The percent input is built after the change.
+  set("rescale.percent", Math.max(1, Math.round(saved.scale * 100)));
+  set("multiple", saved.multiple);
+  set("batch", saved.batch);
+  if (node.widgets?.find((widget) => widget.name === "seed_mode")?.options?.values?.includes(saved.seedMode)) set("seed_mode", saved.seedMode);
+  console.info(`[DiceForge] ${node.comfyClass} #${node.id}: scale ${saved.scale} became rescale by percentage ${Math.round(saved.scale * 100)} (saved by an older version).`);
+}
 // Inputs left from older versions (vae_alignment) that the node no longer has: unconnected ones are removed.
 function removeStaleInputs(node) {
   const names = new Set((node.widgets ?? []).map((widget) => widget.name));
@@ -127,11 +173,14 @@ app.registerExtension({
     if (preview?.options) Object.assign(preview.options, { ratio_widget: "preview_ratio", megapixels_widget: "preview_megapixels", multiple_widget: "multiple" });
     // Workflows saved before seed_mode existed have a helper's value where seed_mode now is: fall back to the default.
     const onConfigure = node.onConfigure;
-    node.onConfigure = function () {
+    node.onConfigure = function (info) {
+      const scale = node.comfyClass === "SDXLResolutionListLatent" ? savedScale(info) : null;
       const seedMode = node.widgets?.find((widget) => widget.name === "seed_mode");
       if (seedMode && !seedMode.options?.values?.includes(seedMode.value)) seedMode.value = "random";
       const result = onConfigure?.apply(this, arguments);
-      repairResolutionGroup(node).then(() => removeStaleInputs(node));
+      repairResolutionGroup(node)
+        .then(() => scale && migrateScale(node, scale))
+        .then(() => removeStaleInputs(node));
       return result;
     };
     let last = null;

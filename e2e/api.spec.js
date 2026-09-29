@@ -25,8 +25,9 @@ test.describe("@api workflows and routes", () => {
   test("ComfyUI loads every DiceForge node", async ({ request }) => {
     const info = await (await request.get("/object_info")).json();
     for (const node of NODES) expect(info[node]?.python_module, node).toContain("DiceForge");
-    expect(info.SDXLResolutionListLatent.input.required.scale[1].display_name).toBe("scale sides by");
-    expect(info.SDXLResolutionListLatent.input.required.scale[1].advanced).toBeFalsy(); // In view, not under the advanced inputs.
+    const rescale = info.SDXLResolutionListLatent.input.required.rescale;
+    expect(rescale[1].options.map((option) => option.key)).toEqual(["by percentage", "to Width/Height", "to longest side"]);
+    expect(rescale[1].advanced).toBeFalsy(); // In view, not under the advanced inputs.
     expect(info.CLIPTextEncodePositiveNegative.input.required.negative[1].advanced).toBe(true);
   });
 
@@ -83,13 +84,17 @@ test.describe("@api workflows and routes", () => {
 
   test("SDXL Resolution List and Resolution Selector make latents of the right size", async ({ request }) => {
     const size = (node) => ({ ...node, 2: { class_type: "PreviewAny", inputs: { source: ["1", 1] } }, 3: { class_type: "PreviewAny", inputs: { source: ["1", 2] } } });
-    let result = await runPrompt(request, size({ 1: { class_type: "SDXLResolutionListLatent", inputs: { resolution: "Standard", "resolution.size": "1216 x 832", seed: 0, scale: 1.0, multiple: 8, batch: 1, seed_mode: "random" } } }));
+    let result = await runPrompt(request, size({ 1: { class_type: "SDXLResolutionListLatent", inputs: { resolution: "Standard", "resolution.size": "1216 x 832", seed: 0, rescale: "by percentage", "rescale.percent": 100, multiple: 8, batch: 1, seed_mode: "random" } } }));
     expect([shown(result, "2"), shown(result, "3")]).toEqual(["1216", "832"]);
-    result = await runPrompt(request, size({ 1: { class_type: "SDXLResolutionListLatent", inputs: { resolution: "Standard", "resolution.size": "1024 x 1024", seed: 0, scale: 1.5, multiple: 16, batch: 1, seed_mode: "random" } } }));
-    expect([shown(result, "2"), shown(result, "3")]).toEqual(["1536", "1536"]); // scale sides by 1.5: each side, 2.25 times the pixels.
+    result = await runPrompt(request, size({ 1: { class_type: "SDXLResolutionListLatent", inputs: { resolution: "Standard", "resolution.size": "1024 x 1024", seed: 0, rescale: "by percentage", "rescale.percent": 150, multiple: 16, batch: 1, seed_mode: "random" } } }));
+    expect([shown(result, "2"), shown(result, "3")]).toEqual(["1536", "1536"]); // 150%: each side, 2.25 times the pixels.
+    result = await runPrompt(request, size({ 1: { class_type: "SDXLResolutionListLatent", inputs: { resolution: "Standard", "resolution.size": "832 x 1216", seed: 0, rescale: "to longest side", "rescale.longer_side": 1536, multiple: 8, batch: 1, seed_mode: "random" } } }));
+    expect([shown(result, "2"), shown(result, "3")]).toEqual(["1048", "1536"]);
+    result = await runPrompt(request, size({ 1: { class_type: "SDXLResolutionListLatent", inputs: { resolution: "Standard", "resolution.size": "1216 x 832", seed: 0, rescale: "to Width/Height", "rescale.width": 1920, "rescale.height": 1080, multiple: 8, batch: 1, seed_mode: "random" } } }));
+    expect([shown(result, "2"), shown(result, "3")]).toEqual(["1920", "1080"]);
     const listed = new Set();
     for (let seed = 0; seed < 4; seed++) {
-      result = await runPrompt(request, size({ 1: { class_type: "SDXLResolutionListLatent", inputs: { resolution: "Random", "resolution.size": "Vertical Listed", seed, scale: 1.0, multiple: 8, batch: 1, seed_mode: "deck" } } }));
+      result = await runPrompt(request, size({ 1: { class_type: "SDXLResolutionListLatent", inputs: { resolution: "Random", "resolution.size": "Vertical Listed", seed, rescale: "by percentage", "rescale.percent": 100, multiple: 8, batch: 1, seed_mode: "deck" } } }));
       listed.add(`${shown(result, "2")}x${shown(result, "3")}`);
       expect(result.outputs["1"].dice_forge_last_size[0].group).toBe("Random");
     }
@@ -99,6 +104,15 @@ test.describe("@api workflows and routes", () => {
     expect(width % 64).toBe(0);
     expect(height).toBeGreaterThan(width);
     expect(width * height).toBeLessThanOrEqual(1024 * 1024);
+  });
+
+  test("a resolution node from the cache still reports its size to the preview", async ({ request }) => {
+    const prompt = { 1: { class_type: "SDXLResolutionListLatent", inputs: { resolution: "Random", "resolution.size": "Any Listed", seed: 777, rescale: "by percentage", "rescale.percent": 100, multiple: 8, batch: 1, seed_mode: "random" } },
+      2: { class_type: "PreviewAny", inputs: { source: ["1", 1] } } };
+    const first = await runPrompt(request, prompt);
+    const again = await runPrompt(request, prompt);
+    expect(again.cached).toContain("1");
+    expect(again.outputs["1"].dice_forge_last_size).toEqual(first.outputs["1"].dice_forge_last_size);
   });
 
   test("VAE Decode + Save and Load VAE + Decode + Save write PNG files with the workflow", async ({ request }) => {

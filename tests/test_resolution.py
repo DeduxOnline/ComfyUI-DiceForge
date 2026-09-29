@@ -8,13 +8,17 @@ import shutil
 import subprocess
 import pytest
 from DiceForge.resolution_selector_random_latent import ASPECT_RATIOS, ResolutionSelectorRandomLatent as Selector
-from DiceForge.sdxl_resolution_list_latent import CHAOS_PIXELS, HIGH_RES, RANDOM_LISTED, STANDARD, SDXLResolutionListLatent as SDXL
+from DiceForge.sdxl_resolution_list_latent import CHAOS_PIXELS, HIGH_RES, RANDOM_LISTED, STANDARD, SDXLResolutionListLatent as SDXL, rescaled
 
 round_to_multiple = SDXL.round_to_multiple
 
 
-def sdxl(group, size, seed=0, scale=1.0, multiple=8, batch=1, mode="random", max_aspect=2.0):
-    latent, width, height, out_seed = SDXL.execute({"resolution": group, "size": size, "max_aspect": max_aspect}, seed, scale, multiple, batch, mode).result
+def by_percentage(percent):
+    return {"rescale": "by percentage", "percent": percent}
+
+
+def sdxl(group, size, seed=0, rescale=None, multiple=8, batch=1, mode="random", max_aspect=2.0):
+    latent, width, height, out_seed = SDXL.execute({"resolution": group, "size": size, "max_aspect": max_aspect}, seed, rescale or by_percentage(100), multiple, batch, mode).result
     return latent, width, height, out_seed
 
 
@@ -40,13 +44,36 @@ def test_standard_size_makes_the_latent():
     assert tuple(latent["samples"].shape) == (2, 4, 104, 152)
 
 
-def test_scale_sides_by_multiplies_each_side():
-    assert sdxl("Standard", "1024 x 1024", scale=1.5, multiple=16)[1:3] == (1536, 1536)
-    assert sdxl("Standard", "1024 x 1024", scale=2.0)[1:3] == (2048, 2048) # Four times the pixels.
-    assert sdxl("Standard", "1216 x 832", scale=0.5)[1:3] == (608, 416)
-    _, width, height, _ = sdxl("Standard", "768 x 1344", scale=1.3, multiple=16)
+def test_rescale_by_percentage_multiplies_each_side():
+    assert sdxl("Standard", "1024 x 1024", rescale=by_percentage(150), multiple=16)[1:3] == (1536, 1536)
+    assert sdxl("Standard", "1024 x 1024", rescale=by_percentage(200))[1:3] == (2048, 2048) # Four times the pixels.
+    assert sdxl("Standard", "1216 x 832", rescale=by_percentage(50))[1:3] == (608, 416)
+    _, width, height, _ = sdxl("Standard", "768 x 1344", rescale=by_percentage(130), multiple=16)
     assert width % 16 == 0 and height % 16 == 0 and abs(width * height / (768 * 1344) - 1.69) < 0.05 # The pixels grow by the square.
     assert abs(width / height - 768 / 1344) < 0.01
+
+
+def test_rescale_to_width_and_height():
+    to = lambda width=0, height=0: {"rescale": "to Width/Height", "width": width, "height": height}
+    assert sdxl("Standard", "1216 x 832", rescale=to(1920, 1080))[1:3] == (1920, 1080) # Both: that exact size.
+    width, height = sdxl("Standard", "1216 x 832", rescale=to(width=1536))[1:3]
+    assert width == 1536 and abs(width / height - 1216 / 832) < 0.01 and height % 8 == 0
+    width, height = sdxl("Standard", "832 x 1216", rescale=to(height=1600))[1:3]
+    assert height == 1600 and abs(width / height - 832 / 1216) < 0.01
+    assert sdxl("Standard", "1216 x 832", rescale=to())[1:3] == (1216, 832) # Neither: unchanged.
+
+
+def test_rescale_to_longest_side():
+    longest = lambda side: {"rescale": "to longest side", "longer_side": side}
+    assert sdxl("Standard", "1024 x 1024", rescale=longest(1536))[1:3] == (1536, 1536)
+    assert sdxl("Standard", "1216 x 832", rescale=longest(1536))[1:3] == (1536, 1048)
+    width, height = sdxl("Standard", "832 x 1216", rescale=longest(2048), multiple=64)[1:3]
+    assert height == 2048 and width % 64 == 0
+
+
+def test_rescale_without_an_input_is_by_100_percent():
+    assert rescaled(1216, 832, None) == (1216, 832)
+    assert SDXL.execute({"resolution": "Standard", "size": "1216 x 832"}).result[1:3] == (1216, 832)
 
 
 def test_high_res_sizes():
@@ -67,12 +94,12 @@ def test_random_sequential_goes_in_order():
     assert [sdxl("Random", "Any Listed", seed=seed, mode="sequential")[1:3] for seed in range(len(listed))] == listed
 
 
-@pytest.mark.parametrize("orientation, scale, multiple, max_aspect", [("Any", 1.0, 8, 2.0), ("Portrait", 1.5, 64, 3.0), ("Landscape", 0.75, 16, 1.5)])
-def test_random_chaos_stays_in_budget_orientation_and_aspect(orientation, scale, multiple, max_aspect):
+@pytest.mark.parametrize("orientation, percent, multiple, max_aspect", [("Any", 100, 8, 2.0), ("Portrait", 150, 64, 3.0), ("Landscape", 75, 16, 1.5)])
+def test_random_chaos_stays_in_budget_orientation_and_aspect(orientation, percent, multiple, max_aspect):
     for seed in range(60):
-        _, width, height, _ = sdxl("Random Chaos", orientation, seed=seed, scale=scale, multiple=multiple, max_aspect=max_aspect)
+        _, width, height, _ = sdxl("Random Chaos", orientation, seed=seed, rescale=by_percentage(percent), multiple=multiple, max_aspect=max_aspect)
         assert width % multiple == 0 and height % multiple == 0
-        assert width * height <= CHAOS_PIXELS * scale ** 2
+        assert width * height <= CHAOS_PIXELS * (percent / 100) ** 2
         assert max(width, height) / min(width, height) <= max_aspect * 1.15 # Rounding down can stretch a little.
         if orientation == "Portrait":
             assert height > width
@@ -80,15 +107,22 @@ def test_random_chaos_stays_in_budget_orientation_and_aspect(orientation, scale,
             assert width > height
 
 
+def test_random_chaos_to_longest_side_keeps_the_longest_side():
+    for seed in range(40):
+        _, width, height, _ = sdxl("Random Chaos", "Any", seed=seed, rescale={"rescale": "to longest side", "longer_side": 1536}, multiple=16)
+        assert 1536 - 16 < max(width, height) <= 1536
+
+
 def test_an_old_node_without_a_group_is_a_clear_error():
     with pytest.raises(ValueError, match="no valid group"):
-        SDXL.execute(None, 0, 1.0, 8, 1, "random")
+        SDXL.execute(None, 0, by_percentage(100), 8, 1, "random")
 
 
 def test_the_run_reports_its_size_for_the_preview():
-    out = SDXL.execute({"resolution": "Random", "size": "Any Listed"}, 3, 1.0, 8, 1, "random")
+    out = SDXL.execute({"resolution": "Random", "size": "Any Listed"}, 3, by_percentage(150), 8, 1, "random")
     last = out.ui["dice_forge_last_size"][0]
     assert (last["width"], last["height"], last["group"], last["size"]) == (out.result[1], out.result[2], "Random", "Any Listed")
+    assert (last["rescale"], last["percent"], last["rescale_width"], last["longer_side"]) == ("by percentage", 150, None, None)
 
 
 def test_listed_random_fingerprint_only_changes_for_remembering_modes():
@@ -128,6 +162,20 @@ def js_function(name):
         if depth == 0:
             return source[start:index + 1]
     raise AssertionError(f"{name} not closed")
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node.js is not installed")
+def test_the_preview_rescales_exactly_like_the_node():
+    rescales = [{"rescale": "by percentage", "percent": percent} for percent in (50, 100, 137, 150)] + \
+        [{"rescale": "to Width/Height", "width": w, "height": h} for w, h in ((1536, 0), (0, 1600), (1920, 1080), (0, 0))] + \
+        [{"rescale": "to longest side", "longer_side": side} for side in (1024, 1536, 2000)]
+    cases = [(w, h, r) for (w, h) in list(STANDARD.values())[:5] for r in rescales]
+    preview = [{"rescale": r["rescale"], "percent": r.get("percent"), "rescale_width": r.get("width"), "rescale_height": r.get("height"), "longer_side": r.get("longer_side")} for _, _, r in cases]
+    script = js_function("rescaled") + f"\nconst cases = {json.dumps([[w, h] for w, h, _ in cases])}, settings = {json.dumps(preview)};" + \
+        "\nconsole.log(JSON.stringify(cases.map(([w, h], index) => rescaled(w, h, settings[index]))));"
+    output = subprocess.run(["node", "-e", script], capture_output=True, text=True, check=True).stdout
+    for got, (w, h, r) in zip(json.loads(output), cases):
+        assert got == pytest.approx(list(rescaled(w, h, r))), (w, h, r)
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="node.js is not installed")

@@ -36,14 +36,36 @@ for (const vue of [true, false]) {
       const [id, preview] = await addNodes(page, [{ type: "SDXLResolutionListLatent", widgets: { "resolution.size": "1216 x 832" } }, { type: "PreviewAny", pos: [500, 40] }]);
       await connect(page, id, 1, preview, 0); // An output, so the workflow can run.
       await expect.poll(() => widgetValue(page, id, "preview_ratio")).toBe("1216:832");
-      await setWidget(page, id, "scale", 1.5); // scale sides by: 1216 x 832 becomes 1824 x 1248.
+      await setWidget(page, id, "rescale.percent", 150); // Each side: 1216 x 832 becomes 1824 x 1248.
       await expect.poll(() => widgetValue(page, id, "preview_ratio")).toBe("1824:1248");
-      await setWidget(page, id, "scale", 1.0);
+      await setWidget(page, id, "rescale", "to longest side");
+      await expect.poll(() => widgetValue(page, id, "preview_ratio")).toBe("1536:1048"); // longer_side 1536 by default.
+      await setWidget(page, id, "rescale", "to Width/Height");
+      await setWidget(page, id, "rescale.width", 1920);
+      await setWidget(page, id, "rescale.height", 1080);
+      await expect.poll(() => widgetValue(page, id, "preview_ratio")).toBe("1920:1080");
+      await setWidget(page, id, "rescale", "by percentage");
       await setWidget(page, id, "resolution", "Random");
       await expect.poll(() => widgetValue(page, id, "preview_ratio")).toBe(""); // Not run yet: "—".
       await queueFromPage(page, request);
       await expect.poll(() => widgetValue(page, id, "preview_ratio")).toMatch(/^\d+:\d+$/);
       if (vue) await expect(nodeElement(page, id)).toContainText("×");
+    });
+
+    test("an SDXL Resolution List saved with the old scale number opens as rescale by percentage", async ({ page }) => {
+      const [id] = await addNodes(page, [{ type: "SDXLResolutionListLatent", widgets: { "resolution.size": "1216 x 832", multiple: 16, batch: 2, seed_mode: "deck" } }]);
+      await setWidget(page, id, "rescale.percent", 150);
+      const workflow = await page.evaluate(() => window.app.graph.serialize());
+      const saved = workflow.nodes.find((node) => node.type === "SDXLResolutionListLatent");
+      const at = saved.widgets_values.indexOf("by percentage");
+      expect(saved.widgets_values.slice(at, at + 2)).toEqual(["by percentage", 150]);
+      saved.widgets_values.splice(at, 2, 1.5); // How the previous version saved it: a scale number (each side 1.5x).
+      await page.evaluate(async (workflow) => { window.app.graph.clear(); await window.app.loadGraphData(workflow); }, workflow);
+      const node = await page.evaluate(() => window.app.graph.nodes.find((node) => node.comfyClass === "SDXLResolutionListLatent").id);
+      await expect.poll(() => widgetValue(page, node, "rescale")).toBe("by percentage");
+      await expect.poll(() => widgetValue(page, node, "rescale.percent")).toBe(150);
+      expect([await widgetValue(page, node, "multiple"), await widgetValue(page, node, "batch"), await widgetValue(page, node, "seed_mode")]).toEqual([16, 2, "deck"]);
+      await expect.poll(() => widgetValue(page, node, "preview_ratio")).toBe("1824:1248");
     });
 
     test("typing __ in CLIP Dual Text Encode suggests wildcards", async ({ page }) => {

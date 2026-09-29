@@ -90,7 +90,10 @@ The resolution is a nested list: first pick a group in `resolution`, then a size
 | `max_aspect` | main (Random Chaos only) | `2.0` | The most stretched aspect ratio Random Chaos may pick (1.0–4.0): 2.0 means up to 2:1 or 1:2, 1.0 gives only squares. |
 | `preview` | main | — | Live preview of the output size and megapixels, the same widget as in the core *Resolution Selector*. For the Random and Random Chaos groups it shows the size of the last run, as long as the settings other than `seed` stay the same, and "—" before a run or after a change. |
 | `seed` | main | `0` | Seed for the random options. The same seed always gives the same size. |
-| `scale` (shown as *scale sides by*) | main | `1.0` | Multiplies the width and the height by this factor (0.1–10), keeping the aspect ratio: `1.5` turns 1024x1024 into 1536x1536, `0.5` into 512x512. The number of pixels (megapixels) grows by its square: `1.5` gives 2.25 times the pixels, `2.0` four times. Then rounded to `multiple`, taking the nearby multiples closest to the exact aspect ratio. With Random Chaos it multiplies each side of the 1024x1024 pixel budget. Workflows saved while this input multiplied the area (2.0 gave twice the pixels) get bigger sizes now: use the square root of the old value for the same size (2.0 → 1.41). |
+| `rescale` | main | `by percentage` | Rescales the picked size, like the HiresFix node of Easy-Use. The input under it depends on the mode (below). Then the size is rounded to `multiple`, taking the nearby multiples closest to the exact aspect ratio. Workflows saved with the earlier `scale` number open with `by percentage` (scale 1.5 becomes 150). |
+| `percent` | main (*by percentage*) | `100` | Each side in percent (5–1000): `150` turns 1024x1024 into 1536x1536, `50` into 512x512. The number of pixels (megapixels) grows by its square: `150` gives 2.25 times the pixels, `200` four times. |
+| `width`, `height` | main (*to Width/Height*) | `1536`, `0` | A width and/or a height. With one of them `0`, the other side follows the aspect ratio (width 1536: 1216x832 becomes 1536x1048); with both set, exactly that size, whatever size was picked; with both `0`, the size stays as picked. |
+| `longer_side` | main (*to longest side*) | `1536` | The longest side, keeping the aspect ratio: 1216x832 becomes 1536x1048 and 832x1216 becomes 1048x1536. Good for random sizes: every size ends up with the same longest side. |
 | `multiple` | Advanced | `8` | Rounds width and height to the nearest multiple of this value (8–256, in steps of 8). Use 64 for SDXL training sizes. |
 | `batch` | Advanced | `1` | Number of latents in the batch (1–32). |
 | `seed_mode` | Advanced | `random` | How the random groups change from run to run: `random`, `deck`, `shuffle`, `balanced` or `sequential`. See [Seed modes for sizes](#seed-modes-for-sizes). |
@@ -121,10 +124,10 @@ The `size` list shows width x height; the aspect ratios are given here for refer
 - **Random**: picks one of the listed sizes at random from the seed.
   - **Any Listed / Any High-Res Listed**: one of the Standard or High-Res sizes above.
   - **Vertical Listed / Horizontal Listed** (and their **High-Res** versions): only portrait or only landscape sizes.
-- **Random Chaos**: a random aspect ratio up to `max_aspect`, at about 1024x1024 pixels with each side times `scale sides by` (the SDXL native size; `1.5` gives about 1536x1536 pixels, 2.25 MP).
+- **Random Chaos**: a random aspect ratio up to `max_aspect`, at about 1024x1024 pixels (the SDXL native size), then rescaled like the other groups: by percentage 150 gives about 1536x1536 pixels (2.25 MP), to longest side 1536 gives a longest side of exactly 1536.
   - **Any**: wide or tall, equally likely (the ratio is picked evenly in log scale).
   - **Portrait / Landscape**: only taller than wide, or only wider than tall; never a square.
-  - The size rounds down to `multiple`, so it never exceeds that pixel budget (it lands at about 0.9–1.0 of that).
+  - The size rounds down to `multiple`, so it never exceeds its rescaled budget (it lands at about 0.9–1.0 of that).
 
 ### Notes
 

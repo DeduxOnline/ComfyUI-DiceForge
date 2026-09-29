@@ -39,6 +39,7 @@ class ResolutionSelectorRandomLatent(io.ComfyNode):
             display_name="Resolution Selector (Random, Latent)",
             category="DiceForge/latent",
             description="Calculate a size from an aspect ratio and a megapixel target (or a random aspect ratio from the seed) and output an empty latent of that size.",
+            has_intermediate_output=True, # The size of the last run reaches the preview also when the node comes from the cache.
             inputs=[
                 io.Combo.Input(
                     "aspect_ratio",
