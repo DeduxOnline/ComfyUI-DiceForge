@@ -33,6 +33,7 @@ const WILDCARDS = {
   "color.txt": "# colors\nred\nblue\ngreen\nwhite\n",
   "hair/style.txt": "bob cut\nlong hair\n",
   "hair/color.txt": "blonde hair\n",
+  "цвет.txt": "красный\nсиний\n", // A name in another script: the autocomplete and the node must both know it.
   "weighted.txt": "9::common\n1::rare\n0::never\n",
   "outfit/male.txt": "suit\ntuxedo\n",
   "outfit/female.txt": "dress\nskirt\n",

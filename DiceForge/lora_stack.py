@@ -11,7 +11,7 @@ import folder_paths
 from aiohttp import web
 from typing_extensions import override
 from comfy_api.latest import ComfyExtension, io
-from .model_info import KINDS, read_info, info_file
+from .model_info import KINDS, json_body, read_info, info_file
 from .seed_modes import MEMORY, SEED_MODES, make_picker, pick_index, seed_mode_tooltip, fingerprint
 # LoRA Stack: several LoRAs in one node, like rgthree's Power Lora Loader, with the DiceForge seed modes. The rows live in the "loras" input as JSON,
 # edited by the frontend (web/lora_stack.js):
@@ -81,7 +81,9 @@ def row_triggers(row):
     if mode == "none":
         return []
     if mode == "custom":
-        return [str(word).strip() for word in row.get("trigger_words") or [] if str(word).strip()]
+        words = row.get("trigger_words")
+        words = words.split(",") if isinstance(words, str) else words if isinstance(words, list) else [] # A list from the node; text with commas by hand.
+        return [str(word).strip() for word in words if isinstance(word, (str, int, float)) and not isinstance(word, bool) and str(word).strip()]
     return trigger_words(row["lora"])
 def short_name(name):
     return os.path.splitext(os.path.basename(name.replace("\\", "/")))[0]
@@ -172,7 +174,7 @@ class LoraStack(io.ComfyNode):
 PRESET_FOLDER = os.path.join(folder_paths.get_user_directory(), "DiceForge", "lora_presets")
 PRESET_NAME = re.compile(r"[\w\-. ()]+")
 def preset_path(name):
-    name = (name or "").strip().removesuffix(".json")
+    name = (name if isinstance(name, str) else "").strip().removesuffix(".json")
     if not PRESET_NAME.fullmatch(name) or name.startswith("."):
         raise web.HTTPBadRequest(text=f"LoRA Stack: {name!r} is not a usable preset name (letters, digits, space, - _ . ( )).")
     return name, os.path.join(PRESET_FOLDER, name + ".json")
@@ -216,11 +218,15 @@ def register_routes():
         name, path = preset_path(request.rel_url.query.get("name"))
         if not os.path.isfile(path):
             raise web.HTTPNotFound(text=f"LoRA Stack: no preset {name}.")
-        with open(path, encoding="utf-8") as handle:
-            return web.json_response({"name": name, "stack": preset_stack(json.load(handle))})
+        try:
+            with open(path, encoding="utf-8") as handle:
+                data = json.load(handle)
+        except ValueError as error:
+            raise web.HTTPBadRequest(text=f"LoRA Stack: preset {name} is damaged, it is not valid JSON ({error}).") from None
+        return web.json_response({"name": name, "stack": preset_stack(data)})
     @routes.post("/diceforge/lora-presets")
     async def save_preset(request):
-        body = await request.json()
+        body = await json_body(request)
         name, path = preset_path(body.get("name"))
         stack = preset_stack(body.get("stack")) # Checked before anything is written.
         if os.path.isfile(path) and not body.get("overwrite"):
@@ -237,13 +243,16 @@ def register_routes():
         return web.json_response({"deleted": name})
     @routes.post("/diceforge/lora-triggers")
     async def lora_triggers(request):
-        names = (await request.json()).get("loras") or []
-        found = await asyncio.get_running_loop().run_in_executor(None, lambda: [known_triggers(name) for name in names[:500]])
+        names = (await json_body(request)).get("loras")
+        names = names[:500] if isinstance(names, list) else [] # Answers in the same order: an entry that isn't a file name gets no words.
+        found = await asyncio.get_running_loop().run_in_executor(None, lambda: [known_triggers(name) if isinstance(name, str) else ([], []) for name in names])
         return web.json_response({"triggers": [{"user": user, "civitai": civitai} for user, civitai in found]})
     @routes.post("/diceforge/model-bases")
     async def model_bases(request):
-        items = (await request.json()).get("items") or []
-        found = await asyncio.get_running_loop().run_in_executor(None, lambda: [cached_base(item.get("kind"), item.get("file")) for item in items[:500]])
+        items = (await json_body(request)).get("items")
+        items = items[:500] if isinstance(items, list) else []
+        found = await asyncio.get_running_loop().run_in_executor(None, lambda: [cached_base(item.get("kind"), item.get("file"))
+                                                                                if isinstance(item, dict) and isinstance(item.get("file"), str) else None for item in items])
         return web.json_response({"bases": found})
 register_routes()
 # Extension entry point for ComfyUI V3 node registration.

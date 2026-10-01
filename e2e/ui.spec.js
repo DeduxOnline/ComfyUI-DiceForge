@@ -106,6 +106,29 @@ for (const vue of [true, false]) {
       await expect(page.locator(".dfwc-pop div").first()).toContainText("__color__");
       await page.keyboard.press("Escape");
       await expect(page.locator(".dfwc-pop")).toHaveCount(0);
+      await positive.fill("");
+      await page.keyboard.type("__цв"); // Not only Latin letters.
+      await expect(page.locator(".dfwc-pop div").first()).toContainText("__цвет__");
+      await page.keyboard.press("Enter");
+      await expect.poll(() => widgetValue(page, id, "positive")).toBe("__цвет__");
+    });
+
+    test("autocomplete follows the text as typed while the wildcard list loads slowly", async ({ page }) => {
+      let requests = 0;
+      await page.route("**/diceforge/wildcards", async (route) => {
+        const delay = [900, 300, 50][Math.min(requests++, 2)]; // Later requests answer sooner: answers come back out of order.
+        await new Promise((resolve) => setTimeout(resolve, delay));
+        await route.continue();
+      });
+      const [id] = await addNodes(page, [{ type: "CLIPTextEncodePositiveNegative", pos: [300, 60] }]);
+      const positive = await promptField(page, id, "positive");
+      await positive.click();
+      await page.keyboard.type("__hair/st");
+      await page.waitForTimeout(1500); // Every answer is in.
+      await expect(page.locator(".dfwc-pop div").first()).toContainText("__hair/style__");
+      await page.keyboard.press("Enter");
+      await expect.poll(() => widgetValue(page, id, "positive")).toBe("__hair/style__");
+      expect(requests).toBe(1); // One shared request, not one per keystroke.
     });
 
     test("Wildcard Browser adds wildcards to the prompt and edits files", async ({ page }) => {

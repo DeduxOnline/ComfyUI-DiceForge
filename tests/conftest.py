@@ -127,7 +127,8 @@ def models(tmp_path, monkeypatch):
 
 @pytest.fixture
 def api():
-    """The DiceForge server routes on a test server: api(method, path, json=...) returns (status, body): JSON, text or bytes."""
+    """The DiceForge server routes on a test server: api(method, path, json=...) returns (status, body): JSON, text or bytes. data=... sends a raw
+    body instead (text or bytes, for requests that aren't JSON)."""
     from aiohttp import web
     from aiohttp.test_utils import TestClient, TestServer
     from DiceForge import lora_stack, model_info, wildcards_api
@@ -146,17 +147,17 @@ def api():
         else:
             sys.modules["server"] = real_server
 
-    def call(method, path, json=None):
+    def call(method, path, json=None, data=None):
         async def run():
             app = web.Application() # One per call: an application belongs to the event loop it first runs in.
             app.add_routes(routes)
             async with TestClient(TestServer(app)) as client:
-                response = await client.request(method, path, json=json)
-                data = await response.read()
+                response = await (client.request(method, path, data=data) if data is not None else client.request(method, path, json=json))
+                raw = await response.read()
                 try:
-                    text = data.decode("utf-8")
+                    text = raw.decode("utf-8")
                 except UnicodeDecodeError:
-                    return response.status, data # A file, like a preview image.
+                    return response.status, raw # A file, like a preview image.
                 try:
                     return response.status, json_module.loads(text)
                 except ValueError:

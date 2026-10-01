@@ -23,9 +23,38 @@ def info_file(kind, name):
 def read_info(kind, name):
     try:
         with open(info_file(kind, name), encoding="utf-8") as file:
-            return json.load(file)
+            return clean_info(json.load(file))
     except (OSError, ValueError):
         return {}
+# Model info as the browser, the dialog and LoRA Stack read it, whatever the file holds (edited by hand, or damaged): user fields are text, Civitai's
+# trigger words a list of text and its images a list of objects. Damaged parts are left out; the rest is kept.
+def clean_info(info):
+    if not isinstance(info, dict):
+        return {}
+    info = dict(info)
+    user = info.get("user")
+    info["user"] = {key: str(value) for key, value in user.items() if key in USER_FIELDS and isinstance(value, (str, int, float)) and not isinstance(value, bool)} \
+        if isinstance(user, dict) else {}
+    civitai = info.pop("civitai", None)
+    if isinstance(civitai, dict):
+        civitai = dict(civitai)
+        words, images = civitai.get("trigger_words"), civitai.get("images")
+        civitai["trigger_words"] = [str(word) for word in words if isinstance(word, (str, int, float)) and not isinstance(word, bool)] if isinstance(words, list) else []
+        civitai["images"] = [image for image in images if isinstance(image, dict)] if isinstance(images, list) else []
+        for key in ("model_name", "version_name", "type", "base_model", "url", "error"):
+            if civitai.get(key) is not None and not isinstance(civitai[key], str):
+                civitai[key] = str(civitai[key])
+        info["civitai"] = civitai
+    return info
+# The JSON object a POST request sends; anything else (no JSON, a list, a number) is a 400 with a message instead of a server error.
+async def json_body(request):
+    try:
+        body = await request.json()
+    except ValueError:
+        raise web.HTTPBadRequest(text="DiceForge: the request body is not valid JSON.") from None
+    if not isinstance(body, dict):
+        raise web.HTTPBadRequest(text="DiceForge: the request body must be a JSON object.")
+    return body
 def write_info(kind, name, info):
     path = info_file(kind, name)
     os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -153,12 +182,14 @@ def register_routes():
         return web.FileResponse(preview, headers={"Cache-Control": "max-age=300"})
     @routes.post("/diceforge/model-info")
     async def save_model_info(request):
-        body = await request.json()
-        kind, name = body.get("kind", ""), body.get("file", "")
-        if kind not in KINDS or not folder_paths.get_full_path(kind, name):
+        body = await json_body(request)
+        kind, name, user = body.get("kind", ""), body.get("file", ""), body.get("user") or {}
+        if kind not in KINDS or not isinstance(name, str) or not folder_paths.get_full_path(kind, name):
             raise web.HTTPNotFound(text="Model info: unknown model.")
+        if not isinstance(user, dict):
+            raise web.HTTPBadRequest(text="Model info: user must be an object of fields.")
         info = read_info(kind, name)
-        info["user"] = {key: str(value)[:10000] for key, value in (body.get("user") or {}).items() if key in USER_FIELDS}
+        info["user"] = {key: str(value)[:10000] for key, value in user.items() if key in USER_FIELDS}
         write_info(kind, name, info)
         return web.json_response({"saved": True})
 register_routes()

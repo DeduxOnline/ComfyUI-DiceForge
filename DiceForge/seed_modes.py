@@ -1,5 +1,6 @@
 import hashlib
 import json
+import logging
 import math
 import os
 import random
@@ -107,24 +108,56 @@ class SeedMemory:
             self.connection = sqlite3.connect(self.path, check_same_thread=False)
             self.connection.execute("CREATE TABLE IF NOT EXISTS memory (mode TEXT, key TEXT, value TEXT, used REAL, PRIMARY KEY (mode, key))")
         return self.connection
+    # A query, with the lock held. A damaged file (not a database, or a malformed one) is kept aside and a new memory starts, instead of failing every
+    # run; a busy or locked database is not damage and still raises.
+    def execute(self, sql, parameters=()):
+        try:
+            return self.database().execute(sql, parameters)
+        except sqlite3.DatabaseError as error:
+            if isinstance(error, sqlite3.OperationalError):
+                raise
+            if self.connection is not None:
+                self.connection.close()
+                self.connection = None
+            broken = f"{self.path}.broken-{int(time.time())}"
+            if os.path.exists(self.path):
+                os.replace(self.path, broken)
+            logging.warning(f"[DiceForge] Seed memory: {self.path} is damaged ({error}). Kept as {broken}; starting a new memory.")
+            return self.database().execute(sql, parameters)
     @staticmethod
     def key(*parts):
         return hashlib.sha256(repr(parts).encode()).hexdigest()
     def get(self, mode, key):
         with self.lock:
-            row = self.database().execute("SELECT value FROM memory WHERE mode = ? AND key = ?", (mode, key)).fetchone()
-        return json.loads(row[0]) if row else None
+            row = self.execute("SELECT value FROM memory WHERE mode = ? AND key = ?", (mode, key)).fetchone()
+        try:
+            return json.loads(row[0]) if row else None
+        except (TypeError, ValueError):
+            return None # A damaged value: as if nothing was remembered.
     def set(self, mode, key, value):
         with self.lock:
-            self.database().execute("INSERT OR REPLACE INTO memory VALUES (?, ?, ?, ?)", (mode, key, json.dumps(value), time.time()))
+            self.execute("INSERT OR REPLACE INTO memory VALUES (?, ?, ?, ?)", (mode, key, json.dumps(value), time.time()))
             self.writes += 1
     def save(self):
         with self.lock:
             if self.connection is not None and self.writes:
-                self.connection.execute("DELETE FROM memory WHERE rowid IN (SELECT rowid FROM memory ORDER BY used DESC LIMIT -1 OFFSET ?)", (MEMORY_LIMIT,))
+                self.execute("DELETE FROM memory WHERE rowid IN (SELECT rowid FROM memory ORDER BY used DESC LIMIT -1 OFFSET ?)", (MEMORY_LIMIT,))
                 self.connection.commit() # Once per run, not per pick.
                 self.writes = 0
 MEMORY = SeedMemory(MEMORY_FILE)
+# A remembered shuffle state, or a new one when it is damaged (wrong shape, or cards that aren't in the list).
+def shuffle_state(state, cards):
+    fresh = {"order": None, "position": 0, "last": None, "previous": None, "pending": []}
+    if not isinstance(state, dict) or set(fresh) - set(state):
+        return fresh
+    order, position, pending = state["order"], state["position"], state["pending"]
+    if order is not None and (not isinstance(order, int) or isinstance(order, bool)):
+        return fresh
+    if not isinstance(position, int) or isinstance(position, bool) or not 0 <= position <= len(cards):
+        return fresh
+    if not isinstance(pending, list) or not all(isinstance(card, str) and card in cards for card in pending):
+        return fresh
+    return state
 # shuffle: like shuffle in a music player. The node remembers where it is in a shuffled order of the options and picks the next one, so every option
 # comes once before any repeats, whatever the seed does. Not reproducible: the same seed gives a different prompt each run. The order is stored as
 # the seed that shuffled it and a position, so even a long wildcard file takes a few bytes.
@@ -134,7 +167,7 @@ class ShufflePicker(Picker):
     def pick(self, weighted, count, plain):
         cards = deck_cards(weighted)
         key = MEMORY.key(cards)
-        state = MEMORY.get("shuffle", key) or {"order": None, "position": 0, "last": None, "previous": None, "pending": []}
+        state = shuffle_state(MEMORY.get("shuffle", key), cards)
         decks, picked, skipped = {}, [], []
         for _ in range(2 * len(cards)):
             if len(picked) == count:
@@ -161,16 +194,19 @@ class ShufflePicker(Picker):
 # possible, nothing waits too long, and in the long run every option comes exactly as often as its weight says. The node remembers the credits
 # (in the memory file), whatever the seed. Not reproducible: the same seed gives a different prompt each run.
 BALANCE_STRENGTH = 5.0 # Higher: fewer repeats, less randomness.
+def valid_credits(credits, size):
+    return isinstance(credits, list) and len(credits) == size and all(isinstance(credit, (int, float)) and not isinstance(credit, bool) and abs(credit) <= 100 for credit in credits) # Credits stay within a few units; far beyond is damage.
 class BalancedPicker(Picker):
     def __init__(self):
         self.rng = random.Random()
     def pick(self, weighted, count, plain):
         key = MEMORY.key(weighted)
         total = sum(weight for weight, _ in weighted) or 1
-        credits = MEMORY.get("balanced", key) or [0.0] * len(weighted)
+        credits = MEMORY.get("balanced", key)
+        credits = credits if valid_credits(credits, len(weighted)) else [0.0] * len(weighted) # None yet, or damaged: start over.
         candidates, picked = list(range(len(weighted))), []
         while candidates and len(picked) < count:
-            weights = [weighted[index][0] * math.exp(BALANCE_STRENGTH * credits[index]) for index in candidates]
+            weights = [weighted[index][0] * math.exp(min(BALANCE_STRENGTH * credits[index], 600.0)) for index in candidates] # Capped: no overflow.
             if sum(weights) <= 0:
                 break
             index = candidates.pop(self.rng.choices(range(len(candidates)), weights=weights)[0])

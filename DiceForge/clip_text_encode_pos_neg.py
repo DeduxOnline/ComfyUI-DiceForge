@@ -347,6 +347,14 @@ class MutatePicker(Picker):
         return self.decide(weighted, lambda: [option for option, _ in RandomPicker(self.rng).pick(weighted, count, plain)])
     def pick_range(self, weighted, low, high):
         return self.decide(weighted, lambda: [option for option, _ in RandomPicker(self.rng).pick_range(weighted, low, high)])
+# The last picks of mutate as remembered: {address: (picked options, option count)}; damaged entries are left out (those choices pick afresh).
+def mutate_memory(entries):
+    last = {}
+    for entry in entries if isinstance(entries, list) else []:
+        if isinstance(entry, list) and len(entry) == 3 and isinstance(entry[0], list) and isinstance(entry[1], list) and isinstance(entry[2], int):
+            if all(isinstance(part, (int, str)) for part in entry[0]):
+                last[tuple(entry[0])] = (entry[1], entry[2])
+    return last
 # Comma cleanup after filling in: an empty option leaves "a, , b" or a trailing comma; this makes it "a, b".
 def tidy_commas(text):
     text = re.sub(r"[ \t]*,(?:[ \t]*,)+", ",", text)
@@ -484,7 +492,7 @@ class CLIPTextEncodePositiveNegative(io.ComfyNode):
             note = f", combination {seed % total + 1} of {total}"
         elif seed_mode == "mutate":
             key = MEMORY.key(positive, negative)
-            last = {tuple(address): (picked, options) for address, picked, options in MEMORY.get("mutate", key) or []}
+            last = mutate_memory(MEMORY.get("mutate", key))
             rng = random.Random()
             changeable = [address for address, (_picked, options) in last.items() if options > 1]
             state = {"rng": rng, "last": last, "now": {}, "mutate": rng.choice(changeable) if changeable else None}

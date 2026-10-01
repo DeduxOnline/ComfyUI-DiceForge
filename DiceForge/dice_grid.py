@@ -130,9 +130,20 @@ class GridStore:
         self.manifest = os.path.join(self.folder, "manifest.json")
         try:
             with open(self.manifest, encoding="utf-8") as file:
-                self.state = json.load(file)
+                self.state = self.checked(json.load(file))
         except (OSError, ValueError):
             self.state = {"cells": [], "done": False, "next": 0}
+    # A manifest as written by save(); a damaged one keeps the cells it still describes properly, and never names a file outside the grid folder.
+    @staticmethod
+    def checked(state):
+        if not isinstance(state, dict):
+            raise ValueError("not a grid manifest")
+        cells = [{"file": cell["file"], "label": cell.get("label") if isinstance(cell.get("label"), str) else "", "row": cell.get("row") if isinstance(cell.get("row"), str) else ""}
+                 for cell in state.get("cells") if isinstance(cell, dict) and isinstance(cell.get("file"), str) and re.fullmatch(r"\d+\.png", cell["file"])] \
+            if isinstance(state.get("cells"), list) else []
+        used = max((int(cell["file"][:-4]) + 1 for cell in cells), default=0)
+        following = state.get("next") if isinstance(state.get("next"), int) and not isinstance(state.get("next"), bool) else 0
+        return {"cells": cells, "done": state.get("done") is True, "next": max(following, used)} # New cells never overwrite a kept one.
     def clear(self):
         shutil.rmtree(self.folder, ignore_errors=True)
         self.state = {"cells": [], "done": False, "next": 0}
@@ -145,13 +156,19 @@ class GridStore:
     def has(self, label, row):
         return any(cell["label"] == label and cell["row"] == row for cell in self.state["cells"])
     def cells(self, cell_width):
-        loaded = []
+        loaded, kept = [], []
         for cell in self.state["cells"]:
-            with Image.open(os.path.join(self.folder, cell["file"])) as image:
-                image = image.convert("RGB")
+            try:
+                with Image.open(os.path.join(self.folder, cell["file"])) as image:
+                    image = image.convert("RGB")
+            except OSError as error: # A cell image deleted or damaged: left out of the grid instead of failing every run.
+                logging.warning(f"[DiceForge] Dice Grid | Leaving out {cell['file']}: {error}")
+                continue
+            kept.append(cell)
             if image.width != cell_width: # cell_width changed during the grid.
                 image = image.resize((cell_width, max(1, round(image.height * cell_width / image.width))), Image.LANCZOS)
             loaded.append({**cell, "image": image})
+        self.state["cells"] = kept
         return loaded
     def save(self):
         os.makedirs(self.folder, exist_ok=True)

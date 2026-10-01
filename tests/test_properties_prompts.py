@@ -10,6 +10,7 @@ from hypothesis import assume, example, given, settings, strategies as st
 from DiceForge import clip_text_encode_pos_neg as prompts
 from DiceForge.clip_text_encode_pos_neg import CLIPTextEncodePositiveNegative as Node
 from DiceForge.seed_modes import RandomPicker
+scaled = lambda count: max(1, count * settings.default.max_examples // 200) # Explicit budgets follow the profile (thorough: 15 times).
 
 MODES = ["random", "deck", "shuffle", "balanced", "combinations", "mutate"]
 REPRODUCIBLE = ["random", "deck", "combinations"]
@@ -106,7 +107,7 @@ def math_prod(values):
 syntax_text = st.text(alphabet="ab {}|$=!:_\\/*,2-#\n", max_size=60)
 
 
-@settings(max_examples=400)
+@settings(max_examples=scaled(400))
 @given(text=syntax_text, negative=syntax_text, seed=seeds, mode=st.sampled_from(MODES), trim=st.booleans())
 @example(text="{" * 80 + "a" + "}" * 80, negative="", seed=0, mode="random", trim=True)
 @example(text="${a=${b}}${b=${a}}${a}", negative="", seed=0, mode="random", trim=True)
@@ -126,7 +127,7 @@ def test_any_text_resolves_or_fails_with_a_clear_error(text, negative, seed, mod
         assert "\x00" not in output and "\x01" not in output # No placeholder of a variable or a counted choice leaks out.
 
 
-@settings(max_examples=300)
+@settings(max_examples=scaled(300))
 @given(text=st.text(max_size=80), seed=seeds, mode=st.sampled_from(MODES))
 def test_any_unicode_text_resolves_or_fails_with_a_clear_error(text, seed, mode, wildcards):
     assume("\x00" not in text and "\x01" not in text)
@@ -168,7 +169,7 @@ def test_plain_text_comes_out_as_written(tokens, joins, seed, mode):
 
 
 # Every pick is a prompt the text can make, in every mode, and the reproducible modes give the same prompt for the same seed.
-@settings(max_examples=150)
+@settings(max_examples=scaled(150))
 @given(sequence=prompt_trees, seed=seeds, mode=st.sampled_from(MODES))
 def test_every_output_is_a_prompt_the_text_can_make(sequence, seed, mode):
     assume(possible_count(sequence) <= 3000)
@@ -181,7 +182,7 @@ def test_every_output_is_a_prompt_the_text_can_make(sequence, seed, mode):
 
 
 # combinations: seeds 0, 1, 2... list every prompt the text can make exactly once, then start over.
-@settings(max_examples=150)
+@settings(max_examples=scaled(150))
 @given(sequence=prompt_trees, start=st.integers(0, 10 ** 6))
 def test_combinations_list_every_prompt_exactly_once(sequence, start):
     text = render(sequence)
@@ -195,7 +196,7 @@ def test_combinations_list_every_prompt_exactly_once(sequence, start):
     assert run(text, seed=first + total + 3, mode="combinations", trim=False) == run(text, seed=3, mode="combinations", trim=False)
 
 
-@settings(max_examples=60)
+@settings(max_examples=scaled(60))
 @given(choices=st.lists(st.integers(1, 5), min_size=1, max_size=4), negative=st.integers(1, 4))
 def test_combinations_of_both_prompts_multiply(choices, negative):
     positive_text = " ".join("{" + "|".join(f"p{index}o{option}" for option in range(count)) + "}" for index, count in enumerate(choices))
@@ -299,7 +300,7 @@ def test_trim_spaces_is_idempotent_and_keeps_every_other_character(text):
 
 
 # mutate: after the first run, each run changes exactly one choice of the last prompt.
-@settings(max_examples=30)
+@settings(max_examples=scaled(30))
 @given(sizes=st.lists(st.integers(2, 4), min_size=1, max_size=5))
 def test_mutate_changes_exactly_one_choice_per_run(sizes):
     text = " ".join("{" + "|".join(f"c{index}o{option}" for option in range(size)) + "}" for index, size in enumerate(sizes))
@@ -315,7 +316,7 @@ def test_mutate_changes_exactly_one_choice_per_run(sizes):
 line_text = st.text(alphabet="abcdefg xyzéä", min_size=1, max_size=10).map(str.strip).filter(bool)
 
 
-@settings(max_examples=80)
+@settings(max_examples=scaled(80))
 @given(lines=st.lists(line_text, min_size=1, max_size=10, unique=True), crlf=st.booleans(), bom=st.booleans(), indent=st.sampled_from(["", "  ", "\t"]))
 def test_wildcard_lines_are_read_as_written(lines, crlf, bom, indent, wildcards):
     newline = "\r\n" if crlf else "\n"
@@ -326,7 +327,7 @@ def test_wildcard_lines_are_read_as_written(lines, crlf, bom, indent, wildcards)
     assert prompts.read_wildcard("w") == lines
 
 
-@settings(max_examples=80)
+@settings(max_examples=scaled(80))
 @given(lines=st.lists(line_text, min_size=1, max_size=10, unique=True), bom=st.booleans())
 def test_first_line_of_a_wildcard_with_bom_is_the_line(lines, bom, wildcards):
     with open(wildcards.folder / "w.txt", "w", encoding="utf-8-sig" if bom else "utf-8") as file:
@@ -335,7 +336,7 @@ def test_first_line_of_a_wildcard_with_bom_is_the_line(lines, bom, wildcards):
     assert {run("__w__", seed=seed, mode="deck")[0] for seed in range(len(lines))} == {prompts.trim_spaces(line) for line in lines}
 
 
-@settings(max_examples=60)
+@settings(max_examples=scaled(60))
 @given(lines=st.lists(st.text(alphabet="abcdefgh", min_size=1, max_size=6), min_size=1, max_size=12, unique=True), round_number=st.integers(0, 10 ** 9))
 def test_wildcard_deck_deals_every_line_once_per_round(lines, round_number, wildcards):
     wildcards("w.txt", "\n".join(lines))
@@ -344,7 +345,7 @@ def test_wildcard_deck_deals_every_line_once_per_round(lines, round_number, wild
     assert sorted(run("__w__", seed=seed, mode="combinations")[0] for seed in range(len(lines))) == sorted(lines)
 
 
-@settings(max_examples=60)
+@settings(max_examples=scaled(60))
 @given(lines=st.lists(st.text(alphabet="abcdefgh", min_size=1, max_size=6), min_size=1, max_size=10, unique=True), count=st.integers(1, 12), seed=seeds,
        mode=st.sampled_from(MODES))
 def test_multi_pick_from_a_wildcard_gives_different_lines(lines, count, seed, mode, wildcards):
@@ -356,7 +357,7 @@ def test_multi_pick_from_a_wildcard_gives_different_lines(lines, count, seed, mo
 name_part = st.text(alphabet="abcxyzабвгдеёжзиклмнопрстуфхцчшщъыьэюя0123456789-_.", min_size=1, max_size=6).filter(lambda part: part.strip("_") == part and part not in (".", ".."))
 
 
-@settings(max_examples=80)
+@settings(max_examples=scaled(80))
 @given(parts=st.lists(st.lists(name_part, min_size=1, max_size=2).map(" ".join), min_size=1, max_size=3), line=words)
 def test_wildcard_names_with_spaces_folders_and_any_letters(parts, line, wildcards):
     name = "/".join(parts)

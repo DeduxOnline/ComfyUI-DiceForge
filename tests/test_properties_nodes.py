@@ -25,6 +25,7 @@ from DiceForge.resolution_selector_random_latent import ResolutionSelectorRandom
 from DiceForge.sdxl_resolution_list_latent import (BY_PERCENTAGE, CHAOS_PIXELS, HIGH_RES, RANDOM_CHAOS, RANDOM_LISTED, STANDARD, TO_LONGEST_SIDE,
                                                    TO_WIDTH_HEIGHT, SDXLResolutionListLatent as SDXL)
 from DiceForge.seed_modes import DeckPicker
+scaled = lambda count: max(1, count * settings.default.max_examples // 200) # Explicit budgets follow the profile (thorough: 15 times).
 
 SEED_MODES = ["random", "deck", "shuffle", "balanced", "sequential"]
 REPRODUCIBLE = ["random", "deck", "sequential"]
@@ -83,7 +84,7 @@ def exact_size(rescale):
 
 # Every size: positive multiples of multiple, the latent of that size and batch, the same size in the preview message, the seed passed through,
 # and the same size again for the same seed in the reproducible modes.
-@settings(max_examples=300)
+@settings(max_examples=scaled(300))
 @given(resolution=sdxl_resolutions(), rescale=rescales, multiple=multiples, batch=st.integers(1, 4), seed=seeds, mode=st.sampled_from(SEED_MODES))
 def test_sdxl_sizes_are_multiples_and_reported_consistently(resolution, rescale, multiple, batch, seed, mode, latents):
     width, height, output = sdxl(resolution, rescale, multiple, seed, mode, batch)
@@ -97,7 +98,7 @@ def test_sdxl_sizes_are_multiples_and_reported_consistently(resolution, rescale,
         assert sdxl(resolution, rescale, multiple, seed, mode, batch)[:2] == (width, height)
 
 
-@settings(max_examples=300)
+@settings(max_examples=scaled(300))
 @given(aspect=st.sampled_from([*ASPECT_RATIOS, *SELECTOR_LISTED, *SELECTOR_CHAOS]), megapixels=st.integers(1, 160).map(lambda k: round(k * 0.1, 1)),
        rescale=rescales, multiple=multiples, batch=st.integers(1, 4), seed=seeds, mode=st.sampled_from(SEED_MODES), max_aspect=max_aspects)
 def test_selector_sizes_are_multiples_and_reported_consistently(aspect, megapixels, rescale, multiple, batch, seed, mode, max_aspect, latents):
@@ -114,14 +115,14 @@ def test_selector_sizes_are_multiples_and_reported_consistently(aspect, megapixe
 
 # The rescale promises, in every group (Random Chaos included): to Width/Height with both sides gives exactly that size; with one side, that side;
 # to longest side, that longest side (the 1520-instead-of-1536 bug); Portrait and Landscape keep their orientation.
-@settings(max_examples=300)
+@settings(max_examples=scaled(300))
 @given(resolution=sdxl_resolutions(), rescale=rescales, multiple=multiples, seed=seeds, mode=st.sampled_from(SEED_MODES))
 def test_sdxl_rescale_promises_hold_in_every_group(resolution, rescale, multiple, seed, mode, latents):
     width, height, _ = sdxl(resolution, rescale, multiple, seed, mode)
     check_rescale_promises(width, height, rescale, multiple, orientation(resolution), resolution.get("max_aspect", 2.0))
 
 
-@settings(max_examples=300)
+@settings(max_examples=scaled(300))
 @given(aspect=st.sampled_from([*ASPECT_RATIOS, *SELECTOR_LISTED, *SELECTOR_CHAOS]), rescale=rescales, multiple=multiples, seed=seeds,
        mode=st.sampled_from(SEED_MODES), max_aspect=max_aspects)
 def test_selector_rescale_promises_hold_for_every_aspect(aspect, rescale, multiple, seed, mode, max_aspect, latents):
@@ -154,7 +155,7 @@ def check_rescale_promises(width, height, rescale, multiple, wanted, max_aspect)
 
 
 # Random Chaos: within the pixel budget (rounded down), the aspect ratio within max_aspect (give or take the rounding), every orientation obeyed.
-@settings(max_examples=300)
+@settings(max_examples=scaled(300))
 @given(size=st.sampled_from(RANDOM_CHAOS), max_aspect=max_aspects, percent=percents, multiple=multiples, seed=seeds, mode=st.sampled_from(SEED_MODES))
 def test_chaos_stays_within_budget_and_aspect(size, max_aspect, percent, multiple, seed, mode, latents):
     resolution = {"resolution": "Random Chaos", "size": size, "max_aspect": max_aspect}
@@ -169,7 +170,7 @@ def test_chaos_stays_within_budget_and_aspect(size, max_aspect, percent, multipl
     assert abs(math.log(width / height)) <= math.log(max_aspect) + slack
 
 
-@settings(max_examples=200)
+@settings(max_examples=scaled(200))
 @given(width=st.floats(1, 20000), height=st.floats(1, 20000), multiple=multiples, round_down=st.booleans())
 @example(width=1020.0, height=1020.0, multiple=8, round_down=False)
 @example(width=1536.0, height=1047.9999999999, multiple=8, round_down=True)
@@ -186,7 +187,7 @@ def test_round_to_multiple_is_the_closest_ratio_on_the_grid(width, height, multi
     assert SDXL.round_to_multiple(height, width, multiple, round_down) == (h, w) # Turning the size turns the result.
 
 
-@settings(max_examples=200)
+@settings(max_examples=scaled(200))
 @given(ratio=st.sampled_from(list(ASPECT_RATIOS.values())), megapixels=st.integers(1, 160).map(lambda k: round(k * 0.1, 1)), multiple=multiples, percent=percents)
 def test_selector_sizes_follow_megapixels_and_ratio(ratio, megapixels, multiple, percent):
     width, height = Selector.size_for_ratio(*ratio, megapixels, multiple, rescale={"rescale": BY_PERCENTAGE, "percent": percent})
@@ -213,7 +214,7 @@ def test_deck_and_sequential_go_through_the_whole_list(group, first, latents):
 
 
 # Random Int / Float / Sampler.
-@settings(max_examples=300)
+@settings(max_examples=scaled(300))
 @given(low=st.integers(-2 ** 64, 2 ** 64), high=st.integers(-2 ** 64, 2 ** 64), step=st.one_of(st.integers(1, 10), st.integers(1, 2 ** 64)), seed=seeds,
        mode=st.sampled_from(SEED_MODES))
 def test_random_int_is_in_range_and_on_the_step(low, high, step, seed, mode):
@@ -230,7 +231,7 @@ def test_random_int_deck_and_sequential_cover_every_value(low, span, step, first
         assert sorted(RandomInt.execute(low, low + span, step, seed, mode).result[0] for seed in range(start, start + len(values))) == values
 
 
-@settings(max_examples=300)
+@settings(max_examples=scaled(300))
 @given(low=st.floats(-1e9, 1e9), high=st.floats(-1e9, 1e9), step=st.one_of(st.just(0.0), st.floats(1e-6, 1e9)), parts=st.integers(2, 1000), seed=seeds,
        mode=st.sampled_from(SEED_MODES))
 @example(low=0.0, high=1.0, step=0.1, parts=10, seed=10, mode="sequential")
@@ -268,7 +269,7 @@ def test_random_sampler_deck_goes_through_every_pair():
     assert len(pairs) == 6
 
 
-@settings(max_examples=60)
+@settings(max_examples=scaled(60))
 @given(names=st.lists(st.text(alphabet="abcxyz", min_size=1, max_size=5), min_size=1, max_size=6, unique=True),
        folders=st.lists(st.sampled_from(["", "a/", "a/b/", "c/"]), min_size=6, max_size=6), seed=seeds, mode=st.sampled_from(SEED_MODES), include_none=st.booleans())
 def test_random_lora_picks_a_file_of_the_folder(names, folders, seed, mode, include_none, models, monkeypatch):
@@ -299,7 +300,7 @@ stack_junk = st.one_of(junk, st.fixed_dictionaries({}, optional={"rows": st.one_
                                                                  "separate_clip": junk}))
 
 
-@settings(max_examples=400)
+@settings(max_examples=scaled(400))
 @given(data=stack_junk, seed=seeds, mode=st.sampled_from(SEED_MODES))
 def test_any_stack_data_runs_or_fails_with_a_clear_error(data, seed, mode, models, monkeypatch):
     models("loras", "a.safetensors")
@@ -373,7 +374,7 @@ def test_a_huge_group_is_refused_quickly():
 labels = st.text(max_size=60)
 
 
-@settings(max_examples=60)
+@settings(max_examples=scaled(60))
 @given(cells=st.lists(st.tuples(labels, st.one_of(st.just(""), st.text(max_size=12)), st.integers(16, 96)), min_size=1, max_size=9), columns=st.integers(0, 5),
        cell_width=st.integers(32, 160), legend=st.text(max_size=80), position=st.sampled_from(dice_grid.LEGEND_POSITIONS), numbered=st.booleans())
 def test_grid_renders_any_labels(cells, columns, cell_width, legend, position, numbered):

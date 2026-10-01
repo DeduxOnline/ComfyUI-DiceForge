@@ -6,13 +6,18 @@ import { api } from "../../scripts/api.js";
 const NODE_TYPE = "CLIPTextEncodePositiveNegative";
 const FIELDS = ["positive", "negative"];
 
-let listCache = null;
-async function wildcardList(refresh = false) {
-  if (!listCache || refresh) {
-    const response = await api.fetchApi("/diceforge/wildcards");
-    listCache = response.ok ? await response.json() : { files: [], folders: [] };
+// The wildcard list, fetched once and shared: keystrokes while it loads wait for the same request instead of each sending one (their answers could
+// come back in any order). listCache is the last list that arrived, for drawing the browser.
+let listCache = null, listRequest = null;
+function wildcardList(refresh = false) {
+  if (!listRequest || refresh) {
+    const request = api.fetchApi("/diceforge/wildcards")
+      .then((response) => (response.ok ? response.json() : Promise.reject(new Error(`${response.status}`))))
+      .then((list) => { if (listRequest === request) listCache = list; return list; }, // An older request finishing late doesn't win.
+        () => { if (listRequest === request) listRequest = null; return listCache ?? { files: [], folders: [] }; }); // Failed: the next use asks again.
+    listRequest = request;
   }
-  return listCache;
+  return listRequest;
 }
 // Folders of the wildcard names ("hair/long/x" is in "hair" and "hair/long").
 function folderNames(files) {
@@ -141,7 +146,9 @@ function caretPoint(textarea) {
   mirror.remove();
   return point;
 }
+let popupRequest = 0; // Counts popup updates: one still waiting for the list when a newer keystroke (or a close) came is dropped.
 function closePopup() {
+  popupRequest++;
   popup.element?.remove();
   popup.element = null;
   popup.textarea = null;
@@ -156,12 +163,14 @@ function renderPopup() {
   popup.element.children[popup.index]?.scrollIntoView({ block: "nearest" });
 }
 async function updatePopup(textarea) {
+  const request = ++popupRequest;
   const before = textarea.value.slice(0, textarea.selectionStart);
   const open = before.split("__").length % 2 === 0; // An odd number of "__": inside a wildcard being typed.
-  const match = /__([\w\-./*? ]*)$/.exec(before);
+  const match = /__([\p{L}\p{N}_\-./*? ]*)$/u.exec(before); // Letters and digits of every script, like the server's \w: __цвет, __色.
   if (!open || !match || !fieldOf(textarea)) return closePopup();
   const typed = match[1].toLowerCase();
   const { files } = await wildcardList();
+  if (request !== popupRequest) return; // Typed on (or closed) meanwhile: the newer update shows the popup, for the text as it is now.
   const entries = [...files.map((file) => ({ token: file.name, lines: file.lines })), ...folderNames(files).map((folder) => ({ token: `${folder}/*`, lines: null }))];
   const found = entries.filter((entry) => entry.token.toLowerCase().includes(typed))
     .sort((a, b) => (b.token.toLowerCase().startsWith(typed) - a.token.toLowerCase().startsWith(typed)) || a.token.localeCompare(b.token)).slice(0, 12);

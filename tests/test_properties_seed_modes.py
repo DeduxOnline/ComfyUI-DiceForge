@@ -11,6 +11,7 @@ from hypothesis import assume, given, settings, strategies as st
 from DiceForge import seed_modes
 from DiceForge.seed_modes import (INDEX_LIMIT, BalancedPicker, DeckPicker, RandomPicker, SeedMemory, ShufflePicker, deck_cards, fingerprint,
                                   make_picker, pick_in_range, pick_index, pick_label, stable_seed)
+scaled = lambda count: max(1, count * settings.default.max_examples // 200) # Explicit budgets follow the profile (thorough: 15 times).
 
 names = st.lists(st.text(alphabet="abcdefghijklmnopqrstuvwxyz0123456789 _-", min_size=1, max_size=8), min_size=1, max_size=12, unique=True)
 weights = st.floats(min_value=0.0, max_value=10.0, allow_nan=False, allow_infinity=False)
@@ -123,7 +124,7 @@ def test_deck_first_pick_of_a_run_is_the_same_as_a_lone_pick(options, count, pos
     assert first == picked(DeckPicker(random.Random(1), position, {}), weighted, count) # Another use later in the prompt doesn't change the first.
 
 
-@settings(max_examples=60)
+@settings(max_examples=scaled(60))
 @given(options=st.lists(st.text(alphabet="xyz", min_size=3, max_size=6), min_size=2, max_size=8, unique=True), rounds=st.integers(2, 4))
 def test_shuffle_covers_every_option_per_round_and_never_repeats_at_the_seam(options, rounds):
     weighted = [(1.0, option) for option in options]
@@ -146,7 +147,7 @@ def test_shuffle_survives_a_restart(tmp_path, monkeypatch):
     assert sorted(first + rest) == list("abcdef")
 
 
-@settings(max_examples=40)
+@settings(max_examples=scaled(40))
 @given(weighted=weighted_options(min_size=2, max_size=6))
 def test_balanced_credits_always_sum_to_zero(weighted):
     assume(sum(weight for weight, _ in weighted) > 0)

@@ -110,7 +110,10 @@ class RandomImageLoader(io.ComfyNode):
         name = pick_label(files, make_picker(seed_mode, seed), seed)
         MEMORY.save()
         logging.info(f"[DiceForge] Random Image | {name} | Seed: {seed} ({seed_mode})")
-        image, mask = load_image_file(os.path.join(root, name))
+        try:
+            image, mask = load_image_file(os.path.join(root, name))
+        except (OSError, ValueError, RuntimeError) as error: # A damaged or truncated file: say which one, so it can be fixed or removed.
+            raise ValueError(f"Random Image: {name} can't be read ({error}). Fix or remove it, or use another seed.") from None
         return io.NodeOutput(image, mask, name, ui=ui.PreviewImage(image, cls=cls))
 # Extension entry point for ComfyUI V3 node registration.
 class RandomImageLoaderExtension(ComfyExtension):
