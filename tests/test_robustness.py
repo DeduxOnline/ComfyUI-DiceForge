@@ -212,9 +212,15 @@ def test_junk_requests_never_cause_a_server_error(method, path, api, wildcards, 
     shutil.rmtree(lora_stack.PRESET_FOLDER, ignore_errors=True)
 
 
+KEYS = ["name", "stack", "rows", "text", "loras", "items", "kind", "file", "user", "overwrite", "lora", "groups"]
+
+
+def json_children(children):
+    return st.one_of(st.lists(children, max_size=4), st.dictionaries(st.sampled_from(KEYS), children, max_size=4))
+
+
 json_values = st.recursive(st.one_of(st.none(), st.booleans(), st.integers(), st.floats(allow_nan=False, allow_infinity=False), st.text(max_size=10)),
-                           lambda children: st.one_of(st.lists(children, max_size=4), st.dictionaries(st.sampled_from(["name", "stack", "rows", "text", "loras", "items",
-                                                                                                                    "kind", "file", "user", "overwrite", "lora", "groups"]), children, max_size=4)), max_leaves=10)
+                           json_children, max_leaves=10)
 
 
 @settings(max_examples=scaled(40))
