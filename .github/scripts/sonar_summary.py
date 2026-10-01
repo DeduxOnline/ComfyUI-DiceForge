@@ -62,7 +62,8 @@ def file_of(component, project):
 def main():
     task = report_task()
     project, pr = task["projectKey"], pull_request()
-    where = {"pullRequest": pr} if pr else {"branch": task.get("branch")}
+    # The branch analysed (main, or the pushed branch): asked by name, since SonarQube Cloud's main branch can have another name (master).
+    where = {"pullRequest": pr} if pr else {"branch": os.environ.get("GITHUB_REF_NAME")}
     status = wait_for(task["ceTaskId"])
     lines = [f"## SonarQube Cloud: {project}" + (f" (pull request #{pr})" if pr else ""), "",
              f"[Dashboard]({task.get('dashboardUrl', HOST)}) · analysis {status}", ""]
