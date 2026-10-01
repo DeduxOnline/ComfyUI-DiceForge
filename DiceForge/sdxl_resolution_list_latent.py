@@ -53,6 +53,29 @@ def rescaled(width, height, rescale):
         return (float(side), height * side / width) if width >= height else (width * side / height, float(side))
     factor = (rescale or {}).get("percent", 100) / 100 # Each side: the pixels (megapixels) grow by its square.
     return width * factor, height * factor
+# The rescale input of both resolution nodes: the mode, and the input under it. Optional inputs come after the required ones in the node, so only
+# Resolution Selector (where it is the last input anyway) has it optional: there a prompt without it gets 100%.
+def rescale_input(optional=False):
+    return io.DynamicCombo.Input(
+        "rescale",
+        options=[
+            io.DynamicCombo.Option(BY_PERCENTAGE, [io.Int.Input("percent", default=100, min=5, max=1000, step=5, # min on the step grid: the frontend snaps to min + k * step.
+                tooltip="Each side in percent: 150 turns 1024x1024 into 1536x1536 (2.25 times the pixels), 50 into 512x512. Then rounded to multiple.")]),
+            io.DynamicCombo.Option(TO_WIDTH_HEIGHT, [
+                io.Int.Input("width", default=1536, min=0, max=16384, step=8, tooltip="The width. 0: follows the aspect ratio from the height."),
+                io.Int.Input("height", default=0, min=0, max=16384, step=8, tooltip="The height. 0: follows the aspect ratio from the width. Both set: that exact size, whatever the size picked above."),
+            ]),
+            io.DynamicCombo.Option(TO_LONGEST_SIDE, [io.Int.Input("longer_side", default=1536, min=64, max=16384, step=8,
+                tooltip="The longest side of the size, keeping the aspect ratio: 1536 turns 1216x832 into 1536x1048 (rounded to multiple 8).")]),
+        ],
+        tooltip="Rescale the picked size, like HiresFix: by percentage of each side, to a width and/or height, or to a longest side.",
+        optional=optional,
+    )
+# The rescale settings a run reports with its size (the preview of random sizes compares them with the node's current ones).
+def rescale_settings(rescale):
+    rescale = rescale or {}
+    return {"rescale": rescale.get("rescale", BY_PERCENTAGE), "percent": rescale.get("percent"), "rescale_width": rescale.get("width"),
+            "rescale_height": rescale.get("height"), "longer_side": rescale.get("longer_side")}
 def describe_rescale(rescale):
     mode = (rescale or {}).get("rescale", BY_PERCENTAGE)
     if mode == TO_WIDTH_HEIGHT:
@@ -98,20 +121,7 @@ class SDXLResolutionListLatent(io.ComfyNode):
                     max=0xFFFFFFFFFFFFFFFF,
                     tooltip="Seed for random resolution selection.",
                 ),
-                io.DynamicCombo.Input(
-                    "rescale",
-                    options=[
-                        io.DynamicCombo.Option(BY_PERCENTAGE, [io.Int.Input("percent", default=100, min=5, max=1000, step=5, # min on the step grid: the frontend snaps to min + k * step.
-                            tooltip="Each side in percent: 150 turns 1024x1024 into 1536x1536 (2.25 times the pixels), 50 into 512x512. Then rounded to multiple.")]),
-                        io.DynamicCombo.Option(TO_WIDTH_HEIGHT, [
-                            io.Int.Input("width", default=1536, min=0, max=16384, step=8, tooltip="The width. 0: follows the aspect ratio from the height."),
-                            io.Int.Input("height", default=0, min=0, max=16384, step=8, tooltip="The height. 0: follows the aspect ratio from the width. Both set: that exact size, whatever the size picked above."),
-                        ]),
-                        io.DynamicCombo.Option(TO_LONGEST_SIDE, [io.Int.Input("longer_side", default=1536, min=64, max=16384, step=8,
-                            tooltip="The longest side of the size, keeping the aspect ratio: 1536 turns 1216x832 into 1536x1048 (rounded to multiple 8).")]),
-                    ],
-                    tooltip="Rescale the picked size, like HiresFix: by percentage of each side, to a width and/or height, or to a longest side.",
-                ),
+                rescale_input(),
                 io.Int.Input(
                     "multiple",
                     default=8,
@@ -198,10 +208,8 @@ class SDXLResolutionListLatent(io.ComfyNode):
         )
         latent = nodes.EmptyLatentImage().generate(width, height, batch)[0]
         # The size of this run, with the settings it came from, for the preview of random sizes in the frontend extension.
-        rescale = rescale or {}
         last_size = {"width": width, "height": height, "group": group, "size": size, "max_aspect": resolution.get("max_aspect"), "multiple": multiple,
-                     "rescale": rescale.get("rescale", BY_PERCENTAGE), "percent": rescale.get("percent"), "rescale_width": rescale.get("width"),
-                     "rescale_height": rescale.get("height"), "longer_side": rescale.get("longer_side")}
+                     **rescale_settings(rescale)}
         return io.NodeOutput(latent, width, height, seed, ui={"dice_forge_last_size": [last_size]})
 # Extension entry point for ComfyUI V3 node registration.
 class SDXLResolutionListLatentExtension(ComfyExtension):

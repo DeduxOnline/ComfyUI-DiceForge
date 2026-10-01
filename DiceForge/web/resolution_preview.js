@@ -38,9 +38,32 @@ function rescaled(width, height, current) {
   return [width * factor, height * factor];
 }
 
+// Python's round(): halves go to the even number (round(2.5) is 2), unlike Math.round.
+function roundHalfEven(value) {
+  const floor = Math.floor(value);
+  return value - floor === 0.5 ? (floor % 2 === 0 ? floor : floor + 1) : Math.round(value);
+}
+// Resolution Selector's size (ResolutionSelectorRandomLatent.size_for_ratio): the exact size for the aspect ratio and megapixels, rescaled, then each
+// side rounded to multiple.
+function selectorSize(wRatio, hRatio, current) {
+  const scale = Math.sqrt((current.megapixels * 1024 * 1024) / (wRatio * hRatio));
+  const [width, height] = rescaled(wRatio * scale, hRatio * scale, current);
+  const multiple = current.multiple;
+  return [Math.max(multiple, roundHalfEven(width / multiple) * multiple), Math.max(multiple, roundHalfEven(height / multiple) * multiple)];
+}
+
 function widgetValue(node, name) {
   return node.widgets?.find((widget) => widget.name === name)?.value;
 }
+
+// The rescale settings of a node, as a run reports them (sdxl_resolution_list_latent.rescale_settings).
+const rescaleSettings = (node) => ({
+  rescale: String(widgetValue(node, "rescale") ?? "by percentage"),
+  percent: widgetValue(node, "rescale.percent") ?? null,
+  rescale_width: widgetValue(node, "rescale.width") ?? null,
+  rescale_height: widgetValue(node, "rescale.height") ?? null,
+  longer_side: widgetValue(node, "rescale.longer_side") ?? null,
+});
 
 // Per node: the settings that decide the size (the seed is left out: with "randomize" it changes right after each run), and the preview for fixed choices.
 const NODES = {
@@ -49,11 +72,7 @@ const NODES = {
       group: widgetValue(node, "resolution"),
       size: String(widgetValue(node, "resolution.size") ?? ""),
       max_aspect: widgetValue(node, "resolution.max_aspect") ?? null,
-      rescale: String(widgetValue(node, "rescale") ?? "by percentage"),
-      percent: widgetValue(node, "rescale.percent") ?? null,
-      rescale_width: widgetValue(node, "rescale.width") ?? null,
-      rescale_height: widgetValue(node, "rescale.height") ?? null,
-      longer_side: widgetValue(node, "rescale.longer_side") ?? null,
+      ...rescaleSettings(node),
       multiple: Number(widgetValue(node, "multiple") ?? 8),
     }),
     isRandom: (current) => current.group !== "Standard" && current.group !== "High-Res",
@@ -75,13 +94,16 @@ const NODES = {
       megapixels: Number(widgetValue(node, "megapixels") ?? 1),
       multiple: Number(widgetValue(node, "multiple") ?? 8),
       max_aspect: Number(widgetValue(node, "max_aspect") ?? 2),
+      ...rescaleSettings(node),
     }),
     isRandom: (current) => current.aspect_ratio.startsWith("Random"),
     usesMaxAspect: (current) => current.aspect_ratio.startsWith("Random Chaos"),
-    // The aspect ratio and megapixels as they are: the same as the core preview without this extension.
+    // The final size, as the node computes it (megapixels, rescale, rounding), given to the preview as the ratio and megapixels of an exact multiple.
     fixed: (current) => {
       const match = /^(\d+(?:\.\d+)?)\s*:\s*(\d+(?:\.\d+)?)/.exec(current.aspect_ratio);
-      return match ? { ratio: `${match[1]}:${match[2]}`, megapixels: current.megapixels } : null;
+      if (!match || !(current.megapixels > 0) || !(current.multiple > 0)) return null;
+      const [width, height] = selectorSize(Number(match[1]), Number(match[2]), current);
+      return { ratio: `${width}:${height}`, megapixels: (width * height) / (1024 * 1024) };
     },
   },
 };
@@ -144,6 +166,16 @@ async function migrateScale(node, saved) {
   if (node.widgets?.find((widget) => widget.name === "seed_mode")?.options?.values?.includes(saved.seedMode)) set("seed_mode", saved.seedMode);
   console.info(`[DiceForge] ${node.comfyClass} #${node.id}: scale ${saved.scale} became rescale by percentage ${Math.round(saved.scale * 100)} (saved by an older version).`);
 }
+// A rescale list without a valid mode (a node saved before it had one, with another value in its place): by percentage, at 100.
+async function repairRescale(node) {
+  const rescale = node.widgets?.find((widget) => widget.name === "rescale");
+  if (!rescale || rescale.options?.values?.includes(rescale.value)) return;
+  rescale.value = "by percentage";
+  rescale.callback?.("by percentage");
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  const percent = node.widgets.find((widget) => widget.name === "rescale.percent");
+  if (percent && !(Number(percent.value) > 0)) percent.value = 100;
+}
 // Inputs left from older versions (vae_alignment) that the node no longer has: unconnected ones are removed.
 function removeStaleInputs(node) {
   const names = new Set((node.widgets ?? []).map((widget) => widget.name));
@@ -180,6 +212,7 @@ app.registerExtension({
       const result = onConfigure?.apply(this, arguments);
       repairResolutionGroup(node)
         .then(() => scale && migrateScale(node, scale))
+        .then(() => repairRescale(node))
         .then(() => removeStaleInputs(node));
       return result;
     };

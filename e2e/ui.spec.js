@@ -68,6 +68,31 @@ for (const vue of [true, false]) {
       await expect.poll(() => widgetValue(page, node, "preview_ratio")).toBe("1824:1248");
     });
 
+    test("Resolution Selector previews its size with rescale", async ({ page }) => {
+      const [id] = await addNodes(page, [{ type: "ResolutionSelectorRandomLatent", widgets: { aspect_ratio: "16:9 (Widescreen)" } }]);
+      await expect.poll(() => widgetValue(page, id, "preview_ratio")).toBe("1368:768");
+      await setWidget(page, id, "rescale.percent", 150);
+      await expect.poll(() => widgetValue(page, id, "preview_ratio")).toBe("2048:1152");
+      await setWidget(page, id, "rescale", "to longest side");
+      await setWidget(page, id, "rescale.longer_side", 1920);
+      await expect.poll(() => widgetValue(page, id, "preview_ratio")).toBe("1920:1080");
+      if (vue) await expect(nodeElement(page, id)).toContainText("1920 × 1080");
+    });
+
+    test("a Resolution Selector saved before rescale opens at 100% with its values in place", async ({ page }) => {
+      const [id] = await addNodes(page, [{ type: "ResolutionSelectorRandomLatent", widgets: { aspect_ratio: "4:3 (Standard)", megapixels: 2.0, multiple: 64, batch: 3, seed_mode: "deck" } }]);
+      const workflow = await page.evaluate(() => window.app.graph.serialize());
+      const saved = workflow.nodes.find((node) => node.type === "ResolutionSelectorRandomLatent");
+      const at = saved.widgets_values.indexOf("by percentage");
+      saved.widgets_values.splice(at, 2); // How a version without rescale saved it.
+      await page.evaluate(async (workflow) => { window.app.graph.clear(); await window.app.loadGraphData(workflow); }, workflow);
+      const node = await page.evaluate(() => window.app.graph.nodes.find((node) => node.comfyClass === "ResolutionSelectorRandomLatent").id);
+      await expect.poll(() => widgetValue(page, node, "rescale")).toBe("by percentage");
+      await expect.poll(() => widgetValue(page, node, "rescale.percent")).toBe(100);
+      const values = await Promise.all(["aspect_ratio", "megapixels", "multiple", "batch", "seed_mode"].map((name) => widgetValue(page, node, name)));
+      expect(values).toEqual(["4:3 (Standard)", 2.0, 64, 3, "deck"]);
+    });
+
     test("typing __ in CLIP Dual Text Encode suggests wildcards", async ({ page }) => {
       const [id] = await addNodes(page, [{ type: "CLIPTextEncodePositiveNegative", pos: [300, 60] }]);
       const positive = await promptField(page, id, "positive");

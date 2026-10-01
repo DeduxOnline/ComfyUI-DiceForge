@@ -25,9 +25,11 @@ test.describe("@api workflows and routes", () => {
   test("ComfyUI loads every DiceForge node", async ({ request }) => {
     const info = await (await request.get("/object_info")).json();
     for (const node of NODES) expect(info[node]?.python_module, node).toContain("DiceForge");
-    const rescale = info.SDXLResolutionListLatent.input.required.rescale;
-    expect(rescale[1].options.map((option) => option.key)).toEqual(["by percentage", "to Width/Height", "to longest side"]);
-    expect(rescale[1].advanced).toBeFalsy(); // In view, not under the advanced inputs.
+    for (const [node, section] of [["SDXLResolutionListLatent", "required"], ["ResolutionSelectorRandomLatent", "optional"]]) {
+      const rescale = info[node].input[section].rescale; // Resolution Selector's is optional: a prompt without it gets 100%.
+      expect(rescale[1].options.map((option) => option.key)).toEqual(["by percentage", "to Width/Height", "to longest side"]);
+      expect(rescale[1].advanced).toBeFalsy(); // In view, not under the advanced inputs.
+    }
     expect(info.CLIPTextEncodePositiveNegative.input.required.negative[1].advanced).toBe(true);
   });
 
@@ -99,6 +101,15 @@ test.describe("@api workflows and routes", () => {
       expect(result.outputs["1"].dice_forge_last_size[0].group).toBe("Random");
     }
     expect([...listed].sort()).toEqual(["640x1536", "768x1344", "832x1216", "896x1152"]);
+    const selector = (inputs) => size({ 1: { class_type: "ResolutionSelectorRandomLatent", inputs: { aspect_ratio: "16:9 (Widescreen)", megapixels: 1.0, seed: 0, multiple: 8, batch: 1, max_aspect: 2.0, seed_mode: "random", ...inputs } } });
+    result = await runPrompt(request, selector({})); // Without rescale, as before it existed.
+    expect([shown(result, "2"), shown(result, "3")]).toEqual(["1368", "768"]);
+    result = await runPrompt(request, selector({ rescale: "by percentage", "rescale.percent": 150 }));
+    expect([shown(result, "2"), shown(result, "3")]).toEqual(["2048", "1152"]);
+    result = await runPrompt(request, selector({ rescale: "to longest side", "rescale.longer_side": 1920 }));
+    expect([shown(result, "2"), shown(result, "3")]).toEqual(["1920", "1080"]);
+    result = await runPrompt(request, selector({ rescale: "to Width/Height", "rescale.width": 0, "rescale.height": 1152 }));
+    expect([shown(result, "2"), shown(result, "3")]).toEqual(["2048", "1152"]);
     result = await runPrompt(request, size({ 1: { class_type: "ResolutionSelectorRandomLatent", inputs: { aspect_ratio: "Random Chaos Portrait", megapixels: 1.0, seed: 3, multiple: 64, batch: 1, max_aspect: 2.0, seed_mode: "random" } } }));
     const [width, height] = [Number(shown(result, "2")), Number(shown(result, "3"))];
     expect(width % 64).toBe(0);
