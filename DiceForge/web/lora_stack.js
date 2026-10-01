@@ -12,6 +12,19 @@ const NODE_TYPE = "DiceForgeLoraStack";
 const GROUPS = ["A", "B", "C", "D"];
 const LORAS = BROWSERS.find((spec) => spec.kind === "loras");
 const EMPTY = { rows: [], groups: {}, separate_clip: false };
+// The stack as the panel edits it, whatever the saved JSON holds (a workflow edited by hand or damaged), like lora_stack.parse_stack on the server:
+// rows are objects with a LoRA name, trigger words a list (text with commas is split), groups objects of min and max.
+const isObject = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
+function cleanStack(stack) {
+  stack = isObject(stack) ? stack : {};
+  const rows = (Array.isArray(stack.rows) ? stack.rows : []).filter((row) => isObject(row) && typeof row.lora === "string" && row.lora).map((row) => {
+    const words = typeof row.trigger_words === "string" ? row.trigger_words.split(",") : Array.isArray(row.trigger_words) ? row.trigger_words : [];
+    return { ...row, group: typeof row.group === "string" ? row.group : "",
+      trigger_words: words.filter((word) => typeof word === "string" || typeof word === "number").map((word) => String(word).trim()).filter(Boolean) };
+  });
+  const groups = Object.fromEntries(Object.entries(isObject(stack.groups) ? stack.groups : {}).filter(([, settings]) => isObject(settings)));
+  return { ...stack, rows, groups, separate_clip: !!stack.separate_clip };
+}
 
 const STYLE = `
 .dfls{display:flex;flex-direction:column;gap:4px;font:12px system-ui,sans-serif;color:#ddd;width:100%;box-sizing:border-box;padding:2px 0}
@@ -263,7 +276,7 @@ function setUp(node) {
   const widget = node.addDOMWidget("lora_stack", "diceforge_lora_stack", panel, { serialize: false, getMinHeight: () => panel.scrollHeight + 6 });
   widget.serialize = false;
   const read = () => {
-    try { return { ...EMPTY, ...JSON.parse(data.value || "{}") }; } catch { return structuredClone(EMPTY); }
+    try { return cleanStack(JSON.parse(data.value || "{}")); } catch { return structuredClone(EMPTY); }
   };
   const write = (stack) => {
     data.value = JSON.stringify(stack);

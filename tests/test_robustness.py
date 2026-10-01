@@ -355,9 +355,9 @@ def test_autocomplete_knows_every_letter_the_server_does():
     import re
     import unicodedata
     source = open(os.path.join(REPO, "DiceForge", "web", "wildcards.js"), encoding="utf-8").read()
-    pattern = re.search(r"const match = (/__\(.*?\)\$/u?)\.exec\(before\);", source).group(1)
+    pattern = re.search(r"!(/\^\[.*?\]\*\$/u)\.test\(typedText\)", source).group(1) # The characters a typed name may have.
     script = f"const pattern = {pattern};\nconst found = [];\nfor (let code = 0x20; code < 0x30000; code++) {{ if (code >= 0xD800 && code < 0xE000) continue;" \
-             "\n  if (pattern.exec('__a' + String.fromCodePoint(code))) found.push(code); }\nconsole.log(JSON.stringify(found));"
+             "\n  if (pattern.test('a' + String.fromCodePoint(code))) found.push(code); }\nconsole.log(JSON.stringify(found));"
     javascript = set(json.loads(subprocess.run(["node", "-e", script], capture_output=True, text=True, check=True).stdout))
     name_char = re.compile(prompts.NAME_PART)
     python = {code for code in range(0x20, 0x30000) if not 0xD800 <= code < 0xE000 and name_char.fullmatch(chr(code))}
@@ -373,3 +373,34 @@ def test_a_damaged_image_is_named_in_the_error(tmp_path, content):
     (tmp_path / "broken.png").write_bytes(content)
     with pytest.raises(ValueError, match=r"Random Image: broken\.png can't be read"):
         RandomImageLoader.execute(seed=0, seed_mode="sequential", path=str(tmp_path))
+
+
+# The memory file replaced while ComfyUI runs (deleted and a new file put there): the memory opens what is there now, instead of writing to the
+# deleted file ("attempt to write a readonly database" on every run until a restart).
+def test_a_memory_file_replaced_while_open_is_reopened():
+    memory = seed_modes.MEMORY
+    memory.set("shuffle", "k", {"position": 1})
+    memory.save()
+    os.remove(memory.path)
+    with open(memory.path, "wb") as file:
+        file.write(b"\x5a" * 8192) # Another file at the same place.
+    memory.set("shuffle", "k", {"position": 2})
+    memory.save()
+    assert memory.get("shuffle", "k") == {"position": 2}
+    with sqlite3.connect(memory.path) as connection: # What was written is in the file that is there now.
+        assert connection.execute("SELECT COUNT(*) FROM memory").fetchone()[0] == 1
+
+
+@pytest.mark.parametrize("route, body", [("/diceforge/wildcards/file", {"name": "x" * 5000, "text": "y"}),
+                                         ("/diceforge/lora-presets", {"name": "x" * 5000, "stack": {"rows": []}})])
+def test_a_name_too_long_for_the_file_system_is_a_400(route, body, api, wildcards):
+    status, answer = api("POST", route, json=body)
+    assert status == 400 and "can't save" in answer
+    shutil.rmtree(lora_stack.PRESET_FOLDER, ignore_errors=True)
+
+
+def test_an_unknown_rescale_mode_is_a_clear_error():
+    from DiceForge.sdxl_resolution_list_latent import rescaled
+    with pytest.raises(ValueError, match="Rescale: unknown mode 'sideways'"):
+        rescaled(1024, 1024, {"rescale": "sideways"})
+    assert rescaled(1024, 768, None) == (1024, 768) # No rescale at all (Resolution Selector's optional input): 100%.

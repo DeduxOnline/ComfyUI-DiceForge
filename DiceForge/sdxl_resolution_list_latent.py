@@ -39,6 +39,8 @@ CHAOS_PIXELS = 1024 * 1024 # Pixel budget of Random Chaos before rescale: the SD
 BY_PERCENTAGE, TO_WIDTH_HEIGHT, TO_LONGEST_SIDE = "by percentage", "to Width/Height", "to longest side"
 def rescaled(width, height, rescale):
     mode = (rescale or {}).get("rescale", BY_PERCENTAGE)
+    if mode not in (BY_PERCENTAGE, TO_WIDTH_HEIGHT, TO_LONGEST_SIDE): # ComfyUI lets an unknown option through in an API prompt.
+        raise ValueError(f"Rescale: unknown mode {mode!r}. Use one of: {BY_PERCENTAGE}, {TO_WIDTH_HEIGHT}, {TO_LONGEST_SIDE}.")
     if mode == TO_WIDTH_HEIGHT:
         target_width, target_height = rescale.get("width", 0), rescale.get("height", 0)
         if target_width and target_height:

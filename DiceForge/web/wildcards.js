@@ -166,9 +166,11 @@ async function updatePopup(textarea) {
   const request = ++popupRequest;
   const before = textarea.value.slice(0, textarea.selectionStart);
   const open = before.split("__").length % 2 === 0; // An odd number of "__": inside a wildcard being typed.
-  const match = /__([\p{L}\p{N}_\-./*? ]*)$/u.exec(before); // Letters and digits of every script, like the server's \w: __цвет, __色.
-  if (!open || !match || !fieldOf(textarea)) return closePopup();
-  const typed = match[1].toLowerCase();
+  // What is typed after the last "__" (not the first: in "__hair__ __col" it is "col"), in letters and digits of every script like the server's \w.
+  const opening = before.lastIndexOf("__");
+  const typedText = opening < 0 ? "" : before.slice(opening + 2);
+  if (!open || opening < 0 || !/^[\p{L}\p{N}_\-./*? ]*$/u.test(typedText) || !fieldOf(textarea)) return closePopup();
+  const typed = typedText.toLowerCase();
   const { files } = await wildcardList();
   if (request !== popupRequest) return; // Typed on (or closed) meanwhile: the newer update shows the popup, for the text as it is now.
   const entries = [...files.map((file) => ({ token: file.name, lines: file.lines })), ...folderNames(files).map((folder) => ({ token: `${folder}/*`, lines: null }))];
@@ -176,7 +178,7 @@ async function updatePopup(textarea) {
     .sort((a, b) => (b.token.toLowerCase().startsWith(typed) - a.token.toLowerCase().startsWith(typed)) || a.token.localeCompare(b.token)).slice(0, 12);
   popup.items = [...found, { browse: true }];
   popup.index = 0;
-  popup.start = before.length - match[0].length;
+  popup.start = opening;
   popup.textarea = textarea;
   if (!popup.element) {
     addStyle();

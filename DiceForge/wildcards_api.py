@@ -55,8 +55,11 @@ def register_routes():
             path = os.path.abspath(os.path.join(root, *name.split("/")) + ".txt")
             if not path.startswith(root + os.sep):
                 raise web.HTTPBadRequest(text="Wildcards: the file would be outside the wildcards folder.")
+        try:
             os.makedirs(os.path.dirname(path), exist_ok=True)
-        with open(path, "w", encoding="utf-8", newline="\n") as file:
-            file.write(str(body.get("text", "")).replace("\r\n", "\n").rstrip("\n") + "\n")
+            with open(path, "w", encoding="utf-8", newline="\n") as file:
+                file.write(str(body.get("text", "")).replace("\r\n", "\n").rstrip("\n") + "\n")
+        except OSError as error: # A name too long for the file system, a read-only folder...: a message, not a server error.
+            raise web.HTTPBadRequest(text=f"Wildcards: can't save {name}: {error.strerror or error}.") from None
         return web.json_response({"saved": name, "path": path})
 register_routes()

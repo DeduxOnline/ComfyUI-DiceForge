@@ -231,9 +231,12 @@ def register_routes():
         stack = preset_stack(body.get("stack")) # Checked before anything is written.
         if os.path.isfile(path) and not body.get("overwrite"):
             raise web.HTTPConflict(text=f"LoRA Stack: a preset named {name} already exists.")
-        os.makedirs(PRESET_FOLDER, exist_ok=True)
-        with open(path, "w", encoding="utf-8") as handle:
-            json.dump({"type": "DiceForge LoRA Stack preset", "version": 1, "stack": stack}, handle, ensure_ascii=False, indent=1)
+        try:
+            os.makedirs(PRESET_FOLDER, exist_ok=True)
+            with open(path, "w", encoding="utf-8") as handle:
+                json.dump({"type": "DiceForge LoRA Stack preset", "version": 1, "stack": stack}, handle, ensure_ascii=False, indent=1)
+        except OSError as error:
+            raise web.HTTPBadRequest(text=f"LoRA Stack: can't save the preset {name}: {error.strerror or error}.") from None
         return web.json_response({"saved": name})
     @routes.delete("/diceforge/lora-presets")
     async def delete_preset(request):

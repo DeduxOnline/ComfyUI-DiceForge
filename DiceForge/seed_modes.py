@@ -96,16 +96,23 @@ OLD_MEMORY_FILE = os.path.join(folder_paths.get_user_directory(), "ResolutionFor
 MEMORY_LIMIT = 20000
 class SeedMemory:
     def __init__(self, path):
-        self.path, self.lock, self.connection, self.writes = path, threading.Lock(), None, 0
+        self.path, self.lock, self.connection, self.writes, self.opened = path, threading.Lock(), None, 0, None
+    def identity(self):
+        try:
+            stat = os.stat(self.path)
+        except OSError:
+            return None
+        return stat.st_dev, stat.st_ino
     def database(self):
-        if self.connection is not None and not os.path.exists(self.path):
-            self.connection.close() # The file was deleted to start over: make a new one.
+        if self.connection is not None and self.identity() != self.opened:
+            self.connection.close() # The file was deleted to start over, or replaced by another one: open what is there now.
             self.connection = None
         if self.connection is None:
             os.makedirs(os.path.dirname(self.path), exist_ok=True)
             if self.path == MEMORY_FILE and not os.path.exists(self.path) and os.path.exists(OLD_MEMORY_FILE):
                 shutil.move(OLD_MEMORY_FILE, self.path) # Keeps the memory from before the rename.
             self.connection = sqlite3.connect(self.path, check_same_thread=False)
+            self.opened = self.identity()
             self.connection.execute("CREATE TABLE IF NOT EXISTS memory (mode TEXT, key TEXT, value TEXT, used REAL, PRIMARY KEY (mode, key))")
         return self.connection
     # A query, with the lock held. A damaged file (not a database, or a malformed one) is kept aside and a new memory starts, instead of failing every

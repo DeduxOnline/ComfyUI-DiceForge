@@ -4,7 +4,7 @@
   "description": "End-to-end tests of DiceForge in a real ComfyUI server and browser.",
   "scripts": {
     "test": "playwright test",
-    "test:api": "playwright test api.spec.js",
+    "test:api": "playwright test --grep @api",
     "test:ui": "playwright test --grep-invert @api"
   },
   "devDependencies": {
