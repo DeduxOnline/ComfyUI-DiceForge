@@ -2,6 +2,7 @@ import asyncio
 import itertools
 import json
 import logging
+import math
 import os
 import re
 import comfy.sd
@@ -26,13 +27,23 @@ def parse_stack(text):
         stack = json.loads(text or "{}")
     except ValueError as error:
         raise ValueError(f"LoRA Stack: the stack data is not valid JSON ({error}). Re-add the LoRAs in the node.")
-    rows = [row for row in stack.get("rows") or [] if isinstance(row, dict) and row.get("lora")]
-    return rows, stack.get("groups") or {}, bool(stack.get("separate_clip"))
+    if stack is None:
+        stack = {}
+    if not isinstance(stack, dict):
+        raise ValueError("LoRA Stack: the stack data is not a LoRA Stack (no rows). Re-add the LoRAs in the node.")
+    return clean_rows(stack.get("rows")), clean_groups(stack.get("groups")), bool(stack.get("separate_clip"))
+# Rows and groups as the node uses them, whatever the JSON holds (a hand-edited workflow, a preset from elsewhere): rows are objects with a LoRA name,
+# groups are objects with min and max.
+def clean_rows(rows):
+    return [row for row in rows if isinstance(row, dict) and isinstance(row.get("lora"), str) and row["lora"]] if isinstance(rows, list) else []
+def clean_groups(groups):
+    return {name: settings for name, settings in groups.items() if isinstance(settings, dict)} if isinstance(groups, dict) else {}
 def number(value, default):
     try:
-        return float(value)
-    except (TypeError, ValueError):
+        value = float(value)
+    except (TypeError, ValueError, OverflowError):
         return default
+    return value if math.isfinite(value) else default # NaN or infinity (possible in JSON written by hand) count as not set.
 # Strength of a row: fixed, or picked in [min, max] on the STRENGTH_STEP grid (each row has its own list of values for the seed mode).
 def row_strength(row, picker, seed):
     strength = number(row.get("strength"), 1.0)
@@ -46,9 +57,10 @@ def group_pick(name, rows, settings, picker, seed):
     low = max(0, int(number(settings.get("min"), 1)))
     high = max(low, int(number(settings.get("max"), low)))
     low, high = min(low, len(rows)), min(high, len(rows))
+    total = sum(math.comb(len(rows), size) for size in range(low, high + 1)) # Counted before listing: 40 rows would be 2^40 combinations.
+    if total > SUBSET_LIMIT:
+        raise ValueError(f"LoRA Stack: group {name} has too many combinations ({total}): use fewer LoRAs or a smaller count.")
     subsets = [subset for size in range(low, high + 1) for subset in itertools.combinations(range(len(rows)), size)]
-    if len(subsets) > SUBSET_LIMIT:
-        raise ValueError(f"LoRA Stack: group {name} has too many combinations ({len(subsets)}): use fewer LoRAs or a smaller count.")
     if len(subsets) == 1:
         return [rows[index] for index in subsets[0]]
     labels = ", ".join(row["lora"] for row in rows)
@@ -168,7 +180,7 @@ def preset_stack(data):
     stack = data.get("stack") if isinstance(data, dict) and "stack" in data else data # A preset file, or a bare stack.
     if not isinstance(stack, dict) or not isinstance(stack.get("rows"), list):
         raise web.HTTPBadRequest(text="LoRA Stack: this is not a LoRA Stack preset (no rows).")
-    return {"rows": [row for row in stack["rows"] if isinstance(row, dict) and row.get("lora")], "groups": stack.get("groups") or {}, "separate_clip": bool(stack.get("separate_clip"))}
+    return {"rows": clean_rows(stack["rows"]), "groups": clean_groups(stack.get("groups")), "separate_clip": bool(stack.get("separate_clip"))}
 def list_presets():
     presets = []
     if os.path.isdir(PRESET_FOLDER):

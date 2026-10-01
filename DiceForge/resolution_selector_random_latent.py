@@ -4,7 +4,7 @@ import nodes
 from typing_extensions import override
 from comfy_api.latest import ComfyExtension, io
 from .seed_modes import MEMORY, SEED_MODES, SEED_MODE_TOOLTIP, make_picker, pick_label, pick_in_range, fingerprint
-from .sdxl_resolution_list_latent import describe_rescale, rescale_input, rescale_settings, rescaled
+from .sdxl_resolution_list_latent import describe_rescale, keep_orientation, rescale_input, rescale_settings, rescaled
 # Aspect ratios for the canvas, in the "W:H (Name)" form the frontend resolution preview reads.
 ASPECT_RATIOS = {
     "1:1 (Square)": (1, 1),
@@ -147,12 +147,8 @@ class ResolutionSelectorRandomLatent(io.ComfyNode):
             w_ratio, h_ratio = ASPECT_RATIOS[aspect_ratio]#Returning the fixed aspect ratio for standard options.
         chaos = aspect_ratio in RANDOM_CHAOS
         width, height = cls.size_for_ratio(w_ratio, h_ratio, megapixels, multiple, round_down=chaos, rescale=rescale)
-        # Chaos Portrait and Landscape stay non-square after rounding (a ratio close to 1:1 can round to a square): the shorter side steps down, keeping the megapixels.
-        if chaos and RANDOM_CHAOS[aspect_ratio] != "any" and width == height and max_aspect > 1.0 and width > multiple:
-            if RANDOM_CHAOS[aspect_ratio] == "portrait":
-                width -= multiple
-            else:
-                height -= multiple
+        if chaos and max_aspect > 1.0:
+            width, height = keep_orientation(width, height, RANDOM_CHAOS[aspect_ratio], multiple, rescale) # Portrait and Landscape stay non-square.
         MEMORY.save()
         # Logging the final resolution, megapixels, rescale, seed, and batch size for debugging and verification purposes.
         logging.info(

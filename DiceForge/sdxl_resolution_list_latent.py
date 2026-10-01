@@ -71,6 +71,22 @@ def rescale_input(optional=False):
         tooltip="Rescale the picked size, like HiresFix: by percentage of each side, to a width and/or height, or to a longest side.",
         optional=optional,
     )
+# Random Chaos Portrait and Landscape stay non-square after rounding (a ratio close to 1:1 can round to a square): the shorter side steps down a
+# multiple, keeping the pixel budget, unless the rescale sets that side or it is already at the minimum: then the longer side steps up, unless the
+# rescale sets that one (to longest side, or an exact size): what you set wins, even if that is a square.
+def keep_orientation(width, height, orientation, multiple, rescale):
+    if width != height or orientation not in ("portrait", "landscape"):
+        return width, height
+    mode = (rescale or {}).get("rescale")
+    set_width = mode == TO_WIDTH_HEIGHT and bool(rescale.get("width"))
+    set_height = mode == TO_WIDTH_HEIGHT and bool(rescale.get("height"))
+    if orientation == "portrait": # Width is the shorter side, height the longer.
+        if width > multiple and not set_width:
+            return width - multiple, height
+        return (width, height + multiple) if not set_height and mode != TO_LONGEST_SIDE else (width, height)
+    if height > multiple and not set_height:
+        return width, height - multiple
+    return (width + multiple, height) if not set_width and mode != TO_LONGEST_SIDE else (width, height)
 # The rescale settings a run reports with its size (the preview of random sizes compares them with the node's current ones).
 def rescale_settings(rescale):
     rescale = rescale or {}
@@ -195,12 +211,8 @@ class SDXLResolutionListLatent(io.ComfyNode):
         # rescaled pixel budget.
         chaos = group == "Random Chaos"
         width, height = cls.round_to_multiple(*rescaled(width, height, rescale), multiple, round_down=chaos)
-        # Portrait and Landscape stay non-square after rounding (a ratio close to 1:1 can round to a square): the shorter side steps down, keeping the budget.
-        if chaos and size != "Any" and width == height and max(resolution.get("max_aspect", 2.0), 1.0) > 1.0 and width > multiple:
-            if size == "Portrait":
-                width -= multiple
-            else:
-                height -= multiple
+        if chaos and max(resolution.get("max_aspect", 2.0), 1.0) > 1.0:
+            width, height = keep_orientation(width, height, size.lower(), multiple, rescale)
         MEMORY.save()
         # Logging the final resolution, rescale, multiple, seed, and batch size for debugging and verification purposes.
         logging.info(
