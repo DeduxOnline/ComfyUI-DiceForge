@@ -5,6 +5,7 @@ import json
 import os
 import sys
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 
@@ -15,11 +16,23 @@ MEASURES = [("alert_status", "Quality Gate"), ("bugs", "Bugs"), ("vulnerabilitie
             ("duplicated_lines_density", "Duplications %"), ("ncloc", "Lines of code")]
 
 
-def api(path, **params):
+def fetch(path, params):
     url = f"{HOST}/api/{path}?{urllib.parse.urlencode({key: value for key, value in params.items() if value is not None})}"
     request = urllib.request.Request(url, headers={"Authorization": f"Bearer {TOKEN}"})
     with urllib.request.urlopen(request, timeout=30) as response:
         return json.load(response)
+
+
+# A call of the Web API. Asked for a branch by name and refused (403: some plans answer for the main branch only), it asks again without the
+# branch; any other failure names the call, so the summary says which part could not be read.
+def api(path, **params):
+    try:
+        return fetch(path, params)
+    except urllib.error.HTTPError as error:
+        if error.code == 403 and params.get("branch"):
+            print(f"{path}: branch {params['branch']} refused (403), reading the main branch instead", file=sys.stderr)
+            return fetch(path, {key: value for key, value in params.items() if key != "branch"})
+        raise RuntimeError(f"{path}: HTTP {error.code} {error.reason}") from None
 
 
 def report_task():
