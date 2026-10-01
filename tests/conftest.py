@@ -54,6 +54,17 @@ from DiceForge import seed_modes  # noqa: E402
 folder_paths.folder_names_and_paths["wildcards"] = ([os.path.join(TEMP, "wildcards")], set())
 
 
+# Property-based tests (Hypothesis): many generated inputs per test. Profiles: "default" (random examples, a different search each run), "ci" (the
+# same examples every run, so CI never fails by chance), "thorough" (many more examples, for a long hunt). Pick one with HYPOTHESIS_PROFILE.
+from hypothesis import HealthCheck, settings  # noqa: E402
+
+_common = dict(deadline=None, suppress_health_check=[HealthCheck.function_scoped_fixture, HealthCheck.too_slow, HealthCheck.data_too_large])
+settings.register_profile("default", max_examples=200, **_common)
+settings.register_profile("ci", max_examples=200, derandomize=True, database=None, print_blob=True, **_common)
+settings.register_profile("thorough", max_examples=3000, **_common)
+settings.load_profile(os.environ.get("HYPOTHESIS_PROFILE", "default"))
+
+
 def pytest_sessionfinish(session, exitstatus):
     shutil.rmtree(TEMP, ignore_errors=True)
 

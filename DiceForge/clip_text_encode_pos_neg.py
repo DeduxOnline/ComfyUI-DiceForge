@@ -49,6 +49,11 @@ def yaml_wildcards(data, name):
     elif name and data is not None:
         items = data if isinstance(data, list) else [data]
         yield name, [str(item).strip() for item in items if item is not None and not isinstance(item, (dict, list))]
+# YAML lines are text as written: "yes", "no", "12:30" or "0123" stay as they are instead of becoming True, False, 750 or 83 (YAML 1.1 rules);
+# only null (~, null, an empty item) means no line.
+class TextLoader(yaml.SafeLoader):
+    yaml_implicit_resolvers = {first: [(tag, pattern) for tag, pattern in resolvers if tag == "tag:yaml.org,2002:null"]
+                               for first, resolvers in yaml.SafeLoader.yaml_implicit_resolvers.items()}
 # Wildcard index: every wildcard name ("hair/color") and where it comes from ({"path"} for a .txt file, {"path", "lines"} for a yaml key). A name in an
 # earlier folder hides the same name in a later one, and a .txt file hides a yaml key of the same name. Rebuilt when a file changes; the node checks
 # that once per run, and a name that is not found checks again.
@@ -65,10 +70,10 @@ def wildcard_index(refresh=False):
             for prefix, name, path in files:
                 if not name.lower().endswith(".txt"):
                     try:
-                        with open(path, encoding="utf-8") as file:
-                            data = yaml.safe_load(file)
-                    except (OSError, yaml.YAMLError) as error:
-                        logging.warning(f"[DiceForge] Wildcards: skipping {path}, it is not valid YAML: {error}")
+                        with open(path, encoding="utf-8-sig") as file:
+                            data = yaml.load(file, Loader=TextLoader)
+                    except (OSError, UnicodeDecodeError, yaml.YAMLError) as error:
+                        logging.warning(f"[DiceForge] Wildcards: skipping {path}, it is not valid UTF-8 YAML: {error}")
                         continue
                     for key, lines in yaml_wildcards(data, prefix.rstrip("/")):
                         entries.setdefault(key, {"path": path, "lines": lines})
@@ -77,13 +82,18 @@ def wildcard_index(refresh=False):
 # Every wildcard name, sorted.
 def wildcard_names(refresh=False):
     return sorted(wildcard_index(refresh), key=str.lower)
+# Wildcard text files: UTF-8, with or without the BOM Windows Notepad adds. A file in another encoding, or one that can't be read, is a clear error.
+def read_text_lines(path):
+    try:
+        with open(path, encoding="utf-8-sig") as file:
+            return [line.rstrip("\r\n") for line in file]
+    except UnicodeDecodeError as error:
+        raise ValueError(f"Wildcard file {path} is not UTF-8 text ({error.reason} at byte {error.start}): save it as UTF-8.") from None
+    except OSError as error:
+        raise ValueError(f"Wildcard file {path} can't be read: {error.strerror or error}.") from None
 # The lines of an index entry, with empty lines and # comments skipped.
 def entry_lines(entry):
-    if "lines" in entry:
-        lines = entry["lines"]
-    else:
-        with open(entry["path"], encoding="utf-8") as file:
-            lines = [line.strip() for line in file]
+    lines = entry["lines"] if "lines" in entry else [line.strip() for line in read_text_lines(entry["path"])]
     return [line for line in lines if line and not line.startswith("#")]
 # Wildcard reading: the lines of one wildcard, as written ("3::red" keeps its weight; see weighted_lines). A name with * or ? (__hair/*__: every file
 # in hair and its subfolders; __*/color__: every color file) joins the lines of all the wildcards it matches, in name order.
@@ -111,7 +121,7 @@ def read_wildcard(name):
     return options
 # Line weights in wildcard files, like in choices: "3::blonde hair" comes 3 times as often as a line without a weight, "0::..." never.
 def weighted_lines(name):
-    weighted = [(float(found.group(1)), found.group(2).strip()) if (found := OPTION_WEIGHT.match(line)) else (1.0, line) for line in read_wildcard(name)]
+    weighted = [(option_weight(found.group(1)), found.group(2).strip()) if (found := OPTION_WEIGHT.match(line)) else (1.0, line) for line in read_wildcard(name)]
     if not any(weight > 0 for weight, _ in weighted):
         raise ValueError(f"Wildcard __{name}__: every line has weight 0, so there is nothing to choose from.")
     return weighted
@@ -153,8 +163,12 @@ def parse_choice(text, i):
     return options, i
 # Choice options with the sd-dynamic-prompts extras: "{2$$a|b|c}" picks 2 different options (also "1-3", "-2", "2-"), "{2$$ and $$a|b}" sets the separator
 # (", " by default), and "2::a" gives an option weight 2 (1 by default). Returns the weighted options, the count range (None for a single pick) and the separator.
-CHOICE_COUNT = re.compile(r"^\s*(\d+(?:-\d*)?|-\d+)\$\$(?:(.*?)\$\$)?(.*)$", re.S)
+# The separator has no braces, so a multi-pick as the first option ({2$${2$$a|b}|c}) stays an option.
+CHOICE_COUNT = re.compile(r"^\s*(\d+(?:-\d*)?|-\d+)\$\$(?:([^{}]*?)\$\$)?(.*)$", re.S)
 OPTION_WEIGHT = re.compile(r"^\s*(\d+(?:\.\d+)?)::(.*)$", re.S)
+WEIGHT_LIMIT = 1e12 # Bigger weights count as this, so a long run of digits can't make an infinite weight.
+def option_weight(digits):
+    return min(float(digits), WEIGHT_LIMIT)
 # A multi-pick whose only option is a wildcard picks from its lines (sd-dynamic-prompts style): {2$$__color__} gives 2 different colors.
 def parse_options(options, variables=None):
     count_range, separator = None, ", "
@@ -173,7 +187,7 @@ def parse_options(options, variables=None):
         lock = option.lstrip().startswith("!")
         option = option.lstrip()[1:] if lock else option
         found = OPTION_WEIGHT.match(option)
-        weight, option = (float(found.group(1)), found.group(2)) if found else (1.0, option)
+        weight, option = (option_weight(found.group(1)), found.group(2)) if found else (1.0, option)
         if option.lstrip().startswith("!") and not lock:
             lock, option = True, option.lstrip()[1:] # "3::!a" works like "!3::a".
         weighted.append((weight, option))

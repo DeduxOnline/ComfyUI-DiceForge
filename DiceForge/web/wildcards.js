@@ -271,9 +271,10 @@ async function openBrowser(node) {
         element("div", { class: "row" }, element("span", { class: "name" }, `📁 ${part}`), element("span", { class: "muted" }, "all files"),
           element("button", { class: "add", title: `Insert __${folder.path}/*__`, onclick: () => add(`${folder.path}/*`) }, "+ Add")),
         element("div", { class: "kids" }, ...drawLevel(folder)))),
-      ...level.files.map((file) => element("div", { class: "row" + (file.name === selected ? " sel" : ""), title: file.preview.join("\n") },
+      ...level.files.map((file) => element("div", { class: "row" + (file.name === selected ? " sel" : ""), title: file.error || file.preview.join("\n") },
         element("span", { class: "name", onclick: () => open(file.name) }, file.name.split("/").pop()),
-        element("span", { class: "muted", title: file.yaml ? `From ${file.yaml}` : "" }, `${file.yaml ? "yaml · " : ""}${file.lines} ${file.lines === 1 ? "line" : "lines"}`),
+        element("span", { class: "muted", title: file.error || (file.yaml ? `From ${file.yaml}` : "") },
+          file.error ? "⚠ can't be read" : `${file.yaml ? "yaml · " : ""}${file.lines} ${file.lines === 1 ? "line" : "lines"}`),
         element("button", { class: "add", title: `Insert __${file.name}__`, onclick: () => add(file.name) }, "+ Add"))),
     ];
     const items = drawLevel(root);

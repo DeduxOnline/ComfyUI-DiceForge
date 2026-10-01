@@ -2,7 +2,7 @@ import os
 import re
 import folder_paths
 from aiohttp import web
-from .clip_text_encode_pos_neg import entry_lines, find_wildcard, wildcard_index
+from .clip_text_encode_pos_neg import entry_lines, find_wildcard, read_text_lines, wildcard_index
 # Server side of the Wildcard Browser and the __ autocomplete (web/wildcards.js): the list of wildcards, reading one, and saving one. Wildcards from
 # yaml files are listed and shown too, but read-only: they are edited in their yaml file.
 PART = r"[\w\-.]+(?: [\w\-.]+)*" # Single spaces inside a name, as __hair color__ reads them (clip_text_encode_pos_neg.WILDCARD_PATTERN).
@@ -12,9 +12,6 @@ def checked_name(name):
     if not NAME.fullmatch(name) or ".." in name.split("/"):
         raise web.HTTPBadRequest(text=f"Wildcards: {name!r} is not a usable name (letters, digits, - _ ., single spaces inside, and / for folders).")
     return name
-def read_lines(path):
-    with open(path, encoding="utf-8") as file:
-        return [line.rstrip("\r\n") for line in file]
 def register_routes():
     try:
         from server import PromptServer
@@ -25,8 +22,11 @@ def register_routes():
     async def list_wildcards(request):
         files = []
         for name, entry in sorted(wildcard_index(refresh=True).items(), key=lambda item: item[0].lower()):
-            options = entry_lines(entry)
-            files.append({"name": name, "lines": len(options), "preview": options[:3], **({"yaml": os.path.basename(entry["path"])} if "lines" in entry else {})})
+            try:
+                options, error = entry_lines(entry), {}
+            except ValueError as problem: # One unreadable file doesn't hide the others: it is listed with its error.
+                options, error = [], {"error": str(problem)}
+            files.append({"name": name, "lines": len(options), "preview": options[:3], **({"yaml": os.path.basename(entry["path"])} if "lines" in entry else {}), **error})
         return web.json_response({"folders": folder_paths.get_folder_paths("wildcards"), "files": files})
     @routes.get("/diceforge/wildcards/file")
     async def read_wildcard_file(request):
@@ -36,7 +36,11 @@ def register_routes():
             raise web.HTTPNotFound(text=f"Wildcards: no wildcard {name}.")
         if "lines" in entry:
             return web.json_response({"name": name, "path": entry["path"], "text": "\n".join(entry["lines"]), "readonly": True})
-        return web.json_response({"name": name, "path": entry["path"], "text": "\n".join(read_lines(entry["path"]))})
+        try:
+            lines = read_text_lines(entry["path"])
+        except ValueError as error:
+            raise web.HTTPBadRequest(text=f"Wildcards: {error}") from None
+        return web.json_response({"name": name, "path": entry["path"], "text": "\n".join(lines)})
     @routes.post("/diceforge/wildcards/file")
     async def save_wildcard_file(request):
         body = await request.json()

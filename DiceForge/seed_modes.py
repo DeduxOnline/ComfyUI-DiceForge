@@ -19,8 +19,13 @@ class Picker:
         return [(option, self) for option in locked] # "{!a|b}": always the options marked with !, in every mode.
 def stable_seed(*parts):
     return int.from_bytes(hashlib.sha256(repr(parts).encode()).digest()[:8], "big") # Unlike hash(), the same in every ComfyUI run.
+DECK_LIMIT = 10000 # Cards in a deck at most: bigger weights are scaled down to fit (every option keeps a card), so 99999999::a can't hang the run.
 def deck_cards(weighted):
-    return [option for weight, option in weighted for _ in range(max(1, round(weight)) if weight > 0 else 0)] # Weight = copies of the option in the deck.
+    copies = [max(1, round(weight)) if weight > 0 else 0 for weight, _ in weighted] # Weight = copies of the option in the deck.
+    if sum(copies) > DECK_LIMIT:
+        total = sum(weight for weight, _ in weighted if weight > 0)
+        copies = [max(1, round(weight / total * DECK_LIMIT)) if weight > 0 else 0 for weight, _ in weighted]
+    return [option for (_, option), count in zip(weighted, copies) for _ in range(count)]
 def avoid_first(deck, last):
     if deck and deck[0] == last:
         swap = next((index for index in range(1, len(deck) - 1) if deck[index] != last), None) # Never the last card, so the next deck can still check it.
@@ -62,19 +67,22 @@ class DeckPicker(Picker):
         cards = tuple(deck_cards(weighted))
         if not cards:
             return []
-        key = (cards, self.position)
-        position = self.position + self.draws.get(key, 0) # The same deck again in this run takes the next cards, so it doesn't repeat within the prompt.
-        picked, seen = [], set()
-        for _ in range(2 * len(cards)):
+        key, distinct = (cards, self.position), len(set(cards))
+        drawn, dealt = self.draws.get(key, (0, set())) # The same deck again in this run takes the next cards and skips the ones it already dealt
+        position, picked, seen = self.position + drawn, [], set() # (also across the end of a round), so it doesn't repeat within the prompt.
+        for _ in range(4 * len(cards)):
             if len(picked) == count:
                 break
+            if len(dealt) == distinct:
+                dealt = set() # Every option came up in this run: start over.
             round_number, index = divmod(position, len(cards))
             card = self.deck(cards, round_number)[index]
             position += 1
-            if card not in seen:
+            if card not in seen and card not in dealt:
                 seen.add(card)
+                dealt.add(card)
                 picked.append((card, DeckPicker(self.rng, round_number, self.draws)))
-        self.draws[key] = position - self.position
+        self.draws[key] = (position - self.position, dealt)
         return picked
     def lock(self, weighted, count_range, plain, locked):
         if count_range is not None:
