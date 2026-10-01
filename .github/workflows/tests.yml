@@ -69,6 +69,11 @@ jobs:
         if: ${{ env.SONAR_TOKEN != '' }}
         uses: SonarSource/sonarqube-scan-action@v5
 
+      # The results on GitHub: Quality Gate, measures, open issues and security hotspots on the run's summary page and in this log.
+      - name: SonarQube Cloud results
+        if: ${{ env.SONAR_TOKEN != '' }}
+        run: python .github/scripts/sonar_summary.py
+
   e2e:
     name: End-to-end tests
     runs-on: ubuntu-latest
