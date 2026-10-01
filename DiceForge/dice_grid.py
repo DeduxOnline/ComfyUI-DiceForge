@@ -24,7 +24,7 @@ def clean_label(label):
     return label
 def font_for(cell_width):
     try:
-        return ImageFont.load_default(size=max(12, cell_width // 18))
+        return ImageFont.load_default(size=max(12, cell_width // 18)) # NOSONAR: size exists since Pillow 10.1; older Pillow raises TypeError, handled below.
     except TypeError:
         return ImageFont.load_default() # Pillow before 10.1: the small bitmap font.
 # Text split into lines that fit a width (long words are cut), for captions and headers.

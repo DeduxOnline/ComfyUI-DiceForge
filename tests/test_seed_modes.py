@@ -15,7 +15,8 @@ def picks(picker, weighted=OPTIONS, count=1, plain=True):
 
 
 def test_stable_seed_is_the_same_every_time_and_differs_by_parts():
-    assert stable_seed("a", 1) == stable_seed("a", 1)
+    first, again = stable_seed("a", 1), stable_seed("a", 1)
+    assert first == again
     assert stable_seed("a", 1) != stable_seed("a", 2)
 
 

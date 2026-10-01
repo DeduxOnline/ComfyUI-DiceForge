@@ -87,4 +87,5 @@ def test_cells_survive_on_disk_between_runs():
 
 
 def test_the_node_runs_every_time():
-    assert DiceGrid.fingerprint_inputs() != DiceGrid.fingerprint_inputs()
+    first, second = DiceGrid.fingerprint_inputs(), DiceGrid.fingerprint_inputs()
+    assert first != second

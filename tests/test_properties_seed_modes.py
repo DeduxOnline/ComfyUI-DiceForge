@@ -50,12 +50,14 @@ def test_every_picker_picks_distinct_options_with_weight(weighted, count, seed, 
 
 @given(weighted=weighted_options(), seed=seeds, count=st.integers(1, 5))
 def test_random_picks_are_reproducible_from_the_seed(weighted, seed, count):
-    assert picked(RandomPicker(random.Random(seed)), weighted, count) == picked(RandomPicker(random.Random(seed)), weighted, count)
+    first, again = picked(RandomPicker(random.Random(seed)), weighted, count), picked(RandomPicker(random.Random(seed)), weighted, count)
+    assert first == again
 
 
 @given(weighted=weighted_options(), seed=seeds)
 def test_deck_picks_are_reproducible_from_the_seed(weighted, seed):
-    assert picked(DeckPicker(random.Random(seed), seed, {}), weighted) == picked(DeckPicker(random.Random(seed), seed, {}), weighted)
+    first, again = picked(DeckPicker(random.Random(seed), seed, {}), weighted), picked(DeckPicker(random.Random(seed), seed, {}), weighted)
+    assert first == again
 
 
 @given(options=names, first_round=st.integers(0, 10 ** 12))

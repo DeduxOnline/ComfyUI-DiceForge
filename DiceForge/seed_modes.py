@@ -58,10 +58,10 @@ class DeckPicker(Picker):
         if len(cards) <= 2:
             round_number = 0 # Two options simply alternate.
         deck = list(cards)
-        random.Random(stable_seed(cards, round_number)).shuffle(deck)
+        random.Random(stable_seed(cards, round_number)).shuffle(deck) # NOSONAR: picks prompt options from the seed (reproducible on purpose), not security.
         if round_number:
             last = list(cards)
-            random.Random(stable_seed(cards, round_number - 1)).shuffle(last)
+            random.Random(stable_seed(cards, round_number - 1)).shuffle(last) # NOSONAR: as above.
             avoid_first(deck, last[-1]) # No repeat across the end of one round and the start of the next.
         return deck
     def pick(self, weighted, count, plain):
@@ -186,7 +186,7 @@ class ShufflePicker(Picker):
                     state.update(order=self.rng.getrandbits(63), position=0, previous=state["last"]) # New round.
                 if state["order"] not in decks:
                     deck = list(cards)
-                    random.Random(state["order"]).shuffle(deck)
+                    random.Random(state["order"]).shuffle(deck) # NOSONAR: a shuffled order of prompt options, not security.
                     decks[state["order"]] = avoid_first(deck, state["previous"])
                 card = decks[state["order"]][state["position"]]
                 state["position"] += 1

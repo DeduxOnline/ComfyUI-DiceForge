@@ -256,7 +256,7 @@ for (const vue of [true, false]) {
     });
 
     if (vue) {
-      test("DiceForge nodes fit their inputs when advanced inputs are shown and hidden", async ({ page }) => {
+      test("DiceForge nodes fit their inputs when advanced inputs are shown and hidden", async ({ page }) => { // NOSONAR: expect.poll(...) assertions below.
         const [id] = await addNodes(page, [{ type: "SDXLResolutionListLatent" }]);
         const height = async () => (await nodeElement(page, id).boundingBox()).height;
         await expect.poll(async () => page.evaluate((id) => window.app.graph.getNodeById(id).size[1], id)).toBeLessThan(100);

@@ -1,3 +1,4 @@
+import asyncio
 import os
 import re
 import folder_paths
@@ -13,6 +14,10 @@ def checked_name(name):
     if not NAME.fullmatch(name) or ".." in name.split("/"):
         raise web.HTTPBadRequest(text=f"Wildcards: {name!r} is not a usable name (letters, digits, - _ ., single spaces inside, and / for folders).")
     return name
+def write_lines(path, text):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8", newline="\n") as file:
+        file.write(text.replace("\r\n", "\n").rstrip("\n") + "\n")
 def register_routes():
     try:
         from server import PromptServer
@@ -56,9 +61,7 @@ def register_routes():
             if not path.startswith(root + os.sep):
                 raise web.HTTPBadRequest(text="Wildcards: the file would be outside the wildcards folder.")
         try:
-            os.makedirs(os.path.dirname(path), exist_ok=True)
-            with open(path, "w", encoding="utf-8", newline="\n") as file:
-                file.write(str(body.get("text", "")).replace("\r\n", "\n").rstrip("\n") + "\n")
+            await asyncio.get_running_loop().run_in_executor(None, write_lines, path, str(body.get("text", ""))) # Off the event loop.
         except OSError as error: # A name too long for the file system, a read-only folder...: a message, not a server error.
             raise web.HTTPBadRequest(text=f"Wildcards: can't save {name}: {error.strerror or error}.") from None
         return web.json_response({"saved": name, "path": path})

@@ -204,6 +204,13 @@ def cached_base(kind, name):
     if info.get("size") != stat.st_size or info.get("mtime") != stat.st_mtime:
         return None
     return (info.get("civitai") or {}).get("base_model")
+def read_json(path):
+    with open(path, encoding="utf-8") as handle:
+        return json.load(handle)
+def write_preset(path, stack):
+    os.makedirs(PRESET_FOLDER, exist_ok=True)
+    with open(path, "w", encoding="utf-8") as handle:
+        json.dump({"type": "DiceForge LoRA Stack preset", "version": 1, "stack": stack}, handle, ensure_ascii=False, indent=1)
 def register_routes():
     try:
         from server import PromptServer
@@ -219,8 +226,7 @@ def register_routes():
         if not os.path.isfile(path):
             raise web.HTTPNotFound(text=f"LoRA Stack: no preset {name}.")
         try:
-            with open(path, encoding="utf-8") as handle:
-                data = json.load(handle)
+            data = await asyncio.get_running_loop().run_in_executor(None, read_json, path) # Off the event loop: the server keeps answering.
         except ValueError as error:
             raise web.HTTPBadRequest(text=f"LoRA Stack: preset {name} is damaged, it is not valid JSON ({error}).") from None
         return web.json_response({"name": name, "stack": preset_stack(data)})
@@ -232,9 +238,7 @@ def register_routes():
         if os.path.isfile(path) and not body.get("overwrite"):
             raise web.HTTPConflict(text=f"LoRA Stack: a preset named {name} already exists.")
         try:
-            os.makedirs(PRESET_FOLDER, exist_ok=True)
-            with open(path, "w", encoding="utf-8") as handle:
-                json.dump({"type": "DiceForge LoRA Stack preset", "version": 1, "stack": stack}, handle, ensure_ascii=False, indent=1)
+            await asyncio.get_running_loop().run_in_executor(None, write_preset, path, stack)
         except OSError as error:
             raise web.HTTPBadRequest(text=f"LoRA Stack: can't save the preset {name}: {error.strerror or error}.") from None
         return web.json_response({"saved": name})

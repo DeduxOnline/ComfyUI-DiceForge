@@ -393,3 +393,25 @@ def test_huge_weights_still_favour_the_heavy_option():
     assert counts["a"] >= 195
     counts = Counter(run("{1000000::a|b}", seed=seed, mode="deck")[0] for seed in range(200))
     assert counts["a"] >= 195
+
+
+# Comma tidying in linear time (a prompt with thousands of spaces in a row took seconds, quadratic): the same result as the earlier version.
+def tidy_commas_before(text):
+    text = re.sub(r"[ \t]*,(?:[ \t]*,)+", ",", text)
+    text = re.sub(r"[ \t]+,", ",", text)
+    text = re.sub(r"(^|\n)[ \t]*,[ \t]*", r"\1", text)
+    text = re.sub(r"[ \t]{2,}", " ", text)
+    return re.sub(r"^[\s,]+|[\s,]+$", "", text)
+
+
+@settings(max_examples=scaled(1000))
+@given(text=st.text(alphabet="ab ,\t\n\r ", max_size=60))
+def test_tidy_commas_gives_what_it_gave_before(text):
+    assert prompts.tidy_commas(text) == tidy_commas_before(text)
+
+
+def test_tidy_commas_is_fast_on_long_runs_of_spaces():
+    for text in (" " * 200000 + "x", "\t" * 200000 + ",", "a" + " ," * 100000, "\n" * 200000 + " , x"):
+        started = time.perf_counter()
+        prompts.tidy_commas(text)
+        assert time.perf_counter() - started < 1

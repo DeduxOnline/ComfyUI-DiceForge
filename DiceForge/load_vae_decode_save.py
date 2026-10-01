@@ -43,9 +43,9 @@ class LoadVAEDecodeSave(io.ComfyNode):
     @staticmethod
     def load_vae(vae_name):
         if _vae_cache["name"] != vae_name:
-            _vae_cache["name"], _vae_cache["vae"] = None, None  # Release the previous VAE first; a failed load then retries on the next run.
-            _vae_cache["vae"] = nodes.VAELoader().load_vae(vae_name)[0]
-            _vae_cache["name"] = vae_name
+            _vae_cache.update(name=None, vae=None)  # Release the previous VAE first; a failed load then retries on the next run.
+            vae = nodes.VAELoader().load_vae(vae_name)[0]
+            _vae_cache.update(name=vae_name, vae=vae)
         return _vae_cache["vae"]
     @classmethod
     def execute(cls, samples, vae_name, filename_prefix="ComfyUI"):

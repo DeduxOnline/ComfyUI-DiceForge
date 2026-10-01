@@ -1,5 +1,7 @@
 import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
+// Runs an async step without awaiting it; a failure (the server not answering...) is logged instead of being an unhandled rejection.
+const background = (step) => Promise.resolve(step).catch((error) => console.error("[DiceForge]", error));
 
 // Wildcards in CLIP Dual Text Encode: autocomplete after "__" in the prompt fields, and the Wildcard Browser (node menu) with a folder tree,
 // "+ Add" buttons that insert __name__ (or __folder/*__) where the cursor was, and an editor for the files.
@@ -157,7 +159,7 @@ function renderPopup() {
   popup.element.replaceChildren(...popup.items.map((item, index) => {
     const row = element("div", { class: (index === popup.index ? "on " : "") + (item.browse ? "browse" : "") },
       item.browse ? "📂 Browse wildcards…" : `__${item.token}__`, ...(item.lines != null ? [element("span", { class: "n" }, `${item.lines}`)] : []));
-    row.addEventListener("mousedown", (event) => { event.preventDefault(); accept(index); });
+    row.addEventListener("mousedown", (event) => { event.preventDefault(); background(accept(index)); });
     return row;
   }));
   popup.element.children[popup.index]?.scrollIntoView({ block: "nearest" });
@@ -205,12 +207,12 @@ function accept(index) {
   const token = `__${item.token}__`;
   setField(field.node, field.name, textarea.value.slice(0, start) + token + textarea.value.slice(end + after), start + token.length);
 }
-document.addEventListener("input", (event) => { if (event.target?.tagName === "TEXTAREA" && event.isTrusted) updatePopup(event.target); }, true);
+document.addEventListener("input", (event) => { if (event.target?.tagName === "TEXTAREA" && event.isTrusted) background(updatePopup(event.target)); }, true);
 document.addEventListener("keydown", (event) => {
   if (!popup.element || event.target !== popup.textarea) return;
   const keys = { ArrowDown: 1, ArrowUp: -1 };
   if (event.key in keys) popup.index = (popup.index + keys[event.key] + popup.items.length) % popup.items.length, renderPopup();
-  else if (event.key === "Enter" || event.key === "Tab") accept(popup.index);
+  else if (event.key === "Enter" || event.key === "Tab") background(accept(popup.index));
   else if (event.key === "Escape") closePopup();
   else return;
   event.preventDefault();

@@ -27,7 +27,8 @@ def test_text_without_syntax_stays_as_it_is():
 def test_choice_picks_one_option_reproducibly():
     results = {one("{red|green|blue} car", seed) for seed in range(50)}
     assert results == {"red car", "green car", "blue car"}
-    assert one("{red|green|blue}", 7) == one("{red|green|blue}", 7)
+    first, again = one("{red|green|blue}", 7), one("{red|green|blue}", 7)
+    assert first == again
 
 
 def test_nested_choices_and_empty_options():
@@ -173,4 +174,5 @@ def test_mutate_changes_exactly_one_choice_per_run():
 
 def test_remembering_modes_never_use_the_cache():
     assert Node.fingerprint_inputs(seed_mode="random")[1] is None
-    assert Node.fingerprint_inputs(seed_mode="shuffle")[1] != Node.fingerprint_inputs(seed_mode="shuffle")[1]
+    first, second = Node.fingerprint_inputs(seed_mode="shuffle")[1], Node.fingerprint_inputs(seed_mode="shuffle")[1]
+    assert first != second

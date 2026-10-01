@@ -3,6 +3,8 @@ import { api } from "../../scripts/api.js";
 import { openModelInfo } from "./model_info.js";
 import { openModelBrowser, BROWSERS, compareBases } from "./model_browser.js";
 import { fitNodeHeight } from "./node_size.js";
+// Runs an async step without awaiting it; a failure (the server not answering...) is logged instead of being an unhandled rejection.
+const background = (step) => Promise.resolve(step).catch((error) => console.error("[DiceForge]", error));
 
 // LoRA Stack (lora_stack.py): the rows of LoRAs drawn in the node, like rgthree's Power Lora Loader. The node's "loras" text input holds them as JSON;
 // it is hidden and this panel edits it. Each row: on/off, the LoRA (click to change it in the LoRA Browser), Model info, a group, a fixed strength or
@@ -164,7 +166,7 @@ function openPresets(apply) {
         if (!confirm(`Delete the preset "${preset.name}"?`)) return;
         await presetRequest(`/diceforge/lora-presets?name=${encodeURIComponent(preset.name)}`, { method: "DELETE" });
         say(`Deleted ${preset.name}.`);
-        draw();
+        background(draw());
       } }, "🗑"))) : [element("div", { class: "muted" }, `No presets yet: save a stack with 💾 Save preset in the node, or import a preset file. They are kept in ${data.folder}.`)]));
   }
   const picker = element("input", { type: "file", accept: ".json,application/json", multiple: "", style: "display:none" });
@@ -180,14 +182,14 @@ function openPresets(apply) {
       }
     }
     picker.value = "";
-    draw();
+    background(draw());
   });
   back.append(element("div", { class: "dflp" },
     element("h2", {}, "LoRA Stack presets"),
     element("div", { class: "top" }, element("button", { onclick: () => picker.click() }, "⬆ Import file…"), picker, element("span", { style: "flex:1" }), element("button", { onclick: close }, "Close")),
     list, status));
   document.body.append(back);
-  draw();
+  background(draw());
 }
 
 // Trigger words of a row (🏷): which of the LoRA's trigger words go to the triggers output. Default: all of them (yours from Model info, else
@@ -281,7 +283,7 @@ function setUp(node) {
   const write = (stack) => {
     data.value = JSON.stringify(stack);
     data.callback?.(data.value);
-    render();
+    background(render());
     node.setDirtyCanvas?.(true, true);
   };
   const update = (change) => { const stack = read(); change(stack); write(stack); };
@@ -392,7 +394,7 @@ function setUp(node) {
           }
         })) }, "📂 Presets")),
       modelLine, noteLine);
-    checkBases();
+    background(checkBases());
     if (!node.flags?.collapsed) fitNodeHeight(node); // Room for the rows (node_size.js).
   }
   const modelLine = element("div", { class: "muted model" });
@@ -428,10 +430,10 @@ function setUp(node) {
   const onConfigure = node.onConfigure;
   node.onConfigure = function (...args) {
     const result = onConfigure?.apply(this, args);
-    render(); // A loaded workflow's rows.
+    background(render()); // A loaded workflow's rows.
     return result;
   };
-  render();
+  background(render());
 }
 
 app.registerExtension({

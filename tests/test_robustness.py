@@ -293,7 +293,8 @@ def test_nodes_survive_many_threads(wildcards):
             for step in range(15):
                 mode = ("random", "deck", "shuffle", "balanced", "combinations", "mutate")[(index + step) % 6]
                 positive, _ = run("{a|b|c} __color__ {2$$x|y|z}", seed=step, mode=mode)
-                assert positive
+                if not positive:
+                    errors.append(f"empty prompt in {mode}")
                 if step % 5 == 0:
                     wildcards(f"extra{index}.txt", f"v{step}\n") # Files change while others read the index.
         except Exception as error: # noqa: BLE001
@@ -404,3 +405,12 @@ def test_an_unknown_rescale_mode_is_a_clear_error():
     with pytest.raises(ValueError, match="Rescale: unknown mode 'sideways'"):
         rescaled(1024, 1024, {"rescale": "sideways"})
     assert rescaled(1024, 768, None) == (1024, 768) # No rescale at all (Resolution Selector's optional input): 100%.
+
+
+# mutate keeps its last picks only while they fit: a wildcard file that grows gives a multi-pick its full count again.
+def test_mutate_multi_pick_follows_a_wildcard_file_that_grows(wildcards):
+    wildcards("grow.txt", "only\n")
+    assert run("{3$$__grow__}", mode="mutate")[0] == "only"
+    wildcards("grow.txt", "only\nb\nc\nd\ne\n")
+    picked = run("{3$$__grow__}", mode="mutate")[0].split(", ")
+    assert len(picked) == len(set(picked)) == 3

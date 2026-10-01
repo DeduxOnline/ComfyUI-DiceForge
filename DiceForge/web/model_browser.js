@@ -2,6 +2,8 @@ import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
 import { openModelInfo } from "./model_info.js";
 import { insertIntoNode } from "./wildcards.js";
+// Runs an async step without awaiting it; a failure (the server not answering...) is logged instead of being an unhandled rejection.
+const background = (step) => Promise.resolve(step).catch((error) => console.error("[DiceForge]", error));
 
 // Model browsers (node menu): LoRA and Checkpoint Browser. The model files as cards with a preview, name, base model and trigger words from Civitai
 // (looked up by the file's hash, as in Model info), a folder tree, search and filters. What a card's button does depends on the node it was opened
@@ -176,7 +178,7 @@ async function openBrowser(node, spec, target = targetOf(node, spec)) {
   }
   function card(entry) {
     const words = element("div", { class: "words" }, ...entry.trigger_words.slice(0, 8).map((word) =>
-      element("span", { title: "Click to copy", onclick: () => { navigator.clipboard?.writeText(word); say(`Copied "${word}".`); } }, word)));
+      element("span", { title: "Click to copy", onclick: () => { background(navigator.clipboard?.writeText(word)); say(`Copied "${word}".`); } }, word)));
     const lookUpButton = element("button", { onclick: async () => {
       lookUpButton.disabled = true;
       lookUpButton.textContent = "Looking up…";
@@ -189,7 +191,7 @@ async function openBrowser(node, spec, target = targetOf(node, spec)) {
       }
     } }, entry.checked ? "↻ Civitai" : "🔍 Civitai");
     const info = element("button", { onclick: () => {
-      openModelInfo(kind, entry.file);
+      background(openModelInfo(kind, entry.file));
       const watch = setInterval(async () => { // When the Info dialog closes, the card shows what it looked up or what you typed there.
         if (document.querySelector(".dfmi-back")) return;
         clearInterval(watch);
@@ -238,7 +240,7 @@ async function openBrowser(node, spec, target = targetOf(node, spec)) {
     }));
   }
   function draw() {
-    const bases = [...new Set(files.map((entry) => entry.base_model).filter(Boolean))].sort();
+    const bases = [...new Set(files.map((entry) => entry.base_model).filter(Boolean))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true })); // SD 1.5 before SDXL 1.0, Flux.1 D before Flux.1 S.
     const chosen = base.value;
     base.replaceChildren(element("option", { value: "" }, "All base models"),
       ...(target?.base ? [element("option", { value: FITS, title: "The same base, the same family (⚠) and the ones not looked up yet" }, `Fits the model (${target.base})`)] : []),

@@ -196,7 +196,7 @@ def parse_options(options, variables=None):
     return weighted, count_range, separator, locked
 def pick_choices(options, picker, variables):
     weighted, count_range, separator, locked = parse_options(options, variables)
-    plain = count_range is None and all(weight == 1.0 for weight, _ in weighted)
+    plain = count_range is None and all(weight == 1.0 for weight, _ in weighted) # NOSONAR: 1.0 is the exact default weight, never computed.
     if locked:
         return picker.lock(weighted, count_range, plain, locked), separator
     if count_range is None:
@@ -329,11 +329,14 @@ class MutatePicker(Picker):
         address = self.address()
         self.state["now"][address] = (locked, 1) # Never the one to change.
         return [(option, MutatePicker(self.state, address + (option,))) for option in locked]
-    def decide(self, weighted, fresh):
+    # The last picks of this choice are kept while they still fit it: every option still there, and as many as it picks now (a wildcard file that
+    # grew from 1 to 10 lines gives a {8$$__file__} 8 lines again, not the 1 it had).
+    def decide(self, weighted, fresh, low=1, high=1):
         address = self.address()
         options = [option for weight, option in weighted if weight > 0]
         previous = self.state["last"].get(address, (None, 0))[0]
-        if address != self.state["mutate"] and previous is not None and all(option in options for option in previous):
+        fits = previous is not None and all(option in options for option in previous) and min(low, len(options)) <= len(previous) <= min(high, len(options))
+        if address != self.state["mutate"] and fits:
             picked = previous
         else:
             picked = fresh()
@@ -344,9 +347,9 @@ class MutatePicker(Picker):
         self.state["now"][address] = (picked, len(options))
         return [(option, MutatePicker(self.state, address + (option,))) for option in picked]
     def pick(self, weighted, count, plain):
-        return self.decide(weighted, lambda: [option for option, _ in RandomPicker(self.rng).pick(weighted, count, plain)])
+        return self.decide(weighted, lambda: [option for option, _ in RandomPicker(self.rng).pick(weighted, count, plain)], count, count)
     def pick_range(self, weighted, low, high):
-        return self.decide(weighted, lambda: [option for option, _ in RandomPicker(self.rng).pick_range(weighted, low, high)])
+        return self.decide(weighted, lambda: [option for option, _ in RandomPicker(self.rng).pick_range(weighted, low, high)], low, high)
 # The last picks of mutate as remembered: {address: (picked options, option count)}; damaged entries are left out (those choices pick afresh).
 def mutate_memory(entries):
     last = {}
@@ -356,19 +359,27 @@ def mutate_memory(entries):
                 last[tuple(entry[0])] = (entry[1], entry[2])
     return last
 # Comma cleanup after filling in: an empty option leaves "a, , b" or a trailing comma; this makes it "a, b".
+# Runs of spaces are collapsed first, so the other patterns only meet single spaces: linear time even for a prompt with thousands of spaces in a row.
 def tidy_commas(text):
-    text = re.sub(r"[ \t]*,(?:[ \t]*,)+", ",", text)
-    text = re.sub(r"[ \t]+,", ",", text)
-    text = re.sub(r"(^|\n)[ \t]*,[ \t]*", r"\1", text)
     text = re.sub(r"[ \t]{2,}", " ", text)
-    return re.sub(r"^[\s,]+|[\s,]+$", "", text)
+    text = re.sub(r"[ \t]?,(?:[ \t]?,)+", ",", text)
+    text = re.sub(r"[ \t],", ",", text)
+    text = re.sub(r"(^|\n)[ \t]?,[ \t]?", r"\1", text)
+    return strip_commas(text)
+def strip_commas(text):
+    start, end = 0, len(text)
+    while start < end and (text[start].isspace() or text[start] == ","):
+        start += 1
+    while end > start and (text[end - 1].isspace() or text[end - 1] == ","):
+        end -= 1
+    return text[start:end]
 # Space cleanup (the trim input): no spaces at the start or end of a line, one space between words, none before , . ; : ! ? ) or after (, and at most
 # one empty line in a row. Only spaces change, so the words and weights stay as written.
 def trim_spaces(text):
-    text = re.sub(r"[ \t]+", " ", text)
-    text = re.sub(r" *\n *", "\n", text)
-    text = re.sub(r" +([,.;:!?)])", r"\1", text)
-    text = re.sub(r"\( +", "(", text)
+    text = re.sub(r"[ \t]+", " ", text) # First: single spaces only, so the patterns below take linear time.
+    text = re.sub(r" ?\n ?", "\n", text)
+    text = re.sub(r" ([,.;:!?)])", r"\1", text)
+    text = re.sub(r"\( ", "(", text)
     text = re.sub(r"\n{3,}", "\n\n", text)
     return text.strip()
 # Prompt expansion: picks {a|b} choices and sets ${name=value} variables, then replaces __name__ wildcards, expanding the picked text again so choices
@@ -397,7 +408,7 @@ def expand(text, picker, depth, variables):
             result += char
     def wildcard(match):
         weighted = weighted_lines(wildcard_name(match.group(1), variables))
-        return expand(*picker.pick(weighted, 1, all(weight == 1.0 for weight, _ in weighted))[0], depth + 1, variables)
+        return expand(*picker.pick(weighted, 1, all(weight == 1.0 for weight, _ in weighted))[0], depth + 1, variables) # NOSONAR: as above.
     return WILDCARD_PATTERN.sub(wildcard, result)
 # Full prompt processing: strips // and /* */ comments like the frontend, expands choices and wildcards, fills in variables (shared by both prompts),
 # unescapes \{ \} \| \!, then tidies commas. Wildcard names are kept whole: the /* of __hair/*__ does not start a comment.
@@ -493,7 +504,7 @@ class CLIPTextEncodePositiveNegative(io.ComfyNode):
         elif seed_mode == "mutate":
             key = MEMORY.key(positive, negative)
             last = mutate_memory(MEMORY.get("mutate", key))
-            rng = random.Random()
+            rng = random.Random() # NOSONAR: picks prompt options, not security.
             changeable = [address for address, (_picked, options) in last.items() if options > 1]
             state = {"rng": rng, "last": last, "now": {}, "mutate": rng.choice(changeable) if changeable else None}
             picker = MutatePicker(state)
