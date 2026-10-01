@@ -433,6 +433,10 @@ COMFYUI_PATH=/path/to/ComfyUI npm test          # PowerShell: $env:COMFYUI_PATH=
 
 GitHub Actions (`.github/workflows/tests.yml`) runs both suites on every push to `main` and every pull request, on Linux and the CPU, with the ComfyUI version the tests were written with (pinned in the workflow). A weekly run tests against ComfyUI's latest `master`, to see early when a ComfyUI update breaks something, and *Run workflow* on the Actions page can test any ComfyUI commit, branch or tag. When end-to-end tests fail, the run keeps the Playwright report (screenshots and traces) as the `playwright-report` artifact.
 
+### Code analysis (SonarQube Cloud)
+
+The unit tests also measure which lines of `DiceForge` they run (pytest-cov, `coverage.xml`), and GitHub Actions sends the code and that coverage to [SonarQube Cloud](https://sonarcloud.io) (settings in `sonar-project.properties`), which reports bugs, vulnerabilities, duplications and coverage for every push and pull request. To set it up in a fork: import the repository in your SonarQube Cloud organization, turn off *Automatic Analysis* (Administration → Analysis Method), put your organization and project key in `sonar-project.properties`, and add a token from My Account → Security as the `SONAR_TOKEN` secret of the GitHub repository. Without the secret the scan step is skipped. Locally: `COMFYUI_PATH=/path/to/ComfyUI python -m pytest tests --cov=DiceForge --cov-report=term`.
+
 ## About the latent
 
 Like the output of **Empty Latent Image**, the latent works with any model you would use that node with: the core samplers adapt an empty latent to the model's latent format.

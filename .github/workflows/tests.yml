@@ -32,8 +32,12 @@ jobs:
     name: Unit tests
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }} # Here, not on the step: a step's condition can't see the step's own env (and not secrets).
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0 # The whole history: SonarQube Cloud tells new code from old by it.
 
       - name: Check out ComfyUI (${{ env.COMFYUI_REF }})
         uses: actions/checkout@v5
@@ -52,12 +56,18 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
-          pip install -r ComfyUI/requirements.txt pytest hypothesis
+          pip install -r ComfyUI/requirements.txt pytest hypothesis pytest-cov
 
       - name: Run the unit tests
-        run: python -m pytest tests -v
+        run: python -m pytest tests -v --cov=DiceForge --cov-branch --cov-report=xml:coverage.xml --cov-report=term
         env:
           HYPOTHESIS_PROFILE: ci # The same generated examples every run, so a red run is a real bug, not bad luck.
+
+      # Code analysis and the coverage above on SonarQube Cloud (settings: sonar-project.properties). Only with the SONAR_TOKEN secret: without it
+      # (before it is set up, or a pull request from a fork) the step is skipped instead of failing.
+      - name: SonarQube Cloud scan
+        if: ${{ env.SONAR_TOKEN != '' }}
+        uses: SonarSource/sonarqube-scan-action@v5
 
   e2e:
     name: End-to-end tests
