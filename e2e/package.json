@@ -8,6 +8,6 @@
     "test:ui": "playwright test --grep-invert @api"
   },
   "devDependencies": {
-    "@playwright/test": "1.56.1"
+    "@playwright/test": "1.63.0"
   }
 }
