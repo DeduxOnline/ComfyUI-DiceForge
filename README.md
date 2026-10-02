@@ -587,7 +587,11 @@ In `deck` and `shuffle` modes:
 - **Autocomplete:** type `__` in the positive or negative field and a list of the wildcard files (with their number of lines) and folders (`folder/*`) opens at the cursor. Keep typing to filter it; ↑/↓ to move, Enter or Tab to insert, Esc to close. The last entry, *📂 Browse wildcards…*, opens the browser.
 - **Wildcard Browser:** right-click the node → *🎲 Wildcard Browser*. It shows the wildcard folders as a tree, with the number of lines of each file and its first lines as a tooltip, and a search box.
   - **+ Add** next to a file inserts `__name__`, next to a folder `__folder/*__`, where the cursor was last in the node's positive or negative field (at the end of the positive prompt if you have not clicked in one yet). Commas are added when the name would touch other text.
-  - Click a file name to open it in the editor on the right, change its lines and **Save**. **+ New file** creates a file (`hair/color` makes the `hair` folder too) in the first wildcards folder.
+  - **+ New file** creates a file (`hair/color` makes the `hair` folder too) in the first wildcards folder. A name that is already taken is refused, so an existing file is never emptied.
+  - Click a file name to open it in the editor on the right, change its lines and **Save** (or Ctrl+S). *Save •* means there are unsaved changes.
+  - **Rename** gives the open file a new name or moves it: `hair/color` to `palette/hair` moves it to the `palette` folder. It stays in its wildcards folder, and a name that is already taken (by a file or a yaml wildcard) is refused. Prompts that use the old `__name__` need the new one.
+  - **Delete** removes the open file, after a confirmation. Folders left empty by a rename or delete are removed too.
+  - Wildcards from yaml files are shown read-only: edit, rename or delete them in their yaml file.
 - Both work in the Nodes 2.0 and the classic node design.
 
 Example `color.txt`:

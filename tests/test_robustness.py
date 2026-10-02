@@ -194,11 +194,14 @@ def test_a_damaged_preset_is_skipped_in_the_list_and_refused_when_opened(api):
 ROUTES = [("POST", "/diceforge/wildcards/file"), ("POST", "/diceforge/lora-presets"), ("POST", "/diceforge/lora-triggers"), ("POST", "/diceforge/model-bases"),
           ("POST", "/diceforge/model-info"), ("GET", "/diceforge/model-info?kind=loras&file=nope"), ("GET", "/diceforge/model-info?kind=x&file=y"),
           ("GET", "/diceforge/model-browser?kind=nope"), ("GET", "/diceforge/model-preview?kind=loras&file=../../x"), ("GET", "/diceforge/wildcards/file?name=../x"),
-          ("GET", "/diceforge/lora-presets/file?name=../x"), ("DELETE", "/diceforge/lora-presets?name=../x"), ("GET", "/diceforge/wildcards/file")]
+          ("GET", "/diceforge/lora-presets/file?name=../x"), ("DELETE", "/diceforge/lora-presets?name=../x"), ("GET", "/diceforge/wildcards/file"),
+          ("POST", "/diceforge/wildcards/rename"), ("DELETE", "/diceforge/wildcards/file?name=../x"), ("DELETE", "/diceforge/wildcards/file"),
+          ("DELETE", "/diceforge/wildcards/file?name=nope")]
 JUNK_BODIES = ["not json", "", "[]", "5", "null", '"text"', '{"loras": 5}', '{"loras": [1, null, {"a": 1}, "x.safetensors"]}', '{"items": 5}',
                '{"items": [1, null, "x", {"kind": 5, "file": []}, {"kind": "loras", "file": "../../x"}]}', '{"kind": "loras", "file": "x", "user": [1]}',
                '{"kind": "loras", "file": "x", "user": {"name": {"a": 1}}}', '{"name": 5}', '{"name": "ok", "stack": 5}', '{"name": "ok", "stack": {"rows": "x"}}',
-               '{"name": "../../evil", "text": "x"}', '{"name": "ok", "text": 5}', '{"name": ["a"]}']
+               '{"name": "../../evil", "text": "x"}', '{"name": "ok", "text": 5}', '{"name": ["a"]}', '{"name": "ok", "to": 5}',
+               '{"name": "ok", "to": "../../evil"}', '{"name": "ok", "text": "x", "create": "yes"}']
 
 
 @pytest.mark.parametrize("method, path", ROUTES)
@@ -212,7 +215,7 @@ def test_junk_requests_never_cause_a_server_error(method, path, api, wildcards, 
     shutil.rmtree(lora_stack.PRESET_FOLDER, ignore_errors=True)
 
 
-KEYS = ["name", "stack", "rows", "text", "loras", "items", "kind", "file", "user", "overwrite", "lora", "groups"]
+KEYS = ["name", "stack", "rows", "text", "loras", "items", "kind", "file", "user", "overwrite", "lora", "groups", "to", "create"]
 
 
 def json_children(children):

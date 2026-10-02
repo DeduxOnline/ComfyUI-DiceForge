@@ -110,7 +110,7 @@ const STYLE = `
 .dfwc .row .name{flex:1;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dfwc .row.sel{background:#2f3f55}
 .dfwc .folder>.row .name{font-weight:600}.dfwc .kids{margin-left:16px}.dfwc .muted{color:#999;font-size:12px}
 .dfwc button{background:#222;color:#eee;border:1px solid #666;border-radius:6px;padding:5px 12px;cursor:pointer;font:inherit}.dfwc button:hover{background:#2c2c2c}
-.dfwc button:disabled{opacity:.5;cursor:default}.dfwc textarea[readonly]{color:#aaa}.dfwc button.add{padding:1px 8px;font-size:12px;border-color:#4a7a4a;color:#bfe8bf}.dfwc .status{color:#9c9;min-height:18px;font-size:13px}
+.dfwc button:disabled{opacity:.5;cursor:default}.dfwc button.delete:not(:disabled){border-color:#8a4a4a;color:#f0b0b0}.dfwc textarea[readonly]{color:#aaa}.dfwc button.add{padding:1px 8px;font-size:12px;border-color:#4a7a4a;color:#bfe8bf}.dfwc .status{color:#9c9;min-height:18px;font-size:13px}
 `;
 const addStyle = () => addStyleOnce("dfwc-style", STYLE);
 
@@ -204,7 +204,8 @@ document.addEventListener("keydown", (event) => {
 document.addEventListener("focusout", (event) => { if (event.target === popup.textarea) setTimeout(closePopup, 150); rememberCursor(event); }, true);
 for (const type of ["keyup", "mouseup", "focusin"]) document.addEventListener(type, rememberCursor, true);
 
-// Wildcard Browser: folder tree with search, "+ Add" for files (__name__) and folders (__folder/*__), and an editor for the selected file.
+// Wildcard Browser: folder tree with search, "+ Add" for files (__name__) and folders (__folder/*__), and the selected file's editor: create, save
+// (button or Ctrl+S; • marks unsaved changes), rename or move (a / puts it in a folder) and delete.
 async function openBrowser(node) {
   addStyle();
   const search = element("input", { placeholder: "Search wildcards…" });
@@ -212,8 +213,15 @@ async function openBrowser(node) {
   const title = element("div", { class: "muted" }, "Select a file to see and edit its lines, one option per line (# starts a comment).");
   const editor = element("textarea", { placeholder: "One option per line" });
   const status = element("div", { class: "status" });
-  const save = element("button", {}, "Save");
-  let selected = null;
+  const save = element("button", { class: "save" }, "Save");
+  const rename = element("button", { class: "rename", disabled: true }, "Rename");
+  const remove = element("button", { class: "delete", disabled: true }, "Delete");
+  let selected = null, saved = "";
+  const showDirty = () => { save.textContent = selected && !editor.readOnly && editor.value !== saved ? "Save •" : "Save"; };
+  editor.addEventListener("input", showDirty);
+  editor.addEventListener("keydown", (event) => {
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") { event.preventDefault(); event.stopPropagation(); save.click(); }
+  });
   const back = element("div", { class: "dfwc-back" });
   const close = () => { back.remove(); document.removeEventListener("keydown", onKey, true); };
   const onKey = (event) => { if (event.key === "Escape") { event.stopPropagation(); close(); } };
@@ -227,23 +235,55 @@ async function openBrowser(node) {
     const file = await response.json();
     selected = name;
     title.replaceChildren(element("b", {}, `__${name}__`), " ", element("span", { class: "muted" }, file.path));
-    editor.value = file.text;
+    editor.value = saved = file.text;
     editor.readOnly = !!file.readonly; // A yaml wildcard is one key of a yaml file: edited in that file.
-    save.disabled = !!file.readonly;
+    save.disabled = rename.disabled = remove.disabled = !!file.readonly;
+    showDirty();
     say(file.readonly ? "From a yaml file: read-only here, edit the yaml file to change it." : "");
     draw();
   }
   save.addEventListener("click", async () => {
     if (!selected) return say("Select or create a file first.");
-    const response = await api.fetchApi("/diceforge/wildcards/file", { method: "POST", body: JSON.stringify({ name: selected, text: editor.value }) });
+    const text = editor.value;
+    const response = await api.fetchApi("/diceforge/wildcards/file", { method: "POST", body: JSON.stringify({ name: selected, text }) });
+    if (response.ok) saved = text;
     say(response.ok ? `Saved ${selected}.txt.` : await response.text());
+    showDirty();
     await wildcardList(true);
     draw();
+  });
+  rename.addEventListener("click", async () => {
+    if (!selected) return;
+    const to = prompt("New name (folders with /, for example hair/color):", selected)?.trim();
+    if (!to || to === selected) return;
+    const response = await api.fetchApi("/diceforge/wildcards/rename", { method: "POST", body: JSON.stringify({ name: selected, to }) });
+    if (!response.ok) return say(await response.text());
+    const result = await response.json();
+    const edited = editor.value !== saved ? editor.value : null; // Unsaved changes stay in the editor under the new name.
+    await wildcardList(true);
+    await open(result.to);
+    if (edited != null) editor.value = edited, showDirty();
+    say(`Renamed ${result.renamed} to ${result.to}. Prompts that use __${result.renamed}__ need the new name.`);
+  });
+  remove.addEventListener("click", async () => {
+    if (!selected || !confirm(`Delete the wildcard file ${selected}.txt? This can't be undone.`)) return;
+    const response = await api.fetchApi(`/diceforge/wildcards/file?name=${encodeURIComponent(selected)}`, { method: "DELETE" });
+    if (!response.ok) return say(await response.text());
+    const name = selected;
+    selected = null;
+    editor.value = saved = "";
+    editor.readOnly = false;
+    rename.disabled = remove.disabled = true;
+    showDirty();
+    title.replaceChildren("Select a file to see and edit its lines, one option per line (# starts a comment).");
+    await wildcardList(true);
+    draw();
+    say(`Deleted ${name}.txt.`);
   });
   const create = element("button", { onclick: async () => {
     const name = prompt("New wildcard file name (folders with /, for example hair/color):", search.value.trim());
     if (!name) return;
-    const response = await api.fetchApi("/diceforge/wildcards/file", { method: "POST", body: JSON.stringify({ name, text: "" }) });
+    const response = await api.fetchApi("/diceforge/wildcards/file", { method: "POST", body: JSON.stringify({ name, text: "", create: true }) });
     if (!response.ok) return say(await response.text());
     await wildcardList(true);
     await open((await response.json()).saved);
@@ -280,7 +320,7 @@ async function openBrowser(node) {
   back.append(element("div", { class: "dfwc" },
     element("h2", {}, "Wildcards"),
     element("div", { class: "top" }, search, create, element("button", { onclick: close }, "Close")),
-    element("div", { class: "main" }, tree, element("div", { class: "edit" }, title, editor, element("div", { class: "top" }, status, element("span", { style: "flex:1" }), save)))));
+    element("div", { class: "main" }, tree, element("div", { class: "edit" }, title, editor, element("div", { class: "top" }, status, element("span", { style: "flex:1" }), remove, rename, save)))));
   document.body.append(back);
   await wildcardList(true);
   draw();

@@ -56,6 +56,9 @@ test.describe("README screenshots (Nodes 2.0)", () => {
     await clickMenu(page, id, "DiceForge.Wildcards", "Wildcard Browser");
     await page.locator(".dfwc .tree > .row", { hasText: /^color/ }).locator(".name").click();
     await expect(page.locator(".dfwc .edit textarea")).toHaveValue(/red/);
+    await page.locator(".dfwc .edit textarea").press("Control+End");
+    await page.keyboard.type("\nyellow"); // An unsaved change: Save •.
+    await expect(page.locator(".dfwc button.save")).toHaveText("Save •");
     await page.waitForTimeout(500);
     await page.locator(".dfwc").first().screenshot({ path: path.join(OUT, "wildcard_browser.png") });
   });

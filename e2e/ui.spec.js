@@ -151,6 +151,39 @@ for (const vue of [true, false]) {
       await expect(page.locator(".dfwc")).toHaveCount(0);
     });
 
+    test("Wildcard Browser creates, renames and deletes files", async ({ page }) => {
+      const tag = vue ? "vue" : "classic", wildcards = (...parts) => basePath("models", "wildcards", ...parts);
+      const [id] = await addNodes(page, [{ type: "CLIPTextEncodePositiveNegative", pos: [300, 60] }]);
+      await clickMenu(page, id, "DiceForge.Wildcards", "Wildcard Browser");
+      const answers = [`crud_${tag}/new`, `crud_${tag}/new`, `crud_${tag}_done/renamed`]; // The prompts in order: new file, the same name again, rename.
+      page.on("dialog", (dialog) => (dialog.type() === "confirm" ? dialog.accept() : dialog.accept(answers.shift())));
+      const editor = page.locator(".dfwc .edit textarea"), save = page.locator(".dfwc button.save"), status = page.locator(".dfwc .status");
+      await page.locator(".dfwc button", { hasText: "+ New file" }).click();
+      await expect(page.locator(".dfwc .row.sel")).toContainText("new");
+      await editor.fill("alpha\nbeta");
+      await expect(save).toHaveText("Save •"); // Unsaved changes are marked...
+      await editor.press("Control+s");
+      await expect(status).toContainText(`Saved crud_${tag}/new.txt`);
+      await expect(save).toHaveText("Save"); // ...until saved (Ctrl+S here).
+      expect(fs.readFileSync(wildcards(`crud_${tag}`, "new.txt"), "utf8")).toBe("alpha\nbeta\n");
+      await page.locator(".dfwc button", { hasText: "+ New file" }).click(); // A taken name: refused, the file keeps its lines.
+      await expect(status).toContainText("already exists");
+      expect(fs.readFileSync(wildcards(`crud_${tag}`, "new.txt"), "utf8")).toBe("alpha\nbeta\n");
+      await page.locator(".dfwc button.rename").click();
+      await expect(status).toContainText(`Renamed crud_${tag}/new to crud_${tag}_done/renamed`);
+      await expect(page.locator(".dfwc .row.sel")).toContainText("renamed");
+      await expect(editor).toHaveValue("alpha\nbeta");
+      expect(fs.existsSync(wildcards(`crud_${tag}`))).toBe(false);
+      await page.locator(".dfwc button.delete").click();
+      await expect(status).toContainText(`Deleted crud_${tag}_done/renamed.txt`);
+      expect(fs.existsSync(wildcards(`crud_${tag}_done`))).toBe(false);
+      await expect(page.locator(".dfwc .row", { hasText: `crud_${tag}` })).toHaveCount(0);
+      await expect(page.locator(".dfwc button.delete")).toBeDisabled();
+      await page.locator(".dfwc .row", { hasText: "outfit" }).filter({ hasText: "yaml" }).first().locator(".name").click(); // yaml: read-only.
+      await expect(page.locator(".dfwc button.rename")).toBeDisabled();
+      await expect(page.locator(".dfwc button.delete")).toBeDisabled();
+    });
+
     test("Model info shows what Civitai knows and keeps your notes", async ({ page, request }) => {
       const [id] = await addNodes(page, [{ type: "LoraLoader", widgets: { lora_name: "style/ink.safetensors" } }]);
       const items = await menuItems(page, id, "DiceForge.ModelInfo");

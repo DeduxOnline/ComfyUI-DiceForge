@@ -180,6 +180,27 @@ test.describe("@api workflows and routes", () => {
     expect((await request.post("/diceforge/wildcards/file", { data: { name: "../escape", text: "x" } })).status()).toBe(400);
   });
 
+  test("Wildcard files: create, read, update, rename and delete", async ({ request }) => {
+    const file = (...parts) => basePath("models", "wildcards", ...parts);
+    expect((await request.post("/diceforge/wildcards/file", { data: { name: "e2e_crud/fruit", text: "apple", create: true } })).ok()).toBe(true);
+    expect((await request.post("/diceforge/wildcards/file", { data: { name: "e2e_crud/fruit", text: "", create: true } })).status()).toBe(409);
+    expect(await (await request.get("/diceforge/wildcards/file?name=e2e_crud/fruit")).json()).toMatchObject({ text: "apple" });
+    expect((await request.post("/diceforge/wildcards/file", { data: { name: "e2e_crud/fruit", text: "apple\npear" } })).ok()).toBe(true);
+    const renamed = await request.post("/diceforge/wildcards/rename", { data: { name: "e2e_crud/fruit", to: "e2e_crud_moved/fruits" } });
+    expect(await renamed.json()).toMatchObject({ renamed: "e2e_crud/fruit", to: "e2e_crud_moved/fruits" });
+    expect(fs.existsSync(file("e2e_crud"))).toBe(false); // The folder left empty went too.
+    expect(fs.readFileSync(file("e2e_crud_moved", "fruits.txt"), "utf8")).toBe("apple\npear\n");
+    expect(["apple", "pear"]).toContain(shown(await runPrompt(request, clip("__e2e_crud_moved/fruits__")), "2")); // The node finds the new name.
+    expect((await request.post("/diceforge/wildcards/rename", { data: { name: "e2e_crud_moved/fruits", to: "color" } })).status()).toBe(409);
+    expect((await request.post("/diceforge/wildcards/rename", { data: { name: "characters/alice/outfit", to: "x" } })).status()).toBe(400); // yaml
+    expect((await request.delete("/diceforge/wildcards/file?name=e2e_crud_moved/fruits")).ok()).toBe(true);
+    expect(fs.existsSync(file("e2e_crud_moved"))).toBe(false);
+    expect((await request.get("/diceforge/wildcards/file?name=e2e_crud_moved/fruits")).status()).toBe(404);
+    expect((await request.delete("/diceforge/wildcards/file?name=e2e_crud_moved/fruits")).status()).toBe(404);
+    const names = (await (await request.get("/diceforge/wildcards")).json()).files.map((entry) => entry.name);
+    expect(names.filter((name) => name.startsWith("e2e_crud"))).toEqual([]);
+  });
+
   test("Model info looks the file up on Civitai (the stand-in) and the browser shows it", async ({ request }) => {
     const info = await (await request.get("/diceforge/model-info?kind=loras&file=style/ink.safetensors")).json();
     expect(info.civitai).toMatchObject({ found: true, model_name: "Ink", base_model: "Illustrious", trigger_words: ["ink style", "lineart"] });

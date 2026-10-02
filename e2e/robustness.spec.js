@@ -36,7 +36,7 @@ test.describe("@api robustness on the real server", () => {
     const bodies = ["not json", "", "[]", "5", "null", '"text"', '{"loras": 5}', '{"loras": [1, null, {"a": 1}]}', '{"items": [1, null, {"kind": 5, "file": []}]}',
       '{"kind": "loras", "file": "x", "user": [1]}', '{"name": 5}', '{"name": "ok", "stack": 5}', '{"name": "ok", "stack": {"rows": "x"}}', '{"name": ["a"]}',
       '{"name": "' + "x".repeat(5000) + '", "text": "y"}', '{"name": "' + "x".repeat(5000) + '", "stack": {"rows": []}}', "{".repeat(10000)];
-    const posts = ["/diceforge/wildcards/file", "/diceforge/lora-presets", "/diceforge/lora-triggers", "/diceforge/model-bases", "/diceforge/model-info"];
+    const posts = ["/diceforge/wildcards/file", "/diceforge/wildcards/rename", "/diceforge/lora-presets", "/diceforge/lora-triggers", "/diceforge/model-bases", "/diceforge/model-info"];
     for (const route of posts) {
       for (const body of bodies) {
         const response = await request.post(route, { data: body, headers: { "Content-Type": "application/json" } });
@@ -49,6 +49,8 @@ test.describe("@api robustness on the real server", () => {
       "/diceforge/wildcards/file?name=", "/diceforge/wildcards/file?name=%00", "/diceforge/lora-presets/file?name=", "/diceforge/lora-presets/file?name=%00x"];
     for (const route of gets) expect((await request.get(route)).status(), route).toBeLessThan(500);
     expect((await request.delete("/diceforge/lora-presets?name=")).status()).toBeLessThan(500);
+    for (const route of ["/diceforge/wildcards/file", "/diceforge/wildcards/file?name=", "/diceforge/wildcards/file?name=%00", "/diceforge/wildcards/file?name=nope"])
+      expect((await request.delete(route)).status(), route).toBeLessThan(500);
     await stillWorks(request);
   });
 
@@ -74,6 +76,9 @@ test.describe("@api robustness on the real server", () => {
           await request.post("/diceforge/lora-presets", { data: { name, stack: { rows: [] }, overwrite: true } }),
           await request.post("/diceforge/model-info", { data: { kind: "loras", file: name, user: { notes: "escaped" } } }),
           await request.delete(`/diceforge/lora-presets?name=${encoded}`),
+          await request.delete(`/diceforge/wildcards/file?name=${encoded}`),
+          await request.post("/diceforge/wildcards/rename", { data: { name, to: "escaped" } }),
+          await request.post("/diceforge/wildcards/rename", { data: { name: "weighted", to: name } }),
         ]) expect(response.status(), name).toBeGreaterThanOrEqual(400);
       }
       expect(JSON.parse(fs.readFileSync(outside, "utf8")).secret).toBe(true); // Not overwritten or deleted.
