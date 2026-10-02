@@ -30,11 +30,13 @@ test.describe("README screenshots (Nodes 2.0)", () => {
     const [sdxl] = await addNodes(page, [{ type: "SDXLResolutionListLatent", pos: [400, 220], widgets: { "resolution.size": "1216 x 832" } }]);
     await setWidget(page, sdxl, "rescale.percent", 150);
     await showAdvanced(page, sdxl);
+    await expect(nodeElement(page, sdxl)).toContainText("1824 × 1248");
     await shot(page, [sdxl], "sdxl_resolution_list.png");
     await page.evaluate(() => window.app.graph.clear());
     const [selector] = await addNodes(page, [{ type: "ResolutionSelectorRandomLatent", pos: [400, 220], widgets: { aspect_ratio: "16:9 (Widescreen)" } }]);
     await setWidget(page, selector, "rescale", "to longest side");
     await setWidget(page, selector, "rescale.longer_side", 1920);
+    await expect(nodeElement(page, selector)).toContainText("1920 × 1080");
     await shot(page, [selector], "resolution_selector.png");
   });
 
@@ -64,6 +66,7 @@ test.describe("README screenshots (Nodes 2.0)", () => {
       { type: "DiceForgeRandomFloat", pos: [720, 220], widgets: { min: 4.5, max: 8, step: 0.5, seed_mode: "shuffle" } },
       { type: "DiceForgeRandomSampler", pos: [1040, 220], widgets: { samplers: "euler, dpmpp_2m, dpmpp_2m_sde", schedulers: "normal, karras", seed_mode: "deck" } },
     ]);
+    await expect(nodeElement(page, ids[2]).locator("textarea").first()).toHaveValue("euler, dpmpp_2m, dpmpp_2m_sde");
     await shot(page, ids, "random_numbers_sampler.png");
   });
 
@@ -74,6 +77,7 @@ test.describe("README screenshots (Nodes 2.0)", () => {
       { type: "DiceForgeRandomDiffusionModel", pos: [1040, 220] },
       { type: "DiceForgeRandomVAE", pos: [1360, 220] },
     ]);
+    await expect(nodeElement(page, ids[0])).toContainText("style");
     await shot(page, ids, "random_loaders.png");
   });
 
@@ -127,6 +131,7 @@ test.describe("README screenshots (Nodes 2.0)", () => {
       { type: "LoadVAEDecodeSave", pos: [720, 220] },
       { type: "LoadDiffusionModelCLIP", pos: [1040, 220], widgets: { unet_name: "flux1-dev.safetensors", clip_name1: "clip_l.safetensors" } },
     ]);
+    await expect(nodeElement(page, ids[2])).toContainText("flux1-dev.safetensors");
     await shot(page, ids, "utility_nodes.png");
   });
 });
