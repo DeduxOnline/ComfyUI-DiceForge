@@ -3,7 +3,7 @@ import { api } from "../../scripts/api.js";
 import { openModelInfo } from "./model_info.js";
 import { insertIntoNode } from "./wildcards.js";
 // Runs an async step without awaiting it; a failure (the server not answering...) is logged instead of being an unhandled rejection.
-const background = (step) => Promise.resolve(step).catch((error) => console.error("[DiceForge]", error));
+const background = (step) => { Promise.resolve(step).catch((error) => console.error("[DiceForge]", error)); }; // Returns nothing: the step is handled here.
 
 // Model browsers (node menu): LoRA and Checkpoint Browser. The model files as cards with a preview, name, base model and trigger words from Civitai
 // (looked up by the file's hash, as in Model info), a folder tree, search and filters. What a card's button does depends on the node it was opened

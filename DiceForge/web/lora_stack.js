@@ -4,7 +4,7 @@ import { openModelInfo } from "./model_info.js";
 import { openModelBrowser, BROWSERS, compareBases } from "./model_browser.js";
 import { fitNodeHeight } from "./node_size.js";
 // Runs an async step without awaiting it; a failure (the server not answering...) is logged instead of being an unhandled rejection.
-const background = (step) => Promise.resolve(step).catch((error) => console.error("[DiceForge]", error));
+const background = (step) => { Promise.resolve(step).catch((error) => console.error("[DiceForge]", error)); }; // Returns nothing: the step is handled here.
 
 // LoRA Stack (lora_stack.py): the rows of LoRAs drawn in the node, like rgthree's Power Lora Loader. The node's "loras" text input holds them as JSON;
 // it is hidden and this panel edits it. Each row: on/off, the LoRA (click to change it in the LoRA Browser), Model info, a group, a fixed strength or

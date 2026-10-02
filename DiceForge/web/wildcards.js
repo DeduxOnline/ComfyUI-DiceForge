@@ -1,7 +1,7 @@
 import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
 // Runs an async step without awaiting it; a failure (the server not answering...) is logged instead of being an unhandled rejection.
-const background = (step) => Promise.resolve(step).catch((error) => console.error("[DiceForge]", error));
+const background = (step) => { Promise.resolve(step).catch((error) => console.error("[DiceForge]", error)); }; // Returns nothing: the step is handled here.
 
 // Wildcards in CLIP Dual Text Encode: autocomplete after "__" in the prompt fields, and the Wildcard Browser (node menu) with a folder tree,
 // "+ Add" buttons that insert __name__ (or __folder/*__) where the cursor was, and an editor for the files.

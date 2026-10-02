@@ -1,6 +1,6 @@
 import { app } from "../../scripts/app.js";
 // Runs an async step without awaiting it; a failure (the server not answering...) is logged instead of being an unhandled rejection.
-const background = (step) => Promise.resolve(step).catch((error) => console.error("[DiceForge]", error));
+const background = (step) => { Promise.resolve(step).catch((error) => console.error("[DiceForge]", error)); }; // Returns nothing: the step is handled here.
 
 // Live size preview for the DiceForge resolution nodes. Both use the core resolution preview widget; this extension feeds it through two hidden
 // helper widgets: a size or aspect ratio as the ratio ("1216:832") and the megapixels, so the core preview math gives exactly the size to show.
