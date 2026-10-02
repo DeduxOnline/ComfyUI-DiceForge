@@ -2,8 +2,7 @@ import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
 import { openModelInfo } from "./model_info.js";
 import { insertIntoNode } from "./wildcards.js";
-// Runs an async step without awaiting it; a failure (the server not answering...) is logged instead of being an unhandled rejection.
-const background = (step) => { Promise.resolve(step).catch((error) => console.error("[DiceForge]", error)); }; // Returns nothing: the step is handled here.
+import { addStyleOnce, background, element } from "./dom.js";
 
 // Model browsers (node menu): LoRA and Checkpoint Browser. The model files as cards with a preview, name, base model and trigger words from Civitai
 // (looked up by the file's hash, as in Model info), a folder tree, search and filters. What a card's button does depends on the node it was opened
@@ -65,23 +64,7 @@ const STYLE = `
 .dflb .muted{color:#999;font-size:12px;word-break:break-all}.dflb .words span{display:inline-block;background:#262626;border:1px solid #555;border-radius:4px;padding:0 5px;margin:0 3px 3px 0;font-size:12px;cursor:copy}
 .dflb .buttons{display:flex;gap:5px;flex-wrap:wrap;margin-top:auto}.dflb .buttons button{padding:3px 8px;font-size:12px}.dflb .status{color:#9c9;font-size:13px;min-height:18px}
 `;
-function addStyle() {
-  if (document.getElementById("dflb-style")) return;
-  const style = document.createElement("style");
-  style.id = "dflb-style";
-  style.textContent = STYLE;
-  document.head.append(style);
-}
-function element(tag, attributes = {}, ...children) {
-  const node = document.createElement(tag);
-  for (const [key, value] of Object.entries(attributes)) {
-    if (key === "class") node.className = value;
-    else if (key.startsWith("on")) node.addEventListener(key.slice(2), value);
-    else node.setAttribute(key, value);
-  }
-  for (const child of children) node.append(child instanceof Node ? child : document.createTextNode(String(child ?? "")));
-  return node;
-}
+const addStyle = () => addStyleOnce("dflb-style", STYLE);
 const pathParts = (file) => file.split(/[\\/]/);
 const folderOf = (file) => pathParts(file).slice(0, -1).join("/");
 const shortName = (file) => pathParts(file).pop().replace(/\.[^.]+$/, "");

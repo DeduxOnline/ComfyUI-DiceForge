@@ -1,7 +1,6 @@
 import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
-// Runs an async step without awaiting it; a failure (the server not answering...) is logged instead of being an unhandled rejection.
-const background = (step) => { Promise.resolve(step).catch((error) => console.error("[DiceForge]", error)); }; // Returns nothing: the step is handled here.
+import { addStyleOnce, background, element } from "./dom.js";
 
 // Wildcards in CLIP Dual Text Encode: autocomplete after "__" in the prompt fields, and the Wildcard Browser (node menu) with a folder tree,
 // "+ Add" buttons that insert __name__ (or __folder/*__) where the cursor was, and an editor for the files.
@@ -113,23 +112,7 @@ const STYLE = `
 .dfwc button{background:#222;color:#eee;border:1px solid #666;border-radius:6px;padding:5px 12px;cursor:pointer;font:inherit}.dfwc button:hover{background:#2c2c2c}
 .dfwc button:disabled{opacity:.5;cursor:default}.dfwc textarea[readonly]{color:#aaa}.dfwc button.add{padding:1px 8px;font-size:12px;border-color:#4a7a4a;color:#bfe8bf}.dfwc .status{color:#9c9;min-height:18px;font-size:13px}
 `;
-function addStyle() {
-  if (document.getElementById("dfwc-style")) return;
-  const style = document.createElement("style");
-  style.id = "dfwc-style";
-  style.textContent = STYLE;
-  document.head.append(style);
-}
-function element(tag, attributes = {}, ...children) {
-  const node = document.createElement(tag);
-  for (const [key, value] of Object.entries(attributes)) {
-    if (key === "class") node.className = value;
-    else if (key.startsWith("on")) node.addEventListener(key.slice(2), value);
-    else node.setAttribute(key, value);
-  }
-  for (const child of children) node.append(child instanceof Node ? child : document.createTextNode(String(child ?? "")));
-  return node;
-}
+const addStyle = () => addStyleOnce("dfwc-style", STYLE);
 
 // Autocomplete: after an opening "__" (an odd number of "__" before the cursor), the wildcards and folders (folder/*) that contain what is typed.
 const popup = { element: null, textarea: null, items: [], index: 0, start: 0 };

@@ -3,8 +3,7 @@ import { api } from "../../scripts/api.js";
 import { openModelInfo } from "./model_info.js";
 import { openModelBrowser, BROWSERS, compareBases } from "./model_browser.js";
 import { fitNodeHeight } from "./node_size.js";
-// Runs an async step without awaiting it; a failure (the server not answering...) is logged instead of being an unhandled rejection.
-const background = (step) => { Promise.resolve(step).catch((error) => console.error("[DiceForge]", error)); }; // Returns nothing: the step is handled here.
+import { addStyleOnce, background, element } from "./dom.js";
 
 // LoRA Stack (lora_stack.py): the rows of LoRAs drawn in the node, like rgthree's Power Lora Loader. The node's "loras" text input holds them as JSON;
 // it is hidden and this panel edits it. Each row: on/off, the LoRA (click to change it in the LoRA Browser), Model info, a group, a fixed strength or
@@ -57,23 +56,7 @@ const STYLE = `
 .dflp button{background:#222;color:#eee;border:1px solid #666;border-radius:6px;padding:4px 10px;cursor:pointer;font:inherit}.dflp button:hover{background:#2c2c2c}
 .dflp button.go{border-color:#4a7a4a;color:#bfe8bf}.dflp .status{color:#9c9;font-size:13px;min-height:18px;margin-top:8px}
 `;
-function addStyle() {
-  if (document.getElementById("dfls-style")) return;
-  const style = document.createElement("style");
-  style.id = "dfls-style";
-  style.textContent = STYLE;
-  document.head.append(style);
-}
-function element(tag, attributes = {}, ...children) {
-  const node = document.createElement(tag);
-  for (const [key, value] of Object.entries(attributes)) {
-    if (key === "class") node.className = value;
-    else if (key.startsWith("on")) node.addEventListener(key.slice(2), value);
-    else node.setAttribute(key, value);
-  }
-  for (const child of children) node.append(child instanceof Node ? child : document.createTextNode(String(child ?? "")));
-  return node;
-}
+const addStyle = () => addStyleOnce("dfls-style", STYLE);
 const shortName = (file) => file.split(/[\\/]/).pop().replace(/\.[^.]+$/, "");
 const round = (value) => Math.round(value * 100) / 100;
 

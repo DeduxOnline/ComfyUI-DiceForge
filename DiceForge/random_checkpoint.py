@@ -2,8 +2,7 @@ import logging
 import nodes
 from typing_extensions import override
 from comfy_api.latest import ComfyExtension, io
-from .model_lists import files_in_folder, folder_input
-from .seed_modes import MEMORY, SEED_MODES, make_picker, pick_label, seed_mode_tooltip, fingerprint
+from .model_lists import folder_fingerprint, folder_input, pick_model_file, seed_inputs
 # Node schema (V3 / Nodes 2.0): like Load Checkpoint, but the checkpoint is picked from a folder with the DiceForge seed modes, so a series can go
 # through every checkpoint before repeating one.
 class RandomCheckpointLoader(io.ComfyNode):
@@ -17,21 +16,7 @@ class RandomCheckpointLoader(io.ComfyNode):
             search_aliases=["random checkpoint", "random model", "checkpoint", "load checkpoint", "ckpt", "random", "seed modes"],
             inputs=[
                 folder_input("checkpoints", "checkpoint"),
-                io.Int.Input(
-                    "seed",
-                    default=0,
-                    min=0,
-                    max=0xFFFFFFFFFFFFFFFF,
-                    control_after_generate=True,
-                    tooltip="Seed for the random pick. With deck or sequential, set control after generate to increment.",
-                ),
-                io.Combo.Input(
-                    "seed_mode",
-                    options=SEED_MODES,
-                    default="random",
-                    tooltip=seed_mode_tooltip("checkpoints"),
-                    advanced=True,
-                ),
+                *seed_inputs("checkpoints"),
             ],
             outputs=[
                 io.Model.Output(display_name="model", tooltip="The model used for denoising latents."),
@@ -43,15 +28,11 @@ class RandomCheckpointLoader(io.ComfyNode):
     # Method to run the node again when the files in the folder change, and every time in the modes that remember earlier runs.
     @classmethod
     def fingerprint_inputs(cls, folder="(all)", seed_mode="random", **kwargs):
-        return tuple(files_in_folder("checkpoints", folder)), fingerprint(seed_mode)
+        return folder_fingerprint("checkpoints", folder, seed_mode)
     # Main method: picks a checkpoint file of the folder by the seed mode, then loads it with the core Load Checkpoint.
     @classmethod
     def execute(cls, folder="(all)", seed=0, seed_mode="random"):
-        files = files_in_folder("checkpoints", folder)
-        if not files:
-            raise ValueError(f"No checkpoint files in {folder}: add some to ComfyUI/models/checkpoints, or pick another folder.")
-        name = pick_label(files, make_picker(seed_mode, seed), seed)
-        MEMORY.save()
+        name = pick_model_file("checkpoints", folder, seed, seed_mode, "checkpoint")
         logging.info(f"[DiceForge] Random Checkpoint | {name} | Seed: {seed} ({seed_mode})")
         model, clip, vae = nodes.CheckpointLoaderSimple().load_checkpoint(name)
         return io.NodeOutput(model, clip, vae, name)

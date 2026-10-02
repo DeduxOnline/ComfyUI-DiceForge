@@ -22,6 +22,27 @@ def folder_input(kind, what):
         default=ALL_FOLDERS,
         tooltip=f"The folder to pick the {what} from, subfolders included. (all): every {what}. Refresh the node definitions (R) after adding folders.",
     )
+# What the random loaders share: the seed inputs, the pick of a file of the folder by the seed mode, and the fingerprint that runs the node again
+# when the folder's files change (and every time in the modes that remember earlier runs).
+def seed_inputs(things):
+    from comfy_api.latest import io
+    from .seed_modes import SEED_MODES, seed_mode_tooltip
+    return [
+        io.Int.Input("seed", default=0, min=0, max=0xFFFFFFFFFFFFFFFF, control_after_generate=True,
+                     tooltip="Seed for the random pick. With deck or sequential, set control after generate to increment."),
+        io.Combo.Input("seed_mode", options=SEED_MODES, default="random", tooltip=seed_mode_tooltip(things), advanced=True),
+    ]
+def pick_model_file(kind, folder, seed, seed_mode, what, extra=()):
+    from .seed_modes import MEMORY, make_picker, pick_label
+    files = files_in_folder(kind, folder)
+    if not files:
+        raise ValueError(f"No {what} files in {folder}: add some to ComfyUI/models/{kind}, or pick another folder.")
+    name = pick_label(files + list(extra), make_picker(seed_mode, seed), seed)
+    MEMORY.save()
+    return name
+def folder_fingerprint(kind, folder, seed_mode, *more):
+    from .seed_modes import fingerprint
+    return tuple(files_in_folder(kind, folder)), *more, fingerprint(seed_mode)
 # Image files for Random Image: the images under a folder (subfolders included, hidden folders and the mask editor's clipspace left out), as paths
 # relative to it with "/", sorted by name.
 IMAGE_EXTENSIONS = (".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif", ".tif", ".tiff")

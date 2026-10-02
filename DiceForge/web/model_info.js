@@ -1,5 +1,6 @@
 import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
+import { addStyleOnce, element } from "./dom.js";
 
 // "Model info" in the node menu, for every node with a model file picked in a list (Load Checkpoint, Load Diffusion Model, Load LoRA, Load VAE,
 // Load CLIP and the DiceForge loaders): a dialog like rgthree's LoRA info, with the file's sha256, what Civitai knows about it, and your own notes.
@@ -41,23 +42,7 @@ const STYLE = `
 .dfmi button{background:#222;color:#eee;border:1px solid #666;border-radius:6px;padding:7px 16px;cursor:pointer;font:inherit}
 .dfmi button:hover{background:#2c2c2c}.dfmi .muted{color:#999}.dfmi .words span{display:inline-block;background:#262626;border:1px solid #555;border-radius:4px;padding:1px 6px;margin:0 4px 4px 0;cursor:copy}
 `;
-function addStyle() {
-  if (document.getElementById("dfmi-style")) return;
-  const style = document.createElement("style");
-  style.id = "dfmi-style";
-  style.textContent = STYLE;
-  document.head.append(style);
-}
-function element(tag, attributes = {}, ...children) {
-  const node = document.createElement(tag);
-  for (const [key, value] of Object.entries(attributes)) {
-    if (key === "class") node.className = value;
-    else if (key.startsWith("on")) node.addEventListener(key.slice(2), value);
-    else node.setAttribute(key, value);
-  }
-  for (const child of children) node.append(child instanceof Node ? child : document.createTextNode(String(child ?? "")));
-  return node;
-}
+const addStyle = () => addStyleOnce("dfmi-style", STYLE);
 
 async function openModelInfo(kind, file) {
   addStyle();
