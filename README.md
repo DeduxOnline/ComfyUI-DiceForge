@@ -42,6 +42,10 @@ The remembering modes keep their memory in a small file, so they continue after 
 
 All nodes use the ComfyUI V3 node schema: in the Nodes 2.0 frontend, the secondary inputs (including `seed_mode`) sit in the node's **Advanced** section.
 
+The utility nodes: VAE Decode + Save, Load VAE + Decode + Save and Load Diffusion Model + CLIP.
+
+<img src="docs/images/utility_nodes.png" width="976" alt="VAE Decode + Save, Load VAE + Decode + Save and Load Diffusion Model + CLIP in Nodes 2.0">
+
 The anime prompt builder *Prompt Director* lives in its own repository: [DeduxOnline/ComfyUI-PromptDirector](https://github.com/DeduxOnline/ComfyUI-PromptDirector).
 
 ### Coming from ResolutionForge
@@ -81,6 +85,8 @@ Cloning the whole repository straight into `custom_nodes` does not work: the nod
 - For a series of images without repeats, set `seed_mode` to `deck` and *control after generate* to *increment* on each DiceForge node (reproducible), or use `shuffle` with any seed (not reproducible, continues after a restart).
 
 ## SDXL Resolution List (Latent)
+
+<img src="docs/images/sdxl_resolution_list.png" width="339" alt="SDXL Resolution List (Latent) in Nodes 2.0, Advanced section open, rescaled by 150%">
 
 Node id: `SDXLResolutionListLatent`.
 
@@ -141,6 +147,8 @@ The `size` list shows width x height; the aspect ratios are given here for refer
 
 ## Resolution Selector (Random, Latent)
 
+<img src="docs/images/resolution_selector.png" width="393" alt="Resolution Selector (Random, Latent) in Nodes 2.0, 16:9 rescaled to a longest side of 1920">
+
 Node id: `ResolutionSelectorRandomLatent`.
 
 It works like the core ComfyUI *Resolution Selector* followed by **Empty Latent Image**, using the same size calculation, and adds random aspect ratios. For fixed ratios, the size is identical to the core node's.
@@ -200,6 +208,8 @@ Both resolution nodes (and [Random Int and Random Float](#random-int-and-random-
 
 ## Random Int and Random Float
 
+<img src="docs/images/random_numbers_sampler.png" width="1088" alt="Random Int, Random Float and Random Sampler in Nodes 2.0">
+
 A random number between `min` and `max`, picked from the seed with the same [seed modes](#seed-modes-for-sizes) as the resolution nodes, so values can go through the whole range instead of clustering. Connect the `value` output to any number input (converted to an input), for example KSampler's `cfg` or `steps`.
 
 ### Inputs
@@ -228,6 +238,8 @@ A random number between `min` and `max`, picked from the seed with the same [see
 
 ## Random LoRA, Random Checkpoint, Random Diffusion Model and Random VAE
 
+<img src="docs/images/random_loaders.png" width="1278" alt="Random LoRA, Random Checkpoint, Random Diffusion Model and Random VAE in Nodes 2.0">
+
 Loaders that pick the file from a folder with the [seed modes](#seed-modes-for-sizes), then load it with the core loader (**Load LoRA**, **Load Checkpoint**, **Load Diffusion Model**, **Load VAE**), so the result is the same as picking that file by hand.
 
 | Input | Where | Description |
@@ -247,6 +259,8 @@ Each loader outputs what its core loader does (`model`, `clip`, `vae`) plus the 
 - With `deck` and *increment*, a checkpoint comparison shows every checkpoint once before any repeats; with `shuffle` it continues after a restart.
 
 ## Random Image
+
+<img src="docs/images/random_image_dice_grid.png" width="888" alt="Random Image in deck mode feeding Dice Grid, after four runs">
 
 Like **Load Image**, but the image is picked from a folder with the [seed modes](#seed-modes-for-sizes): with `deck` and *increment* an img2img or ControlNet series goes through every image once before any repeats. The picked image is shown on the node.
 
@@ -317,6 +331,8 @@ Collects the image of each run into a grid with labels, and saves the grid to th
 
 ## Model info
 
+<img src="docs/images/model_info.png" width="960" alt="The Model info window for a LoRA, with its Civitai data">
+
 Right-click a node with a model file picked in a list (**Load Checkpoint**, **Load Diffusion Model**, **Load LoRA**, **Load VAE**, **Load CLIP**, **Load Diffusion Model + CLIP**, and custom nodes with such lists) and choose **🛈 Model info**. A dialog like rgthree's LoRA info opens, for every model kind:
 
 - the file, its **sha256** and size;
@@ -326,6 +342,8 @@ Right-click a node with a model file picked in a list (**Load Checkpoint**, **Lo
 The first time, the hash is computed from the whole file, which takes a few seconds for a large checkpoint; it is kept and only computed again when the file changes. **Refresh from Civitai** asks Civitai again. Everything is stored in `ComfyUI/user/DiceForge/model_info`, one JSON file per model, so the model folders stay untouched. A merged or private model that isn't on Civitai still gets its hash and your notes.
 
 ## LoRA Stack
+
+<img src="docs/images/lora_stack.png" width="948" alt="LoRA Stack after Load Checkpoint: a random strength, a group of two LoRAs taking turns, and base model warnings">
 
 Node id: `DiceForgeLoraStack`. Several LoRAs in one node, like rgthree's *Power Lora Loader*, applied in order to the model and CLIP.
 
@@ -367,6 +385,8 @@ A preset refers to the LoRAs by their file names in the loras folder: on another
 The rows are saved in the workflow (in the node's hidden `loras` input, as JSON). The node reads each LoRA file once and keeps it in memory while it is in the stack, and runs again when you change trigger words in Model info.
 
 ## LoRA Browser
+
+<img src="docs/images/lora_browser.png" width="1400" alt="The LoRA Browser with the LoRA cards of the test folder">
 
 Right-click **Load LoRA** (or another node with a LoRA list), **Random LoRA** or **CLIP Dual Text Encode** and choose **🎴 LoRA Browser**. It shows your LoRAs as cards, with the same Civitai data as [Model info](#model-info):
 
@@ -434,6 +454,13 @@ COMFYUI_PATH=/path/to/ComfyUI npm test          # PowerShell: $env:COMFYUI_PATH=
 
 `e2e/server.js` makes a temporary ComfyUI base folder (`--base-directory`, in the system temp folder, deleted afterwards) with a link to this repository's `DiceForge` folder and small test files (stand-in model files, wildcards, images), starts a small stand-in for Civitai on the local machine (the tests never go online; DiceForge reads its address from `DICEFORGE_CIVITAI_URL`), and runs ComfyUI on the CPU at port 8199. `COMFYUI_PYTHON` picks the Python that runs ComfyUI (by default its `venv`/`.venv`, the portable build's `python_embeded`, or `python` from the PATH), `DICEFORGE_E2E_PORT` another port (the Civitai stand-in uses the next one). `npm run test:api` runs only the tests without a browser. A run takes about 6 minutes; after a failure, `npx playwright show-report report` shows screenshots and traces.
 
+The screenshots in this README (`docs/images`) are made by `e2e/screenshots.spec.js` in the same ComfyUI with the same test files. It is skipped in a normal run; to make them again after a change to the nodes:
+
+```bash
+cd ComfyUI-DiceForge/e2e
+DICEFORGE_SCREENSHOTS=1 npx playwright test screenshots.spec.js
+```
+
 ### On GitHub
 
 GitHub Actions (`.github/workflows/tests.yml`) runs both suites on every push to `main` and every pull request, on Linux and the CPU, with the ComfyUI version the tests were written with (pinned in the workflow). A weekly run tests against ComfyUI's latest `master`, to see early when a ComfyUI update breaks something, and *Run workflow* on the Actions page can test any ComfyUI commit, branch or tag. When end-to-end tests fail, the run keeps the Playwright report (screenshots and traces) as the `playwright-report` artifact.
@@ -449,6 +476,8 @@ The unit tests also measure which lines of `DiceForge` they run (pytest-cov, `co
 Like the output of **Empty Latent Image**, the latent works with any model you would use that node with: the core samplers adapt an empty latent to the model's latent format.
 
 ## CLIP Dual Text Encode
+
+<img src="docs/images/clip_dual_text_encode.png" width="448" alt="CLIP Dual Text Encode in Nodes 2.0 with wildcards, variables and choices">
 
 Node id: `CLIPTextEncodePositiveNegative`.
 
@@ -550,6 +579,10 @@ In `deck` and `shuffle` modes:
 - A `*` or `?` name (`__hair/*__`) joins the lines of every file it matches, in name order, so all seed modes (deck, shuffle, combinations…) treat them as one list. Empty files among them are skipped; a name that matches nothing stops the run with an error.
 
 ### Autocomplete and the Wildcard Browser
+
+<img src="docs/images/wildcard_autocomplete.png" width="467" alt="Wildcard autocomplete in the positive prompt">
+
+<img src="docs/images/wildcard_browser.png" width="1100" alt="The Wildcard Browser editing color.txt">
 
 - **Autocomplete:** type `__` in the positive or negative field and a list of the wildcard files (with their number of lines) and folders (`folder/*`) opens at the cursor. Keep typing to filter it; ↑/↓ to move, Enter or Tab to insert, Esc to close. The last entry, *📂 Browse wildcards…*, opens the browser.
 - **Wildcard Browser:** right-click the node → *🎲 Wildcard Browser*. It shows the wildcard folders as a tree, with the number of lines of each file and its first lines as a tooltip, and a search box.

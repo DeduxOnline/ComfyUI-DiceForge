@@ -28,6 +28,9 @@ const MODELS = {
   "loras/detail.safetensors": { content: "detail lora" },
   "checkpoints/illustrious_base.safetensors": { content: "checkpoint", civitai: { model: "Base", version: "v1", base: "Illustrious", words: [] } },
   "checkpoints/sdxl/other.safetensors": { content: "other checkpoint" },
+  "diffusion_models/flux1-dev.safetensors": { content: "diffusion model" },
+  "text_encoders/clip_l.safetensors": { content: "clip l" },
+  "text_encoders/t5xxl_fp16.safetensors": { content: "t5xxl" },
 };
 const WILDCARDS = {
   "color.txt": "# colors\nred\nblue\ngreen\nwhite\n",
