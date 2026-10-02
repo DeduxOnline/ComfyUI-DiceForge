@@ -1,0 +1,26 @@
+# Dependabot: weekly pull requests that update the GitHub Actions of the workflows and the end-to-end test tools (e2e/package.json), so they
+# don't fall behind (old action versions stop working when GitHub retires their runtime). Each pull request runs the tests (tests.yml)
+# before it can be merged. DiceForge itself has no dependencies of its own: it runs on ComfyUI's Python packages.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      actions: # One pull request for all actions.
+        patterns: ["*"]
+    commit-message:
+      prefix: "CI"
+
+  - package-ecosystem: npm
+    directory: /e2e
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      e2e:
+        patterns: ["*"]
+    commit-message:
+      prefix: "E2E"
