@@ -1,6 +1,11 @@
 # DiceForge
 
 [![Tests](https://github.com/DeduxOnline/ComfyUI-DiceForge/actions/workflows/tests.yml/badge.svg)](https://github.com/DeduxOnline/ComfyUI-DiceForge/actions/workflows/tests.yml)
+[![Quality gate](https://sonarcloud.io/api/project_badges/measure?project=DeduxOnline_ComfyUI-DiceForge&token=5ba0aa0425a57e69209e90956cf4d0d507626169&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=DeduxOnline_ComfyUI-DiceForge)
+[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=DeduxOnline_ComfyUI-DiceForge&token=5ba0aa0425a57e69209e90956cf4d0d507626169&metric=coverage)](https://sonarcloud.io/summary/new_code?id=DeduxOnline_ComfyUI-DiceForge)
+[![Bugs](https://sonarcloud.io/api/project_badges/measure?project=DeduxOnline_ComfyUI-DiceForge&token=5ba0aa0425a57e69209e90956cf4d0d507626169&metric=bugs)](https://sonarcloud.io/summary/new_code?id=DeduxOnline_ComfyUI-DiceForge)
+[![Vulnerabilities](https://sonarcloud.io/api/project_badges/measure?project=DeduxOnline_ComfyUI-DiceForge&token=5ba0aa0425a57e69209e90956cf4d0d507626169&metric=vulnerabilities)](https://sonarcloud.io/summary/new_code?id=DeduxOnline_ComfyUI-DiceForge)
+[![Duplicated lines](https://sonarcloud.io/api/project_badges/measure?project=DeduxOnline_ComfyUI-DiceForge&token=5ba0aa0425a57e69209e90956cf4d0d507626169&metric=duplicated_lines_density)](https://sonarcloud.io/summary/new_code?id=DeduxOnline_ComfyUI-DiceForge)
 
 **Controlled randomness for ComfyUI.** Every random pick in these nodes (a prompt choice, a wildcard line, an image size, a number) follows a *seed mode* you choose. Plain random repeats itself: roll 5 skies 5 times and you get about 3 different ones. DiceForge can deal them like cards, shuffle them like a playlist, balance the odds like a game, go through every combination, or change one detail at a time.
 
