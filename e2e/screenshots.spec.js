@@ -124,6 +124,9 @@ test.describe("README screenshots (Nodes 2.0)", () => {
     const [loader] = await addNodes(page, [{ type: "LoraLoader", pos: [400, 220], widgets: { lora_name: "style/ink.safetensors" } }]);
     await clickMenu(page, loader, "DiceForge.ModelInfo", "Model info");
     await expect(page.locator(".dfmi h2")).toHaveText("Ink - v2");
+    await page.locator(".dfmi .stage").scrollIntoViewIfNeeded();
+    await page.locator(".dfmi .stage").hover(); // How the image was made, over it.
+    await expect(page.locator(".dfmi .stage .meta")).toHaveCSS("opacity", "1");
     await page.waitForTimeout(800);
     await page.locator(".dfmi").first().screenshot({ path: path.join(OUT, "model_info.png") });
   });

@@ -53,6 +53,22 @@ def test_civitai_summary_and_thumbnails():
     assert thumbnail("https://a/original=true/b.png") == "https://a/width=450/b.png"
 
 
+def test_civitai_summary_keeps_how_each_image_was_made():
+    meta = {"prompt": "1girl, solo", "negativePrompt": "lowres", "seed": 3032258275, "steps": 30, "cfgScale": 4, "sampler": "Euler a", "Model": "base",
+            "hashes": {"model": "x"}, "resources": [{"name": "a"}], "Size": "", "Clip skip": True, "VAE": None}
+    version = {**CIVITAI_VERSION, "images": [{"url": "https://image.civitai.com/x/original=true/64739376.jpeg", "type": "image", "hasMeta": True, "meta": meta},
+                                             {"url": "https://image.civitai.com/x/original=true/name.jpeg", "hasMeta": False, "meta": None}, "junk"]}
+    first, second = civitai_summary(version)["images"]
+    assert first["meta"] == {"prompt": "1girl, solo", "negativePrompt": "lowres", "seed": 3032258275, "steps": 30, "cfgScale": 4, "sampler": "Euler a", "Model": "base"}
+    assert first["page"] == "https://civitai.com/images/64739376" and first["hasMeta"] is True
+    assert second["meta"] == {} and second["page"] is None # No number in the file name: no page link.
+
+
+def test_damaged_image_meta_in_an_info_file_is_cleaned():
+    info = model_info.clean_info({"civitai": {"images": [{"url": "u", "meta": {"seed": [1], "prompt": {"a": 1}, "steps": 20}}, {"url": "v", "meta": "text"}, {"url": "w"}]}})
+    assert [image["meta"] for image in info["civitai"]["images"]] == [{"steps": 20}, {}, {}]
+
+
 def test_local_preview_prefers_name_preview_png(tmp_path):
     model = str(tmp_path / "a.safetensors")
     assert local_preview(model, {"a.png", "a.preview.png"}).endswith("a.preview.png")
@@ -108,3 +124,14 @@ def test_model_browser_and_preview_routes(api, models):
     assert api("GET", "/diceforge/model-preview?kind=loras&file=anime/ink.safetensors") == (200, b"\x89PNG fake")
     assert api("GET", "/diceforge/model-preview?kind=loras&file=plain.safetensors")[0] == 404
     assert api("GET", "/diceforge/model-browser?kind=nope")[0] == 400
+
+
+def test_info_saved_before_image_meta_is_looked_up_once_more(api, models, civitai):
+    path = models("loras", "old.safetensors", b"weights")
+    stat = os.stat(path)
+    old = {"found": True, "model_name": "Ink", "images": [{"url": "https://image.civitai.com/x/width=450/1.jpeg"}], "checked": 1.0} # No "page", no "meta".
+    write_info("loras", "old.safetensors", {"size": stat.st_size, "mtime": stat.st_mtime, "sha256": "abc", "civitai": old})
+    info = api("GET", "/diceforge/model-info?kind=loras&file=old.safetensors")[1]
+    assert len(civitai) == 1 and all("page" in image for image in info["civitai"]["images"])
+    api("GET", "/diceforge/model-info?kind=loras&file=old.safetensors")
+    assert len(civitai) == 1 # Once: now it has them.

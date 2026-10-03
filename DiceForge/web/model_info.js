@@ -35,9 +35,16 @@ const STYLE = `
 .dfmi a{color:#9cc8ff}.dfmi code{font-size:12px;word-break:break-all}
 .dfmi input,.dfmi textarea{width:100%;box-sizing:border-box;background:#262626;color:#eee;border:1px solid #555;border-radius:4px;padding:5px 7px;font:inherit}
 .dfmi textarea{min-height:52px;resize:vertical}
-.dfmi .imgs{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px}
-.dfmi .imgs img,.dfmi .imgs video{width:100%;border-radius:6px;display:block;cursor:zoom-in}
-.dfmi .blur{filter:blur(24px);cursor:pointer}
+.dfmi .slider{display:flex;align-items:center;gap:8px}.dfmi .slider>button{flex:none;width:42px;height:64px;padding:0;font-size:26px;line-height:1}
+.dfmi .stage{position:relative;flex:1;height:min(62vh,640px);background:#1e1e1e;border-radius:8px;overflow:hidden;display:flex;align-items:center;justify-content:center}
+.dfmi .stage img,.dfmi .stage video{max-width:100%;max-height:100%;object-fit:contain;display:block;cursor:zoom-in}
+.dfmi .blur{filter:blur(28px);cursor:pointer}.dfmi .count{text-align:center;color:#999;font-size:13px;margin-top:6px}
+.dfmi .dots{display:flex;justify-content:center;gap:5px;margin-top:6px;flex-wrap:wrap}.dfmi .dots span{width:8px;height:8px;border-radius:50%;background:#555;cursor:pointer}.dfmi .dots span.on{background:#ddd}
+.dfmi .meta{position:absolute;left:0;right:0;bottom:0;max-height:55%;overflow:auto;background:rgba(24,24,24,.92);padding:10px 12px;box-sizing:border-box;opacity:0;transition:opacity .15s;font-size:13px}
+.dfmi .stage:hover .meta,.dfmi .meta:focus-within{opacity:1}
+.dfmi .meta .chip{display:inline-block;border:1px solid #555;border-radius:5px;padding:2px 7px;margin:0 5px 5px 0;cursor:copy}.dfmi .meta .chip b{color:#999;font-weight:400;margin-right:5px}
+.dfmi .meta a.chip{cursor:pointer;color:#fff}.dfmi .meta .prompt{border:1px solid #4a4a4a;border-radius:5px;padding:6px 8px;margin-top:4px;white-space:pre-wrap;word-break:break-word;cursor:copy}
+.dfmi .meta .prompt b{color:#999;font-weight:400;margin-right:5px}
 .dfmi .row{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
 .dfmi button{background:#222;color:#eee;border:1px solid #666;border-radius:6px;padding:7px 16px;cursor:pointer;font:inherit}
 .dfmi button:hover{background:#2c2c2c}.dfmi .muted{color:#999}.dfmi .words span{display:inline-block;background:#262626;border:1px solid #555;border-radius:4px;padding:1px 6px;margin:0 4px 4px 0;cursor:copy}
@@ -65,6 +72,62 @@ async function openModelInfo(kind, file) {
   } catch (error) {
     panel.replaceChildren(element("h2", {}, file), element("p", {}, `Could not read the model info: ${error.message}`), element("div", { class: "row" }, element("button", { onclick: close }, "Close")));
   }
+}
+
+// Civitai's example images one at a time: ‹ › (or the arrow keys, or the dots), and how the image was made over it on hover (the prompts and
+// settings from Civitai; click one to copy it). R-rated and up start blurred: the first click reveals, the next opens the full size.
+const META_CHIPS = [["seed", "seed"], ["steps", "steps"], ["cfgScale", "cfg"], ["sampler", "sampler"], ["Schedule type", "schedule"], ["scheduler", "scheduler"],
+  ["Clip skip", "clip skip"], ["Denoising strength", "denoise"], ["Size", "size"], ["Model", "model"], ["VAE", "vae"]];
+const copy = (text) => navigator.clipboard?.writeText(String(text));
+function metaPanel(image) {
+  const meta = image.meta ?? {};
+  const chips = META_CHIPS.filter(([key]) => meta[key] != null).map(([key, label]) =>
+    element("span", { class: "chip", title: "Click to copy", onclick: () => copy(meta[key]) }, element("b", {}, label), String(meta[key])));
+  const prompts = [["prompt", "positive"], ["negativePrompt", "negative"]].filter(([key]) => meta[key]).map(([key, label]) =>
+    element("div", { class: "prompt", title: "Click to copy", onclick: () => copy(meta[key]) }, element("b", {}, label), meta[key]));
+  const link = image.page ? [element("a", { class: "chip", href: image.page, target: "_blank", rel: "noopener" }, "civitai 🔗")] : [];
+  const none = chips.length || prompts.length ? []
+    : [element("span", { class: "muted" }, image.hasMeta !== false ? "Refresh from Civitai to see how this image was made." : "Civitai has no generation data for this image.")];
+  return element("div", { class: "meta" }, element("div", {}, ...link, ...chips, ...none), ...prompts);
+}
+function slider(images) {
+  if (!images.length) return element("div");
+  let index = 0;
+  const stage = element("div", { class: "stage" });
+  const count = element("div", { class: "count" });
+  const dots = element("div", { class: "dots" });
+  const revealed = new Set();
+  function show(next) {
+    index = (next + images.length) % images.length;
+    const image = images[index];
+    const large = image.full ? image.full.replace("/original=true/", "/width=1200/") : image.url; // Big enough for the slider, smaller than the original.
+    const media = image.type === "video"
+      ? element("video", { src: large, muted: "", loop: "", autoplay: "", playsinline: "" })
+      : element("img", { src: large });
+    media.title = "Click to open the full size";
+    if ((image.nsfwLevel ?? 1) >= 4 && !revealed.has(index)) media.classList.add("blur"); // Civitai's R and up: blurred until clicked.
+    media.addEventListener("click", () => {
+      if (media.classList.contains("blur")) media.classList.remove("blur"), revealed.add(index);
+      else window.open(image.full || image.url, "_blank", "noopener");
+    });
+    media.addEventListener("error", () => { if (media.src !== image.url) media.src = image.url; }, { once: true }); // The small copy instead.
+    stage.replaceChildren(media, metaPanel(image));
+    count.textContent = `${index + 1} / ${images.length}`;
+    dots.replaceChildren(...images.map((_, dot) => element("span", { class: dot === index ? "on" : "", onclick: () => show(dot) })));
+  }
+  const onKey = (event) => {
+    if (!stage.isConnected) return document.removeEventListener("keydown", onKey, true); // Closed, or drawn again (Refresh).
+    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight" || event.target.closest?.("input, textarea")) return;
+    event.preventDefault();
+    show(index + (event.key === "ArrowRight" ? 1 : -1));
+  };
+  document.addEventListener("keydown", onKey, true);
+  show(0);
+  const arrows = images.length > 1;
+  return element("div", { class: "gallery" },
+    element("div", { class: "slider" }, ...(arrows ? [element("button", { class: "prev", title: "Previous image (←)", onclick: () => show(index - 1) }, "‹")] : []),
+      stage, ...(arrows ? [element("button", { class: "next", title: "Next image (→)", onclick: () => show(index + 1) }, "›")] : [])),
+    count, ...(arrows ? [dots] : []));
 }
 
 function render(panel, info, close, load) {
@@ -102,18 +165,7 @@ function render(panel, info, close, load) {
     ["Recommended settings", edit("settings", "Steps, CFG, sampler, scheduler, resolution…", true)],
     ["Notes", edit("notes", "Anything to remember about this model", true)],
   ];
-  const images = element("div", { class: "imgs" }, ...(civitai.images ?? []).map((image) => {
-    const media = image.type === "video"
-      ? element("video", { src: image.url, muted: "", loop: "", autoplay: "", playsinline: "" })
-      : element("img", { src: image.url, loading: "lazy" });
-    media.title = "Click to open the full size";
-    media.addEventListener("click", () => {
-      if (media.classList.contains("blur")) media.classList.remove("blur"); // First click on a blurred one only reveals it.
-      else window.open(image.full || image.url, "_blank", "noopener");
-    });
-    if ((image.nsfwLevel ?? 1) >= 4) media.classList.add("blur"); // Civitai's R and up: blurred until clicked.
-    return media;
-  }));
+  const images = slider(civitai.images ?? []);
   const refresh = element("button", { onclick: async () => {
     refresh.textContent = "Asking Civitai…";
     try { render(panel, await load(true), close, load); } catch (error) { refresh.textContent = `Failed: ${error.message}`; }

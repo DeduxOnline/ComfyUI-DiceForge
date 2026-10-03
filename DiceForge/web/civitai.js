@@ -18,7 +18,7 @@ const STYLE = `
 .dfcv input,.dfcv select{background:#262626;color:#eee;border:1px solid #555;border-radius:4px;padding:6px 8px;font:inherit}.dfcv .top input.query{flex:1;min-width:180px}
 .dfcv button{background:#222;color:#eee;border:1px solid #666;border-radius:6px;padding:5px 12px;cursor:pointer;font:inherit}.dfcv button:hover{background:#2c2c2c}
 .dfcv button:disabled{opacity:.5;cursor:default}.dfcv button.go{border-color:#4a7a4a;color:#bfe8bf}.dfcv label{display:flex;gap:5px;align-items:center}
-.dfcv .grid{flex:1;overflow:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;align-content:start}
+.dfcv .grid{flex:1;overflow:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;align-content:start;grid-auto-rows:max-content}
 .dfcv .card{background:#2a2a2a;border:1px solid #474747;border-radius:8px;overflow:hidden;display:flex;flex-direction:column}
 .dfcv .pic{aspect-ratio:3/4;background:#1e1e1e;display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative}
 .dfcv .pic img,.dfcv .pic video{width:100%;height:100%;object-fit:cover;display:block}.dfcv .pic .none{font-size:40px;opacity:.35}.dfcv .blur{filter:blur(22px);cursor:pointer}

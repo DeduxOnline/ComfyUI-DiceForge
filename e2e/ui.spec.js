@@ -152,6 +152,31 @@ for (const vue of [true, false]) {
       await expect(page.locator(".dfwc")).toHaveCount(0);
     });
 
+    test("Wildcard Browser folders open and close, and stay so", async ({ page }) => {
+      const [id] = await addNodes(page, [{ type: "CLIPTextEncodePositiveNegative", pos: [300, 60] }]);
+      await page.evaluate(() => localStorage.removeItem("diceforge.wildcards.open"));
+      await clickMenu(page, id, "DiceForge.Wildcards", "Wildcard Browser");
+      const hair = page.locator('.dfwc .folder[data-path="hair"]');
+      const style = hair.locator(".row", { hasText: "style" });
+      await expect(hair).not.toHaveClass(/open/); // Folders start closed.
+      await expect(style).toBeHidden();
+      await hair.locator("> .row .name").click();
+      await expect(style).toBeVisible();
+      await page.keyboard.press("Escape");
+      await clickMenu(page, id, "DiceForge.Wildcards", "Wildcard Browser");
+      await expect(style).toBeVisible(); // Still open when the browser opens again.
+      await page.locator(".dfwc button.close-all").click();
+      await expect(style).toBeHidden();
+      await page.locator(".dfwc .top input").first().fill("sty"); // A search shows the matches in their folders.
+      await expect(style).toBeVisible();
+      await page.locator(".dfwc .top input").first().fill("");
+      await expect(style).toBeHidden();
+      await page.locator(".dfwc button.open-all").click();
+      await expect(page.locator('.dfwc .folder[data-path="characters/alice"] .row', { hasText: "outfit" })).toBeVisible();
+      await page.locator(".dfwc button.close-all").click();
+      await page.keyboard.press("Escape");
+    });
+
     test("Wildcard Browser creates, renames and deletes files", async ({ page }) => {
       const tag = vue ? "vue" : "classic", wildcards = (...parts) => basePath("models", "wildcards", ...parts);
       const [id] = await addNodes(page, [{ type: "CLIPTextEncodePositiveNegative", pos: [300, 60] }]);
@@ -180,6 +205,7 @@ for (const vue of [true, false]) {
       expect(fs.existsSync(wildcards(`crud_${tag}_done`))).toBe(false);
       await expect(page.locator(".dfwc .row", { hasText: `crud_${tag}` })).toHaveCount(0);
       await expect(page.locator(".dfwc button.delete")).toBeDisabled();
+      await page.locator(".dfwc button.open-all").click(); // The yaml wildcards are in closed folders.
       await page.locator(".dfwc .row", { hasText: "outfit" }).filter({ hasText: "yaml" }).first().locator(".name").click(); // yaml: read-only.
       await expect(page.locator(".dfwc button.rename")).toBeDisabled();
       await expect(page.locator(".dfwc button.delete")).toBeDisabled();
@@ -193,6 +219,28 @@ for (const vue of [true, false]) {
       await expect(page.locator(".dfmi h2")).toHaveText("Ink - v2");
       await expect(page.locator(".dfmi")).toContainText("Illustrious");
       await expect(page.locator(".dfmi .words")).toContainText("ink style");
+      // Civitai's images one at a time, with how each was made over it on hover.
+      const stage = page.locator(".dfmi .stage");
+      await expect(page.locator(".dfmi .count")).toHaveText("1 / 2");
+      await expect(stage.locator("img")).toHaveCount(1);
+      await expect(stage.locator("img")).toHaveJSProperty("naturalWidth", 8);
+      await expect(stage.locator(".meta")).toHaveCSS("opacity", "0");
+      await stage.hover();
+      await expect(stage.locator(".meta")).toHaveCSS("opacity", "1");
+      await expect(stage.locator(".meta")).toContainText("seed3032258275");
+      await expect(stage.locator(".meta")).toContainText("cfg4");
+      await expect(stage.locator(".meta")).toContainText("samplerEuler a");
+      await expect(stage.locator(".meta .prompt").first()).toContainText("Ink test prompt, 1girl");
+      await expect(stage.locator(".meta a.chip")).toHaveAttribute("href", /civitai\.com\/images\/70\d/);
+      await page.locator(".dfmi button.next").click();
+      await expect(page.locator(".dfmi .count")).toHaveText("2 / 2");
+      await expect(stage.locator(".meta")).toContainText("Civitai has no generation data for this image.");
+      await page.locator('.dfmi textarea[placeholder^="Steps"]').click();
+      await page.keyboard.press("ArrowRight"); // In a text field the arrow keys move the cursor, not the images.
+      await expect(page.locator(".dfmi .count")).toHaveText("2 / 2");
+      await page.locator(".dfmi h2").click();
+      await page.keyboard.press("ArrowRight");
+      await expect(page.locator(".dfmi .count")).toHaveText("1 / 2"); // Around to the first.
       await page.locator('.dfmi textarea[placeholder^="Steps"]').fill("28 steps, CFG 5");
       await expect.poll(async () => (await (await lookUp(request, "loras", "style/ink.safetensors")).json()).user?.settings).toBe("28 steps, CFG 5");
       await page.keyboard.press("Escape");
@@ -215,6 +263,21 @@ for (const vue of [true, false]) {
       await page.locator(".dflb .tree .row", { hasText: "style" }).locator("button", { hasText: "Use folder" }).click();
       await expect.poll(() => widgetValue(page, random, "folder")).toBe("style");
       await page.keyboard.press("Escape");
+    });
+
+    test("LoRA Browser keeps its cards full size with many LoRAs", async ({ page }) => {
+      const folder = `many_${vue ? "vue" : "classic"}`;
+      for (let index = 0; index < 60; index++) writeFile(`models/loras/${folder}/lora_${String(index).padStart(2, "0")}.safetensors`, `${folder} ${index}`);
+      try {
+        const [loader] = await addNodes(page, [{ type: "LoraLoader" }]);
+        await clickMenu(page, loader, "DiceForge.ModelBrowser", "LoRA Browser");
+        await expect(page.locator(".dflb .card")).toHaveCount(64);
+        const heights = await page.$$eval(".dflb .card", (cards) => cards.map((card) => card.getBoundingClientRect().height));
+        expect(Math.min(...heights)).toBeGreaterThan(250); // Not squeezed into the dialog's height (they were 50 px high).
+        await page.keyboard.press("Escape");
+      } finally {
+        fs.rmSync(basePath("models", "loras", folder), { recursive: true, force: true });
+      }
     });
 
     test("LoRA Browser finds and downloads LoRAs on Civitai, renames and deletes them", async ({ page }) => {

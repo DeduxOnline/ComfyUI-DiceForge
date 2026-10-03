@@ -108,7 +108,8 @@ const STYLE = `
 .dfwc .edit{flex:1;display:flex;flex-direction:column;gap:8px;min-width:0}.dfwc .edit textarea{flex:1;resize:none;font:13px ui-monospace,monospace}
 .dfwc .row{display:flex;align-items:center;gap:6px;padding:3px 6px;border-radius:4px}.dfwc .row:hover{background:#2c2c2c}
 .dfwc .row .name{flex:1;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dfwc .row.sel{background:#2f3f55}
-.dfwc .folder>.row .name{font-weight:600}.dfwc .kids{margin-left:16px}.dfwc .muted{color:#999;font-size:12px}
+.dfwc .folder>.row .name{font-weight:600}.dfwc .folder>.row .name::before{content:"▸ ";color:#999}.dfwc .folder.open>.row .name::before{content:"▾ "}
+.dfwc .kids{margin-left:16px}.dfwc .folder:not(.open)>.kids{display:none}.dfwc .muted{color:#999;font-size:12px}
 .dfwc button{background:#222;color:#eee;border:1px solid #666;border-radius:6px;padding:5px 12px;cursor:pointer;font:inherit}.dfwc button:hover{background:#2c2c2c}
 .dfwc button:disabled{opacity:.5;cursor:default}.dfwc button.delete:not(:disabled){border-color:#8a4a4a;color:#f0b0b0}.dfwc textarea[readonly]{color:#aaa}.dfwc button.add{padding:1px 8px;font-size:12px;border-color:#4a7a4a;color:#bfe8bf}.dfwc .status{color:#9c9;min-height:18px;font-size:13px}
 `;
@@ -204,7 +205,16 @@ document.addEventListener("keydown", (event) => {
 document.addEventListener("focusout", (event) => { if (event.target === popup.textarea) setTimeout(closePopup, 150); rememberCursor(event); }, true);
 for (const type of ["keyup", "mouseup", "focusin"]) document.addEventListener(type, rememberCursor, true);
 
-// Wildcard Browser: folder tree with search, "+ Add" for files (__name__) and folders (__folder/*__), and the selected file's editor: create, save
+// Folders open in the Wildcard Browser, kept between openings (and reloads) in this browser. Folders start closed; a search opens them all.
+const OPEN_KEY = "diceforge.wildcards.open";
+function openFolders() {
+  try { return new Set(JSON.parse(localStorage.getItem(OPEN_KEY)) || []); } catch { return new Set(); }
+}
+function keepOpenFolders(folders) {
+  try { localStorage.setItem(OPEN_KEY, JSON.stringify([...folders])); } catch { /* Private mode or no storage: open only for this visit. */ }
+}
+
+// Wildcard Browser: folder tree (click a folder to open or close it) with search, "+ Add" for files (__name__) and folders (__folder/*__), and the selected file's editor: create, save
 // (button or Ctrl+S; • marks unsaved changes), rename or move (a / puts it in a folder) and delete.
 async function openBrowser(node) {
   addStyle();
@@ -234,6 +244,9 @@ async function openBrowser(node) {
     if (!response.ok) return say(await response.text());
     const file = await response.json();
     selected = name;
+    const parts = name.split("/").slice(0, -1); // The file's folders open, so it shows in the tree.
+    parts.forEach((_, index) => opened.add(parts.slice(0, index + 1).join("/")));
+    keepOpenFolders(opened);
     title.replaceChildren(element("b", {}, `__${name}__`), " ", element("span", { class: "muted" }, file.path));
     editor.value = saved = file.text;
     editor.readOnly = !!file.readonly; // A yaml wildcard is one key of a yaml file: edited in that file.
@@ -288,6 +301,18 @@ async function openBrowser(node) {
     await wildcardList(true);
     await open((await response.json()).saved);
   } }, "+ New file");
+  const opened = openFolders();
+  const toggle = (path, open = !opened.has(path)) => {
+    if (open) opened.add(path); else opened.delete(path);
+    keepOpenFolders(opened);
+    draw();
+  };
+  const expandAll = element("button", { class: "open-all", title: "Open every folder", onclick: () => {
+    for (const folder of folderNames(listCache?.files ?? [])) opened.add(folder);
+    keepOpenFolders(opened);
+    draw();
+  } }, "Expand all");
+  const collapseAll = element("button", { class: "close-all", title: "Close every folder", onclick: () => { opened.clear(); keepOpenFolders(opened); draw(); } }, "Collapse all");
   function draw() {
     const { files } = listCache ?? { files: [] };
     const query = search.value.trim().toLowerCase();
@@ -303,8 +328,8 @@ async function openBrowser(node) {
       level.files.push(file);
     }
     const drawLevel = (level) => [
-      ...[...level.folders.entries()].map(([part, folder]) => element("div", { class: "folder" },
-        element("div", { class: "row" }, element("span", { class: "name" }, `📁 ${part}`), element("span", { class: "muted" }, "all files"),
+      ...[...level.folders.entries()].map(([part, folder]) => element("div", { class: "folder" + (query || opened.has(folder.path) ? " open" : ""), "data-path": folder.path },
+        element("div", { class: "row" }, element("span", { class: "name", title: "Open or close the folder", onclick: () => toggle(folder.path) }, `📁 ${part}`), element("span", { class: "muted" }, "all files"),
           element("button", { class: "add", title: `Insert __${folder.path}/*__`, onclick: () => add(`${folder.path}/*`) }, "+ Add")),
         element("div", { class: "kids" }, ...drawLevel(folder)))),
       ...level.files.map((file) => element("div", { class: "row" + (file.name === selected ? " sel" : ""), title: file.error || file.preview.join("\n") },
@@ -319,7 +344,7 @@ async function openBrowser(node) {
   search.addEventListener("input", draw);
   back.append(element("div", { class: "dfwc" },
     element("h2", {}, "Wildcards"),
-    element("div", { class: "top" }, search, create, element("button", { onclick: close }, "Close")),
+    element("div", { class: "top" }, search, expandAll, collapseAll, create, element("button", { onclick: close }, "Close")),
     element("div", { class: "main" }, tree, element("div", { class: "edit" }, title, editor, element("div", { class: "top" }, status, element("span", { style: "flex:1" }), remove, rename, save)))));
   document.body.append(back);
   await wildcardList(true);

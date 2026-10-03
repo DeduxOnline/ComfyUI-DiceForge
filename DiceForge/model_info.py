@@ -3,6 +3,7 @@ import hashlib
 import json
 import logging
 import os
+import re
 import time
 import aiohttp
 import folder_paths
@@ -40,7 +41,7 @@ def clean_info(info):
         civitai = dict(civitai)
         words, images = civitai.get("trigger_words"), civitai.get("images")
         civitai["trigger_words"] = [str(word) for word in words if isinstance(word, (str, int, float)) and not isinstance(word, bool)] if isinstance(words, list) else []
-        civitai["images"] = [image for image in images if isinstance(image, dict)] if isinstance(images, list) else []
+        civitai["images"] = [{**image, "meta": image_meta(image.get("meta"))} for image in images if isinstance(image, dict)] if isinstance(images, list) else []
         for key in ("model_name", "version_name", "type", "base_model", "url", "error"):
             if civitai.get(key) is not None and not isinstance(civitai[key], str):
                 civitai[key] = str(civitai[key])
@@ -79,8 +80,21 @@ def civitai_summary(data):
         "base_model": data.get("baseModel"),
         "trigger_words": data.get("trainedWords") or [],
         "url": f"https://civitai.com/models/{data.get('modelId')}?modelVersionId={data.get('id')}",
-        "images": [{**{key: image.get(key) for key in ("type", "width", "height", "nsfwLevel")}, "url": thumbnail(image.get("url") or ""), "full": image.get("url")} for image in (data.get("images") or [])[:12]],
+        "images": [{**{key: image.get(key) for key in ("type", "width", "height", "nsfwLevel", "hasMeta")}, "url": thumbnail(image.get("url") or ""), "full": image.get("url"),
+                    "page": image_page(image.get("url") or ""), "meta": image_meta(image.get("meta"))} for image in (data.get("images") or [])[:12] if isinstance(image, dict)],
     }
+# How an example image was made, from Civitai's meta of it (the generation data of A1111, Forge, ComfyUI or Civitai's own generator): the prompts and
+# the settings the dialog shows over the image, as text and numbers only.
+META_KEYS = ("prompt", "negativePrompt", "seed", "steps", "cfgScale", "sampler", "Schedule type", "scheduler", "Model", "Size", "Clip skip", "Denoising strength", "VAE")
+def image_meta(meta):
+    if not isinstance(meta, dict):
+        return {}
+    return {key: str(meta[key])[:5000] if isinstance(meta[key], str) else meta[key] for key in META_KEYS
+            if isinstance(meta.get(key), (str, int, float)) and not isinstance(meta.get(key), bool) and str(meta[key]).strip()}
+# The image's page on Civitai: its id is the file name of its url (.../original=true/64739376.jpeg).
+def image_page(url):
+    match = re.search(r"/(\d+)\.\w+$", url)
+    return f"https://civitai.com/images/{match.group(1)}" if match else None
 # Civitai serves resized copies: 450 px wide instead of the original (often 2 MB and more) for the dialog's previews.
 def thumbnail(url):
     return url.replace("/original=true/", "/width=450/")
@@ -110,7 +124,9 @@ async def model_info(kind, name, refresh=False):
         started = time.time()
         info["sha256"] = await asyncio.get_running_loop().run_in_executor(None, sha256_of, path) # Off the event loop: big files take a while.
         logging.info(f"[DiceForge] Model info: sha256 of {name} in {time.time() - started:.1f}s")
-    if refresh or not info.get("civitai") or info["civitai"].get("error"):
+    civitai = info.get("civitai") or {}
+    saved_before_meta = civitai.get("found") and any("page" not in image for image in civitai.get("images") or []) # Saved before the images' generation data was kept.
+    if refresh or not civitai or civitai.get("error") or saved_before_meta:
         info["civitai"] = await civitai_lookup(info["sha256"])
     write_info(kind, name, info)
     return {"kind": kind, "file": name, **info}

@@ -47,7 +47,11 @@ const sha256 = (text) => crypto.createHash("sha256").update(text).digest("hex");
 const CIVITAI = Object.fromEntries(Object.values(MODELS).filter((model) => model.civitai).map(({ content, civitai }, index) => [sha256(content), {
   id: 100 + index, modelId: 10 + index, name: civitai.version, baseModel: civitai.base, trainedWords: civitai.words,
   model: { name: civitai.model, type: "LORA" },
-  images: [{ url: `http://127.0.0.1:${CIVITAI_PORT}/image/original=true/${index}.png`, type: "image", nsfwLevel: 1, width: 8, height: 8 }],
+  images: [ // How the first image was made (Civitai's meta, shown over it in Model info); the second has none.
+    { url: `http://127.0.0.1:${CIVITAI_PORT}/image/original=true/${700 + index}.png`, type: "image", nsfwLevel: 1, width: 8, height: 8, hasMeta: true,
+      meta: { prompt: `${civitai.model} test prompt, 1girl`, negativePrompt: "lowres", seed: 3032258275, steps: 30, cfgScale: 4, sampler: "Euler a", Model: "e2e_base", hashes: { model: "x" } } },
+    { url: `http://127.0.0.1:${CIVITAI_PORT}/image/original=true/${800 + index}.png`, type: "image", nsfwLevel: 1, width: 8, height: 8, hasMeta: false },
+  ],
 }]));
 
 // LoRAs to find on Civitai (the Create of the LoRA Browser): Neon has two versions, the files the stand-in serves for download; Ink is the test

@@ -60,7 +60,7 @@ const STYLE = `
 .dflb .main{display:flex;gap:12px;flex:1;min-height:0}.dflb .tree{width:230px;flex:none;overflow:auto;border:1px solid #4a4a4a;border-radius:6px;padding:6px}
 .dflb .tree .row{display:flex;align-items:center;gap:6px;padding:3px 6px;border-radius:4px;cursor:pointer}.dflb .tree .row:hover{background:#2c2c2c}
 .dflb .tree .row.sel{background:#2f3f55}.dflb .tree .row .name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dflb .tree button{padding:0 6px;font-size:12px}
-.dflb .grid{flex:1;overflow:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;align-content:start}
+.dflb .grid{flex:1;overflow:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;align-content:start;grid-auto-rows:max-content}
 .dflb .card{background:#2a2a2a;border:1px solid #474747;border-radius:8px;overflow:hidden;display:flex;flex-direction:column}.dflb .card.sel{border-color:#6a9ad8}
 .dflb .pic{aspect-ratio:3/4;background:#1e1e1e;display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative}
 .dflb .pic img,.dflb .pic video{width:100%;height:100%;object-fit:cover;display:block}.dflb .pic .none{font-size:40px;opacity:.35}
