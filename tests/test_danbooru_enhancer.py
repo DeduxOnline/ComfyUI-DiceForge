@@ -23,13 +23,15 @@ POSTS = [post(1, "g", "1girl smile twintails long_hair signature"), post(2, "g",
 
 
 def found(tags):
-    wanted = [tag for tag in tags.split() if not tag.startswith("order:")]
-    return [item for item in POSTS if all(tag in " ".join(item[f"tag_string_{group}"] for group in ("general", "character", "copyright")).split() for tag in wanted)]
+    wanted = [tag for tag in tags.split() if not tag.startswith(("order:", "rating:"))]
+    ratings = next((tag[len("rating:"):].split(",") for tag in tags.split() if tag.startswith("rating:")), None)
+    return [item for item in POSTS if (ratings is None or item["rating"] in ratings) and all(tag in " ".join(item[f"tag_string_{group}"] for group in ("general", "character", "copyright")).split() for tag in wanted)]
 
 
 @pytest.fixture
 def danbooru(monkeypatch):
-    """The stand-in: posts by search, refused past two terms (order:score counts), or for order: when asked (requests are recorded)."""
+    """The stand-in: posts by search and rating, refused past two terms (order:score counts, rating: doesn't), or for order: when asked (requests
+    are recorded)."""
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *args):
             pass
@@ -38,7 +40,7 @@ def danbooru(monkeypatch):
             url = urlsplit(self.path)
             tags = parse_qs(url.query).get("tags", [""])[0]
             self.server.requests.append(tags)
-            if len(tags.split()) > 2 or (self.server.refuse_order and "order:" in tags): # Danbooru's two terms, order: counted.
+            if len([tag for tag in tags.split() if not tag.startswith("rating:")]) > 2 or (self.server.refuse_order and "order:" in tags): # Danbooru's two terms, order: counted.
                 status, body = 422, {"message": "You cannot search for more than 2 tags at a time"}
             else:
                 status, body = 200, found(tags)
@@ -81,7 +83,8 @@ def test_search_tags_are_the_most_telling():
 def test_adds_the_posts_tags_by_the_seed(danbooru):
     tag_list()
     text, added, url, number = run(tags="1girl, hatsune miku, masterpiece", seed=0, seed_mode="sequential")
-    assert danbooru.requests == ["hatsune_miku order:score"] # One tag and the order: Danbooru's two terms. The character; masterpiece isn't a Danbooru tag.
+    assert danbooru.requests == ["hatsune_miku rating:g order:score"] # One tag and the order: Danbooru's two terms (the rating is free). The character;
+    # masterpiece isn't a Danbooru tag.
     assert number == 1 and url.endswith("/posts/1") # General only (posts 1 and 2): not 3 (explicit) nor 4 (sensitive).
     assert added == "long hair, smile, twintails" # The most used first; 1girl is there already, signature excluded.
     assert text == "1girl, hatsune miku, masterpiece, long hair, smile, twintails"
@@ -102,7 +105,14 @@ def test_options(danbooru):
 def test_a_refused_order_is_searched_again_without_it(danbooru):
     danbooru.refuse_order = True
     assert run(tags="hatsune miku", seed=0, seed_mode="sequential")[3] == 1
-    assert danbooru.requests == ["hatsune_miku order:score", "hatsune_miku"]
+    assert danbooru.requests == ["hatsune_miku rating:g order:score", "hatsune_miku rating:g"]
+
+
+def test_the_rating_is_asked_of_danbooru(danbooru):
+    tag_list()
+    assert {run(seed=seed, seed_mode="deck", rating="general + sensitive")[3] for seed in range(3)} == {1, 2, 4}
+    run(seed=0, rating="any")
+    assert danbooru.requests == ["hatsune_miku rating:g,s order:score", "hatsune_miku order:score"] # Any: no rating term.
 
 
 def test_the_other_tags_pick_the_posts(danbooru):

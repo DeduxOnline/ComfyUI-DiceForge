@@ -786,8 +786,8 @@ A node that makes a few tags a full prompt from a real Danbooru post: type `1gir
 
 How it picks:
 
-- The most telling of your tags searches Danbooru, with `order:score` for the most liked posts (a search without an account may have two terms, and the order is one): with the [tag lists](#tag-autocomplete-danbooru-e621) downloaded, the rarest tag Danbooru knows, characters and series first (`hatsune miku` before `1girl`), and tags it doesn't know (`masterpiece`) are left out; without the lists, the first tag. Among the 200 most liked posts found, those with the most of your other tags are kept.
-- `rating` keeps only `general` posts (the default), or also `sensitive`, `questionable`, or any.
+- The most telling of your tags searches Danbooru, with `order:score` for the most liked posts and your `rating` (a search without an account may have two terms: the order is one, the rating is free): with the [tag lists](#tag-autocomplete-danbooru-e621) downloaded, the rarest tag Danbooru knows, characters and series first (`hatsune miku` before `1girl`), and tags it doesn't know (`masterpiece`) are left out; without the lists, the first tag. Among the 200 most liked posts found, those with the most of your other tags are kept.
+- `rating` keeps only `general` posts (the default), or also `sensitive`, `questionable`, or any; Danbooru searches with it (`rating:g,s`), so the 200 posts are all of that rating.
 - The seed picks one of them, by `seed_mode`: `deck` with *increment* goes through the posts, the same seed gives the same post again.
 - From that post, its general tags that your prompt lacks are added (characters, series and artists too, if you turn them on under Advanced), the most used first, at most `max_tags` (15; 0 for all), without the `exclude` list (signature, watermark, speech bubble…), `after` or `before` your tags, written as the models learned them (spaces, escaped parentheses).
 - The posts of a search are kept for 30 days in `ComfyUI/user/DiceForge/danbooru`, so Danbooru is asked once per search and a seed gives its post again, also offline (then from what was kept, however old).

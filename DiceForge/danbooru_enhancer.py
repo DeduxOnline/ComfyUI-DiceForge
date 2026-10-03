@@ -15,14 +15,15 @@ from .tag_autocomplete import INDEX, tag_key
 # Danbooru Tag Enhancer: more tags for a prompt, from a real Danbooru post that has the tags already there. The most telling of the prompt's tags
 # (the rarest that Danbooru knows: a character before "1girl") finds the posts, the most liked first; the seed picks one of them, by the seed modes;
 # its tags that the prompt lacks are added, the most used first. The posts of a search are kept on disk, so a seed gives the same post again, also
-# offline. A search without an account may have two terms, and order:score is one: so one tag searches, and the prompt's other tags pick, among the
-# posts found, those that have the most of them.
+# offline. A search without an account may have two terms, and order:score is one (rating: is free): so one tag searches, with the rating, and the
+# prompt's other tags pick, among the posts found, those that have the most of them.
 DANBOORU_URL = os.environ.get("DICEFORGE_DANBOORU_URL", "https://danbooru.donmai.us")
 CACHE_FOLDER = os.path.join(folder_paths.get_user_directory(), "DiceForge", "danbooru")
 CACHE_DAYS = 30
 POSTS = 200
 RATING_CHOICES = ["general", "general + sensitive", "up to questionable", "any"]
 ALLOWED = {"general": {"g"}, "general + sensitive": {"g", "s"}, "up to questionable": {"g", "s", "q"}, "any": {"g", "s", "q", "e"}}
+RATING_TERMS = {"general": "rating:g", "general + sensitive": "rating:g,s", "up to questionable": "rating:g,s,q", "any": ""} # Not in the two terms.
 DEFAULT_EXCLUDE = "signature, watermark, artist_name, twitter_username, web_address, dated, speech_bubble, comic, english_text, text_focus"
 GROUPS = ("general", "character", "copyright", "artist", "meta")
 USER_AGENT = "DiceForge (ComfyUI custom nodes; https://github.com/DeduxOnline/ComfyUI-DiceForge)"
@@ -155,8 +156,8 @@ class DanbooruTagEnhancer(io.ComfyNode):
         have = prompt_tags(tags)
         loop = asyncio.get_running_loop()
         searched, known = await loop.run_in_executor(None, search_tags, have)
-        query = " ".join(searched)
-        posts = [post for post in await posts_for(query) if post["rating"] in ALLOWED[rating]] # The rating here: it would count as a search tag.
+        query = " ".join([*searched, RATING_TERMS[rating]]).strip() # Danbooru picks the rating: the 200 posts are all of it.
+        posts = [post for post in await posts_for(query) if post["rating"] in ALLOWED[rating]] # And here again, for a server that ignored it.
         wanted = [tag for tag in known if tag not in searched]
         overlap = [sum(tag in {t for group in GROUPS for t in post[group]} for tag in wanted) for post in posts]
         best = max(overlap, default=0)

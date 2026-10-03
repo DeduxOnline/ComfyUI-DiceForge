@@ -7,6 +7,9 @@ nodes and features, a patch for fixes. Each version is a [release on GitHub](htt
 
 ## [Unreleased]
 
+### Changed
+- Danbooru Tag Enhancer asks Danbooru for the rating (`rating:` is free of the two-term limit): the 200 posts found are all of it.
+
 ## [1.0.0] - 2026-10-03
 
 The first release on the ComfyUI Registry: install DiceForge from ComfyUI Manager, or with `comfy node install comfyui-diceforge`.
