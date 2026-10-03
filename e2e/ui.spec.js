@@ -293,7 +293,7 @@ for (const vue of [true, false]) {
     });
 
     test("Diffusion Model Browser puts a model in Load Diffusion Model and a folder in Random Diffusion Model", async ({ page }) => {
-      const [loader, random, both] = await addNodes(page, [{ type: "UNETLoader" }, { type: "DiceForgeRandomDiffusionModel", pos: [500, 40] }, { type: "LoadDiffusionModelCLIP", pos: [900, 40] }]);
+      const [loader, random, both] = await addNodes(page, [{ type: "UNETLoader", widgets: { unet_name: "flux1-dev.safetensors" } }, { type: "DiceForgeRandomDiffusionModel", pos: [500, 40] }, { type: "LoadDiffusionModelCLIP", pos: [900, 40] }]);
       for (const id of [loader, random, both]) expect(await menuItems(page, id, "DiceForge.ModelBrowser")).toEqual(["🧊 Diffusion Model Browser"]);
       await clickMenu(page, loader, "DiceForge.ModelBrowser", "Diffusion Model Browser");
       await expect(page.locator(".dflb h2")).toHaveText("Diffusion Model Browser");
