@@ -717,6 +717,45 @@ for (const vue of [true, false]) {
       expect(latent).toBeTruthy();
     });
 
+    test("Prompt styles: the family's quality tags in and out with a click, Auto from the connected model, your own saved and deleted", async ({ page, request }) => {
+      await lookUp(request, "checkpoints", "illustrious_base.safetensors");
+      const [checkpoint, encode] = await addNodes(page, [
+        { type: "CheckpointLoaderSimple", widgets: { ckpt_name: "illustrious_base.safetensors" } },
+        { type: "CLIPTextEncodePositiveNegative", pos: [460, 40], widgets: { positive: "1girl, smile", negative: "" } },
+      ]);
+      const items = () => page.evaluate((id) => window.app.extensions.find((item) => item.name === "DiceForge.PromptStyles")
+        .getNodeMenuItems(window.app.graph.getNodeById(id))[0].submenu.options.filter(Boolean).map((item) => item.content), encode);
+      const click = (content) => page.evaluate(([id, content]) => window.app.extensions.find((item) => item.name === "DiceForge.PromptStyles")
+        .getNodeMenuItems(window.app.graph.getNodeById(id))[0].submenu.options.find((item) => item?.content.includes(content)).callback(), [encode, content]);
+      const prompts = () => Promise.all([widgetValue(page, encode, "positive"), widgetValue(page, encode, "negative")]);
+      await expect.poll(items).toContain("🎨 Illustrious quality");
+      await click("Illustrious quality");
+      expect(await prompts()).toEqual(["masterpiece, best quality, amazing quality, very aesthetic, absurdres, 1girl, smile",
+        "lowres, worst quality, bad quality, bad anatomy, bad hands, jpeg artifacts, signature, watermark, text"]);
+      expect(await items()).toContain("✓ Illustrious quality");
+      await click("Illustrious quality"); // Again: taken out.
+      expect(await prompts()).toEqual(["1girl, smile", ""]);
+      await click("Auto"); // Nothing on the model input yet.
+      expect(await prompts()).toEqual(["1girl, smile", ""]);
+      await connect(page, checkpoint, 0, encode, "model");
+      await click("Auto");
+      await expect.poll(prompts).toEqual(["masterpiece, best quality, amazing quality, very aesthetic, absurdres, 1girl, smile",
+        "lowres, worst quality, bad quality, bad anatomy, bad hands, jpeg artifacts, signature, watermark, text"]);
+      // Your own: the prompts as they are, saved under a name, then put into other prompts, then deleted.
+      await setWidget(page, encode, "positive", "{prompt}, film grain");
+      await setWidget(page, encode, "negative", "cartoon");
+      page.on("dialog", (dialog) => (dialog.type() === "prompt" ? dialog.accept(`E2E film ${vue}`) : dialog.accept()));
+      await click("Save the prompts as a style");
+      await expect.poll(items).toContain(`★ E2E film ${vue}`);
+      await setWidget(page, encode, "positive", "a cat");
+      await setWidget(page, encode, "negative", "");
+      await click(`★ E2E film ${vue}`);
+      expect(await prompts()).toEqual(["a cat, film grain", "cartoon"]);
+      await click(`🗑 Delete E2E film ${vue}`);
+      await expect.poll(items).not.toContain(`🗑 Delete E2E film ${vue}`);
+      expect((await (await request.get("/diceforge/styles")).json()).user.map((style) => style.name)).not.toContain(`E2E film ${vue}`);
+    });
+
     test("XY Plot shows the plot under its fields and queues every cell into Dice Grid", async ({ page, request }) => {
       const [xy, image, grid] = await addNodes(page, [
         { type: "DiceForgeXYPlot", widgets: { x_type: "steps", x_values: "10, 20", y_type: "scheduler", y_values: "normal, karras" } },

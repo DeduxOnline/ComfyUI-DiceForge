@@ -19,6 +19,7 @@ from .lora_stack import LoraStack
 from .xy_plot import XYPlot # Also the route of its preview on the node (web/xy_plot.js).
 from . import model_info # Server routes of the Model info dialog (web/model_info.js).
 from . import wildcards_api # Server routes of the Wildcard Browser and the __ autocomplete (web/wildcards.js).
+from . import prompt_styles # Server routes of the prompt styles in CLIP Dual Text Encode's menu (web/prompt_styles.js).
 from . import sampler_presets # Server routes of the KSampler presets in the node menu (web/sampler_presets.js).
 from . import model_manager # Server routes that manage LoRA files: Civitai search and download, rename and delete (web/civitai.js, web/model_browser.js).
 WEB_DIRECTORY = "./web" # Frontend extension: feeds the live size previews of the resolution nodes.

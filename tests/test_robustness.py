@@ -201,7 +201,7 @@ ROUTES = [("POST", "/diceforge/wildcards/file"), ("POST", "/diceforge/lora-prese
           ("GET", "/diceforge/civitai/downloads"), ("DELETE", "/diceforge/civitai/downloads?id=x"),
           ("POST", "/diceforge/model-favorite"), ("POST", "/diceforge/wildcards/favorite"), ("POST", "/diceforge/sampler-presets"),
           ("GET", "/diceforge/sampler-presets"), ("DELETE", "/diceforge/sampler-presets?name=nope"), ("DELETE", "/diceforge/sampler-presets"),
-          ("POST", "/diceforge/xy-plot")]
+          ("POST", "/diceforge/xy-plot"), ("POST", "/diceforge/styles"), ("GET", "/diceforge/styles"), ("DELETE", "/diceforge/styles?name=nope")]
 JUNK_BODIES = ["not json", "", "[]", "5", "null", '"text"', '{"loras": 5}', '{"loras": [1, null, {"a": 1}, "x.safetensors"]}', '{"items": 5}',
                '{"items": [1, null, "x", {"kind": 5, "file": []}, {"kind": "loras", "file": "../../x"}]}', '{"kind": "loras", "file": "x", "user": [1]}',
                '{"kind": "loras", "file": "x", "user": {"name": {"a": 1}}}', '{"name": 5}', '{"name": "ok", "stack": 5}', '{"name": "ok", "stack": {"rows": "x"}}',
@@ -223,7 +223,7 @@ def test_junk_requests_never_cause_a_server_error(method, path, api, wildcards, 
     shutil.rmtree(lora_stack.PRESET_FOLDER, ignore_errors=True)
 
 
-KEYS = ["name", "stack", "rows", "text", "loras", "items", "kind", "file", "user", "overwrite", "lora", "groups", "to", "create", "favorite", "steps", "cfg", "sampler_name", "scheduler", "x_type", "x_values", "y_type", "y_values"]
+KEYS = ["name", "stack", "rows", "text", "loras", "items", "kind", "file", "user", "overwrite", "lora", "groups", "to", "create", "favorite", "steps", "cfg", "sampler_name", "scheduler", "x_type", "x_values", "y_type", "y_values", "prompt", "negative_prompt"]
 
 
 def json_children(children):

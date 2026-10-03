@@ -673,6 +673,23 @@ As in A1111: `<lora:name:weight>` in either prompt puts that LoRA on the model a
 
 The prompt fields color the syntax as you type: `__wildcards__` (red with a wavy line when no wildcard file has that name; hover the field to see which), the braces and `|` of `{a|b}` choices (one color per nesting level, white on red when a brace is never closed or closes nothing), counts `2$$`, weights `3::`, locks `!`, `${variables}`, `//` and `/* */` comments, `\{` escapes, `(word:1.2)` weights, `embedding:` names and `<lora:...>` tags. Only the colors change: typing, the caret, selecting and the `__` autocomplete work as before. Turn it off in ComfyUI's settings: *DiceForge → Prompts → Highlight the prompt syntax in CLIP Dual Text Encode*.
 
+### Prompt styles
+
+Right-click CLIP Dual Text Encode and choose **🎨 Prompt styles**: named pieces of positive and negative prompt, put in with one click, as A1111's styles. A style already in the prompts is marked ✓, and a second click takes it out again.
+
+| Built-in style | Positive (before your prompt) | For |
+|---|---|---|
+| **Illustrious quality** | `masterpiece, best quality, amazing quality, very aesthetic, absurdres` | Illustrious XL and its merges |
+| **NoobAI quality** | `masterpiece, best quality, newest, absurdres, highres` | NoobAI-XL |
+| **NoobAI v-pred quality** | the same, plus `very awa` | NoobAI-XL v-pred |
+| **Anima quality** | `masterpiece, best quality, score_8, newest` | Anima |
+
+Each also puts the usual negative for its family after your negative prompt (`lowres, worst quality, bad quality, bad anatomy…`).
+
+- **✨ Auto** puts in the style of the model connected to the node's `model` input, by its Civitai base model (from [Model info](#model-info)) or its file name, as [KSampler presets](#ksampler-presets) do.
+- **💾 Save the prompts as a style…** saves the node's two prompts under a name; **🗑 Delete** removes one. Write `{prompt}` where your prompt goes (`{prompt}, film grain, 35mm`); without it the style goes after the prompt.
+- Your styles are kept in `ComfyUI/user/DiceForge/styles.csv`, in A1111's format (`name,prompt,negative_prompt`): an A1111 or Forge `styles.csv` can simply be copied there.
+
 ### Preview of the prompts as encoded
 
 After each run the node shows, under its inputs, the **positive** and **negative** prompts as they were encoded: choices, wildcards and variables filled in, with the seed and seed mode they came from (and *combination N of M* in `combinations`). Click a prompt to copy it. The preview is kept with the workflow, so it is still there after a reload and in a workflow loaded from an image; when you change a prompt it is dimmed and marked *prompt changed since* until the next run. It also updates when the node comes from ComfyUI's cache.
