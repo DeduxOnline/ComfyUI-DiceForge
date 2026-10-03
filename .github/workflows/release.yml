@@ -56,4 +56,5 @@ jobs:
           personal_access_token: ${{ secrets.REGISTRY_ACCESS_TOKEN }}
       - name: No Registry token
         if: env.REGISTRY_ACCESS_TOKEN == ''
-        run: echo "::warning::Not published to the ComfyUI Registry: add the repository secret REGISTRY_ACCESS_TOKEN (an API key from registry.comfy.org) and run this workflow again."
+        run: |
+          echo "::warning::Not published to the ComfyUI Registry: add the repository secret REGISTRY_ACCESS_TOKEN (an API key from registry.comfy.org) and run this workflow again."

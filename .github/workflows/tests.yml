@@ -10,6 +10,11 @@ on:
   schedule:
     - cron: "17 5 * * 1" # Mondays: against ComfyUI master.
   workflow_call: # From the Release workflow: a tag is only released when the tests pass.
+    inputs:
+      comfyui_ref:
+        description: ComfyUI commit, branch or tag to test with
+        type: string
+        default: 79be670e2d9be63e238785af307369d2b9039ed1
   workflow_dispatch:
     inputs:
       comfyui_ref:
@@ -58,6 +63,11 @@ jobs:
           python -m pip install --upgrade pip
           pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
           pip install -r ComfyUI/requirements.txt pytest hypothesis pytest-cov
+
+      - name: Check the workflows (actionlint)
+        run: |
+          pip install actionlint-py
+          actionlint
 
       - name: Run the unit tests
         run: python -m pytest tests -v --cov=DiceForge --cov-branch --cov-report=xml:coverage.xml --cov-report=term
