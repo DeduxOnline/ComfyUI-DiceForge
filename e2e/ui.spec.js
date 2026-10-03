@@ -208,6 +208,32 @@ for (const vue of [true, false]) {
       }
     });
 
+    test("Wildcard Browser favorites: ☆ stars a file, ★ Favorites shows only them, the autocomplete puts them first", async ({ page }) => {
+      const [id] = await addNodes(page, [{ type: "CLIPTextEncodePositiveNegative", pos: [300, 60] }]);
+      await clickMenu(page, id, "DiceForge.Wildcards", "Wildcard Browser");
+      await page.locator(".dfwc button.open-all").click();
+      const style = page.locator('.dfwc .row[data-name="hair/style"]');
+      await style.locator("button.fav").click();
+      await expect(style.locator("button.fav")).toHaveText("★");
+      await page.locator(".dfwc button.close-all").click();
+      await page.locator(".dfwc button.only-favorites").click(); // Only favorites, in open folders.
+      await expect(page.locator(".dfwc .tree .row[data-name]")).toHaveCount(1);
+      await expect(style).toBeVisible();
+      await page.locator(".dfwc button.only-favorites").click();
+      await expect(page.locator('.dfwc .row[data-name="color"]')).toBeVisible();
+      await page.keyboard.press("Escape");
+      const field = await promptField(page, id, "positive");
+      await field.click();
+      await page.keyboard.type("__hair/");
+      await expect(page.locator(".dfwc-pop div").first()).toHaveText("★ __hair/style__2"); // Before hair/color, though c comes before s.
+      await page.keyboard.press("Escape");
+      await clickMenu(page, id, "DiceForge.Wildcards", "Wildcard Browser");
+      await page.locator(".dfwc button.only-favorites").click();
+      await page.locator('.dfwc .row[data-name="hair/style"] button.fav').click(); // Unstarred: the favorites list is empty.
+      await expect(page.locator(".dfwc .tree")).toContainText("No favorites yet");
+      await page.keyboard.press("Escape");
+    });
+
     test("Wildcard Browser creates, renames and deletes files", async ({ page }) => {
       const tag = vue ? "vue" : "classic", wildcards = (...parts) => basePath("models", "wildcards", ...parts);
       const [id] = await addNodes(page, [{ type: "CLIPTextEncodePositiveNegative", pos: [300, 60] }]);
@@ -362,6 +388,24 @@ for (const vue of [true, false]) {
       } finally {
         fs.rmSync(loras(top), { recursive: true, force: true });
       }
+    });
+
+    test("LoRA Browser favorites: ☆ stars a LoRA, ★ Favorites shows only them, and they stay", async ({ page }) => {
+      const [loader] = await addNodes(page, [{ type: "LoraLoader" }]);
+      await clickMenu(page, loader, "DiceForge.ModelBrowser", "LoRA Browser");
+      const ink = page.locator(".dflb .card", { hasText: "ink.safetensors" });
+      await expect(page.locator(`.dflb .tree .row.favs`)).toContainText("★ Favorites0");
+      await ink.locator(".fav").click();
+      await expect(ink.locator(".fav")).toHaveText("★");
+      await page.locator(".dflb .tree .row.favs").click();
+      await expect(page.locator(".dflb .card")).toHaveCount(1);
+      await expect(page.locator(".dflb .card")).toContainText("ink.safetensors");
+      await page.keyboard.press("Escape");
+      await clickMenu(page, loader, "DiceForge.ModelBrowser", "LoRA Browser"); // Kept on the server.
+      await expect(page.locator(".dflb .tree .row.favs")).toContainText("★ Favorites1");
+      await page.locator(".dflb .card", { hasText: "ink.safetensors" }).locator(".fav").click();
+      await expect(page.locator(".dflb .tree .row.favs")).toContainText("★ Favorites0");
+      await page.keyboard.press("Escape");
     });
 
     test("LoRA Browser keeps its cards full size with many LoRAs", async ({ page }) => {

@@ -134,3 +134,38 @@ def test_delete_shows_the_file_it_was_hiding(api, wildcards, tmp_path, monkeypat
     monkeypatch.setitem(folder_paths.folder_names_and_paths, "wildcards", ([str(wildcards.folder), str(second)], set()))
     assert api("DELETE", "/diceforge/wildcards/file?name=color")[0] == 200
     assert api("GET", "/diceforge/wildcards/file?name=color")[1]["text"] == "from the second folder"
+
+
+def test_favorites_follow_renames_and_deletes(api, wildcards):
+    wildcards("color.txt", "red\n")
+    wildcards("hair/style.txt", "bob\n")
+    wildcards("pack.yaml", "outfit: [dress]\n")
+    favorite = lambda: {entry["name"] for entry in api("GET", "/diceforge/wildcards")[1]["files"] if entry["favorite"]}
+    assert favorite() == set()
+    for name in ("color", "outfit"): # A yaml wildcard can be a favorite too.
+        assert api("POST", "/diceforge/wildcards/favorite", {"name": name, "favorite": True})[1] == {"name": name, "favorite": True}
+    assert favorite() == {"color", "outfit"}
+    assert api("POST", "/diceforge/wildcards/rename", {"name": "color", "to": "palette/color"})[0] == 200
+    assert favorite() == {"palette/color", "outfit"} # The star moved with it.
+    assert api("DELETE", "/diceforge/wildcards/file?name=palette/color")[0] == 200
+    assert favorite() == {"outfit"}
+    assert api("POST", "/diceforge/wildcards/favorite", {"name": "outfit", "favorite": False})[0] == 200
+    assert favorite() == set()
+
+
+@pytest.mark.parametrize("body, status", [({"name": "nope", "favorite": True}, 404), ({"name": "color", "favorite": "yes"}, 400), ({"name": "../x", "favorite": True}, 400),
+                                          ({"name": 5, "favorite": True}, 400), ({"favorite": True}, 400)])
+def test_favorite_refusals(body, status, api, wildcards):
+    wildcards("color.txt", "red\n")
+    assert api("POST", "/diceforge/wildcards/favorite", body)[0] == status
+    assert api("POST", "/diceforge/wildcards/favorite", {"name": "gone", "favorite": False})[0] == 200 # Unstarring a missing name is harmless.
+
+
+def test_a_damaged_favorites_file_means_none(api, wildcards):
+    from DiceForge import wildcards_api
+    wildcards("color.txt", "red\n")
+    for junk in ("not json", "{}", "[1, null, \"color\"]"):
+        with open(wildcards_api.FAVORITES_FILE, "w", encoding="utf-8") as file:
+            file.write(junk)
+        status, body = api("GET", "/diceforge/wildcards")
+        assert status == 200 and body["files"][0]["favorite"] == (junk.endswith("]"))

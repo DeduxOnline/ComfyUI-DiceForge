@@ -11,6 +11,7 @@ import { addStyleOnce, background, element } from "./dom.js";
 // from: "Use" puts the file in a loader's list, "Use folder" puts a folder in Random LoRA / Random Checkpoint, "+ Triggers" inserts a LoRA's trigger
 // words into CLIP Dual Text Encode's prompt. The browsers also manage the files (manage: true): ＋ Find on Civitai downloads new ones (civitai.js),
 // ✎ renames one, ⇄ moves one to another folder (or drag its card onto a folder in the tree) and 🗑 deletes one, with its preview and Model info.
+// ☆ on a card makes it a favorite (kept in its Model info, so it goes with the file); ★ Favorites in the tree shows only those.
 const CLIP_NODE = "CLIPTextEncodePositiveNegative";
 const BROWSERS = [
   { kind: "loras", icon: "🎴", title: "LoRA", one: "LoRA", plural: "LoRAs", widget: /lora/i, random: "DiceForgeRandomLora", randomName: "Random LoRA", triggers: true, manage: true },
@@ -61,7 +62,9 @@ const STYLE = `
 .dflb .main{display:flex;gap:12px;flex:1;min-height:0}.dflb .tree{width:230px;flex:none;overflow:auto;border:1px solid #4a4a4a;border-radius:6px;padding:6px}
 .dflb .tree .row{display:flex;align-items:center;gap:6px;padding:3px 6px;border-radius:4px;cursor:pointer}.dflb .tree .row:hover{background:#2c2c2c}
 .dflb .tree .row.sel{background:#2f3f55}.dflb .tree .twist{width:14px;flex:none;color:#999;text-align:center}.dflb .tree .twist:hover{color:#fff}
-.dflb .tree .tools{display:flex;gap:6px;margin-bottom:6px}.dflb .tree .tools button{flex:1}.dflb .tree .row.drop{background:#35584a;outline:1px dashed #8fd0a8}.dflb .tree .row .name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dflb .tree button{padding:0 6px;font-size:12px}
+.dflb .tree .tools{display:flex;gap:6px;margin-bottom:6px}.dflb .tree .tools button{flex:1}.dflb .tree .row.drop{background:#35584a;outline:1px dashed #8fd0a8}
+.dflb .pic .fav{position:absolute;right:6px;top:6px;background:#000a;border:none;border-radius:5px;color:#ddd;font-size:18px;line-height:1;padding:3px 6px}
+.dflb .pic .fav.on{color:#ffd24a}.dflb .pic .fav:hover{background:#000d}.dflb .tree .row.favs .name{color:#ffd24a}.dflb .tree .row .name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dflb .tree button{padding:0 6px;font-size:12px}
 .dflb .grid{flex:1;overflow:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;align-content:start;grid-auto-rows:max-content}
 .dflb .card{background:#2a2a2a;border:1px solid #474747;border-radius:8px;overflow:hidden;display:flex;flex-direction:column}.dflb .card.sel{border-color:#6a9ad8}
 .dflb .pic{aspect-ratio:3/4;background:#1e1e1e;display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative}
@@ -98,6 +101,7 @@ async function openBrowser(node, spec, target = targetOf(node, spec)) {
   const search = element("input", { placeholder: "Search by file, name or trigger word…" });
   const base = element("select", {}, element("option", { value: "" }, "All base models"));
   const FITS = "\u0001fits";
+  const FAVORITES = "\u0002favorites"; // The ★ Favorites row of the tree, as the picked "folder".
   const sort = element("select", {}, ...[["name", "Name"], ["new", "Newest first"], ["base", "Base model"]].map(([value, label]) => element("option", { value }, label)));
   const status = element("div", { class: "status" });
   const tree = element("div", { class: "tree" });
@@ -164,6 +168,8 @@ async function openBrowser(node, spec, target = targetOf(node, spec)) {
       const fit = target?.base ? compareBases(entry.base_model, target.base) : null;
       box.append(element("span", { class: "base", title: fit?.text ?? "" }, `${fit ? (fit.level === "bad" ? "⛔ " : "⚠️ ") : ""}${entry.base_model}`));
     }
+    box.append(element("button", { class: "fav" + (entry.favorite ? " on" : ""), title: entry.favorite ? "A favorite: click to remove the star" : "Add to favorites",
+      onclick: (event) => { event.stopPropagation(); background(setFavorite(entry, !entry.favorite)); } }, entry.favorite ? "★" : "☆"));
     return box;
   }
   function card(entry) {
@@ -244,10 +250,17 @@ async function openBrowser(node, spec, target = targetOf(node, spec)) {
     await reload();
     say(`Deleted ${entry.file}.`);
   }
+  async function setFavorite(entry, favorite) {
+    const response = await api.fetchApi("/diceforge/model-favorite", { method: "POST", body: JSON.stringify({ kind, file: entry.file, favorite }) });
+    if (!response.ok) return say(await response.text());
+    files = files.map((item) => (item.file === entry.file ? { ...item, favorite } : item));
+    say(favorite ? `${shortName(entry.file)} is a favorite.` : `${shortName(entry.file)} is no longer a favorite.`);
+    draw();
+  }
   function matches(entry) {
     const query = search.value.trim().toLowerCase();
     const text = [entry.file, entry.name, entry.base_model, ...entry.trigger_words].join(" ").toLowerCase();
-    const inFolder = !folder || folderOf(entry.file) === folder || folderOf(entry.file).startsWith(folder + "/");
+    const inFolder = folder === FAVORITES ? entry.favorite : !folder || folderOf(entry.file) === folder || folderOf(entry.file).startsWith(folder + "/");
     const baseOk = !base.value || (base.value === FITS ? compareBases(entry.base_model, target.base)?.level !== "bad" : entry.base_model === base.value);
     return inFolder && baseOk && (!query || query.split(/\s+/).every((word) => text.includes(word)));
   }
@@ -278,7 +291,11 @@ async function openBrowser(node, spec, target = targetOf(node, spec)) {
     const tools = parents.size ? [element("div", { class: "tools" },
       element("button", { class: "open-all", title: "Open every folder", onclick: () => { parents.forEach((path) => opened.add(path)); keepOpened(); drawTree(); } }, "Expand all"),
       element("button", { class: "close-all", title: "Close every folder", onclick: () => { opened.clear(); keepOpened(); drawTree(); } }, "Collapse all"))] : [];
-    tree.replaceChildren(...tools, ...shown.map((path) => {
+    const favorites = files.filter((entry) => entry.favorite).length;
+    const favoritesRow = element("div", { class: "row favs" + (folder === FAVORITES ? " sel" : ""), "data-path": FAVORITES, style: "padding-left:6px",
+      title: "Your favorites (☆ on a card)", onclick: () => { folder = FAVORITES; draw(); } },
+      element("span", { class: "name" }, "★ Favorites"), element("span", { class: "muted" }, favorites));
+    tree.replaceChildren(...tools, ...shown.flatMap((path) => (path === "" ? [path, FAVORITES] : [path])).map((path) => path === FAVORITES ? favoritesRow : (() => {
       const depth = path ? path.split("/").length : 0;
       const twist = parents.has(path)
         ? element("span", { class: "twist", title: opened.has(path) ? "Close the folder" : "Open the folder", onclick: (event) => { event.stopPropagation(); toggle(path); } }, opened.has(path) ? "▾" : "▸")
@@ -301,7 +318,7 @@ async function openBrowser(node, spec, target = targetOf(node, spec)) {
         row.title = `Drop a card here to move it to ${path || "the top folder"}`;
       }
       return row;
-    }));
+    })()));
   }
   function draw() {
     const bases = [...new Set(files.map((entry) => entry.base_model).filter(Boolean))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true })); // SD 1.5 before SDXL 1.0, Flux.1 D before Flux.1 S.

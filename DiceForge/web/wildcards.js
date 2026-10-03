@@ -110,7 +110,8 @@ const STYLE = `
 .dfwc .row{display:flex;align-items:center;gap:6px;padding:3px 6px;border-radius:4px}.dfwc .row:hover{background:#2c2c2c}
 .dfwc .row .name{flex:1;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dfwc .row.sel{background:#2f3f55}
 .dfwc .folder>.row .name{font-weight:600}.dfwc .folder>.row .name::before{content:"▸ ";color:#999}.dfwc .folder.open>.row .name::before{content:"▾ "}
-.dfwc .kids{margin-left:16px}.dfwc .row.drop,.dfwc .tree.drop{background:#35584a;outline:1px dashed #8fd0a8}.dfwc .folder:not(.open)>.kids{display:none}.dfwc .muted{color:#999;font-size:12px}
+.dfwc .kids{margin-left:16px}.dfwc button.fav{border:none;background:none;padding:0 4px;font-size:15px;color:#888}.dfwc button.fav.on{color:#ffd24a}
+.dfwc button.only-favorites.on{border-color:#b8962e;color:#ffd24a}.dfwc .row.drop,.dfwc .tree.drop{background:#35584a;outline:1px dashed #8fd0a8}.dfwc .folder:not(.open)>.kids{display:none}.dfwc .muted{color:#999;font-size:12px}
 .dfwc button{background:#222;color:#eee;border:1px solid #666;border-radius:6px;padding:5px 12px;cursor:pointer;font:inherit}.dfwc button:hover{background:#2c2c2c}
 .dfwc button:disabled{opacity:.5;cursor:default}.dfwc button.delete:not(:disabled){border-color:#8a4a4a;color:#f0b0b0}.dfwc textarea[readonly]{color:#aaa}.dfwc button.add{padding:1px 8px;font-size:12px;border-color:#4a7a4a;color:#bfe8bf}.dfwc .status{color:#9c9;min-height:18px;font-size:13px}
 `;
@@ -143,7 +144,7 @@ function closePopup() {
 function renderPopup() {
   popup.element.replaceChildren(...popup.items.map((item, index) => {
     const row = element("div", { class: (index === popup.index ? "on " : "") + (item.browse ? "browse" : "") },
-      item.browse ? "📂 Browse wildcards…" : `__${item.token}__`, ...(item.lines != null ? [element("span", { class: "n" }, `${item.lines}`)] : []));
+      item.browse ? "📂 Browse wildcards…" : `${item.favorite ? "★ " : ""}__${item.token}__`, ...(item.lines != null ? [element("span", { class: "n" }, `${item.lines}`)] : []));
     row.addEventListener("mousedown", (event) => { event.preventDefault(); background(accept(index)); });
     return row;
   }));
@@ -160,9 +161,9 @@ async function updatePopup(textarea) {
   const typed = typedText.toLowerCase();
   const { files } = await wildcardList();
   if (request !== popupRequest) return; // Typed on (or closed) meanwhile: the newer update shows the popup, for the text as it is now.
-  const entries = [...files.map((file) => ({ token: file.name, lines: file.lines })), ...folderNames(files).map((folder) => ({ token: `${folder}/*`, lines: null }))];
-  const found = entries.filter((entry) => entry.token.toLowerCase().includes(typed))
-    .sort((a, b) => (b.token.toLowerCase().startsWith(typed) - a.token.toLowerCase().startsWith(typed)) || a.token.localeCompare(b.token)).slice(0, 12);
+  const entries = [...files.map((file) => ({ token: file.name, lines: file.lines, favorite: !!file.favorite })), ...folderNames(files).map((folder) => ({ token: `${folder}/*`, lines: null }))];
+  const found = entries.filter((entry) => entry.token.toLowerCase().includes(typed)) // Names that start with what is typed first, then ★ favorites.
+    .sort((a, b) => (b.token.toLowerCase().startsWith(typed) - a.token.toLowerCase().startsWith(typed)) || (!!b.favorite - !!a.favorite) || a.token.localeCompare(b.token)).slice(0, 12);
   popup.items = [...found, { browse: true }];
   popup.index = 0;
   popup.start = opening;
@@ -327,10 +328,25 @@ async function openBrowser(node) {
     draw();
   } }, "Expand all");
   const collapseAll = element("button", { class: "close-all", title: "Close every folder", onclick: () => { opened.clear(); keepOpenFolders(opened); draw(); } }, "Collapse all");
+  // ★ Favorites: a star on a file, kept on the server (it follows renames and moves); the toolbar button shows only them.
+  let onlyFavorites = false;
+  const favoritesButton = element("button", { class: "only-favorites", title: "Show only your favorites (☆ on a file)", onclick: () => {
+    onlyFavorites = !onlyFavorites;
+    favoritesButton.classList.toggle("on", onlyFavorites);
+    draw();
+  } }, "★ Favorites");
+  async function setFavorite(name, favorite) {
+    const response = await api.fetchApi("/diceforge/wildcards/favorite", { method: "POST", body: JSON.stringify({ name, favorite }) });
+    if (!response.ok) return say(await response.text());
+    await wildcardList(true); // The autocomplete gets the star too.
+    say(favorite ? `__${name}__ is a favorite.` : `__${name}__ is no longer a favorite.`);
+    draw();
+  }
   function draw() {
     const { files } = listCache ?? { files: [] };
     const query = search.value.trim().toLowerCase();
-    const shown = files.filter((file) => !query || file.name.toLowerCase().includes(query));
+    const shown = files.filter((file) => (!query || file.name.toLowerCase().includes(query)) && (!onlyFavorites || file.favorite));
+    const allOpen = query || onlyFavorites; // A search or the favorites show their matches in open folders.
     const root = { folders: new Map(), files: [] };
     for (const file of shown) {
       let level = root;
@@ -346,26 +362,28 @@ async function openBrowser(node) {
         const row = element("div", { class: "row" }, element("span", { class: "name", title: "Open or close the folder", onclick: () => toggle(folder.path) }, `📁 ${part}`), element("span", { class: "muted" }, "all files"),
           element("button", { class: "add", title: `Insert __${folder.path}/*__`, onclick: () => add(`${folder.path}/*`) }, "+ Add"));
         dropTarget(row, "wildcards", (name) => background(moveFile(name, folder.path))); // A file dropped on a folder moves into it.
-        return element("div", { class: "folder" + (query || opened.has(folder.path) ? " open" : ""), "data-path": folder.path }, row, element("div", { class: "kids" }, ...drawLevel(folder)));
+        return element("div", { class: "folder" + (allOpen || opened.has(folder.path) ? " open" : ""), "data-path": folder.path }, row, element("div", { class: "kids" }, ...drawLevel(folder)));
       }),
       ...level.files.map((file) => {
         const row = element("div", { class: "row" + (file.name === selected ? " sel" : ""), "data-name": file.name, title: file.error || file.preview.join("\n") },
           element("span", { class: "name", onclick: () => open(file.name) }, file.name.split("/").pop()),
           element("span", { class: "muted", title: file.error || (file.yaml ? `From ${file.yaml}` : "") },
             file.error ? "⚠ can't be read" : `${file.yaml ? "yaml · " : ""}${file.lines} ${file.lines === 1 ? "line" : "lines"}`),
+          element("button", { class: "fav" + (file.favorite ? " on" : ""), title: file.favorite ? "A favorite: click to remove the star" : "Add to favorites",
+            onclick: () => background(setFavorite(file.name, !file.favorite)) }, file.favorite ? "★" : "☆"),
           element("button", { class: "add", title: `Insert __${file.name}__`, onclick: () => add(file.name) }, "+ Add"));
         if (!file.yaml) dragSource(row, "wildcards", file.name); // A yaml wildcard moves with its yaml file only.
         return row;
       }),
     ];
     const items = drawLevel(root);
-    tree.replaceChildren(...(items.length ? items : [element("div", { class: "muted" }, files.length ? "No wildcard matches the search." : "No wildcard files yet: create one with + New file (they go to ComfyUI/models/wildcards).")]));
+    tree.replaceChildren(...(items.length ? items : [element("div", { class: "muted" }, files.length ? (onlyFavorites && !query ? "No favorites yet: ☆ next to a file adds it." : "No wildcard matches the search.") : "No wildcard files yet: create one with + New file (they go to ComfyUI/models/wildcards).")]));
   }
   dropTarget(tree, "wildcards", (name) => background(moveFile(name, ""))); // Dropped on the tree, not on a folder: to the top folder.
   search.addEventListener("input", draw);
   back.append(element("div", { class: "dfwc" },
     element("h2", {}, "Wildcards"),
-    element("div", { class: "top" }, search, expandAll, collapseAll, create, element("button", { onclick: close }, "Close")),
+    element("div", { class: "top" }, search, favoritesButton, expandAll, collapseAll, create, element("button", { onclick: close }, "Close")),
     element("div", { class: "main" }, tree, element("div", { class: "edit" }, title, editor, element("div", { class: "top" }, status, element("span", { style: "flex:1" }), remove, move, rename, save)))));
   document.body.append(back);
   await wildcardList(true);

@@ -393,6 +393,7 @@ Right-click **Load LoRA** (or another node with a LoRA list), **Random LoRA** or
 
 - a **preview**: an image saved next to the LoRA (`name.preview.png`, `name.png`, `.jpg`, `.webp`, as Civitai Helper and LoRA Manager save them) or else the first Civitai image (blurred if Civitai rates it R or higher, until clicked);
 - the **name** (yours from Model info, or the Civitai model and version), the file, its size, the **base model** and the **trigger words** (click one to copy it; your own trigger words from Model info come first);
+- **☆ favorites**: the star on a card's picture makes it a favorite (★), and **★ Favorites** under *All LoRAs* in the tree shows only them. The star is kept in the model's Model info on the server, so it is there in every browser and goes with the file when it is renamed, moved or deleted. The Checkpoint and Diffusion Model Browsers have favorites too;
 - a **folder tree** with the number of LoRAs in each folder (subfolders start closed: **▸** opens one, a click on the name shows that folder's LoRAs; **Expand all** / **Collapse all**; the browser remembers which folders are open, and opens the tree to the folder a Random loader uses), a **search** box (file, name or trigger words), a **base model** filter (SDXL, Pony, Illustrious…) and sorting by name, newest or base model.
 
 What a card's button does depends on where the browser was opened:
@@ -620,6 +621,7 @@ After each run the node shows, under its inputs, the **positive** and **negative
   - **+ Add** next to a file inserts `__name__`, next to a folder `__folder/*__`, where the cursor was last in the node's positive or negative field (at the end of the positive prompt if you have not clicked in one yet). Commas are added when the name would touch other text.
   - **+ New file** creates a file (`hair/color` makes the `hair` folder too) in the first wildcards folder. A name that is already taken is refused, so an existing file is never emptied.
   - Click a file name to open it in the editor on the right, change its lines and **Save** (or Ctrl+S). *Save •* means there are unsaved changes.
+  - **☆** next to a file makes it a favorite (★); **★ Favorites** in the toolbar shows only the favorites, in open folders. In the `__` autocomplete, favorites come first (after the names that start with what you typed) and are marked ★. They are kept in `ComfyUI/user/DiceForge/wildcard_favorites.json` and follow a rename or move; a yaml wildcard can be a favorite too.
   - **⇄ Move** moves the open file to another folder: pick a folder (or the top folder) or type a new one. Dragging a file onto a folder in the tree does the same (onto the empty part of the tree for the top folder). Unsaved changes stay in the editor.
   - **Rename** gives the open file a new name or moves it: `hair/color` to `palette/hair` moves it to the `palette` folder. It stays in its wildcards folder, and a name that is already taken (by a file or a yaml wildcard) is refused. Prompts that use the old `__name__` need the new one.
   - **Delete** removes the open file, after a confirmation. Folders left empty by a rename or delete are removed too.

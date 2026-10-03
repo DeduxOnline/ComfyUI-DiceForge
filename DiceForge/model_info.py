@@ -119,7 +119,7 @@ async def model_info(kind, name, refresh=False):
     stat = os.stat(path)
     info = read_info(kind, name)
     if info.get("size") != stat.st_size or info.get("mtime") != stat.st_mtime: # A new or changed file: its hash and Civitai data start over.
-        info = {"user": info.get("user", {}), "size": stat.st_size, "mtime": stat.st_mtime}
+        info = {"user": info.get("user", {}), "favorite": info.get("favorite") is True, "size": stat.st_size, "mtime": stat.st_mtime} # Yours stays.
     if not info.get("sha256"):
         started = time.time()
         info["sha256"] = await asyncio.get_running_loop().run_in_executor(None, sha256_of, path) # Off the event loop: big files take a while.
@@ -148,6 +148,7 @@ def browser_entry(kind, name, path, folder_files):
     found = bool(civitai.get("found"))
     return {
         "file": name,
+        "favorite": info.get("favorite") is True, # ★ in the browsers: kept whatever the file's state, like your notes.
         "size": stat.st_size,
         "mtime": stat.st_mtime,
         "preview": local_preview(path, folder_files) is not None,
@@ -196,6 +197,19 @@ def register_routes():
         if not preview:
             raise web.HTTPNotFound(text="Model browser: no local preview.")
         return web.FileResponse(preview, headers={"Cache-Control": "max-age=300"})
+    # ★ Favorites of the model browsers: a flag in the model's info file, so it moves and goes with the file (rename, move, delete).
+    @routes.post("/diceforge/model-favorite")
+    async def save_model_favorite(request):
+        body = await json_body(request)
+        kind, name, favorite = body.get("kind", ""), body.get("file", ""), body.get("favorite")
+        if kind not in KINDS or not isinstance(name, str) or not name or not folder_paths.get_full_path(kind, name):
+            raise web.HTTPNotFound(text="Model info: unknown model.")
+        if not isinstance(favorite, bool):
+            raise web.HTTPBadRequest(text="Model info: favorite must be true or false.")
+        info = read_info(kind, name)
+        info["favorite"] = favorite
+        write_info(kind, name, info)
+        return web.json_response({"file": name, "favorite": favorite})
     @routes.post("/diceforge/model-info")
     async def save_model_info(request):
         body = await json_body(request)

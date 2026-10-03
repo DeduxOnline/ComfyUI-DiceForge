@@ -296,3 +296,24 @@ def test_downloads_go_to_the_folder_named_like_the_kind(models, tmp_path, monkey
                         ([str(unet), str(models.root / "diffusion_models")], model_manager.folder_paths.supported_pt_extensions))
     assert model_manager.download_root("diffusion_models") == str(models.root / "diffusion_models") # Not the older models/unet listed first.
     assert model_manager.download_root("loras") == str(models.root / "loras")
+
+
+def test_model_favorites_go_with_the_file(api, models):
+    models("loras", "style/ink.safetensors", b"ink")
+    favorite = lambda: {entry["file"] for entry in api("GET", "/diceforge/model-browser?kind=loras")[1]["files"] if entry["favorite"]}
+    assert favorite() == set()
+    assert api("POST", "/diceforge/model-favorite", {"kind": "loras", "file": "style/ink.safetensors", "favorite": True})[1] == {"file": "style/ink.safetensors", "favorite": True}
+    assert favorite() == {"style/ink.safetensors"}
+    api("GET", "/diceforge/model-info?kind=loras&file=style/ink.safetensors") # Hashed and looked up (offline): the star stays.
+    assert favorite() == {"style/ink.safetensors"}
+    assert api("POST", "/diceforge/models/rename", {"kind": "loras", "file": "style/ink.safetensors", "to": "ink"})[0] == 200
+    assert favorite() == {"ink.safetensors"} # Moved with its info.
+    with open(models.root / "loras" / "ink.safetensors", "ab") as file:
+        file.write(b" changed") # A changed file starts its Civitai data over, not your star.
+    api("GET", "/diceforge/model-info?kind=loras&file=ink.safetensors")
+    assert favorite() == {"ink.safetensors"}
+    assert api("POST", "/diceforge/model-favorite", {"kind": "loras", "file": "ink.safetensors", "favorite": False})[0] == 200
+    assert favorite() == set()
+    for body, status in (({"kind": "loras", "file": "nope.safetensors", "favorite": True}, 404), ({"kind": "loras", "file": "ink.safetensors", "favorite": 1}, 400),
+                         ({"kind": "nope", "file": "ink.safetensors", "favorite": True}, 404), ({"kind": "loras", "file": 5, "favorite": True}, 404)):
+        assert api("POST", "/diceforge/model-favorite", body)[0] == status

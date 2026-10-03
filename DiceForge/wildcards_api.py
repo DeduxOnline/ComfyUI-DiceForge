@@ -1,4 +1,5 @@
 import asyncio
+import json
 import os
 import re
 import folder_paths
@@ -49,6 +50,23 @@ def move_file(path, target):
     os.makedirs(os.path.dirname(target), exist_ok=True)
     os.replace(path, target) # The target was checked to be free (or the same file, in another case).
     remove_empty_folders(os.path.dirname(path), root_of(path))
+# ★ Favorite wildcards (txt or yaml), by name, in the ComfyUI user folder; a rename or move takes the star along, a delete drops it.
+FAVORITES_FILE = os.path.join(folder_paths.get_user_directory(), "DiceForge", "wildcard_favorites.json")
+def read_favorites():
+    try:
+        with open(FAVORITES_FILE, encoding="utf-8") as file:
+            names = json.load(file)
+        return {name for name in names if isinstance(name, str)} if isinstance(names, list) else set()
+    except (OSError, ValueError): # None yet, or damaged: no favorites (the next star writes a good file).
+        return set()
+def write_favorites(names):
+    os.makedirs(os.path.dirname(FAVORITES_FILE), exist_ok=True)
+    with open(FAVORITES_FILE, "w", encoding="utf-8") as file:
+        json.dump(sorted(names, key=str.lower), file, ensure_ascii=False, indent=1)
+def rename_favorite(name, to):
+    names = read_favorites()
+    if name in names:
+        write_favorites((names - {name}) | ({to} if to else set()))
 def write_lines(path, text):
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8", newline="\n") as file:
@@ -61,13 +79,14 @@ def register_routes():
         return
     @routes.get("/diceforge/wildcards")
     async def list_wildcards(request):
-        files = []
+        files, favorites = [], read_favorites()
         for name, entry in sorted(wildcard_index(refresh=True).items(), key=lambda item: item[0].lower()):
             try:
                 options, error = entry_lines(entry), {}
             except ValueError as problem: # One unreadable file doesn't hide the others: it is listed with its error.
                 options, error = [], {"error": str(problem)}
-            files.append({"name": name, "lines": len(options), "preview": options[:3], **({"yaml": os.path.basename(entry["path"])} if "lines" in entry else {}), **error})
+            files.append({"name": name, "lines": len(options), "preview": options[:3], "favorite": name in favorites,
+                          **({"yaml": os.path.basename(entry["path"])} if "lines" in entry else {}), **error})
         return web.json_response({"folders": folder_paths.get_folder_paths("wildcards"), "files": files})
     @routes.get("/diceforge/wildcards/file")
     async def read_wildcard_file(request):
@@ -116,6 +135,7 @@ def register_routes():
         except OSError as error:
             raise web.HTTPBadRequest(text=f"Wildcards: can't rename {name} to {to}: {error.strerror or error}.") from None
         wildcard_index(refresh=True)
+        rename_favorite(name, to)
         return web.json_response({"renamed": name, "to": to, "path": target})
     @routes.delete("/diceforge/wildcards/file")
     async def delete_wildcard_file(request):
@@ -126,5 +146,20 @@ def register_routes():
         except OSError as error:
             raise web.HTTPBadRequest(text=f"Wildcards: can't delete {name}: {error.strerror or error}.") from None
         wildcard_index(refresh=True)
+        rename_favorite(name, None)
         return web.json_response({"deleted": name, "path": path})
+    @routes.post("/diceforge/wildcards/favorite")
+    async def favorite_wildcard(request):
+        body = await json_body(request)
+        name, favorite = checked_name(body.get("name")), body.get("favorite")
+        if not isinstance(favorite, bool):
+            raise web.HTTPBadRequest(text="Wildcards: favorite must be true or false.")
+        if favorite and name not in wildcard_index(refresh=True):
+            raise web.HTTPNotFound(text=f"Wildcards: no wildcard {name}.")
+        names = read_favorites()
+        try:
+            write_favorites(names | {name} if favorite else names - {name})
+        except OSError as error:
+            raise web.HTTPBadRequest(text=f"Wildcards: the favorites could not be saved: {error.strerror or error}.") from None
+        return web.json_response({"name": name, "favorite": favorite})
 register_routes()
