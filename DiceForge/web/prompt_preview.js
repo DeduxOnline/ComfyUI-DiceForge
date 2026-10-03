@@ -1,5 +1,5 @@
 import { app } from "../../scripts/app.js";
-import { addStyleOnce, element } from "./dom.js";
+import { addStyleOnce, background, element } from "./dom.js";
 import { fitNodeHeight } from "./node_size.js";
 
 // CLIP Dual Text Encode shows, under its inputs, the positive and negative prompts as the last run encoded them: choices, wildcards and variables
@@ -25,7 +25,7 @@ app.registerExtension({
     const box = (label, value) => {
       const item = element("div", { class: "box", title: "Click to copy" }, element("b", {}, label), value ? value : element("span", { class: "empty" }, "(empty)"));
       item.addEventListener("click", () => {
-        navigator.clipboard?.writeText(value);
+        background(navigator.clipboard?.writeText(value)); // A refused copy (no permission) is logged, not thrown.
         item.classList.add("copied");
         setTimeout(() => item.classList.remove("copied"), 600);
       });

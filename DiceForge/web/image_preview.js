@@ -1,6 +1,6 @@
 import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
-import { addStyleOnce, element } from "./dom.js";
+import { addStyleOnce, background, element } from "./dom.js";
 import { fitNodeHeight } from "./node_size.js";
 
 // Random Image shows, under its inputs, the image the last run picked: the picture, its file and folder, its size (and frames of an animated one) and
@@ -39,7 +39,7 @@ app.registerExtension({
           last.view.type === "temp" ? "The preview was a temporary copy, cleared since: run again to see it." : `${last.file} is no longer there.`)));
         const file = element("div", { class: "file", title: `${last.folder}/${last.file} (click to copy)` }, last.file);
         file.addEventListener("click", () => {
-          navigator.clipboard?.writeText(last.file);
+          background(navigator.clipboard?.writeText(last.file)); // A refused copy (no permission) is logged, not thrown.
           file.classList.add("copied");
           setTimeout(() => file.classList.remove("copied"), 600);
         });
