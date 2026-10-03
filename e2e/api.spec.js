@@ -265,13 +265,15 @@ test.describe("@api workflows and routes", () => {
   });
 
   test("Danbooru Tag Enhancer adds the tags of a Danbooru post (a general one) to the prompt", async ({ request }) => {
-    const prompt = (seed) => ({ 1: { class_type: "DiceForgeDanbooruEnhancer", inputs: { tags: "hatsune miku, masterpiece", seed, seed_mode: "random", rating: "general", max_tags: 15,
+    const prompt = () => ({ 1: { class_type: "DiceForgeDanbooruEnhancer", inputs: { tags: "hatsune miku, masterpiece", rating: "general", max_tags: 15,
       add_general: true, add_character: false, add_copyright: false, add_artist: false, exclude: "", position: "after" } },
       2: { class_type: "PreviewAny", inputs: { source: ["1", 0] } }, 3: { class_type: "PreviewAny", inputs: { source: ["1", 2] } } });
-    const result = await runPrompt(request, prompt(4));
+    const result = await runPrompt(request, prompt());
     expect(result.status, result.error).toBe("success");
-    expect(shown(result, "2")).toBe("hatsune miku, masterpiece, 1girl, smile, twintails"); // Post 101: the explicit one is left out.
+    expect(shown(result, "2")).toBe("hatsune miku, masterpiece, 1girl, smile, twintails"); // Post 101: rating:g leaves the explicit one out.
     expect(shown(result, "3")).toMatch(/\/posts\/101$/);
+    expect(result.outputs["1"].dice_forge_danbooru[0]).toMatchObject({ id: 101, search: "hatsune_miku rating:g", rating: "g" }); // Shown on the node; masterpiece: no post.
+    expect((await runPrompt(request, prompt())).status).toBe("success"); // The same inputs run again: a new post each time, never from the cache.
   });
 
   test("Wildcard Browser routes", async ({ request }) => {

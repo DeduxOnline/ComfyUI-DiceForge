@@ -1,5 +1,5 @@
-# Danbooru Tag Enhancer (DiceForge/danbooru_enhancer.py): the prompt's tags read through weights and escapes, the search tags, the post picked by the
-# seed modes, the tags added, the posts kept on disk, and a stand-in for Danbooru (no test goes online).
+# Danbooru Tag Enhancer (DiceForge/danbooru_enhancer.py): the prompt's tags read through weights and escapes, the search tags, Danbooru's random
+# post, the tags added, and a stand-in for Danbooru (no test goes online).
 import asyncio
 import json
 import os
@@ -8,7 +8,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlsplit
 import pytest
 from DiceForge import danbooru_enhancer, tag_autocomplete
-from DiceForge.danbooru_enhancer import DanbooruTagEnhancer, prompt_tags, prompt_text, search_tags
+from DiceForge.danbooru_enhancer import DanbooruTagEnhancer, prompt_tags, prompt_text, search_tags, searches
 
 TAGS = "1girl,0,6000000,\nhatsune_miku,4,90000,miku\nvocaloid,3,200000,\nsmile,0,4000000,\nlong_hair,0,5000000,\ntwintails,0,900000,\nsignature,0,800000,\nthighhighs,0,700000,\n"
 
@@ -23,15 +23,16 @@ POSTS = [post(1, "g", "1girl smile twintails long_hair signature"), post(2, "g",
 
 
 def found(tags):
-    wanted = [tag for tag in tags.split() if not tag.startswith(("order:", "rating:"))]
+    wanted = [tag for tag in tags.split() if not tag.startswith("rating:")]
     ratings = next((tag[len("rating:"):].split(",") for tag in tags.split() if tag.startswith("rating:")), None)
-    return [item for item in POSTS if (ratings is None or item["rating"] in ratings) and all(tag in " ".join(item[f"tag_string_{group}"] for group in ("general", "character", "copyright")).split() for tag in wanted)]
+    return [item for item in POSTS if (ratings is None or item["rating"] in ratings) and all(
+        tag in " ".join(item[f"tag_string_{group}"] for group in ("general", "character", "copyright")).split() for tag in wanted)]
 
 
 @pytest.fixture
 def danbooru(monkeypatch):
-    """The stand-in: posts by search and rating, refused past two terms (order:score counts, rating: doesn't), or for order: when asked (requests
-    are recorded)."""
+    """The stand-in of /posts/random.json: a post of the search (server.choose picks it: the first by default), 404 when none has the tags, 422 past
+    two tags (rating: isn't counted) or when told to refuse. Requests are recorded."""
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *args):
             pass
@@ -40,10 +41,15 @@ def danbooru(monkeypatch):
             url = urlsplit(self.path)
             tags = parse_qs(url.query).get("tags", [""])[0]
             self.server.requests.append(tags)
-            if len([tag for tag in tags.split() if not tag.startswith("rating:")]) > 2 or (self.server.refuse_order and "order:" in tags): # Danbooru's two terms, order: counted.
-                status, body = 422, {"message": "You cannot search for more than 2 tags at a time"}
+            posts = found(tags)
+            if url.path != "/posts/random.json":
+                status, body = 404, {"message": "Not found"}
+            elif self.server.refuse or len([tag for tag in tags.split() if not tag.startswith("rating:")]) > 2:
+                status, body = 422, {"message": "You cannot search for more than 2 tags at a time."}
+            elif not posts:
+                status, body = 404, {"message": "That record was not found."}
             else:
-                status, body = 200, found(tags)
+                status, body = 200, self.server.choose(posts)
             data = json.dumps(body).encode()
             self.send_response(status)
             self.send_header("Content-Type", "application/json")
@@ -51,7 +57,7 @@ def danbooru(monkeypatch):
             self.end_headers()
             self.wfile.write(data)
     server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-    server.requests, server.refuse_order = [], False
+    server.requests, server.refuse, server.choose = [], False, lambda posts: posts[0]
     threading.Thread(target=server.serve_forever, daemon=True).start()
     monkeypatch.setattr(danbooru_enhancer, "DANBOORU_URL", f"http://127.0.0.1:{server.server_port}")
     yield server
@@ -64,8 +70,12 @@ def tag_list():
         file.write(TAGS)
 
 
+def execute(tags="1girl, hatsune miku, masterpiece", **inputs):
+    return asyncio.run(DanbooruTagEnhancer.execute(tags, **inputs))
+
+
 def run(tags="1girl, hatsune miku, masterpiece", **inputs):
-    return asyncio.run(DanbooruTagEnhancer.execute(tags, **inputs)).result
+    return execute(tags, **inputs).result
 
 
 def test_prompt_tags_read_through_the_prompt_syntax():
@@ -74,69 +84,57 @@ def test_prompt_tags_read_through_the_prompt_syntax():
     assert prompt_text("hatsune_miku_(cosplay)") == "hatsune miku \\(cosplay\\)" and prompt_text("^_^") == "^_^"
 
 
-def test_search_tags_are_the_most_telling():
-    assert search_tags(["1girl", "masterpiece", "hatsune_miku"]) == (["1girl"], ["1girl", "masterpiece", "hatsune_miku"]) # No lists: the first.
+def test_search_tags_are_the_two_most_telling():
+    assert search_tags(["1girl", "masterpiece", "hatsune_miku"]) == ["1girl", "masterpiece"] # No lists: the first two.
     tag_list()
-    assert search_tags(["1girl", "masterpiece", "smile", "hatsune_miku"]) == (["hatsune_miku"], ["1girl", "smile", "hatsune_miku"]) # The character.
+    assert search_tags(["1girl", "masterpiece", "smile", "hatsune_miku"]) == ["hatsune_miku", "smile"] # The character, then the rarer general tag.
+    assert searches(["a", "b"]) == [["a", "b"], ["a"], ["b"]] and searches(["a"]) == [["a"]] and searches([]) == [[]]
 
 
-def test_adds_the_posts_tags_by_the_seed(danbooru):
+def test_adds_the_tags_of_a_random_post(danbooru):
     tag_list()
-    text, added, url, number = run(tags="1girl, hatsune miku, masterpiece", seed=0, seed_mode="sequential")
-    assert danbooru.requests == ["hatsune_miku rating:g order:score"] # One tag and the order: Danbooru's two terms (the rating is free). The character;
-    # masterpiece isn't a Danbooru tag.
-    assert number == 1 and url.endswith("/posts/1") # General only (posts 1 and 2): not 3 (explicit) nor 4 (sensitive).
+    output = execute(tags="1girl, hatsune miku, masterpiece")
+    text, added, url, number = output.result
+    assert danbooru.requests == ["hatsune_miku 1girl rating:g"] # Two tags (masterpiece isn't a Danbooru tag), the rating free.
+    assert number == 1 and url.endswith("/posts/1")
     assert added == "long hair, smile, twintails" # The most used first; 1girl is there already, signature excluded.
     assert text == "1girl, hatsune miku, masterpiece, long hair, smile, twintails"
-    both = {run(seed=seed, seed_mode="deck")[3] for seed in range(2)}
-    assert both == {1, 2} # deck: each post once.
-    assert run(seed=7)[3] == run(seed=7)[3] # The same seed: the same post.
+    assert output.ui["dice_forge_danbooru"][0] == {"text": text, "added": added, "url": url, "id": 1, "search": "hatsune_miku 1girl rating:g", "rating": "g"}
+
+
+def test_a_new_post_on_every_run(danbooru):
+    assert DanbooruTagEnhancer.fingerprint_inputs(tags="x") != DanbooruTagEnhancer.fingerprint_inputs(tags="x") # Never from the cache.
+    danbooru.choose = lambda posts: posts[-1]
+    assert run(tags="hatsune miku", rating="general + sensitive")[3] == 4
+    assert run(tags="hatsune miku", rating="general")[3] == 2
+    assert danbooru.requests == ["hatsune_miku rating:g,s", "hatsune_miku rating:g"] # Asked each time.
 
 
 def test_options(danbooru):
     tag_list()
-    first = run(seed=0, seed_mode="sequential", max_tags=2, add_character=True, add_copyright=True, position="before", rating="any")
-    text, added, _url, number = first
-    assert number == 1 and added == "smile, long hair" and text == "smile, long hair, 1girl, hatsune miku, masterpiece" # The most used first; miku is already there.
-    assert run(seed=2, seed_mode="sequential", rating="any", max_tags=0)[1] == "nude"
-    assert "vocaloid" in run(seed=0, seed_mode="sequential", rating="any", add_general=False, add_copyright=True)[1]
+    text, added, _url, number = run(max_tags=2, add_character=True, add_copyright=True, position="before", rating="any")
+    assert number == 1 and added == "long hair, smile" and text == "long hair, smile, 1girl, hatsune miku, masterpiece" # The most used first.
+    assert danbooru.requests[-1] == "hatsune_miku 1girl" # Any: no rating term.
+    danbooru.choose = lambda posts: next(post for post in posts if post["id"] == 3)
+    assert run(rating="any", max_tags=0)[1] == "nude"
+    assert "vocaloid" in run(rating="any", add_general=False, add_copyright=True)[1]
 
 
-def test_a_refused_order_is_searched_again_without_it(danbooru):
-    danbooru.refuse_order = True
-    assert run(tags="hatsune miku", seed=0, seed_mode="sequential")[3] == 1
-    assert danbooru.requests == ["hatsune_miku rating:g order:score", "hatsune_miku rating:g"]
-
-
-def test_the_rating_is_asked_of_danbooru(danbooru):
-    tag_list()
-    assert {run(seed=seed, seed_mode="deck", rating="general + sensitive")[3] for seed in range(3)} == {1, 2, 4}
-    run(seed=0, rating="any")
-    assert danbooru.requests == ["hatsune_miku rating:g,s order:score", "hatsune_miku order:score"] # Any: no rating term.
-
-
-def test_the_other_tags_pick_the_posts(danbooru):
-    tag_list()
-    assert {run(tags="hatsune miku, thighhighs", seed=seed, rating="any")[3] for seed in range(6)} == {2} # The only post with thighhighs too.
-
-
-def test_posts_are_kept_and_used_offline(danbooru):
-    tag_list()
-    picked = run(seed=3)
-    asked = len(danbooru.requests)
-    assert run(seed=3) == picked and len(danbooru.requests) == asked # Kept: not asked again.
-    danbooru.shutdown()
-    danbooru_enhancer.DANBOORU_URL = "http://127.0.0.1:9"
-    assert run(seed=3) == picked # Offline: the kept posts.
+def test_a_pair_no_post_has_is_searched_one_tag_at_a_time(danbooru):
+    assert run(tags="nothing_here, smile")[3] == 1
+    assert danbooru.requests == ["nothing_here smile rating:g", "nothing_here rating:g", "smile rating:g"]
 
 
 def test_clear_errors(danbooru):
-    with pytest.raises(ValueError, match="no general post on Danbooru has"):
+    with pytest.raises(ValueError, match="no general post on Danbooru has nothing_like_this"):
         run(tags="nothing_like_this")
     with pytest.raises(ValueError, match="unknown rating"):
         run(rating="nope")
+    danbooru.refuse = True
+    with pytest.raises(ValueError, match="refused the search"):
+        run()
 
 
-def test_offline_without_kept_posts_says_so():
+def test_offline_says_so():
     with pytest.raises(ValueError, match="can't be reached"):
         run()

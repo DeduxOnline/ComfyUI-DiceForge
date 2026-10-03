@@ -1058,6 +1058,21 @@ for (const vue of [true, false]) {
       await expect(page.locator(".dfip").first().locator("img")).toHaveJSProperty("naturalWidth", file.endsWith("red.png") ? 32 : 16);
     });
 
+    test("Danbooru Tag Enhancer shows the prompt it made from a Danbooru post, also after a reload", async ({ page, request }) => {
+      const [id] = await addNodes(page, [{ type: "DiceForgeDanbooruEnhancer", widgets: { tags: "hatsune miku" } }]);
+      const panel = page.locator(".dfdb").first();
+      await expect(panel).toContainText("Run the workflow to see the prompt made from a Danbooru post here.");
+      await queueFromPage(page, request); // An output node: it runs with nothing connected.
+      await expect(panel.locator(".text")).toHaveText("hatsune miku, 1girl, smile, twintails"); // Post 101: rating:g.
+      await expect(panel.locator(".head")).toContainText("Last run · post #101 (general)");
+      await expect(panel.locator(".added")).toHaveText("+ 1girl, smile, twintails");
+      await expect(panel.locator("a")).toHaveAttribute("href", /\/posts\/101$/);
+      const workflow = await page.evaluate(() => window.app.graph.serialize());
+      expect(workflow.nodes.find((node) => String(node.id) === String(id)).properties.dice_forge_danbooru.id).toBe(101);
+      await page.evaluate(async (data) => { window.app.graph.clear(); await window.app.loadGraphData(data); }, workflow);
+      await expect(page.locator(".dfdb").first().locator(".text")).toHaveText("hatsune miku, 1girl, smile, twintails"); // Kept with the workflow.
+    });
+
     if (vue) {
       test("DiceForge nodes fit their inputs when advanced inputs are shown and hidden", async ({ page }) => { // NOSONAR: expect.poll(...) assertions below.
         const [id] = await addNodes(page, [{ type: "SDXLResolutionListLatent" }]);

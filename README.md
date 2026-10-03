@@ -40,7 +40,7 @@ Every mode gives the same result for the same seed, so an image can be made agai
 | **Variation Seed** | DiceForge/sampling | `DiceForge/variation_seed.py` | You like a picture and want it again with small differences (folds, hair, background, a hand), as A1111's variation seed: same seed and prompt, the noise blended with a second seed's. |
 | **HiresFix (Load VAE)** | DiceForge/image | `DiceForge/hires_upscale.py` | You want Easy-Use's HiresFix with the VAE picked from a list: the image made bigger with an upscale model, rescaled, shown or saved, and encoded into a latent for a second KSampler pass. |
 | **Hires Fix** | DiceForge/sampling | `DiceForge/hires_fix.py` | You want a bigger image with new detail in one node: the first pass's latent made bigger (by a factor, or to the size of an SDXL Resolution List with rescale; in the latent, or in pixels with an upscale model) and sampled again at low denoise. |
-| **Danbooru Tag Enhancer** | DiceForge/conditioning | `DiceForge/danbooru_enhancer.py` | You want a richer prompt from a few tags: it adds the tags of a real Danbooru post that has your tags (picked by the seed), the way anime models were trained. |
+| **Danbooru Tag Enhancer** | DiceForge/conditioning | `DiceForge/danbooru_enhancer.py` | You want a richer prompt from a few tags: it adds the tags of a random Danbooru post that has your tags, the way anime models were trained. |
 | **XY Plot** | DiceForge/sampling | `DiceForge/xy_plot.py` | You want an X/Y comparison in one node: seed, steps, CFG, sampler, scheduler, LoRA, LoRA strength or denoise on each axis, every combination queued with one button, laid out by Dice Grid with the values as headers. |
 | **Dice Grid** | DiceForge/image | `DiceForge/dice_grid.py` | You want the images of a series side by side with labels: a LoRA, checkpoint or setting comparison, or an XY grid. |
 | **Random Diffusion Model** | DiceForge/loaders | `DiceForge/random_diffusion_model.py` | The same for diffusion models (`models/diffusion_models`, Flux and the like), like **Load Diffusion Model**. |
@@ -783,14 +783,14 @@ A node that makes a few tags a full prompt from a real Danbooru post: type `1gir
 
 1. Type the tags in `tags`, or connect `positive_text` of a CLIP Dual Text Encode (choices and wildcards filled in); weights, `\(` escapes and `<lora:>` tags are read through.
 2. Connect `text` to CLIP Dual Text Encode's `positive` (or another text encoder). `added_tags` has only the added ones, `post_url` the post they came from.
+3. Every run takes a new post, like Danbooru's [random post](https://danbooru.donmai.us/posts/random). The node shows the prompt it made under its inputs, with the added tags and a link to the post: click the text to copy it, and paste a prompt you like into `tags` (or a CLIP Dual Text Encode) to keep it. It runs also with nothing connected, just to see prompts.
 
 How it picks:
 
-- The most telling of your tags searches Danbooru, with `order:score` for the most liked posts and your `rating` (a search without an account may have two terms: the order is one, the rating is free): with the [tag lists](#tag-autocomplete-danbooru-e621) downloaded, the rarest tag Danbooru knows, characters and series first (`hatsune miku` before `1girl`), and tags it doesn't know (`masterpiece`) are left out; without the lists, the first tag. Among the 200 most liked posts found, those with the most of your other tags are kept.
-- `rating` keeps only `general` posts (the default), or also `sensitive`, `questionable`, or any; Danbooru searches with it (`rating:g,s`), so the 200 posts are all of that rating.
-- The seed picks one of them, by `seed_mode`: `deck` with *increment* goes through the posts, the same seed gives the same post again.
+- Danbooru picks a random post (`/posts/random`) with the two most telling of your tags and your `rating` (a search without an account may have two tags; the rating is free): with the [tag lists](#tag-autocomplete-danbooru-e621) downloaded, the rarest tags Danbooru knows, characters and series first (`hatsune miku` before `1girl`), and tags it doesn't know (`masterpiece`) are left out; without the lists, the first two. When no post has both, each tag alone.
+- `rating`: `general` posts only (the default), or also `sensitive`, `questionable`, or any.
 - From that post, its general tags that your prompt lacks are added (characters, series and artists too, if you turn them on under Advanced), the most used first, at most `max_tags` (15; 0 for all), without the `exclude` list (signature, watermark, speech bubble…), `after` or `before` your tags, written as the models learned them (spaces, escaped parentheses).
-- The posts of a search are kept for 30 days in `ComfyUI/user/DiceForge/danbooru`, so Danbooru is asked once per search and a seed gives its post again, also offline (then from what was kept, however old).
+- It needs Danbooru: offline, the node says so.
 
 ### Prompt styles
 
