@@ -20,17 +20,22 @@ def image_output_input():
 # Decoding as in the core VAE Decode node, then saving as in the core Save Image node: PNG files in the output folder, with the prompt and workflow
 # as metadata (or only showing them, by image_output). The decoded images are also passed on. Shared by both nodes below.
 def decode_and_save(node_class, vae, samples, filename_prefix, image_output="Save"):
-    if image_output not in IMAGE_OUTPUTS: # Before decoding: a wrong value costs nothing.
-        raise ValueError(f"VAE Decode + Save: unknown image_output {image_output!r} (one of {', '.join(IMAGE_OUTPUTS)}).")
-    outputs = decode(vae, samples), vae
+    check_image_output(image_output, "VAE Decode + Save") # Before decoding: a wrong value costs nothing.
+    images = decode(vae, samples)
+    return io.NodeOutput(images, vae, ui=show_or_save(node_class, images, filename_prefix, image_output))
+def check_image_output(image_output, node_name):
+    if image_output not in IMAGE_OUTPUTS:
+        raise ValueError(f"{node_name}: unknown image_output {image_output!r} (one of {', '.join(IMAGE_OUTPUTS)}).")
+# The images shown on the node and/or saved, by image_output: the node's ui (None when nothing is shown).
+def show_or_save(node_class, images, filename_prefix, image_output):
     if image_output == "Hide":
-        return io.NodeOutput(*outputs)
+        return None
     if image_output == "Preview":
-        return io.NodeOutput(*outputs, ui=ui.PreviewImage(outputs[0], cls=node_class))
+        return ui.PreviewImage(images, cls=node_class)
     if image_output == "Hide&Save":
-        ui.ImageSaveHelper.save_images(outputs[0], filename_prefix=filename_prefix, folder_type=io.FolderType.output, cls=node_class)
-        return io.NodeOutput(*outputs)
-    return io.NodeOutput(*outputs, ui=ui.ImageSaveHelper.get_save_images_ui(outputs[0], filename_prefix=filename_prefix, cls=node_class))
+        ui.ImageSaveHelper.save_images(images, filename_prefix=filename_prefix, folder_type=io.FolderType.output, cls=node_class)
+        return None
+    return ui.ImageSaveHelper.get_save_images_ui(images, filename_prefix=filename_prefix, cls=node_class)
 def decode(vae, samples):
     latent = samples["samples"]
     if latent.is_nested:

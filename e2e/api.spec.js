@@ -7,7 +7,7 @@ const { MODELS, DOWNLOADS } = require("./fixtures");
 
 const NODES = ["SDXLResolutionListLatent", "ResolutionSelectorRandomLatent", "CLIPTextEncodePositiveNegative", "DiceForgeRandomInt", "DiceForgeRandomFloat",
   "DiceForgeRandomLora", "DiceForgeRandomCheckpoint", "DiceForgeRandomDiffusionModel", "DiceForgeRandomImage", "DiceForgeGrid", "DiceForgeRandomSampler",
-  "DiceForgeRandomVAE", "LoadVAEDecodeSave", "VAEDecodeSave", "LoadDiffusionModelCLIP", "DiceForgeLoraStack", "DiceForgeXYPlot", "DiceForgeHiresFix", "DiceForgeVariationSeed"];
+  "DiceForgeRandomVAE", "LoadVAEDecodeSave", "VAEDecodeSave", "LoadDiffusionModelCLIP", "DiceForgeLoraStack", "DiceForgeXYPlot", "DiceForgeHiresFix", "DiceForgeVariationSeed", "DiceForgeHiresUpscale"];
 const clip = (positive, negative = "", { seed = 0, mode = "random" } = {}) => ({
   1: { class_type: "CLIPTextEncodePositiveNegative", inputs: { positive, negative, seed, seed_mode: mode, trim: true } },
   2: { class_type: "PreviewAny", inputs: { source: ["1", 2] } },
@@ -245,6 +245,23 @@ test.describe("@api workflows and routes", () => {
     const errors = Object.values(result.rejected.node_errors).flatMap((node) => node.errors.map((error) => `${error.type} ${error.extra_info?.input_name ?? ""}`));
     expect(errors.join()).toContain("required_input_missing model"); // No checkpoint here: only the links are checked.
     expect(errors.join()).not.toContain("return_type_mismatch");
+  });
+
+  test("HiresFix (Load VAE) rescales the image, encodes it with the VAE from its list and passes both on", async ({ request }) => {
+    const result = await runPrompt(request, {
+      1: { class_type: "EmptyImage", inputs: { width: 64, height: 48, batch_size: 1, color: 0x3366cc } },
+      2: { class_type: "DiceForgeHiresUpscale", inputs: { image: ["1", 0], model_name: "None", rescale_after_model: true, rescale_method: "lanczos", rescale: "by percentage",
+        "rescale.percent": 200, crop: "disabled", vae_name: "pixel_space", image_output: "Preview", filename_prefix: "e2e/hires" } },
+      3: { class_type: "GetImageSize", inputs: { image: ["2", 0] } },
+      4: { class_type: "PreviewAny", inputs: { source: ["3", 0] } },
+      5: { class_type: "PreviewAny", inputs: { source: ["3", 1] } },
+      6: { class_type: "VAEDecode", inputs: { samples: ["2", 1], vae: ["2", 2] } },
+      7: { class_type: "GetImageSize", inputs: { image: ["6", 0] } },
+      8: { class_type: "PreviewAny", inputs: { source: ["7", 0] } },
+    });
+    expect(result.status, result.error).toBe("success");
+    expect([shown(result, "4"), shown(result, "5"), shown(result, "8")]).toEqual(["128", "96", "128"]); // 200%, and the latent decodes back to that size.
+    expect(result.outputs["2"].images).toHaveLength(1); // Preview: shown on the node.
   });
 
   test("Wildcard Browser routes", async ({ request }) => {

@@ -38,6 +38,7 @@ Every mode gives the same result for the same seed, so an image can be made agai
 | **VAE Decode + Save** | utils | `DiceForge/load_vae_decode_save.py` | The same without Load VAE: VAE Decode and Save Image in one node, with the VAE from its `vae` input (the VAE of Load Checkpoint, Load VAE, Random VAE…). Saves PNG files with the workflow, like Save Image, and passes the images and the VAE on. The same `image_output` choice (Hide, Preview, Save, Hide&Save). |
 | **Load Diffusion Model + CLIP** | utils | `DiceForge/load_diffusion_model_clip.py` | You want Load Diffusion Model and Load CLIP in one node, for models that come as separate files (Flux, Anima, Qwen-Image...): the model from `models/diffusion_models` and one text encoder, or two like DualCLIPLoader when `clip_name2` is set. The CLIP type is checked against the number of files before anything loads. |
 | **Variation Seed** | DiceForge/sampling | `DiceForge/variation_seed.py` | You like a picture and want it again with small differences (folds, hair, background, a hand), as A1111's variation seed: same seed and prompt, the noise blended with a second seed's. |
+| **HiresFix (Load VAE)** | DiceForge/image | `DiceForge/hires_upscale.py` | You want Easy-Use's HiresFix with the VAE picked from a list: the image made bigger with an upscale model, rescaled, shown or saved, and encoded into a latent for a second KSampler pass. |
 | **Hires Fix** | DiceForge/sampling | `DiceForge/hires_fix.py` | You want a bigger image with new detail in one node: the first pass's latent made bigger (by a factor, or to the size of an SDXL Resolution List with rescale; in the latent, or in pixels with an upscale model) and sampled again at low denoise. |
 | **XY Plot** | DiceForge/sampling | `DiceForge/xy_plot.py` | You want an X/Y comparison in one node: seed, steps, CFG, sampler, scheduler, LoRA, LoRA strength or denoise on each axis, every combination queued with one button, laid out by Dice Grid with the values as headers. |
 | **Dice Grid** | DiceForge/image | `DiceForge/dice_grid.py` | You want the images of a series side by side with labels: a LoRA, checkpoint or setting comparison, or an XY grid. |
@@ -411,6 +412,24 @@ The second pass of a hires fix in one node: the latent of the first KSampler is 
 | `upscale_model` | | Optional: an upscale model (**Load Upscale Model**: ESRGAN, 4x-UltraSharp…). The image is made bigger in pixels with it (sharper than a latent upscale), resized to the second pass's size, and encoded again. Needs `vae`. |
 
 Outputs: `latent`, `image` (only with `vae`), `width` and `height` of the second pass. The console shows the sizes and settings of each run.
+
+## HiresFix (Load VAE)
+
+Like Easy-Use's *HiresFix*, with the VAE picked from a list instead of a `vae` input: the image of the first pass is made bigger with an upscale model, rescaled, shown or saved, and encoded into a latent for a second KSampler pass (denoise 0.3–0.5). Where [Hires Fix](#hires-fix) does the second pass itself, this node prepares the image and the latent for your own KSampler.
+
+| Input | Default | Description |
+|---|---|---|
+| `image` | | The image of the first pass (VAE Decode, or VAE Decode + Save's `images`). |
+| `model_name` | the first model | An upscale model from `models/upscale_models` (ESRGAN, 4x-UltraSharp, AnimeSharp…), or `None` to only rescale. |
+| `rescale_after_model` | on | Rescale the upscaled image (below); off keeps the model's size (4× for a 4x model). Without a model the image is always rescaled. |
+| `rescale_method` | `lanczos` | How the image is resized: `nearest-exact`, `bilinear`, `area`, `bicubic`, `lanczos`. |
+| `rescale` | `by percentage` 50 | Of the image after the model: `percent` (a 4x model at 50% gives twice the size), `to Width/Height` (one of them keeps the aspect ratio), or `to longest side`. Rounded to multiples of 8 for the latent. |
+| `crop` | `disabled` | With an exact width and height of another aspect ratio: `disabled` stretches, `center` crops. |
+| `vae_name` | | The VAE that encodes the image, from the same list as Load VAE; kept loaded while the name stays the same. |
+| `image_output` | `Preview` | `Hide`, `Preview`, `Save` or `Hide&Save`, as in Easy-Use. |
+| `filename_prefix` | `DiceForge/hires` | Advanced: where `Save` puts the image. |
+
+Outputs: `image` (upscaled and rescaled), `latent` (encoded with the VAE: connect it to a KSampler with denoise 0.3–0.5) and `vae` (for that KSampler's VAE Decode).
 
 ## Model info
 
