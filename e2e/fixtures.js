@@ -91,4 +91,7 @@ const CIVITAI_PAGES = {
 };
 for (const model of CIVITAI_MODELS) CIVITAI_PAGES[model.id] ??= model; // The models of the search have a page too (for downloads).
 
-module.exports = { MODELS, WILDCARDS, CIVITAI, CIVITAI_MODELS, CIVITAI_VERSIONS, CIVITAI_PAGES, DOWNLOADS, png, sha256 };
+// The Danbooru tag list the stand-in serves for the tag autocomplete (tagcomplete's format: tag,type,count,aliases).
+const TAGS = 'long_hair,0,5000000,"longhair"\nlong_sleeves,0,1500000,\nhatsune_miku,4,90000,miku\nsmile,0,4000000,\n1girl,0,6000000,\n';
+
+module.exports = { MODELS, WILDCARDS, CIVITAI, CIVITAI_MODELS, CIVITAI_VERSIONS, CIVITAI_PAGES, DOWNLOADS, TAGS, png, sha256 };

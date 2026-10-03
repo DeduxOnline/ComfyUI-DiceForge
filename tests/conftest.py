@@ -105,6 +105,10 @@ def own_sampler_presets(monkeypatch, tmp_path):
     monkeypatch.setattr(sampler_presets, "PRESETS_FILE", str(tmp_path / "sampler_presets.json"))
     from DiceForge import prompt_styles
     monkeypatch.setattr(prompt_styles, "STYLES_FILE", str(tmp_path / "styles.csv"))
+    from DiceForge import tag_autocomplete
+    monkeypatch.setattr(tag_autocomplete, "TAGS_FOLDER", str(tmp_path / "tags"))
+    monkeypatch.setattr(tag_autocomplete, "TAGS_URL", "http://127.0.0.1:9/tags/{name}.csv")
+    monkeypatch.setattr(tag_autocomplete, "INDEX", tag_autocomplete.TagIndex())
 
 
 def write(path, text=""):
@@ -158,7 +162,7 @@ def api():
     body instead (text or bytes, for requests that aren't JSON)."""
     from aiohttp import web
     from aiohttp.test_utils import TestClient, TestServer
-    from DiceForge import lora_stack, model_info, model_manager, prompt_styles, sampler_presets, wildcards_api, xy_plot
+    from DiceForge import lora_stack, model_info, model_manager, prompt_styles, sampler_presets, tag_autocomplete, wildcards_api, xy_plot
 
     routes = web.RouteTableDef()
     fake_server = types.ModuleType("server")
@@ -166,7 +170,7 @@ def api():
     real_server = sys.modules.get("server")
     sys.modules["server"] = fake_server
     try:
-        for module in (wildcards_api, model_info, lora_stack, model_manager, sampler_presets, xy_plot, prompt_styles):
+        for module in (wildcards_api, model_info, lora_stack, model_manager, sampler_presets, xy_plot, prompt_styles, tag_autocomplete):
             module.register_routes()
     finally:
         if real_server is None:

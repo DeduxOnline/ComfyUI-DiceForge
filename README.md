@@ -673,6 +673,14 @@ As in A1111: `<lora:name:weight>` in either prompt puts that LoRA on the model a
 
 The prompt fields color the syntax as you type: `__wildcards__` (red with a wavy line when no wildcard file has that name; hover the field to see which), the braces and `|` of `{a|b}` choices (one color per nesting level, white on red when a brace is never closed or closes nothing), counts `2$$`, weights `3::`, locks `!`, `${variables}`, `//` and `/* */` comments, `\{` escapes, `(word:1.2)` weights, `embedding:` names and `<lora:...>` tags. Only the colors change: typing, the caret, selecting and the `__` autocomplete work as before. Turn it off in ComfyUI's settings: *DiceForge → Prompts → Highlight the prompt syntax in CLIP Dual Text Encode*.
 
+### Tag autocomplete (Danbooru, e621)
+
+Anime models (Illustrious, NoobAI, Anima, Pony) were trained on Danbooru tags: written the way the model knows them, a tag works much better. While you type a word in a prompt field, the node suggests the most used tags that start with it, or with one of their aliases (`miku → hatsune_miku`), with how often each is used (👤 characters, 🎨 artists, ©️ series). **Enter** or **Tab** puts the tag in as the models learned it: spaces for underscores (emoticons like `^_^` keep theirs), parentheses escaped (`\(`), and a comma after it.
+
+- The tag lists come from [a1111-sd-webui-tagcomplete](https://github.com/DominikDoom/a1111-sd-webui-tagcomplete): right-click CLIP Dual Text Encode → **🏷 Tag autocomplete** → **⬇ Download: Danbooru** (about 100,000 tags) or **e621** (furry models). Download again to update a list.
+- They are kept in `ComfyUI/user/DiceForge/tags` in that project's CSV format (`tag,type,count,aliases`); any list in that format can be put there by hand. Every list there is used.
+- Turn it off in ComfyUI's settings: *DiceForge → Prompts → Tags*.
+
 ### Prompt styles
 
 Right-click CLIP Dual Text Encode and choose **🎨 Prompt styles**: named pieces of positive and negative prompt, put in with one click, as A1111's styles. A style already in the prompts is marked ✓, and a second click takes it out again.

@@ -756,6 +756,34 @@ for (const vue of [true, false]) {
       expect((await (await request.get("/diceforge/styles")).json()).user.map((style) => style.name)).not.toContain(`E2E film ${vue}`);
     });
 
+    test("Tag autocomplete: the Danbooru list downloaded from the node's menu, then the most used tags while a word is typed", async ({ page }) => {
+      const [id] = await addNodes(page, [{ type: "CLIPTextEncodePositiveNegative", pos: [300, 60] }]);
+      const menu = () => page.evaluate((id) => window.app.extensions.find((item) => item.name === "DiceForge.TagAutocomplete")
+        .getNodeMenuItems(window.app.graph.getNodeById(id))[0].submenu.options.map((item) => item.content), id);
+      await expect.poll(menu).toContain("⬇ Download: Danbooru (anime: Illustrious, NoobAI, Anima, Pony)");
+      await page.evaluate((id) => window.app.extensions.find((item) => item.name === "DiceForge.TagAutocomplete")
+        .getNodeMenuItems(window.app.graph.getNodeById(id))[0].submenu.options[0].callback(), id);
+      await expect.poll(menu).toContain("✓ Download again: Danbooru (anime: Illustrious, NoobAI, Anima, Pony)");
+      try {
+        const positive = await promptField(page, id, "positive");
+        await positive.click();
+        await page.keyboard.type("1gi");
+        await expect(page.locator(".dfwc-pop div").first()).toContainText("1girl");
+        await page.keyboard.press("Enter");
+        await expect.poll(() => widgetValue(page, id, "positive")).toBe("1girl, ");
+        await page.keyboard.type("lo");
+        await expect(page.locator(".dfwc-pop div")).toHaveText([/long_hair\s*5M/, /long_sleeves\s*1\.5M/]); // Most used first, with the count.
+        await page.keyboard.press("Enter");
+        await expect.poll(() => widgetValue(page, id, "positive")).toBe("1girl, long hair, "); // Spaces for underscores.
+        await page.keyboard.type("mik");
+        await expect(page.locator(".dfwc-pop div").first()).toContainText("miku → hatsune_miku"); // By its alias.
+        await page.keyboard.press("Escape");
+        await expect(page.locator(".dfwc-pop")).toHaveCount(0);
+      } finally {
+        fs.rmSync(basePath("user", "DiceForge", "tags"), { recursive: true, force: true }); // No tag suggestions in the other tests.
+      }
+    });
+
     test("XY Plot shows the plot under its fields and queues every cell into Dice Grid", async ({ page, request }) => {
       const [xy, image, grid] = await addNodes(page, [
         { type: "DiceForgeXYPlot", widgets: { x_type: "steps", x_values: "10, 20", y_type: "scheduler", y_values: "normal, karras" } },
