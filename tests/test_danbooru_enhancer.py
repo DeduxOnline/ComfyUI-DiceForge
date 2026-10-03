@@ -10,7 +10,7 @@ import pytest
 from DiceForge import danbooru_enhancer, tag_autocomplete
 from DiceForge.danbooru_enhancer import DanbooruTagEnhancer, prompt_tags, prompt_text, search_tags
 
-TAGS = "1girl,0,6000000,\nhatsune_miku,4,90000,miku\nvocaloid,3,200000,\nsmile,0,4000000,\nlong_hair,0,5000000,\ntwintails,0,900000,\nsignature,0,800000,\n"
+TAGS = "1girl,0,6000000,\nhatsune_miku,4,90000,miku\nvocaloid,3,200000,\nsmile,0,4000000,\nlong_hair,0,5000000,\ntwintails,0,900000,\nsignature,0,800000,\nthighhighs,0,700000,\n"
 
 
 def post(number, rating, general, character="hatsune_miku"):
@@ -29,7 +29,7 @@ def found(tags):
 
 @pytest.fixture
 def danbooru(monkeypatch):
-    """The stand-in: posts by search; order:score is refused once when asked (requests are recorded)."""
+    """The stand-in: posts by search, refused past two terms (order:score counts), or for order: when asked (requests are recorded)."""
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *args):
             pass
@@ -38,7 +38,7 @@ def danbooru(monkeypatch):
             url = urlsplit(self.path)
             tags = parse_qs(url.query).get("tags", [""])[0]
             self.server.requests.append(tags)
-            if self.server.refuse_order and "order:" in tags:
+            if len(tags.split()) > 2 or (self.server.refuse_order and "order:" in tags): # Danbooru's two terms, order: counted.
                 status, body = 422, {"message": "You cannot search for more than 2 tags at a time"}
             else:
                 status, body = 200, found(tags)
@@ -73,16 +73,15 @@ def test_prompt_tags_read_through_the_prompt_syntax():
 
 
 def test_search_tags_are_the_most_telling():
-    assert search_tags(["1girl", "masterpiece", "hatsune_miku"]) == (["1girl", "masterpiece"], ["1girl", "masterpiece", "hatsune_miku"]) # No lists: the first two.
+    assert search_tags(["1girl", "masterpiece", "hatsune_miku"]) == (["1girl"], ["1girl", "masterpiece", "hatsune_miku"]) # No lists: the first.
     tag_list()
-    assert search_tags(["1girl", "masterpiece", "smile", "hatsune_miku"]) == (["hatsune_miku", "smile"], ["1girl", "smile", "hatsune_miku"])
+    assert search_tags(["1girl", "masterpiece", "smile", "hatsune_miku"]) == (["hatsune_miku"], ["1girl", "smile", "hatsune_miku"]) # The character.
 
 
 def test_adds_the_posts_tags_by_the_seed(danbooru):
     tag_list()
-    danbooru.refuse_order = True # Danbooru counting order: as a tag: searched again without it.
     text, added, url, number = run(tags="1girl, hatsune miku, masterpiece", seed=0, seed_mode="sequential")
-    assert danbooru.requests == ["hatsune_miku 1girl order:score", "hatsune_miku 1girl"] # The character first; masterpiece isn't a Danbooru tag.
+    assert danbooru.requests == ["hatsune_miku order:score"] # One tag and the order: Danbooru's two terms. The character; masterpiece isn't a Danbooru tag.
     assert number == 1 and url.endswith("/posts/1") # General only (posts 1 and 2): not 3 (explicit) nor 4 (sensitive).
     assert added == "long hair, smile, twintails" # The most used first; 1girl is there already, signature excluded.
     assert text == "1girl, hatsune miku, masterpiece, long hair, smile, twintails"
@@ -98,6 +97,17 @@ def test_options(danbooru):
     assert number == 1 and added == "smile, long hair" and text == "smile, long hair, 1girl, hatsune miku, masterpiece" # The most used first; miku is already there.
     assert run(seed=2, seed_mode="sequential", rating="any", max_tags=0)[1] == "nude"
     assert "vocaloid" in run(seed=0, seed_mode="sequential", rating="any", add_general=False, add_copyright=True)[1]
+
+
+def test_a_refused_order_is_searched_again_without_it(danbooru):
+    danbooru.refuse_order = True
+    assert run(tags="hatsune miku", seed=0, seed_mode="sequential")[3] == 1
+    assert danbooru.requests == ["hatsune_miku order:score", "hatsune_miku"]
+
+
+def test_the_other_tags_pick_the_posts(danbooru):
+    tag_list()
+    assert {run(tags="hatsune miku, thighhighs", seed=seed, rating="any")[3] for seed in range(6)} == {2} # The only post with thighhighs too.
 
 
 def test_posts_are_kept_and_used_offline(danbooru):

@@ -12,10 +12,11 @@ from comfy_api.latest import ComfyExtension, io
 from .model_lists import seed_inputs
 from .seed_modes import MEMORY, make_picker, pick_index
 from .tag_autocomplete import INDEX, tag_key
-# Danbooru Tag Enhancer: more tags for a prompt, from a real Danbooru post that has the tags already there. The two most telling of the prompt's
-# tags (the rarest that Danbooru knows: a character before "1girl") find the posts, the most liked first; the seed picks one of them, by the seed
-# modes; its tags that the prompt lacks are added, the most used first. The posts of a search are kept on disk, so a seed gives the same post again,
-# also offline. Danbooru lets a search without an account have two tags: the prompt's other tags pick, among the posts found, those that have them.
+# Danbooru Tag Enhancer: more tags for a prompt, from a real Danbooru post that has the tags already there. The most telling of the prompt's tags
+# (the rarest that Danbooru knows: a character before "1girl") finds the posts, the most liked first; the seed picks one of them, by the seed modes;
+# its tags that the prompt lacks are added, the most used first. The posts of a search are kept on disk, so a seed gives the same post again, also
+# offline. A search without an account may have two terms, and order:score is one: so one tag searches, and the prompt's other tags pick, among the
+# posts found, those that have the most of them.
 DANBOORU_URL = os.environ.get("DICEFORGE_DANBOORU_URL", "https://danbooru.donmai.us")
 CACHE_FOLDER = os.path.join(folder_paths.get_user_directory(), "DiceForge", "danbooru")
 CACHE_DAYS = 30
@@ -42,17 +43,17 @@ def prompt_tags(text):
 def prompt_text(tag):
     spaced = tag.replace("_", " ") if re.search(r"[a-z]{2}", tag, re.IGNORECASE) and len(tag) > 3 else tag
     return re.sub(r"([()])", r"\\\1", spaced)
-# The search: the two tags of the prompt that say the most (in the tag lists: characters, then series, then the rarest); without tag lists, the
-# first two. Tags Danbooru doesn't know (masterpiece, score_9) are left out when the lists are there.
-# Returns the two tags and the prompt's tags Danbooru knows (all of them without lists).
+# The search: the tag of the prompt that says the most (in the tag lists: characters, then series, then the rarest); without tag lists, the first.
+# Tags Danbooru doesn't know (masterpiece, score_9) are left out when the lists are there. Returns the search tag (a list: none for an empty
+# prompt) and the prompt's tags Danbooru knows (all of them without lists).
 def search_tags(tags):
     index = INDEX.load()
     known = {tag_key(tag): (kind, count) for tag, kind, count, _aliases in index.tags} if index.tags else None
     if known is None:
-        return tags[:2], tags
+        return tags[:1], tags
     rank = {4: 0, 3: 1, 1: 2, 0: 3, 5: 4} # character, copyright, artist, general, meta
     found = [tag for tag in tags if tag in known]
-    return sorted(found, key=lambda tag: (rank.get(known[tag][0], 3), known[tag][1]))[:2], found
+    return sorted(found, key=lambda tag: (rank.get(known[tag][0], 3), known[tag][1]))[:1], found
 
 
 def cache_path(query):
@@ -78,7 +79,7 @@ def post_summary(post):
         return None
     return {"id": post["id"], "rating": str(post.get("rating") or ""), "score": post.get("score") if isinstance(post.get("score"), int) else 0,
             **{group: str(post.get(f"tag_string_{group}") or "").split() for group in GROUPS}}
-# The most liked posts with the tags (order:score); when Danbooru counts order: against the two tags a search may have, the search again without it.
+# The most liked posts with the tag (order:score); refused anyway (an account's own limits, or a tag that counts double), the search again without it.
 async def fetch_posts(query):
     async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=30), headers={"User-Agent": USER_AGENT}, trust_env=True) as session:
         for tags in (f"{query} order:score".strip(), query):

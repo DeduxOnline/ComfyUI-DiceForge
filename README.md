@@ -786,7 +786,7 @@ A node that makes a few tags a full prompt from a real Danbooru post: type `1gir
 
 How it picks:
 
-- The two most telling of your tags search Danbooru (a search without an account may have two): with the [tag lists](#tag-autocomplete-danbooru-e621) downloaded, the rarest ones Danbooru knows, characters and series first (`hatsune miku` before `1girl`), and tags it doesn't know (`masterpiece`) are left out; without the lists, the first two. Among the 200 most liked posts found, those with the most of your other tags are kept.
+- The most telling of your tags searches Danbooru, with `order:score` for the most liked posts (a search without an account may have two terms, and the order is one): with the [tag lists](#tag-autocomplete-danbooru-e621) downloaded, the rarest tag Danbooru knows, characters and series first (`hatsune miku` before `1girl`), and tags it doesn't know (`masterpiece`) are left out; without the lists, the first tag. Among the 200 most liked posts found, those with the most of your other tags are kept.
 - `rating` keeps only `general` posts (the default), or also `sensitive`, `questionable`, or any.
 - The seed picks one of them, by `seed_mode`: `deck` with *increment* goes through the posts, the same seed gives the same post again.
 - From that post, its general tags that your prompt lacks are added (characters, series and artists too, if you turn them on under Advanced), the most used first, at most `max_tags` (15; 0 for all), without the `exclude` list (signature, watermark, speech bubble…), `after` or `before` your tags, written as the models learned them (spaces, escaped parentheses).
