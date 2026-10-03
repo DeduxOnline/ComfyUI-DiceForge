@@ -40,6 +40,7 @@ Every mode gives the same result for the same seed, so an image can be made agai
 | **Variation Seed** | DiceForge/sampling | `DiceForge/variation_seed.py` | You like a picture and want it again with small differences (folds, hair, background, a hand), as A1111's variation seed: same seed and prompt, the noise blended with a second seed's. |
 | **HiresFix (Load VAE)** | DiceForge/image | `DiceForge/hires_upscale.py` | You want Easy-Use's HiresFix with the VAE picked from a list: the image made bigger with an upscale model, rescaled, shown or saved, and encoded into a latent for a second KSampler pass. |
 | **Hires Fix** | DiceForge/sampling | `DiceForge/hires_fix.py` | You want a bigger image with new detail in one node: the first pass's latent made bigger (by a factor, or to the size of an SDXL Resolution List with rescale; in the latent, or in pixels with an upscale model) and sampled again at low denoise. |
+| **Danbooru Tag Enhancer** | DiceForge/conditioning | `DiceForge/danbooru_enhancer.py` | You want a richer prompt from a few tags: it adds the tags of a real Danbooru post that has your tags (picked by the seed), the way anime models were trained. |
 | **XY Plot** | DiceForge/sampling | `DiceForge/xy_plot.py` | You want an X/Y comparison in one node: seed, steps, CFG, sampler, scheduler, LoRA, LoRA strength or denoise on each axis, every combination queued with one button, laid out by Dice Grid with the values as headers. |
 | **Dice Grid** | DiceForge/image | `DiceForge/dice_grid.py` | You want the images of a series side by side with labels: a LoRA, checkpoint or setting comparison, or an XY grid. |
 | **Random Diffusion Model** | DiceForge/loaders | `DiceForge/random_diffusion_model.py` | The same for diffusion models (`models/diffusion_models`, Flux and the like), like **Load Diffusion Model**. |
@@ -775,6 +776,21 @@ Right-click CLIP Dual Text Encode and choose **🏷 Tag Browser** to look throug
 - **Types**: General, 👤 Characters, ©️ Series, 🎨 Artists, ⚙️ Meta, and your **★ Favorites** (☆ next to a tag stars it; kept in `ComfyUI/user/DiceForge/tag_favorites.json`).
 - **+ Add** puts the tag where the cursor was last in the node's prompts (as the autocomplete writes it: spaces, escaped parentheses), **− Neg** at the end of the negative prompt, **↗** opens it on Danbooru.
 - 100 tags at a time; **Show more** loads the next ones.
+
+### Danbooru Tag Enhancer
+
+A node that makes a few tags a full prompt from a real Danbooru post: type `1girl, hatsune miku` and get, for example, `1girl, hatsune miku, twintails, smile, thighhighs, looking at viewer, holding microphone…`, the tags of a picture that has yours, the way the anime models (Illustrious, NoobAI, Pony, Anima) learned them.
+
+1. Type the tags in `tags`, or connect `positive_text` of a CLIP Dual Text Encode (choices and wildcards filled in); weights, `\(` escapes and `<lora:>` tags are read through.
+2. Connect `text` to CLIP Dual Text Encode's `positive` (or another text encoder). `added_tags` has only the added ones, `post_url` the post they came from.
+
+How it picks:
+
+- The two most telling of your tags search Danbooru (a search without an account may have two): with the [tag lists](#tag-autocomplete-danbooru-e621) downloaded, the rarest ones Danbooru knows, characters and series first (`hatsune miku` before `1girl`), and tags it doesn't know (`masterpiece`) are left out; without the lists, the first two. Among the 200 most liked posts found, those with the most of your other tags are kept.
+- `rating` keeps only `general` posts (the default), or also `sensitive`, `questionable`, or any.
+- The seed picks one of them, by `seed_mode`: `deck` with *increment* goes through the posts, the same seed gives the same post again.
+- From that post, its general tags that your prompt lacks are added (characters, series and artists too, if you turn them on under Advanced), the most used first, at most `max_tags` (15; 0 for all), without the `exclude` list (signature, watermark, speech bubble…), `after` or `before` your tags, written as the models learned them (spaces, escaped parentheses).
+- The posts of a search are kept for 30 days in `ComfyUI/user/DiceForge/danbooru`, so Danbooru is asked once per search and a seed gives its post again, also offline (then from what was kept, however old).
 
 ### Prompt styles
 

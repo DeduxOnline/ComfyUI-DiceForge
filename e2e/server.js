@@ -7,7 +7,7 @@ const http = require("http");
 const path = require("path");
 const { spawn } = require("child_process");
 const { REPO, PORT, CIVITAI_PORT, BASE, comfyuiPath, comfyuiPython } = require("./settings");
-const { MODELS, WILDCARDS, CIVITAI, CIVITAI_MODELS, CIVITAI_VERSIONS, CIVITAI_PAGES, DOWNLOADS, TAGS, png } = require("./fixtures");
+const { MODELS, WILDCARDS, CIVITAI, CIVITAI_MODELS, CIVITAI_VERSIONS, CIVITAI_PAGES, DOWNLOADS, TAGS, DANBOORU_POSTS, png } = require("./fixtures");
 
 function prepare() {
   fs.rmSync(BASE, { recursive: true, force: true });
@@ -28,7 +28,7 @@ function prepare() {
 }
 
 // Civitai stand-in: /by-hash/<sha256> answers like Civitai's model-versions/by-hash for the test models, /api/v1/models (search: the query filters
-// by name), /tags/danbooru.csv (a tag list), /api/v1/models/<id> (a model's page) and /api/v1/model-versions/<id> like its API, /download/<id> serves a version's file and /image/... a small image.
+// by name), /tags/danbooru.csv (a tag list), /danbooru/posts.json (Danbooru's posts), /api/v1/models/<id> (a model's page) and /api/v1/model-versions/<id> like its API, /download/<id> serves a version's file and /image/... a small image.
 function startCivitai() {
   const json = (response, status, body) => { response.writeHead(status, { "Content-Type": "application/json" }); response.end(JSON.stringify(body)); };
   const server = http.createServer((request, response) => {
@@ -52,6 +52,7 @@ function startCivitai() {
       response.writeHead(200, { "Content-Type": "application/json" });
       return response.end(JSON.stringify(CIVITAI[byHash[1]]));
     }
+    if (url.pathname === "/danbooru/posts.json") return json(response, 200, DANBOORU_POSTS);
     if (url.pathname === "/tags/danbooru.csv") {
       response.writeHead(200, { "Content-Type": "text/csv" });
       return response.end(TAGS);
@@ -84,6 +85,7 @@ const child = spawn(python, ["main.py", "--cpu", "--listen", "127.0.0.1", "--por
     DICEFORGE_CIVITAI_URL: `http://127.0.0.1:${CIVITAI_PORT}/by-hash/{}`,
     DICEFORGE_CIVITAI_API: `http://127.0.0.1:${CIVITAI_PORT}/api/v1`,
     DICEFORGE_TAGS_URL: `http://127.0.0.1:${CIVITAI_PORT}/tags/{name}.csv`,
+    DICEFORGE_DANBOORU_URL: `http://127.0.0.1:${CIVITAI_PORT}/danbooru`,
     CIVITAI_API_KEY: "", DICEFORGE_CIVITAI_KEY: "", // Your own key never reaches the tests.
     NO_PROXY: ["127.0.0.1", "localhost", process.env.NO_PROXY].filter(Boolean).join(","),
     no_proxy: ["127.0.0.1", "localhost", process.env.no_proxy].filter(Boolean).join(","),

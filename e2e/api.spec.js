@@ -7,7 +7,7 @@ const { MODELS, DOWNLOADS } = require("./fixtures");
 
 const NODES = ["SDXLResolutionListLatent", "ResolutionSelectorRandomLatent", "CLIPTextEncodePositiveNegative", "DiceForgeRandomInt", "DiceForgeRandomFloat",
   "DiceForgeRandomLora", "DiceForgeRandomCheckpoint", "DiceForgeRandomDiffusionModel", "DiceForgeRandomImage", "DiceForgeGrid", "DiceForgeRandomSampler",
-  "DiceForgeRandomVAE", "LoadVAEDecodeSave", "VAEDecodeSave", "LoadDiffusionModelCLIP", "DiceForgeLoraStack", "DiceForgeXYPlot", "DiceForgeHiresFix", "DiceForgeVariationSeed", "DiceForgeHiresUpscale"];
+  "DiceForgeRandomVAE", "LoadVAEDecodeSave", "VAEDecodeSave", "LoadDiffusionModelCLIP", "DiceForgeLoraStack", "DiceForgeXYPlot", "DiceForgeHiresFix", "DiceForgeVariationSeed", "DiceForgeHiresUpscale", "DiceForgeDanbooruEnhancer"];
 const clip = (positive, negative = "", { seed = 0, mode = "random" } = {}) => ({
   1: { class_type: "CLIPTextEncodePositiveNegative", inputs: { positive, negative, seed, seed_mode: mode, trim: true } },
   2: { class_type: "PreviewAny", inputs: { source: ["1", 2] } },
@@ -262,6 +262,16 @@ test.describe("@api workflows and routes", () => {
     expect(result.status, result.error).toBe("success");
     expect([shown(result, "4"), shown(result, "5"), shown(result, "8")]).toEqual(["128", "96", "128"]); // 200%, and the latent decodes back to that size.
     expect(result.outputs["2"].images).toHaveLength(1); // Preview: shown on the node.
+  });
+
+  test("Danbooru Tag Enhancer adds the tags of a Danbooru post (a general one) to the prompt", async ({ request }) => {
+    const prompt = (seed) => ({ 1: { class_type: "DiceForgeDanbooruEnhancer", inputs: { tags: "hatsune miku, masterpiece", seed, seed_mode: "random", rating: "general", max_tags: 15,
+      add_general: true, add_character: false, add_copyright: false, add_artist: false, exclude: "", position: "after" } },
+      2: { class_type: "PreviewAny", inputs: { source: ["1", 0] } }, 3: { class_type: "PreviewAny", inputs: { source: ["1", 2] } } });
+    const result = await runPrompt(request, prompt(4));
+    expect(result.status, result.error).toBe("success");
+    expect(shown(result, "2")).toBe("hatsune miku, masterpiece, 1girl, smile, twintails"); // Post 101: the explicit one is left out.
+    expect(shown(result, "3")).toMatch(/\/posts\/101$/);
   });
 
   test("Wildcard Browser routes", async ({ request }) => {

@@ -7,7 +7,7 @@ const { test, expect, basePath, openComfy, addNodes, connect, widgetValue, setWi
 
 const ALL_NODES = ["SDXLResolutionListLatent", "ResolutionSelectorRandomLatent", "CLIPTextEncodePositiveNegative", "DiceForgeRandomInt", "DiceForgeRandomFloat",
   "DiceForgeRandomLora", "DiceForgeRandomCheckpoint", "DiceForgeRandomDiffusionModel", "DiceForgeRandomImage", "DiceForgeGrid", "DiceForgeRandomSampler",
-  "DiceForgeRandomVAE", "LoadVAEDecodeSave", "VAEDecodeSave", "LoadDiffusionModelCLIP", "DiceForgeLoraStack", "DiceForgeXYPlot", "DiceForgeHiresFix", "DiceForgeVariationSeed", "DiceForgeHiresUpscale"];
+  "DiceForgeRandomVAE", "LoadVAEDecodeSave", "VAEDecodeSave", "LoadDiffusionModelCLIP", "DiceForgeLoraStack", "DiceForgeXYPlot", "DiceForgeHiresFix", "DiceForgeVariationSeed", "DiceForgeHiresUpscale", "DiceForgeDanbooruEnhancer"];
 const STACK = JSON.stringify({ rows: [{ lora: "style/ink.safetensors", strength: 0.7, random: true, min: 0.4, max: 0.9, group: "A", triggers: "custom", trigger_words: ["ink style"] },
   { lora: "detail.safetensors", strength: 1.2, on: false }], groups: { A: { min: 0, max: 1 } }, separate_clip: true });
 // Values that differ from the defaults, so a value lost on the way shows.

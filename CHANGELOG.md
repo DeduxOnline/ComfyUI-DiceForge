@@ -25,6 +25,7 @@ The first release on the ComfyUI Registry: install DiceForge from ComfyUI Manage
   queued with one button.
 - **Hires Fix**: the second pass in one node, in the latent or with an upscale model.
 - **HiresFix (Load VAE)**: as Easy-Use's HiresFix with the VAE from a list: upscale model, rescale, preview or save, encode.
+- **Danbooru Tag Enhancer**: adds the tags of a Danbooru post that has the prompt's tags, picked by the seed.
 - **Variation Seed**: variations of a picture, as A1111's variation seed, for every model with the plain KSampler.
 - **Load VAE + Decode + Save**, **VAE Decode + Save** (with Easy-Use's image_output choice and a vae output), **Load Diffusion Model + CLIP**.
 

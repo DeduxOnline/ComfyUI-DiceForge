@@ -94,4 +94,10 @@ for (const model of CIVITAI_MODELS) CIVITAI_PAGES[model.id] ??= model; // The mo
 // The Danbooru tag list the stand-in serves for the tag autocomplete (tagcomplete's format: tag,type,count,aliases).
 const TAGS = 'long_hair,0,5000000,"longhair"\nlong_sleeves,0,1500000,\nhatsune_miku,4,90000,miku\nsmile,0,4000000,\n1girl,0,6000000,\n';
 
-module.exports = { MODELS, WILDCARDS, CIVITAI, CIVITAI_MODELS, CIVITAI_VERSIONS, CIVITAI_PAGES, DOWNLOADS, TAGS, png, sha256 };
+// Danbooru posts the stand-in answers searches with (/posts.json), for the Danbooru Tag Enhancer.
+const DANBOORU_POSTS = [
+  { id: 101, rating: "g", score: 50, tag_string_general: "1girl smile twintails", tag_string_character: "hatsune_miku", tag_string_copyright: "vocaloid", tag_string_artist: "e2e", tag_string_meta: "highres" },
+  { id: 102, rating: "e", score: 40, tag_string_general: "1girl nude", tag_string_character: "hatsune_miku", tag_string_copyright: "vocaloid", tag_string_artist: "e2e", tag_string_meta: "" },
+];
+
+module.exports = { MODELS, WILDCARDS, CIVITAI, CIVITAI_MODELS, CIVITAI_VERSIONS, CIVITAI_PAGES, DOWNLOADS, TAGS, DANBOORU_POSTS, png, sha256 };
