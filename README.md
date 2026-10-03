@@ -567,9 +567,10 @@ Works like two core *CLIP Text Encode (Prompt)* nodes sharing one CLIP model: ea
 | Input | Section | Description |
 |---|---|---|
 | `clip` | main | The CLIP model used for encoding both prompts. Optional: without it the node only fills in the prompts, for the text outputs. |
+| `model` | main | Optional: the model, for [`<lora:...>` in the prompts](#loras-in-the-prompt). Passed through to the `model` output when the prompts have none. |
 | `positive` | main | The positive prompt (top text field): what the image should contain. |
 | `negative` | Advanced | The negative prompt: what the image should avoid. Under *Show advanced inputs*, since it is usually set once; it is used and saved the same when hidden. |
-| `seed` | Advanced | Seed for choices and wildcards. The same seed always gives the same prompts (except in *shuffle*, *balanced* and *mutate* modes). By default it is randomized after each run (*control after generate*); set it to *fixed* to repeat a result. |
+| `seed` | Advanced | Seed for choices and wildcards. The same seed always gives the same prompts, in every mode. By default it is randomized after each run (*control after generate*); set it to *fixed* to repeat a result. |
 | `seed_mode` | Advanced | How choices and wildcards change from run to run: `random` (default), `deck`, `shuffle`, `balanced`, `combinations` or `mutate`. See [Seed modes](#seed-modes). |
 | `trim` | Advanced | On by default: removes extra spaces from both prompts, at the start and end of lines, double spaces, spaces before `, . ; : ! ? )` and after `(`, and extra empty lines (`  a  girl , ( smile :1.1 )` becomes `a girl, (smile:1.1)`). Only spaces change. |
 
@@ -581,6 +582,7 @@ Works like two core *CLIP Text Encode (Prompt)* nodes sharing one CLIP model: ea
 | `negative` | Conditioning from the negative prompt. |
 | `positive_text` | The positive prompt as encoded, with choices, wildcards and variables filled in. |
 | `negative_text` | The negative prompt as encoded, with choices, wildcards and variables filled in. |
+| `model` | The model with the prompts' `<lora:...>` LoRAs. Connect it to KSampler instead of the loader's model. |
 
 The text outputs carry the prompt that was actually used, for example to show it with a preview node, put it in a file name, or feed a text encoder for other models (Flux, SD3, video models): leave `clip` unconnected and the node only fills in the prompts, with every seed mode.
 
@@ -658,9 +660,18 @@ In `deck` and `shuffle` modes:
 - The node runs again when a wildcard file changes, even if the prompts and the seed stay the same.
 - A `*` or `?` name (`__hair/*__`) joins the lines of every file it matches, in name order, so all seed modes (deck, shuffle, combinations…) treat them as one list. Empty files among them are skipped; a name that matches nothing stops the run with an error.
 
+### LoRAs in the prompt
+
+As in A1111: `<lora:name:weight>` in either prompt puts that LoRA on the model and on the CLIP before the prompts are encoded. `<lora:name:0.8:0.5>` gives the model and the CLIP different weights, `<lora:name>` is weight 1, and `<lyco:...>` works the same. The name is the file name, with or without its folder and extension (`ink`, `style/ink`, `style/ink.safetensors`).
+
+- Connect the loader's `model` to the node's `model` input and the node's `model` output to KSampler, and the loader's CLIP to `clip`, as usual.
+- The tags are read after choices and wildcards are filled in, so they can be random too: `{<lora:ink:0.8>|<lora:glow:0.7>|}`, or a wildcard file of LoRA tags.
+- The tags are taken out of the text (and the commas around them tidied); the preview under the node lists the LoRAs of the run.
+- A name with no LoRA file stops the run and says which. Typing `<lora:` in a prompt field suggests the LoRA files.
+
 ### Syntax highlighting
 
-The prompt fields color the syntax as you type: `__wildcards__` (red with a wavy line when no wildcard file has that name; hover the field to see which), the braces and `|` of `{a|b}` choices (one color per nesting level, white on red when a brace is never closed or closes nothing), counts `2$$`, weights `3::`, locks `!`, `${variables}`, `//` and `/* */` comments, `\{` escapes, `(word:1.2)` weights and `embedding:` names. Only the colors change: typing, the caret, selecting and the `__` autocomplete work as before. Turn it off in ComfyUI's settings: *DiceForge → Prompts → Highlight the prompt syntax in CLIP Dual Text Encode*.
+The prompt fields color the syntax as you type: `__wildcards__` (red with a wavy line when no wildcard file has that name; hover the field to see which), the braces and `|` of `{a|b}` choices (one color per nesting level, white on red when a brace is never closed or closes nothing), counts `2$$`, weights `3::`, locks `!`, `${variables}`, `//` and `/* */` comments, `\{` escapes, `(word:1.2)` weights, `embedding:` names and `<lora:...>` tags. Only the colors change: typing, the caret, selecting and the `__` autocomplete work as before. Turn it off in ComfyUI's settings: *DiceForge → Prompts → Highlight the prompt syntax in CLIP Dual Text Encode*.
 
 ### Preview of the prompts as encoded
 

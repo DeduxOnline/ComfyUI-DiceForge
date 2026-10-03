@@ -117,6 +117,10 @@ for (const vue of [true, false]) {
       await expect(page.locator(".dfwc-pop div").first()).toContainText("__цвет__");
       await page.keyboard.press("Enter");
       await expect.poll(() => widgetValue(page, id, "positive")).toBe("__цвет__");
+      await page.keyboard.type(", <lora:in"); // LoRA files after <lora:
+      await expect(page.locator(".dfwc-pop div").first()).toContainText("style/ink");
+      await page.keyboard.press("Enter");
+      await expect.poll(() => widgetValue(page, id, "positive")).toBe("__цвет__, <lora:style/ink:1>");
     });
 
     test("autocomplete follows the text as typed while the wildcard list loads slowly", async ({ page }) => {

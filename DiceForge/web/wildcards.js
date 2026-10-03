@@ -117,8 +117,16 @@ const STYLE = `
 `;
 const addStyle = () => addStyleOnce("dfwc-style", STYLE);
 
-// Autocomplete: after an opening "__" (an odd number of "__" before the cursor), the wildcards and folders (folder/*) that contain what is typed.
-const popup = { element: null, textarea: null, items: [], index: 0, start: 0 };
+// Autocomplete in the prompt fields, from sources tried in order: the wildcards and folders (folder/*) after an opening "__" (an odd number of "__"
+// before the cursor), the LoRA files after "<lora:", and what other extensions add (prompt tags, tag_autocomplete.js). A source looks at the text
+// before the cursor and gives null (not its turn) or { start, items, skip }: items (or a promise of them) are { label, hint, insert, favorite,
+// browse }, and accepting one replaces the text from start to the cursor (and a typed skip right after it) with its insert.
+const popup = { element: null, textarea: null, items: [], index: 0, start: 0, skip: null };
+const sources = [];
+export function addCompletionSource(source, first = false) {
+  if (first) sources.unshift(source);
+  else sources.push(source);
+}
 function caretPoint(textarea) {
   const style = getComputedStyle(textarea);
   const mirror = document.createElement("div");
@@ -144,29 +152,59 @@ function closePopup() {
 function renderPopup() {
   popup.element.replaceChildren(...popup.items.map((item, index) => {
     const row = element("div", { class: (index === popup.index ? "on " : "") + (item.browse ? "browse" : "") },
-      item.browse ? "📂 Browse wildcards…" : `${item.favorite ? "★ " : ""}__${item.token}__`, ...(item.lines != null ? [element("span", { class: "n" }, `${item.lines}`)] : []));
+      `${item.favorite ? "★ " : ""}${item.label}`, ...(item.hint != null ? [element("span", { class: "n" }, `${item.hint}`)] : []));
     row.addEventListener("mousedown", (event) => { event.preventDefault(); background(accept(index)); });
     return row;
   }));
   popup.element.children[popup.index]?.scrollIntoView({ block: "nearest" });
 }
-async function updatePopup(textarea) {
-  const request = ++popupRequest;
-  const before = textarea.value.slice(0, textarea.selectionStart);
-  const open = before.split("__").length % 2 === 0; // An odd number of "__": inside a wildcard being typed.
-  // What is typed after the last "__" (not the first: in "__hair__ __col" it is "col"), in letters and digits of every script like the server's \w.
+// Wildcards: what is typed after the last "__" (not the first: in "__hair__ __col" it is "col"), in letters and digits of every script like the
+// server's \w.
+addCompletionSource((before) => {
   const opening = before.lastIndexOf("__");
   const typedText = opening < 0 ? "" : before.slice(opening + 2);
-  if (!open || opening < 0 || !/^[\p{L}\p{N}_\-./*? ]*$/u.test(typedText) || !fieldOf(textarea)) return closePopup();
+  if (before.split("__").length % 2 !== 0 || opening < 0 || !/^[\p{L}\p{N}_\-./*? ]*$/u.test(typedText)) return null;
   const typed = typedText.toLowerCase();
-  const { files } = await wildcardList();
+  const items = wildcardList().then(({ files }) => {
+    const entries = [...files.map((file) => ({ token: file.name, hint: file.lines, favorite: !!file.favorite })), ...folderNames(files).map((folder) => ({ token: `${folder}/*` }))];
+    const found = entries.filter((entry) => entry.token.toLowerCase().includes(typed)) // Names that start with what is typed first, then ★ favorites.
+      .sort((a, b) => (b.token.toLowerCase().startsWith(typed) - a.token.toLowerCase().startsWith(typed)) || (!!b.favorite - !!a.favorite) || a.token.localeCompare(b.token)).slice(0, 12);
+    return [...found.map((entry) => ({ ...entry, label: `__${entry.token}__`, insert: `__${entry.token}__` })), { browse: true, label: "📂 Browse wildcards…" }];
+  });
+  return { start: opening, items, skip: "__" }; // Typed closing underscores are replaced too.
+});
+// LoRAs: after "<lora:" (or "<lyco:"), the LoRA files that contain what is typed, put in as <lora:folder/name:1>.
+let loraFiles = null, loraTime = 0;
+async function loraList() {
+  if (!loraFiles || Date.now() - loraTime > 30000) {
+    try { loraFiles = await (await api.fetchApi("/models/loras")).json(); } catch { loraFiles ??= []; }
+    loraTime = Date.now();
+  }
+  return Array.isArray(loraFiles) ? loraFiles : [];
+}
+addCompletionSource((before) => {
+  const match = /<\s*(lora|lyco)\s*:([^:<>\n]*)$/i.exec(before);
+  if (!match) return null;
+  const typed = match[2].trim().toLowerCase();
+  const items = loraList().then((files) => files.map((file) => file.replace(/\\/g, "/").replace(/\.[^./]+$/, ""))
+    .filter((name) => name.toLowerCase().includes(typed))
+    .sort((a, b) => (b.toLowerCase().split("/").pop().startsWith(typed) - a.toLowerCase().split("/").pop().startsWith(typed)) || a.localeCompare(b)).slice(0, 15)
+    .map((name) => ({ label: name, hint: "LoRA", insert: `<${match[1].toLowerCase()}:${name}:1>` })));
+  return { start: match.index, items, skip: ">" };
+});
+async function updatePopup(textarea) {
+  const request = ++popupRequest;
+  if (!fieldOf(textarea)) return closePopup();
+  const before = textarea.value.slice(0, textarea.selectionStart);
+  const found = sources.map((source) => source(before)).find(Boolean);
+  if (!found) return closePopup();
+  const items = await found.items;
   if (request !== popupRequest) return; // Typed on (or closed) meanwhile: the newer update shows the popup, for the text as it is now.
-  const entries = [...files.map((file) => ({ token: file.name, lines: file.lines, favorite: !!file.favorite })), ...folderNames(files).map((folder) => ({ token: `${folder}/*`, lines: null }))];
-  const found = entries.filter((entry) => entry.token.toLowerCase().includes(typed)) // Names that start with what is typed first, then ★ favorites.
-    .sort((a, b) => (b.token.toLowerCase().startsWith(typed) - a.token.toLowerCase().startsWith(typed)) || (!!b.favorite - !!a.favorite) || a.token.localeCompare(b.token)).slice(0, 12);
-  popup.items = [...found, { browse: true }];
+  if (!items.length) return closePopup();
+  popup.items = items;
   popup.index = 0;
-  popup.start = opening;
+  popup.start = found.start;
+  popup.skip = found.skip ?? null;
   popup.textarea = textarea;
   if (!popup.element) {
     addStyle();
@@ -180,6 +218,7 @@ async function updatePopup(textarea) {
 function accept(index) {
   const item = popup.items[index];
   const textarea = popup.textarea;
+  const skip = popup.skip; // Read before closePopup.
   if (!item || !textarea) return closePopup();
   const field = fieldOf(textarea);
   closePopup();
@@ -189,9 +228,8 @@ function accept(index) {
     return openBrowser(field.node);
   }
   const start = popup.start, end = textarea.selectionStart;
-  const after = textarea.value.slice(end).startsWith("__") ? 2 : 0; // Typed closing underscores are replaced too.
-  const token = `__${item.token}__`;
-  setField(field.node, field.name, textarea.value.slice(0, start) + token + textarea.value.slice(end + after), start + token.length);
+  const after = skip && textarea.value.slice(end).startsWith(skip) ? skip.length : 0;
+  setField(field.node, field.name, textarea.value.slice(0, start) + item.insert + textarea.value.slice(end + after), start + item.insert.length);
 }
 document.addEventListener("input", (event) => { if (event.target?.tagName === "TEXTAREA" && event.isTrusted) background(updatePopup(event.target)); }, true);
 document.addEventListener("keydown", (event) => {

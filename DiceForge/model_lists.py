@@ -1,4 +1,6 @@
+import fnmatch
 import os
+import re
 import folder_paths
 # Model files for the random loader nodes: the folders of a model kind (loras, checkpoints, diffusion_models), and the files in one of them.
 ALL_FOLDERS = "(all)"
@@ -10,6 +12,14 @@ def model_folders(kind):
         parts = name.replace("\\", "/").split("/")[:-1]
         folders.update("/".join(parts[:depth]) for depth in range(1, len(parts) + 1)) # "a/b/x.safetensors" is in "a" and in "a/b".
     return [ALL_FOLDERS, *sorted(folders, key=str.lower)]
+# The files of a kind a name stands for, as people type them: the file name with or without folder and extension ("style/ink", "ink",
+# "ink.safetensors"), or a pattern ("style/*"). Sorted; none when nothing matches.
+def stem(name):
+    return re.sub(r"\.[^./]+$", "", name.replace("\\", "/")).lower()
+def matching_files(kind, name):
+    wanted, pattern = stem(name), name.replace("\\", "/").lower()
+    return sorted((file for file in folder_paths.get_filename_list(kind) if fnmatch.fnmatch(file.replace("\\", "/").lower(), pattern)
+                   or stem(file) == wanted or stem(file).split("/")[-1] == wanted), key=str.lower)
 def files_in_folder(kind, folder):
     if folder == ALL_FOLDERS:
         return model_files(kind)

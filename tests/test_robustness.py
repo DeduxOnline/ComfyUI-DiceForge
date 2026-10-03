@@ -26,7 +26,7 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 def run(positive, negative="", seed=0, mode="random"):
-    return Node.execute(positive, negative, clip=None, seed=seed, seed_mode=mode).result[2:]
+    return Node.execute(positive, negative, clip=None, seed=seed, seed_mode=mode).result[2:4]
 
 
 # Seed memory: a file that isn't a database, values that aren't JSON, and states of the wrong shape.
@@ -356,7 +356,7 @@ nodes.EmptyLatentImage.generate = lambda self, w, h, batch_size=1: ({"samples": 
 results = []
 for seed in (0, 1, 7, 123456789, 2 ** 63):
     for mode in ("random", "deck", "combinations"):
-        results.append(Node.execute("{a|b|{c|d}} {2$$e|f|g|h} ${v={i|j}}${v} {3::k|l}", "{m|n}", clip=None, seed=seed, seed_mode=mode).result[2:])
+        results.append(Node.execute("{a|b|{c|d}} {2$$e|f|g|h} ${v={i|j}}${v} {3::k|l}", "{m|n}", clip=None, seed=seed, seed_mode=mode).result[2:4])
     for mode in ("random", "deck", "sequential"):
         results.append(SDXL.execute({"resolution": "Random Chaos", "size": "Any", "max_aspect": 2.5}, seed, None, 8, 1, mode).result[1:3])
         results.append(SDXL.execute({"resolution": "Random", "size": "Any Listed"}, seed, None, 8, 1, mode).result[1:3])

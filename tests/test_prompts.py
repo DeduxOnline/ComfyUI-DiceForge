@@ -118,8 +118,8 @@ def test_node_trim_input():
 
 
 def test_node_without_clip_outputs_only_text():
-    positive, negative, positive_text, negative_text = run("{a|b}", "bad", seed=1)
-    assert positive is None and negative is None
+    positive, negative, positive_text, negative_text, model = run("{a|b}", "bad", seed=1)
+    assert positive is None and negative is None and model is None
     assert positive_text in ("a", "b") and negative_text == "bad"
 
 
@@ -193,3 +193,30 @@ def test_the_node_sends_its_prompts_to_the_page_preview(wildcards):
     assert output.ui == {"dice_forge_prompts": [{"positive": "a red car", "negative": "lowres", "seed": 7, "seed_mode": "deck", "note": ""}]}
     combinations = CLIPTextEncodePositiveNegative.execute("{a|b}", "", seed=1, seed_mode="combinations").ui["dice_forge_prompts"][0]
     assert combinations["positive"] == "b" and combinations["note"] == "combination 2 of 2"
+
+
+@pytest.fixture
+def lora_calls(monkeypatch):
+    """A stand-in for the core LoRA loader: each call is recorded as (file, strength model, strength clip)."""
+    calls = []
+    monkeypatch.setattr(Node.loader, "load_lora", lambda model, clip, name, sm, sc: (calls.append((name, sm, sc)) or (model and f"{model}+{name}", clip and f"{clip}+{name}")))
+    return calls
+
+
+def test_lora_tags_go_on_the_model_and_leave_the_text(models, lora_calls):
+    for name in ("style/ink.safetensors", "detail.safetensors"):
+        models("loras", name)
+    result = Node.execute("1girl, <lora:ink:0.8>, smile <LORA:detail.safetensors>", "lowres, <lyco:style/ink:0.5:0.25>", seed=0, model="model").result
+    assert result[2] == "1girl, smile" and result[3] == "lowres"
+    assert lora_calls == [("style/ink.safetensors", 0.8, 0), ("detail.safetensors", 1.0, 0), ("style/ink.safetensors", 0.5, 0)] # No CLIP: the model only.
+    assert result[4] == "model+style/ink.safetensors+detail.safetensors+style/ink.safetensors"
+
+
+def test_a_choice_can_pick_the_lora_and_a_missing_one_says_so(models, lora_calls):
+    for name in ("a.safetensors", "b.safetensors"):
+        models("loras", name)
+    picked = {Node.execute("cat {<lora:a:1>|<lora:b:1>}", "", seed=seed, model="m").result[4] for seed in range(20)}
+    assert picked == {"m+a.safetensors", "m+b.safetensors"}
+    assert Node.execute("no tags", "", seed=0, model="m").result[4] == "m" and len(lora_calls) == 20 # Passed through.
+    with pytest.raises(ValueError, match="no LoRA file for <lora:nope>"):
+        Node.execute("<lora:nope:1>", "", seed=0, model="m")

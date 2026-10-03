@@ -3,8 +3,8 @@ import { addStyleOnce } from "./dom.js";
 import { knownWildcards, PROMPT_FIELDS, PROMPT_NODE_TYPE, textareaOf, wildcardList } from "./wildcards.js";
 
 // Syntax highlighting in the prompt fields of CLIP Dual Text Encode: __wildcards__ (red and wavy when no file has that name), {a|b} choices with
-// their braces colored by depth, counts (2$$), weights (3::), locks (!), ${variables}, // and /* */ comments, \ escapes, (word:1.2) weights and
-// embeddings. The text is drawn by a layer behind the field, which shows through it (the field keeps the caret, the selection and the editing).
+// their braces colored by depth, counts (2$$), weights (3::), locks (!), ${variables}, // and /* */ comments, \ escapes, (word:1.2) weights,
+// embeddings and <lora:name:weight>. The text is drawn by a layer behind the field, which shows through it (the field keeps the caret, the selection and the editing).
 // A setting turns it off.
 const SETTING = "DiceForge.PromptHighlight";
 const STYLE = `
@@ -15,12 +15,13 @@ textarea.dfhl-input::selection{background:rgba(90,140,230,.4);color:transparent}
 .dfhl .wc{color:#7fd4ff}.dfhl .wc-missing{color:#ff8a8a;text-decoration:underline wavy #ff5c5c;text-decoration-skip-ink:none}
 .dfhl .b0{color:#ffcf5c;font-weight:700}.dfhl .b1{color:#d79bff;font-weight:700}.dfhl .b2{color:#7fe0a8;font-weight:700}.dfhl .bad{color:#fff;background:#b33}
 .dfhl .count{color:#ffa65c}.dfhl .weight{color:#ffa65c}.dfhl .lock{color:#ff6b9d;font-weight:700}.dfhl .var{color:#8be08b}
-.dfhl .comment{color:#7a8a7a;font-style:italic}.dfhl .esc{color:#aaa}.dfhl .attn{color:#e0c07f}.dfhl .embed{color:#c4a3ff}
+.dfhl .lora{color:#ff9ad5;font-weight:600}.dfhl .comment{color:#7a8a7a;font-style:italic}.dfhl .esc{color:#aaa}.dfhl .attn{color:#e0c07f}.dfhl .embed{color:#c4a3ff}
 `;
 
 const NAME_CHAR = String.raw`[\p{L}\p{M}\p{N}_\-./*?]|\$\{\w+\}`; // As the node reads names (clip_text_encode_pos_neg.WILDCARD_PATTERN).
 const TOKENS = new RegExp([
   String.raw`(?<esc>\\[{}|!\\])`,
+  String.raw`(?<lora><\s*(?:lora|lyco)\s*:[^<>\n]*>)`,
   String.raw`(?<wc>__(?:${NAME_CHAR})+?(?: (?:${NAME_CHAR})+?)*?__)`,
   String.raw`(?<comment>\/\*[\s\S]*?\*\/|\/\/[^\n]*)`,
   String.raw`(?<varset>\$\{\s*[A-Za-z_]\w*\s*=!?)`,
@@ -71,7 +72,7 @@ export function promptMarks(text, names) {
       const missing = known && !name.includes("${") && (/[*?]/.test(name) ? !names.some((item) => globTest(name).test(item)) : !known.has(name.toLowerCase()));
       marks.push([start, end, missing ? "wc-missing" : "wc"]);
     } else if (group === "varuse") marks.push([start, end, "var"]);
-    else marks.push([start, end, group]); // esc, comment, attn, embed
+    else marks.push([start, end, group]); // esc, lora, comment, attn, embed
   }
   for (const open of stack) marks[open.mark][2] = "bad"; // Never closed.
   return marks.sort((a, b) => a[0] - b[0]);

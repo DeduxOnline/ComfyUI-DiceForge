@@ -1,4 +1,3 @@
-import fnmatch
 import math
 import re
 import folder_paths
@@ -7,6 +6,7 @@ from aiohttp import web
 from typing_extensions import override
 from comfy_api.latest import ComfyExtension, io
 from .model_info import json_body
+from .model_lists import matching_files
 from .random_sampler import SAMPLERS, SCHEDULERS, options_output, parse_names
 # XY Plot: one node gives KSampler the settings of one cell of an X/Y comparison (seed, steps, CFG, sampler, scheduler, LoRA, LoRA strength or
 # denoise on each axis) and Dice Grid its labels; the node's ▶ Queue button (web/xy_plot.js) queues every cell, index 0 to count - 1, and Dice Grid
@@ -57,22 +57,19 @@ def parse_numbers(text, axis):
     if outside:
         raise ValueError(f"XY Plot: {', '.join(outside)} out of range for {axis} ({short(kind(low))} to {short(kind(high))}).")
     return list(dict.fromkeys(values))
-def stem(name): # Folder/name, without the extension, for comparing names.
-    return re.sub(r"\.[^./]+$", "", name.replace("\\", "/")).lower()
 # LoRA files typed in a field: names (with or without folder and extension) or patterns like style/* ; None for the image without a LoRA.
 def parse_loras(text):
-    files, names = folder_paths.get_filename_list("loras"), []
+    names = []
     for item in (item.strip() for item in re.split(r"[,\n]", text or "")):
         if not item:
             continue
         if item.lower() == "none":
             names.append("None")
             continue
-        found = [name for name in files if fnmatch.fnmatch(name.replace("\\", "/").lower(), item.replace("\\", "/").lower())
-                 or stem(name) == stem(item) or stem(name).split("/")[-1] == stem(item)]
+        found = matching_files("loras", item)
         if not found:
             raise ValueError(f"XY Plot: no LoRA matches {item!r}.")
-        names += sorted(found)
+        names += found
     return list(dict.fromkeys(names))
 def axis_values(axis, text):
     if axis not in AXES:

@@ -80,6 +80,15 @@ test.describe("@api workflows and routes", () => {
     expect(shown(again, "2")).toBe(values[2]);
   });
 
+  test("<lora:...> in the prompt: the tags leave the text, a LoRA that isn't there stops the run with its name", async ({ request }) => {
+    const result = await runPrompt(request, clip("1girl, <lora:ink:0.8>, smile", "lowres, <lora:style/ink>"));
+    expect(result.status).toBe("success");
+    expect([shown(result, "2"), shown(result, "3")]).toEqual(["1girl, smile", "lowres"]);
+    const missing = await runPrompt(request, clip("<lora:nope:1> cat"));
+    expect(missing.status).toBe("error");
+    expect(missing.error).toContain("no LoRA file for <lora:nope>");
+  });
+
   test("a missing wildcard stops the run with a clear message", async ({ request }) => {
     const result = await runPrompt(request, clip("__nope__"));
     expect(result.status).toBe("error");

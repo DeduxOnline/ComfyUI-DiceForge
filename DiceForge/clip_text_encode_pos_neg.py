@@ -7,9 +7,11 @@ import os
 import random
 import re
 import folder_paths
+import nodes
 import yaml
 from typing_extensions import override
 from comfy_api.latest import ComfyExtension, io
+from .model_lists import matching_files
 from .seed_modes import MEMORY, Picker, RandomPicker, DeckPicker, ShufflePicker, BalancedPicker, recall, stable_seed
 # Wildcards: __name__ in a prompt is replaced by a random line of name.txt from the wildcards folders (ComfyUI/models/wildcards by default, more can be added in extra_model_paths.yaml).
 folder_paths.add_model_folder_path("wildcards", os.path.join(folder_paths.models_dir, "wildcards"), is_default=True)
@@ -358,6 +360,26 @@ def mutate_memory(entries):
             if all(isinstance(part, (int, str)) for part in entry[0]):
                 last[tuple(entry[0])] = (entry[1], entry[2])
     return last
+# LoRAs in the prompt, as in A1111: <lora:name:weight> (or <lora:name:model weight:clip weight>, <lyco:...>), after choices and wildcards are
+# filled in, so a wildcard or {a|b} can pick the LoRA too. The tags are taken out of the text; the LoRAs go on the model and on the CLIP that
+# encodes the prompts. The name is the file name, with or without folder and extension.
+LORA_TAG = re.compile(r"<\s*(?:lora|lyco)\s*:\s*([^:<>]+?)\s*(?::\s*(-?\d*\.?\d+)\s*)?(?::\s*(-?\d*\.?\d+)\s*)?>", re.IGNORECASE)
+def lora_tags(text):
+    loras = []
+    def take(match):
+        model = float(match.group(2)) if match.group(2) else 1.0
+        loras.append((match.group(1), model, float(match.group(3)) if match.group(3) else model))
+        return ""
+    stripped = LORA_TAG.sub(take, text)
+    return (tidy_commas(stripped) if loras else stripped), loras
+def lora_files(loras):
+    found = []
+    for name, model, clip in loras:
+        files = matching_files("loras", name)
+        if not files:
+            raise ValueError(f"CLIP Dual Text Encode: no LoRA file for <lora:{name}> (put it in models/loras, or check the name).")
+        found.append((files[0], model, clip))
+    return found
 # Comma cleanup after filling in: an empty option leaves "a, , b" or a trailing comma; this makes it "a, b".
 # Runs of spaces are collapsed first, so the other patterns only meet single spaces: linear time even for a prompt with thousands of spaces in a row.
 def tidy_commas(text):
@@ -420,6 +442,7 @@ def resolve_prompts(prompts, picker):
     return [tidy_commas(re.sub(r"\\([{}|!])", r"\1", fill_variables(text, variables))) for text in expanded]
 # Node schema (V3 / Nodes 2.0) like CLIP Text Encode (Prompt), but with a positive prompt on top, a negative prompt below, and one conditioning output for each. Both prompts support {a|b} choices and __name__ wildcards, picked from the seed.
 class CLIPTextEncodePositiveNegative(io.ComfyNode):
+    loader = nodes.LoraLoader() # The core loader, which keeps the last LoRA file in memory.
     @classmethod
     def define_schema(cls):
         return io.Schema(
@@ -439,6 +462,11 @@ class CLIPTextEncodePositiveNegative(io.ComfyNode):
                     multiline=True,
                     tooltip="The negative prompt: what the image should avoid. Supports {a|b} choices, __name__ wildcards and ${name=value} / ${name} variables.",
                     advanced=True, # Usually set once: under Show advanced inputs, with the positive prompt in view.
+                ),
+                io.Model.Input(
+                    "model",
+                    optional=True,
+                    tooltip="The model, for <lora:name:weight> in the prompts: the LoRAs go on it (model output) and on the CLIP. Passed through when the prompts have none.",
                 ),
                 io.Clip.Input(
                     "clip",
@@ -481,6 +509,7 @@ class CLIPTextEncodePositiveNegative(io.ComfyNode):
                 io.Conditioning.Output(display_name="negative", tooltip="Conditioning from the negative prompt."),
                 io.String.Output(display_name="positive_text", tooltip="The positive prompt as encoded: choices, wildcards and variables filled in. Connect it to another text encoder (Flux, SD3...) or a Save Image file name."),
                 io.String.Output(display_name="negative_text", tooltip="The negative prompt as encoded: choices, wildcards and variables filled in."),
+                io.Model.Output(display_name="model", tooltip="The model with the prompts' <lora:...> LoRAs (connect it to KSampler instead of the loader's model)."),
             ],
         )
     # Method to run the node again when a wildcard file changes, even if the inputs are the same.
@@ -494,7 +523,7 @@ class CLIPTextEncodePositiveNegative(io.ComfyNode):
         return clip.encode_from_tokens_scheduled(tokens)
     # Main method to fill in choices and wildcards from the seed, encode both prompts, and return the conditioning and the final prompts.
     @classmethod
-    def execute(cls, positive, negative, clip=None, seed=0, seed_mode="random", trim=True):
+    def execute(cls, positive, negative, clip=None, seed=0, seed_mode="random", trim=True, model=None):
         note = ""
         wildcard_index(refresh=True) # Wildcard files added or changed since the last run.
         if seed_mode == "combinations":
@@ -519,6 +548,9 @@ class CLIPTextEncodePositiveNegative(io.ComfyNode):
         else:
             picker = RandomPicker(random.Random(seed)) # Seed behavior for reproducible choices and wildcards.
         positive_text, negative_text = resolve_prompts((positive, negative), picker)
+        positive_text, positive_loras = lora_tags(positive_text)
+        negative_text, negative_loras = lora_tags(negative_text)
+        loras = lora_files(positive_loras + negative_loras)
         if trim:
             positive_text, negative_text = trim_spaces(positive_text), trim_spaces(negative_text)
         if seed_mode == "mutate" and not replay: # A seed that came before gives its prompt again without moving mutate on.
@@ -528,10 +560,17 @@ class CLIPTextEncodePositiveNegative(io.ComfyNode):
         if (positive_text, negative_text) != (positive, negative):
             logging.info(f"[DiceForge] CLIP Dual Text Encode | Seed: {seed} ({seed_mode}{note}) | Positive: {positive_text} | Negative: {negative_text}")
         # The prompts as encoded, for the node's preview in the page (web/prompt_preview.js), with the seed and mode they came from.
+        if loras:
+            applied = ", ".join(f"{os.path.splitext(os.path.basename(name))[0]} {model_weight:g}" for name, model_weight, _ in loras)
+            note += f", LoRAs {applied}"
+            for name, model_weight, clip_weight in loras:
+                model, lora_clip = cls.loader.load_lora(model, clip, name, model_weight if model is not None else 0, clip_weight if clip is not None else 0)
+                clip = lora_clip if clip is not None else None
+            logging.info(f"[DiceForge] CLIP Dual Text Encode | LoRAs from the prompts: {applied}{'' if model is not None else ' (CLIP only: the model input is not connected)'}")
         shown = {"dice_forge_prompts": [{"positive": positive_text, "negative": negative_text, "seed": seed, "seed_mode": seed_mode, "note": note.lstrip(", ")}]}
         if clip is None:
-            return io.NodeOutput(None, None, positive_text, negative_text, ui=shown) # No CLIP: only the text, for other text encoders.
-        return io.NodeOutput(cls.encode(clip, positive_text), cls.encode(clip, negative_text), positive_text, negative_text, ui=shown)
+            return io.NodeOutput(None, None, positive_text, negative_text, model, ui=shown) # No CLIP: only the text, for other text encoders.
+        return io.NodeOutput(cls.encode(clip, positive_text), cls.encode(clip, negative_text), positive_text, negative_text, model, ui=shown)
 # Extension entry point for ComfyUI V3 node registration.
 class CLIPTextEncodePositiveNegativeExtension(ComfyExtension):
     @override
