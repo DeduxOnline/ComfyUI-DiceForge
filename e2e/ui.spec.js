@@ -487,6 +487,31 @@ for (const vue of [true, false]) {
       await expect(page.locator(".dfpp").first().locator(".box").first()).toHaveText(`positive${text}`);
     });
 
+    test("Random Image shows the picked image, its file and seed, also from the cache and after a reload", async ({ page, request }) => {
+      const [image, name] = await addNodes(page, [
+        { type: "DiceForgeRandomImage", widgets: { folder: "e2e", seed: 1, control_after_generate: "fixed", seed_mode: "sequential" } },
+        { type: "PreviewAny", pos: [500, 40] },
+      ]);
+      await connect(page, image, 2, name, 0);
+      const panel = page.locator(".dfip").first();
+      await expect(panel).toContainText("Run the workflow to see the picked image here.");
+      await queueFromPage(page, request);
+      const history = Object.values(await (await request.get("/history?max_items=1")).json())[0];
+      const file = history.outputs[String(name)].text[0]; // e2e/red.png or e2e/blue.png, by the seed.
+      await expect(panel.locator(".file")).toHaveText(file);
+      await expect(panel.locator(".head")).toHaveText("Last run · seed 1 (sequential)");
+      await expect(panel.locator(".size")).toHaveText(file.endsWith("red.png") ? "32 × 16 · input/e2e" : "16 × 24 · input/e2e");
+      await expect(panel.locator("img")).toHaveJSProperty("naturalWidth", file.endsWith("red.png") ? 32 : 16); // From the input folder.
+      await page.evaluate((id) => { delete window.app.graph.getNodeById(id).properties.dice_forge_image; }, image);
+      await expect(panel).toContainText("Run the workflow");
+      await queueFromPage(page, request); // The same inputs: the node comes from ComfyUI's cache, and still shows its pick.
+      await expect(panel.locator(".file")).toHaveText(file);
+      const workflow = await page.evaluate(() => window.app.graph.serialize());
+      await page.evaluate(async (data) => { window.app.graph.clear(); await window.app.loadGraphData(data); }, workflow);
+      await expect(page.locator(".dfip").first().locator(".file")).toHaveText(file); // Kept with the workflow.
+      await expect(page.locator(".dfip").first().locator("img")).toHaveJSProperty("naturalWidth", file.endsWith("red.png") ? 32 : 16);
+    });
+
     if (vue) {
       test("DiceForge nodes fit their inputs when advanced inputs are shown and hidden", async ({ page }) => { // NOSONAR: expect.poll(...) assertions below.
         const [id] = await addNodes(page, [{ type: "SDXLResolutionListLatent" }]);

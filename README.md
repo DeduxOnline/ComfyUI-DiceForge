@@ -262,7 +262,7 @@ Each loader outputs what its core loader does (`model`, `clip`, `vae`) plus the 
 
 <img src="docs/images/random_image_dice_grid.png" width="888" alt="Random Image in deck mode feeding Dice Grid, after four runs">
 
-Like **Load Image**, but the image is picked from a folder with the [seed modes](#seed-modes-for-sizes): with `deck` and *increment* an img2img or ControlNet series goes through every image once before any repeats. The picked image is shown on the node.
+Like **Load Image**, but the image is picked from a folder with the [seed modes](#seed-modes-for-sizes): with `deck` and *increment* an img2img or ControlNet series goes through every image once before any repeats. After each run the node shows the picked image, its file name (click to copy), size (and frames of an animated one), folder, and the seed and mode it came from; click the image to open it full size. The preview is kept with the workflow, so it is still there after a reload, and it also updates when the node comes from ComfyUI's cache. A file of the input folder is shown from there; one from `path` through a temporary copy, which ComfyUI clears on restart (the preview then says to run again).
 
 | Input | Where | Description |
 |---|---|---|

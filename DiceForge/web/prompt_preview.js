@@ -1,5 +1,6 @@
 import { app } from "../../scripts/app.js";
 import { addStyleOnce, element } from "./dom.js";
+import { fitNodeHeight } from "./node_size.js";
 
 // CLIP Dual Text Encode shows, under its inputs, the positive and negative prompts as the last run encoded them: choices, wildcards and variables
 // filled in, with the seed and mode they came from. Click a prompt to copy it. They are kept in the node's properties, so they are still there after
@@ -41,8 +42,7 @@ app.registerExtension({
           box("positive", last.positive ?? ""), box("negative", last.negative ?? ""));
       }
       markStale();
-      node.setSize?.([node.size[0], Math.max(node.size[1], node.computeSize()[1])]); // Room for the preview in the classic canvas.
-      node.setDirtyCanvas?.(true, true);
+      fitNodeHeight(node); // Room for the preview: taller in the classic canvas, no gap in Nodes 2.0 (node_size.js).
     }
     // Dimmed while the prompts in the fields are not the ones the preview came from.
     function markStale() {

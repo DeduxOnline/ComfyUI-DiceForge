@@ -160,6 +160,20 @@ def test_random_image_loads_like_load_image(images):
     assert np.allclose(image[0, 0, 0].cpu().numpy(), [1.0, 0.0, 0.0])
 
 
+def test_random_image_sends_its_pick_to_the_node_preview(images, monkeypatch):
+    output = RandomImageLoader.execute(seed=1, seed_mode="sequential", path=str(images)) # Another folder: a temporary copy to show.
+    shown = output.ui["dice_forge_image"][0]
+    assert {key: shown[key] for key in ("file", "folder", "width", "height", "frames", "seed", "seed_mode")} == \
+        {"file": "sub/blue.png", "folder": os.path.abspath(str(images)), "width": 8, "height": 8, "frames": 1, "seed": 1, "seed_mode": "sequential"}
+    assert shown["view"]["type"] == "temp" and shown["view"]["filename"].endswith(".png")
+    assert set(output.ui) == {"dice_forge_image"} # Only this preview: not also ComfyUI's image preview.
+    monkeypatch.setattr(model_lists.folder_paths, "get_input_directory", lambda: str(images)) # The input folder: shown from there.
+    shown = RandomImageLoader.execute(folder="sub", seed=0, seed_mode="sequential").ui["dice_forge_image"][0]
+    assert shown["file"] == "sub/blue.png" and shown["folder"] == "input/sub" and shown["view"] == {"filename": "blue.png", "subfolder": "sub", "type": "input"}
+    shown = RandomImageLoader.execute(seed=0, seed_mode="sequential").ui["dice_forge_image"][0]
+    assert shown["folder"] == "input" and shown["view"] == {"filename": "red.png", "subfolder": "", "type": "input"}
+
+
 def test_random_image_errors(tmp_path, images):
     with pytest.raises(ValueError, match="is not a folder"):
         RandomImageLoader.execute(path=str(tmp_path / "missing"))

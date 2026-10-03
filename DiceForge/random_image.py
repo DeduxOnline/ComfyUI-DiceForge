@@ -48,6 +48,7 @@ class RandomImageLoader(io.ComfyNode):
             category="DiceForge/loaders",
             description="Loads an image picked from a folder, like Load Image, with the DiceForge seed modes (deck, shuffle... go through every image before repeating one).",
             search_aliases=["random image", "load image", "image from folder", "image batch", "random picture", "random", "seed modes"],
+            has_intermediate_output=True, # The picked image reaches the node's preview also when the node comes from the cache.
             inputs=[
                 io.Combo.Input(
                     "folder",
@@ -114,7 +115,16 @@ class RandomImageLoader(io.ComfyNode):
             image, mask = load_image_file(os.path.join(root, name))
         except (OSError, ValueError, RuntimeError) as error: # A damaged or truncated file: say which one, so it can be fixed or removed.
             raise ValueError(f"Random Image: {name} can't be read ({error}). Fix or remove it, or use another seed.") from None
-        return io.NodeOutput(image, mask, name, ui=ui.PreviewImage(image, cls=cls))
+        # The node's preview (web/image_preview.js): the picked file with its size and the seed it came from. A file of the input folder is shown
+        # from there (it stays, also after a restart); one from another folder through a temporary copy of its first frame, like Preview Image.
+        if path.strip():
+            view = ui.PreviewImage(image[:1], cls=cls).values[0]
+        else:
+            subfolder, file = os.path.split(os.path.relpath(os.path.join(root, name), folder_paths.get_input_directory()))
+            view = {"filename": file, "subfolder": subfolder.replace(os.sep, "/"), "type": "input"}
+        shown = {"file": name, "folder": root if path.strip() else "input" + ("" if folder == ALL_FOLDERS else f"/{folder}"), "width": int(image.shape[2]),
+                 "height": int(image.shape[1]), "frames": int(image.shape[0]), "seed": seed, "seed_mode": seed_mode, "view": view}
+        return io.NodeOutput(image, mask, name, ui={"dice_forge_image": [shown]})
 # Extension entry point for ComfyUI V3 node registration.
 class RandomImageLoaderExtension(ComfyExtension):
     @override
