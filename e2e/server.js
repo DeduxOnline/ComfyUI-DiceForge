@@ -7,7 +7,7 @@ const http = require("http");
 const path = require("path");
 const { spawn } = require("child_process");
 const { REPO, PORT, CIVITAI_PORT, BASE, comfyuiPath, comfyuiPython } = require("./settings");
-const { MODELS, WILDCARDS, CIVITAI, CIVITAI_MODELS, CIVITAI_VERSIONS, DOWNLOADS, png } = require("./fixtures");
+const { MODELS, WILDCARDS, CIVITAI, CIVITAI_MODELS, CIVITAI_VERSIONS, CIVITAI_PAGES, DOWNLOADS, png } = require("./fixtures");
 
 function prepare() {
   fs.rmSync(BASE, { recursive: true, force: true });
@@ -28,7 +28,7 @@ function prepare() {
 }
 
 // Civitai stand-in: /by-hash/<sha256> answers like Civitai's model-versions/by-hash for the test models, /api/v1/models (search: the query filters
-// by name) and /api/v1/model-versions/<id> like its API, /download/<id> serves a version's file and /image/... a small image.
+// by name), /api/v1/models/<id> (a model's page) and /api/v1/model-versions/<id> like its API, /download/<id> serves a version's file and /image/... a small image.
 function startCivitai() {
   const json = (response, status, body) => { response.writeHead(status, { "Content-Type": "application/json" }); response.end(JSON.stringify(body)); };
   const server = http.createServer((request, response) => {
@@ -38,6 +38,8 @@ function startCivitai() {
       const types = url.searchParams.getAll("types"); // LORA, LoCon, DoRA for LoRAs; Checkpoint for checkpoints and diffusion models.
       return json(response, 200, { items: CIVITAI_MODELS.filter((model) => model.name.toLowerCase().includes(query) && types.includes(model.type)), metadata: {} });
     }
+    const page = /^\/api\/v1\/models\/(\d+)$/.exec(url.pathname);
+    if (page) return CIVITAI_PAGES[page[1]] ? json(response, 200, CIVITAI_PAGES[page[1]]) : json(response, 404, { error: "Model not found" });
     const version = /^\/api\/v1\/model-versions\/(\d+)$/.exec(url.pathname);
     if (version) return CIVITAI_VERSIONS[version[1]] ? json(response, 200, CIVITAI_VERSIONS[version[1]]) : json(response, 404, { error: "Model version not found" });
     const download = /^\/download\/(\d+)$/.exec(url.pathname);

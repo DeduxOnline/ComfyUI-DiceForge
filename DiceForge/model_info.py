@@ -14,6 +14,7 @@ from aiohttp import web
 KINDS = ("checkpoints", "diffusion_models", "loras", "vae", "text_encoders", "embeddings")
 INFO_FOLDER = os.path.join(folder_paths.get_user_directory(), "DiceForge", "model_info")
 CIVITAI_BY_HASH = os.environ.get("DICEFORGE_CIVITAI_URL", "https://civitai.com/api/v1/model-versions/by-hash/{}") # Another server for tests (e2e/server.js).
+CIVITAI_MODEL = os.environ.get("DICEFORGE_CIVITAI_API", "https://civitai.com/api/v1").rstrip("/") + "/models/{}" # The model page: tags, stats, versions.
 USER_FIELDS = ("name", "trigger_words", "settings", "notes")
 def info_file(kind, name):
     root = os.path.abspath(os.path.join(INFO_FOLDER, kind))
@@ -83,6 +84,43 @@ def civitai_summary(data):
         "images": [{**{key: image.get(key) for key in ("type", "width", "height", "nsfwLevel", "hasMeta")}, "url": thumbnail(image.get("url") or ""), "full": image.get("url"),
                     "page": image_page(image.get("url") or ""), "meta": image_meta(image.get("meta"))} for image in (data.get("images") or [])[:12] if isinstance(image, dict)],
     }
+# What the model's page on Civitai adds (GET /models/{id}): its tags, its counts (likes, downloads, tips, comments), its creator and its versions, newest
+# first, with when they came out; the versions show whether a newer one than yours is out. Bookmarks, generations and the Buzz amount of the page
+# aren't in Civitai's public API.
+def number(value):
+    return value if isinstance(value, int) and not isinstance(value, bool) and value >= 0 else 0
+def listed(value):
+    return value if isinstance(value, list) else []
+def civitai_details(data):
+    if not isinstance(data, dict):
+        return {}
+    stats = data.get("stats") if isinstance(data.get("stats"), dict) else {}
+    creator = data.get("creator") if isinstance(data.get("creator"), dict) else {}
+    versions = [version for version in listed(data.get("modelVersions")) if isinstance(version, dict) and isinstance(version.get("id"), int)]
+    def published(version):
+        return str(version.get("publishedAt") or version.get("createdAt") or "")[:40]
+    return {
+        "tags": [str(tag).strip()[:40] for tag in listed(data.get("tags")) if isinstance(tag, (str, int)) and str(tag).strip()][:20],
+        "stats": {"likes": number(stats.get("thumbsUpCount")), "downloads": number(stats.get("downloadCount")), "tips": number(stats.get("tippedAmountCount")),
+                  "comments": number(stats.get("commentCount"))},
+        "creator": str(creator.get("username") or "")[:60],
+        "versions": [{"id": version["id"], "name": str(version.get("name") or "")[:60], "base_model": str(version.get("baseModel") or "")[:40],
+                      "published": published(version), "downloads": number((version.get("stats") or {}).get("downloadCount") if isinstance(version.get("stats"), dict) else 0)}
+                     for version in versions[:30]],
+        "updated": max((published(version) for version in versions), default=""),
+    }
+async def civitai_model_details(session, model_id):
+    if not isinstance(model_id, int) or isinstance(model_id, bool):
+        return {}
+    try:
+        async with session.get(CIVITAI_MODEL.format(model_id)) as response:
+            if response.status == 404: # The model's page is gone (deleted, or hidden): nothing to add, and no need to ask again.
+                return {"details_checked": time.time()}
+            response.raise_for_status()
+            return {**civitai_details(await response.json()), "details_checked": time.time()}
+    except Exception as error: # The version is known all the same; the details are asked again on the next lookup.
+        logging.warning(f"[DiceForge] Model info: Civitai model details failed: {error}")
+        return {}
 # How an example image was made, from Civitai's meta of it (the generation data of A1111, Forge, ComfyUI or Civitai's own generator): the prompts and
 # the settings the dialog shows over the image, as text and numbers only.
 META_KEYS = ("prompt", "negativePrompt", "seed", "steps", "cfgScale", "sampler", "Schedule type", "scheduler", "Model", "Size", "Clip skip", "Denoising strength", "VAE")
@@ -106,7 +144,8 @@ async def civitai_lookup(sha256):
                 if response.status == 404:
                     return {"found": False, "checked": time.time()}
                 response.raise_for_status()
-                return {**civitai_summary(await response.json()), "checked": time.time()}
+                summary = civitai_summary(await response.json())
+            return {**summary, **await civitai_model_details(session, summary["model_id"]), "checked": time.time()}
     except Exception as error:
         logging.warning(f"[DiceForge] Model info: Civitai lookup failed: {error}")
         return {"found": False, "error": str(error), "checked": time.time()}
@@ -128,6 +167,9 @@ async def model_info(kind, name, refresh=False):
     saved_before_meta = civitai.get("found") and any("page" not in image for image in civitai.get("images") or []) # Saved before the images' generation data was kept.
     if refresh or not civitai or civitai.get("error") or saved_before_meta:
         info["civitai"] = await civitai_lookup(info["sha256"])
+    elif civitai.get("found") and not civitai.get("details_checked"): # Looked up before the tags and stats were kept, or they failed: only those.
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=30), trust_env=True) as session:
+            info["civitai"] = {**civitai, **await civitai_model_details(session, civitai.get("model_id"))}
     write_info(kind, name, info)
     return {"kind": kind, "file": name, **info}
 # Model browser (web/model_browser.js): every file of a model kind with what is already known about it, without hashing anything; the dialog looks
@@ -160,7 +202,20 @@ def browser_entry(kind, name, path, folder_files):
         "settings": (user.get("settings") or "").strip(),
         "image": image and {"url": image.get("url"), "type": image.get("type"), "nsfwLevel": image.get("nsfwLevel")},
         "url": civitai.get("url") if found else None,
+        "tags": civitai.get("tags") or [] if found else [],
+        "stats": civitai.get("stats") if found and civitai.get("stats") else None,
+        "creator": civitai.get("creator") or "" if found else "",
+        "updated": civitai.get("updated") or "" if found else "",
+        "newer": newer_version(civitai) if found else None,
     }
+# The newest version on Civitai when it isn't yours (and came out after yours): "an update is out".
+def newer_version(civitai):
+    versions = civitai.get("versions") or []
+    mine = next((version for version in versions if version.get("id") == civitai.get("version_id")), None)
+    newest = versions[0] if versions else None
+    if not mine or not newest or newest is mine or newest.get("published", "") <= mine.get("published", ""):
+        return None
+    return {"id": newest["id"], "name": newest.get("name", ""), "url": f"https://civitai.com/models/{civitai.get('model_id')}?modelVersionId={newest['id']}"}
 def model_list(kind):
     if kind not in KINDS:
         raise web.HTTPBadRequest(text=f"Model browser: unknown kind {kind}.")

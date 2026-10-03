@@ -10,7 +10,7 @@ from urllib.parse import urlsplit
 import aiohttp
 import folder_paths
 from aiohttp import web
-from .model_info import PREVIEW_ENDINGS, civitai_summary, info_file, json_body, local_preview, read_info, thumbnail, write_info
+from .model_info import PREVIEW_ENDINGS, civitai_details, civitai_summary, info_file, json_body, local_preview, read_info, thumbnail, write_info
 # Managing the model files of the LoRA, Checkpoint and Diffusion Model Browsers (web/model_browser.js, web/civitai.js): Create is finding a model on
 # Civitai and downloading it (with its Civitai data and a preview, so the browser shows it at once), Read is the browser and Model info, Update is
 # renaming or moving a file (its preview and info go with it) and Delete is removing it. MANAGED_KINDS lists the kinds the routes accept.
@@ -292,7 +292,7 @@ async def run_download(job, version, file, url):
         os.replace(part, path)
         stat = os.stat(path)
         write_info(job["kind"], job["file"], {"user": {}, "size": stat.st_size, "mtime": stat.st_mtime, "sha256": sha256,
-                                              "civitai": {**civitai_summary(version), "checked": time.time()}})
+                                              "civitai": {**civitai_summary(version), **await model_details(version.get("modelId")), "checked": time.time()}})
         await save_preview(version, path)
         drop_list_cache(job["kind"])
         job.update(status="done", done=stat.st_size, total=stat.st_size)
@@ -307,6 +307,15 @@ async def run_download(job, version, file, url):
             os.remove(part)
         TASKS.pop(job["id"], None)
 # The first image of the version (not a video), resized by Civitai, as name.preview.<png|jpg|webp> when the model has no preview yet.
+# The tags, stats and versions of the downloaded model's page (Model info asks again later when this fails).
+async def model_details(model_id):
+    if not isinstance(model_id, int) or isinstance(model_id, bool):
+        return {}
+    try:
+        return {**civitai_details(await civitai_json(f"/models/{model_id}")), "details_checked": time.time()}
+    except web.HTTPException as error:
+        logging.warning(f"[DiceForge] Civitai: no model details for {model_id}: {error.text}")
+        return {}
 async def save_preview(version, path):
     image = next((image for image in images_of(version, 12) if image["type"] != "video"), None)
     if not image or local_preview(path, set(os.listdir(os.path.dirname(path)))):

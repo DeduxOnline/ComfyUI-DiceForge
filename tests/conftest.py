@@ -85,8 +85,9 @@ def fresh_memory():
 @pytest.fixture(autouse=True)
 def offline_civitai(monkeypatch, tmp_path):
     """No test goes online: Civitai is a closed local port unless a test starts the stand-in (civitai_server). No API key, no downloads left over."""
-    from DiceForge import model_manager
+    from DiceForge import model_info, model_manager
     monkeypatch.setattr(model_manager, "CIVITAI_API", "http://127.0.0.1:9/api/v1")
+    monkeypatch.setattr(model_info, "CIVITAI_MODEL", "http://127.0.0.1:9/api/v1/models/{}")
     monkeypatch.setattr(model_manager, "KEY_FILE", str(tmp_path / "civitai.json"))
     for variable in ("CIVITAI_API_KEY", "DICEFORGE_CIVITAI_KEY"):
         monkeypatch.delenv(variable, raising=False)

@@ -49,6 +49,10 @@ class CivitaiStandIn(BaseHTTPRequestHandler):
             item = {"id": 30, "name": "Neon", "type": "LORA", "nsfw": False, "creator": {"username": "maker"}, "stats": {"downloadCount": 5, "thumbsUpCount": 2},
                     "modelVersions": [versions[301], version(310, name="v0", file="neon_old.safetensors", content=b"old", host=host), "junk"]}
             return self.answer(200, {"items": [item, 5, None], "metadata": {"nextCursor": "page2"}})
+        if url.path == "/api/v1/models/30": # Neon's page: tags, counts, versions.
+            return self.answer(200, {"id": 30, "name": "Neon", "tags": ["neon", "style"], "creator": {"username": "maker"},
+                                     "stats": {"downloadCount": 5, "thumbsUpCount": 2, "tippedAmountCount": 1},
+                                     "modelVersions": [{"id": 301, "name": "v1", "baseModel": "Illustrious", "publishedAt": "2026-02-01T00:00:00Z"}]})
         if url.path.startswith("/api/v1/model-versions/"):
             number = int(url.path.rsplit("/", 1)[1])
             return self.answer(200, versions[number]) if number in versions else self.answer(404, {"error": "not found"})
@@ -130,6 +134,8 @@ def test_download_saves_the_file_its_civitai_data_and_a_preview(api, models, civ
     status, listing = api("GET", "/diceforge/model-browser?kind=loras") # The browser shows it at once, looked up, with its preview.
     entry = next(entry for entry in listing["files"] if entry["file"] == "styles/neon/neon_style.safetensors")
     assert entry["found"] and entry["checked"] and entry["preview"] and entry["name"] == "Neon - v1" and entry["trigger_words"] == ["neon glow"]
+    assert entry["tags"] == ["neon", "style"] and entry["stats"] == {"likes": 2, "downloads": 5, "tips": 1, "comments": 0} and entry["creator"] == "maker"
+    assert entry["updated"] == "2026-02-01T00:00:00Z" and entry["newer"] is None # Its page, asked once with the download.
     status, body = api("GET", "/diceforge/civitai/downloads")
     assert status == 200 and body["jobs"][0]["status"] == "done" and "path" not in body["jobs"][0]
     assert api("POST", "/diceforge/civitai/download", {"version_id": 301, "folder": "styles/neon"})[0] == 409 # Already there.

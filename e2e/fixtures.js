@@ -70,10 +70,24 @@ const CIVITAI_VERSIONS = {
 };
 const ink = Object.entries(CIVITAI).find(([, version]) => version.model.name === "Ink");
 const CIVITAI_MODELS = [
-  { id: 50, name: "Neon", type: "LORA", nsfw: false, creator: { username: "e2e" }, stats: { downloadCount: 1234, thumbsUpCount: 56 }, modelVersions: [CIVITAI_VERSIONS[501], CIVITAI_VERSIONS[502]] },
+  { id: 50, name: "Neon", type: "LORA", nsfw: false, creator: { username: "e2e" }, tags: ["style", "neon"], stats: { downloadCount: 1234, thumbsUpCount: 56 }, modelVersions: [CIVITAI_VERSIONS[501], CIVITAI_VERSIONS[502]] },
   { id: ink[1].modelId, name: "Ink", type: "LORA", nsfw: false, creator: { username: "e2e" }, stats: { downloadCount: 7, thumbsUpCount: 1 },
     modelVersions: [{ ...ink[1], files: [{ id: 9, name: "ink.safetensors", sizeKB: 1, primary: true, type: "Model", hashes: { SHA256: ink[0] }, downloadUrl: `${host}/download/9` }] }] },
   { id: 60, name: "Studio XL", type: "Checkpoint", nsfw: false, creator: { username: "e2e" }, stats: { downloadCount: 99, thumbsUpCount: 9 }, modelVersions: [CIVITAI_VERSIONS[601]] },
 ];
 
-module.exports = { MODELS, WILDCARDS, CIVITAI, CIVITAI_MODELS, CIVITAI_VERSIONS, DOWNLOADS, png, sha256 };
+// The model pages (GET /api/v1/models/<id>): tags, counts, creator and versions, newest first. Ink has a newer version (v3) than the test file's
+// (v2); Glow has only its own; Film and Base have no page (the lookup keeps the version all the same).
+const glow = Object.values(CIVITAI).find((version) => version.model.name === "Glow");
+const CIVITAI_PAGES = {
+  [ink[1].modelId]: { id: ink[1].modelId, name: "Ink", type: "LORA", tags: ["anime", "ink", "lineart"], creator: { username: "inkmaker" },
+    stats: { downloadCount: 71087, thumbsUpCount: 2770, thumbsDownCount: 2, commentCount: 0, tippedAmountCount: 920 },
+    modelVersions: [{ id: 199, name: "v3", baseModel: "Illustrious", publishedAt: "2026-05-26T18:39:52.929Z", stats: { downloadCount: 52275 } },
+      { id: ink[1].id, name: "v2", baseModel: "Illustrious", publishedAt: "2026-04-20T22:36:19.392Z", stats: { downloadCount: 18812 } }] },
+  [glow.modelId]: { id: glow.modelId, name: "Glow", type: "LORA", tags: ["pony", "style"], creator: { username: "glower" },
+    stats: { downloadCount: 900, thumbsUpCount: 40, commentCount: 3, tippedAmountCount: 0 },
+    modelVersions: [{ id: glow.id, name: "v1", baseModel: "Pony", publishedAt: "2026-01-02T10:00:00.000Z", stats: { downloadCount: 900 } }] },
+};
+for (const model of CIVITAI_MODELS) CIVITAI_PAGES[model.id] ??= model; // The models of the search have a page too (for downloads).
+
+module.exports = { MODELS, WILDCARDS, CIVITAI, CIVITAI_MODELS, CIVITAI_VERSIONS, CIVITAI_PAGES, DOWNLOADS, png, sha256 };

@@ -1,6 +1,7 @@
 import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
 import { addStyleOnce, element } from "./dom.js";
+import { dateText, statsChips } from "./civitai_meta.js";
 
 // "Model info" in the node menu, for every node with a model file picked in a list (Load Checkpoint, Load Diffusion Model, Load LoRA, Load VAE,
 // Load CLIP and the DiceForge loaders): a dialog like rgthree's LoRA info, with the file's sha256, what Civitai knows about it, and your own notes.
@@ -30,6 +31,10 @@ const STYLE = `
 .dfmi h2{margin:0 0 10px;font-size:22px;color:#fff}
 .dfmi .tags{margin-bottom:12px}.dfmi .tag{display:inline-block;padding:2px 8px;border-radius:5px;margin-right:6px;font-weight:600;font-size:13px}
 .dfmi .t1{background:#4b3565;color:#d9c8f0}.dfmi .t2{background:#35584a;color:#c8f0dc}
+.dfmi .t3{background:#3a3a3a;color:#ddd;text-transform:uppercase;font-size:12px}.dfmi .stats{display:inline-flex;gap:6px;margin-left:4px;vertical-align:middle}
+.dfmi .stat{background:#2a2a2a;border:1px solid #4a4a4a;border-radius:5px;padding:1px 7px;font-size:13px;font-weight:600}
+.dfmi .versions{display:flex;flex-wrap:wrap;gap:6px}.dfmi .version{display:inline-block;background:#2f2f2f;border:1px solid #555;border-radius:5px;padding:2px 8px;text-decoration:none;color:#ddd}
+.dfmi .version.mine{background:#1f5fa8;border-color:#3b82d0;color:#fff}.dfmi .version.newer{border-color:#6a9a6a;color:#bfe8bf}
 .dfmi table{width:100%;border-collapse:collapse;margin-bottom:14px}
 .dfmi td{border:1px solid #4a4a4a;padding:7px 10px;vertical-align:top}.dfmi td:first-child{width:170px;color:#bbb;white-space:nowrap}
 .dfmi a{color:#9cc8ff}.dfmi code{font-size:12px;word-break:break-all}
@@ -130,6 +135,20 @@ function slider(images) {
     count, ...(arrows ? [dots] : []));
 }
 
+// The model's versions on Civitai, newest first: yours marked, a newer one than yours marked new; each opens its page.
+const VERSION_STATES = { mine: { className: "mine", title: "Your version", mark: "● " }, newer: { className: "newer", title: "Newer than yours", mark: "🆕 " },
+  other: { className: "", title: "", mark: "" } };
+function versionList(civitai) {
+  const mine = civitai.versions.find((version) => version.id === civitai.version_id);
+  return element("div", { class: "versions" }, ...civitai.versions.map((version) => {
+    let state = VERSION_STATES.other;
+    if (version.id === civitai.version_id) state = VERSION_STATES.mine;
+    else if (mine && version.published > mine.published) state = VERSION_STATES.newer;
+    return element("a", { class: `version ${state.className}`, href: `https://civitai.com/models/${civitai.model_id}?modelVersionId=${version.id}`,
+      target: "_blank", rel: "noopener", title: [state.title, version.base_model, dateText(version.published)].filter(Boolean).join(" · ") },
+    `${state.mark}${version.name}`);
+  }));
+}
 function render(panel, info, close, load) {
   const civitai = info.civitai ?? {};
   const user = info.user ?? {};
@@ -160,6 +179,8 @@ function render(panel, info, close, load) {
     ["Size", info.size >= 1024 ** 3 ? `${(info.size / 1024 ** 3).toFixed(2)} GB` : `${(info.size / 1024 ** 2).toFixed(1)} MB`],
     ["Civitai", civitaiCell],
     ...(civitai.found ? [["Base model", civitai.base_model ?? "—"], ["Civitai trigger words", civitai.trigger_words?.length ? words : element("span", { class: "muted" }, "none")]] : []),
+    ...(civitai.found && civitai.versions?.length ? [["Versions", versionList(civitai)]] : []),
+    ...(civitai.found && (civitai.creator || civitai.updated) ? [["Creator, updated", [civitai.creator && `by ${civitai.creator}`, civitai.updated && `updated ${dateText(civitai.updated)}`].filter(Boolean).join(" · ")]] : []),
     ["Name", edit("name", civitai.found ? `${civitai.model_name} - ${civitai.version_name}` : "Your name for this model")],
     ["Trigger words", edit("trigger_words", "Words to put in the prompt")],
     ["Recommended settings", edit("settings", "Steps, CFG, sampler, scheduler, resolution…", true)],
@@ -172,7 +193,9 @@ function render(panel, info, close, load) {
   } }, "Refresh from Civitai");
   panel.replaceChildren(
     element("h2", {}, title),
-    element("div", { class: "tags" }, element("span", { class: "tag t1" }, civitai.type ?? info.kind), ...(civitai.base_model ? [element("span", { class: "tag t2" }, civitai.base_model)] : [])),
+    element("div", { class: "tags" }, element("span", { class: "tag t1" }, civitai.type ?? info.kind), ...(civitai.base_model ? [element("span", { class: "tag t2" }, civitai.base_model)] : []),
+      ...(civitai.found ? (civitai.tags ?? []).map((tag) => element("span", { class: "tag t3" }, tag)) : []),
+      ...(civitai.found && civitai.stats ? [element("span", { class: "stats" }, ...statsChips(civitai.stats))] : [])),
     element("table", {}, ...rows.map(([label, value]) => element("tr", {}, element("td", {}, label), element("td", {}, value)))),
     images,
     element("div", { class: "row" }, refresh, element("button", { onclick: close }, "Close")),

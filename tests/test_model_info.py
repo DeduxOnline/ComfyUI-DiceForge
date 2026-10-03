@@ -1,6 +1,7 @@
 # Model info and the model browsers (DiceForge/model_info.py): the info files, Civitai data, card data, local previews and the server routes. Civitai
 # is replaced by a stand-in, so the tests never go online.
 import hashlib
+import json
 import os
 import pytest
 from aiohttp import web
@@ -135,3 +136,95 @@ def test_info_saved_before_image_meta_is_looked_up_once_more(api, models, civita
     assert len(civitai) == 1 and all("page" in image for image in info["civitai"]["images"])
     api("GET", "/diceforge/model-info?kind=loras&file=old.safetensors")
     assert len(civitai) == 1 # Once: now it has them.
+
+
+INK_PAGE = {
+    "id": 11, "name": "Ink", "tags": ["anime", "ink", 5, "", None, "x" * 99], "creator": {"username": "inkmaker"},
+    "stats": {"downloadCount": 71087, "thumbsUpCount": 2770, "tippedAmountCount": 920, "commentCount": True},
+    "modelVersions": [{"id": 23, "name": "v3", "baseModel": "Illustrious", "publishedAt": "2026-05-26T18:39:52.929Z", "stats": {"downloadCount": 52275}},
+                      {"id": 22, "name": "v2", "baseModel": "Illustrious", "publishedAt": "2026-04-20T22:36:19.392Z"}, "junk", {"name": "no id"}],
+}
+
+
+def test_civitai_details_keep_tags_counts_creator_and_versions():
+    details = model_info.civitai_details(INK_PAGE)
+    assert details["tags"] == ["anime", "ink", "5", "x" * 40]
+    assert details["stats"] == {"likes": 2770, "downloads": 71087, "tips": 920, "comments": 0} # Not a number: 0.
+    assert details["creator"] == "inkmaker" and details["updated"] == "2026-05-26T18:39:52.929Z"
+    assert [(version["id"], version["name"], version["downloads"]) for version in details["versions"]] == [(23, "v3", 52275), (22, "v2", 0)]
+    for junk in (None, "x", [], {"stats": 5, "creator": "x", "modelVersions": 7, "tags": "abc"}):
+        assert model_info.civitai_details(junk) in ({}, {"tags": [], "stats": {"likes": 0, "downloads": 0, "tips": 0, "comments": 0}, "creator": "",
+                                                          "versions": [], "updated": ""})
+
+
+def test_a_newer_version_than_yours_is_named():
+    civitai = {**civitai_summary(CIVITAI_VERSION), **model_info.civitai_details(INK_PAGE)}
+    assert model_info.newer_version(civitai) == {"id": 23, "name": "v3", "url": "https://civitai.com/models/11?modelVersionId=23"}
+    assert model_info.newer_version({**civitai, "version_id": 23}) is None # Yours is the newest.
+    assert model_info.newer_version({**civitai, "version_id": 999}) is None # Yours isn't listed (removed): nothing to compare.
+    assert model_info.newer_version({**civitai, "versions": []}) is None
+
+
+def test_browser_cards_carry_the_civitai_page(api, models, civitai, monkeypatch):
+    async def details(session, model_id):
+        return {**model_info.civitai_details(INK_PAGE), "details_checked": 1.0}
+    monkeypatch.setattr(model_info, "civitai_model_details", details)
+    models("loras", "ink.safetensors", b"ink")
+    api("GET", "/diceforge/model-info?kind=loras&file=ink.safetensors") # The lookup (faked by civitai: the version only)...
+    api("GET", "/diceforge/model-info?kind=loras&file=ink.safetensors") # ...then the page, which it lacks.
+    entry = next(item for item in api("GET", "/diceforge/model-browser?kind=loras")[1]["files"] if item["file"] == "ink.safetensors")
+    assert entry["tags"][:2] == ["anime", "ink"] and entry["stats"]["likes"] == 2770 and entry["creator"] == "inkmaker"
+    assert entry["newer"]["name"] == "v3"
+
+
+def test_info_looked_up_before_the_page_was_kept_gets_only_the_page(api, models, civitai, monkeypatch):
+    asked = []
+
+    async def details(session, model_id):
+        asked.append(model_id)
+        return {"tags": ["anime"], "details_checked": 1.0}
+    monkeypatch.setattr(model_info, "civitai_model_details", details)
+    path = models("loras", "old.safetensors", b"weights")
+    stat = os.stat(path)
+    old = {**civitai_summary(CIVITAI_VERSION), "checked": 1.0} # Images with "page": no new lookup for them.
+    write_info("loras", "old.safetensors", {"size": stat.st_size, "mtime": stat.st_mtime, "sha256": "abc", "civitai": old})
+    info = api("GET", "/diceforge/model-info?kind=loras&file=old.safetensors")[1]
+    assert civitai == [] and asked == [11] and info["civitai"]["tags"] == ["anime"] and info["civitai"]["model_name"] == "Ink"
+    api("GET", "/diceforge/model-info?kind=loras&file=old.safetensors")
+    assert asked == [11] # Once.
+
+
+def test_civitai_lookup_adds_the_page_and_survives_its_failure(monkeypatch):
+    import asyncio
+    import threading
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+    class Handler(BaseHTTPRequestHandler):
+        def log_message(self, *args):
+            pass
+
+        def do_GET(self):
+            pages = {"/by-hash/a": (200, CIVITAI_VERSION), "/by-hash/b": (200, {**CIVITAI_VERSION, "modelId": 12}), "/by-hash/c": (200, {**CIVITAI_VERSION, "modelId": 13}),
+                     "/models/11": (200, INK_PAGE), "/models/12": (500, {"error": "down"}), "/models/13": (404, {"error": "gone"})}
+            status, body = pages.get(self.path, (404, {"error": "nope"}))
+            data = json.dumps(body).encode()
+            self.send_response(status)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        host = f"http://127.0.0.1:{server.server_port}"
+        monkeypatch.setattr(model_info, "CIVITAI_BY_HASH", host + "/by-hash/{}")
+        monkeypatch.setattr(model_info, "CIVITAI_MODEL", host + "/models/{}")
+        found = asyncio.run(model_info.civitai_lookup("a"))
+        assert found["found"] and found["tags"] == ["anime", "ink", "5", "x" * 40] and found["details_checked"] and found["versions"][0]["name"] == "v3"
+        failed = asyncio.run(model_info.civitai_lookup("b")) # The page failed: the version is kept, the page asked again next time.
+        assert failed["found"] and failed["model_name"] == "Ink" and "tags" not in failed and "details_checked" not in failed
+        gone = asyncio.run(model_info.civitai_lookup("c")) # No page (404): nothing to add, not asked again.
+        assert gone["found"] and "tags" not in gone and gone["details_checked"]
+        assert asyncio.run(model_info.civitai_lookup("zzz")) == {"found": False, "checked": pytest.approx(gone["checked"], abs=60)}
+    finally:
+        server.shutdown()

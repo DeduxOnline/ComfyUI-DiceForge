@@ -5,6 +5,7 @@ import { insertIntoNode } from "./wildcards.js";
 import { openCivitaiSearch } from "./civitai.js";
 import { dragSource, dropTarget, pickFolder } from "./move_dialog.js";
 import { addStyleOnce, background, element } from "./dom.js";
+import { dateText, statsChips } from "./civitai_meta.js";
 
 // Model browsers (node menu): LoRA, Checkpoint and Diffusion Model Browser. The model files as cards with a preview, name, base model and trigger words from Civitai
 // (looked up by the file's hash, as in Model info), a folder tree, search and filters. What a card's button does depends on the node it was opened
@@ -78,6 +79,10 @@ const STYLE = `
 .dflb .blur{filter:blur(22px);cursor:pointer}.dflb .base{position:absolute;left:6px;top:6px;background:#35584acc;color:#c8f0dc;border-radius:4px;padding:1px 6px;font-size:12px;font-weight:600}
 .dflb .body{padding:7px 8px;display:flex;flex-direction:column;gap:5px;flex:1}.dflb .title{font-weight:600;color:#fff;word-break:break-word}
 .dflb .muted{color:#999;font-size:12px;word-break:break-all}.dflb .words span{display:inline-block;background:#262626;border:1px solid #555;border-radius:4px;padding:0 5px;margin:0 3px 3px 0;font-size:12px;cursor:copy}
+.dflb .byline{color:#999;font-size:12px}.dflb .ctags{display:flex;flex-wrap:wrap;gap:3px}.dflb .ctags span{background:#3a3a3a;color:#ccc;border-radius:4px;padding:0 5px;font-size:11px;text-transform:uppercase;cursor:pointer}
+.dflb .ctags span:hover{background:#4a4a4a;color:#fff}.dflb .ctags span.on{background:#2f3f55;color:#cfe2ff}.dflb .stats{display:flex;flex-wrap:wrap;gap:4px;align-items:center}
+.dflb .stats .stat{background:#232323;border:1px solid #444;border-radius:4px;padding:0 5px;font-size:12px;font-weight:600;color:#ddd}
+.dflb .stats a.newer{background:#2c4a2c;border:1px solid #4a7a4a;color:#bfe8bf;border-radius:4px;padding:0 5px;font-size:12px;text-decoration:none}
 .dflb .buttons{display:flex;gap:5px;flex-wrap:wrap;margin-top:auto}.dflb .buttons button{padding:3px 8px;font-size:12px}.dflb .status{color:#9c9;font-size:13px;min-height:18px}
 `;
 const addStyle = () => addStyleOnce("dflb-style", STYLE);
@@ -104,11 +109,13 @@ async function openBrowser(node, spec, target = targetOf(node, spec)) {
   const { kind } = spec;
   const what = spec.one;
   let files = [], folder = "", selectedFile = target?.model?.value, stopLookUp = null;
-  const search = element("input", { placeholder: "Search by file, name or trigger word…" });
+  const search = element("input", { placeholder: "Search by file, name, trigger word, tag or creator…" });
   const base = element("select", {}, element("option", { value: "" }, "All base models"));
   const FITS = "\u0001fits";
   const FAVORITES = "\u0002favorites"; // The ★ Favorites row of the tree, as the picked "folder".
-  const sort = element("select", {}, ...[["name", "Name"], ["new", "Newest first"], ["base", "Base model"]].map(([value, label]) => element("option", { value }, label)));
+  const sort = element("select", {}, ...[["name", "Name"], ["new", "Newest first"], ["base", "Base model"], ["downloads", "Most downloaded"], ["likes", "Most liked"],
+    ["updated", "Updated on Civitai"]].map(([value, label]) => element("option", { value }, label)));
+  const tagFilter = element("select", { class: "tag-filter", title: "Civitai's tags of the models looked up" }, element("option", { value: "" }, "All tags"));
   const status = element("div", { class: "status" });
   const tree = element("div", { class: "tree" });
   const grid = element("div", { class: "grid" });
@@ -277,6 +284,22 @@ async function openBrowser(node, spec, target = targetOf(node, spec)) {
       onclick: (event) => { event.stopPropagation(); background(setFavorite(entry, !entry.favorite)); } }, entry.favorite ? "★" : "☆"));
     return box;
   }
+  // From the model's Civitai page: its counts, a newer version than yours, who made it and when it was updated, its tags (a click filters by one).
+  function civitaiFacts(entry) {
+    const facts = [];
+    const newer = entry.newer ? [element("a", { class: "newer", href: entry.newer.url, target: "_blank", rel: "noopener", title: `A newer version is on Civitai: ${entry.newer.name}` },
+      `🆕 ${entry.newer.name}`)] : [];
+    if (entry.stats || newer.length) facts.push(element("div", { class: "stats" }, ...statsChips(entry.stats), ...newer));
+    const byline = [entry.creator && `by ${entry.creator}`, entry.updated && `updated ${dateText(entry.updated)}`].filter(Boolean).join(" · ");
+    if (byline) facts.push(element("div", { class: "byline" }, byline));
+    if (entry.tags?.length) {
+      facts.push(element("div", { class: "ctags" }, ...entry.tags.slice(0, 6).map((tag) => element("span", { class: tag === tagFilter.value ? "on" : "",
+        title: tag === tagFilter.value ? "Showing this tag: click for all tags" : `Show only the ${what} files tagged ${tag}`,
+        onclick: () => { tagFilter.value = tag === tagFilter.value ? "" : tag; draw(); } }, tag)),
+      ...(entry.tags.length > 6 ? [element("span", { title: entry.tags.slice(6).join(", ") }, `+${entry.tags.length - 6}`)] : [])));
+    }
+    return facts;
+  }
   function card(entry) {
     const words = element("div", { class: "words" }, ...entry.trigger_words.slice(0, 8).map((word) =>
       element("span", { title: "Click to copy", onclick: () => { background(navigator.clipboard?.writeText(word)); say(`Copied "${word}".`); } }, word)));
@@ -312,13 +335,14 @@ async function openBrowser(node, spec, target = targetOf(node, spec)) {
       element("div", { class: "body" },
         element("div", { class: "title" }, entry.name || shortName(entry.file)),
         element("div", { class: "muted" }, entry.file, ` · ${(entry.size / 1024 ** 2).toFixed(0)} MB`, note ? ` · ${note}` : ""),
+        ...civitaiFacts(entry),
         words,
         ...(entry.settings ? [element("div", { class: "muted", title: "Your recommended settings, from Model info" }, `⚙ ${entry.settings}`)] : []),
         element("div", { class: "buttons" }, ...action(entry), info, lookUpButton, ...link, ...manage)));
     if (spec.manage) dragSource(box, kind, entry.file);
     box.classList.toggle("picked", picked.has(entry.file));
     box.addEventListener("click", (event) => { // Picking: Ctrl (⌘) or Shift, or any click in ☐ Select mode; not on the card's buttons and links.
-      if (event.target.closest("button, a, .words span, .blur") || !(selecting || event.ctrlKey || event.metaKey || event.shiftKey)) return;
+      if (event.target.closest("button, a, .words span, .ctags span, .blur") || !(selecting || event.ctrlKey || event.metaKey || event.shiftKey)) return;
       event.preventDefault();
       togglePick(entry.file, event.shiftKey);
     });
@@ -373,10 +397,11 @@ async function openBrowser(node, spec, target = targetOf(node, spec)) {
   }
   function matches(entry) {
     const query = search.value.trim().toLowerCase();
-    const text = [entry.file, entry.name, entry.base_model, ...entry.trigger_words].join(" ").toLowerCase();
+    const text = [entry.file, entry.name, entry.base_model, entry.creator, ...entry.trigger_words, ...(entry.tags ?? [])].join(" ").toLowerCase();
     const inFolder = folder === FAVORITES ? entry.favorite : !folder || folderOf(entry.file) === folder || folderOf(entry.file).startsWith(folder + "/");
     const baseOk = !base.value || (base.value === FITS ? compareBases(entry.base_model, target.base)?.level !== "bad" : entry.base_model === base.value);
-    return inFolder && baseOk && (!query || query.split(/\s+/).every((word) => text.includes(word)));
+    const tagOk = !tagFilter.value || (entry.tags ?? []).includes(tagFilter.value);
+    return inFolder && baseOk && tagOk && (!query || query.split(/\s+/).every((word) => text.includes(word)));
   }
   // Folders open in the tree, kept per kind between openings (and reloads) in this browser. Subfolders start closed; ▸ opens one, and the folder
   // picked in the tree (or the one a Random loader uses) is opened to.
@@ -442,8 +467,19 @@ async function openBrowser(node, spec, target = targetOf(node, spec)) {
       ...(target?.base ? [element("option", { value: FITS, title: "The same base, the same family (⚠) and the ones not looked up yet" }, `Fits the model (${target.base})`)] : []),
       ...bases.map((name) => element("option", { value: name }, name)));
     base.value = chosen === FITS || bases.includes(chosen) ? chosen : "";
+    const tagCounts = new Map();
+    for (const tag of files.flatMap((entry) => entry.tags ?? [])) tagCounts.set(tag, (tagCounts.get(tag) ?? 0) + 1);
+    const chosenTag = tagFilter.value;
+    tagFilter.replaceChildren(element("option", { value: "" }, "All tags"), ...[...tagCounts].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .map(([tag, count]) => element("option", { value: tag }, `${tag} (${count})`)));
+    tagFilter.value = tagCounts.has(chosenTag) ? chosenTag : "";
+    tagFilter.hidden = !tagCounts.size; // Nothing looked up yet: no tags to pick.
+    const byName = (a, b) => (a.name || shortName(a.file)).localeCompare(b.name || shortName(b.file));
     const order = {
-      name: (a, b) => (a.name || shortName(a.file)).localeCompare(b.name || shortName(b.file)),
+      name: byName,
+      downloads: (a, b) => (b.stats?.downloads ?? -1) - (a.stats?.downloads ?? -1) || byName(a, b),
+      likes: (a, b) => (b.stats?.likes ?? -1) - (a.stats?.likes ?? -1) || byName(a, b),
+      updated: (a, b) => (b.updated || "").localeCompare(a.updated || "") || byName(a, b),
       new: (a, b) => b.mtime - a.mtime,
       base: (a, b) => (a.base_model || "~").localeCompare(b.base_model || "~") || shortName(a.file).localeCompare(shortName(b.file)),
     }[sort.value];
@@ -474,11 +510,11 @@ async function openBrowser(node, spec, target = targetOf(node, spec)) {
       draw();
     }
   });
-  for (const input of [search, base, sort]) input.addEventListener(input === search ? "input" : "change", draw);
+  for (const input of [search, base, tagFilter, sort]) input.addEventListener(input === search ? "input" : "change", draw);
   const hint = target?.pick ? target.hint : target?.model ? `Use puts a ${what} in ${target.model.name}.` : target?.folder ? `Use folder sets the folder ${spec.randomName} picks from.` : target?.triggers ? `+ Triggers inserts a ${what}'s trigger words where the cursor was in the prompt.` : "";
   back.append(element("div", { class: "dflb" },
     element("h2", {}, `${spec.title} Browser`),
-    element("div", { class: "top" }, search, base, sort, selectMode, lookAll,
+    element("div", { class: "top" }, search, base, tagFilter, sort, selectMode, lookAll,
       ...(spec.manage ? [element("button", { class: "go find", title: `Search Civitai and download ${spec.plural} into models/${kind}`, onclick: () => background(openCivitaiSearch({
         kind, title: spec.title, plural: spec.plural, icon: spec.icon, hint: spec.civitaiHint ?? "", base: target?.base, folders: [...new Set(files.map((entry) => folderOf(entry.file)).filter(Boolean))].sort((a, b) => a.localeCompare(b)),
         onChange: () => background(reload().then(() => say("The download is done: it is in the list."))),

@@ -242,6 +242,25 @@ def test_generated_json_bodies_never_cause_a_server_error(body, route, api, wild
     shutil.rmtree(lora_stack.PRESET_FOLDER, ignore_errors=True)
 
 
+
+PAGE_KEYS = ["tags", "stats", "creator", "modelVersions", "id", "name", "publishedAt", "downloadCount", "thumbsUpCount", "username", "baseModel"]
+civitai_pages = st.recursive(st.one_of(st.none(), st.booleans(), st.integers(), st.text(max_size=8)),
+                             lambda children: st.one_of(st.lists(children, max_size=4), st.dictionaries(st.sampled_from(PAGE_KEYS), children, max_size=5)), max_leaves=14)
+
+
+@settings(max_examples=scaled(200))
+@given(page=civitai_pages, version_id=st.one_of(st.none(), st.integers()))
+def test_any_civitai_page_gives_clean_details(page, version_id):
+    """Whatever Civitai's model page holds, the details are plain: tags as short strings, counts as numbers >= 0, versions with an id, and the newer
+    version check never fails."""
+    details = model_info.civitai_details(page)
+    json.dumps(details)
+    if details:
+        assert all(isinstance(tag, str) and 0 < len(tag) <= 40 for tag in details["tags"])
+        assert all(isinstance(count, int) and count >= 0 for count in details["stats"].values())
+        assert all(isinstance(version["id"], int) for version in details["versions"])
+        model_info.newer_version({**details, "version_id": version_id, "model_id": 1})
+
 # Wildcard files in other encodings, invalid YAML, YAML scalars, files deleted after indexing.
 def test_a_wildcard_file_in_another_encoding_is_a_clear_error(wildcards, api):
     wildcards("good.txt", "red\n")

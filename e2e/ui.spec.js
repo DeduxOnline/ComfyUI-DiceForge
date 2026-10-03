@@ -621,6 +621,42 @@ for (const vue of [true, false]) {
       await page.keyboard.press("Escape");
     });
 
+    test("LoRA Browser: Civitai tags, counts, creator and a newer version on the cards; filter by tag, sort by downloads; versions in Model info", async ({ page, request }) => {
+      for (const file of ["style/ink.safetensors", "style/pony_glow.safetensors", "style/flux_film.safetensors"]) await lookUp(request, "loras", file);
+      const [loader] = await addNodes(page, [{ type: "LoraLoader" }]);
+      await clickMenu(page, loader, "DiceForge.ModelBrowser", "LoRA Browser");
+      const ink = page.locator(".dflb .card", { hasText: "Ink - v2" });
+      await expect(ink.locator(".ctags span")).toHaveText(["anime", "ink", "lineart"]);
+      await expect(ink.locator(".stats .stat")).toHaveText(["👍 2.8K", "⬇ 71.1K", "⚡ 920"]); // No comments: not shown.
+      await expect(ink.locator(".stats a.newer")).toHaveText("🆕 v3");
+      expect(await ink.locator(".stats a.newer").getAttribute("href")).toContain("modelVersionId=199");
+      await expect(ink).toContainText("by inkmaker · updated");
+      const glow = page.locator(".dflb .card", { hasText: "Glow - v1" });
+      await expect(glow.locator(".stats .stat")).toHaveText(["👍 40", "⬇ 900", "💬 3"]);
+      await expect(glow.locator(".stats a.newer")).toHaveCount(0); // Its only version.
+      await expect(page.locator(".dflb .card", { hasText: "Film - v1" }).locator(".ctags, .stats")).toHaveCount(0); // No page on Civitai.
+      // A tag: from the card or the list; the search finds tags and creators too.
+      await glow.locator(".ctags span", { hasText: "pony" }).click();
+      await expect(page.locator(".dflb .tag-filter")).toHaveValue("pony");
+      expect(await cardTitles(page)).toEqual(["Glow - v1 [Pony]"]);
+      await page.locator(".dflb .tag-filter").selectOption("");
+      await page.locator(".dflb .top input").fill("inkmaker");
+      expect(await cardTitles(page)).toEqual(["Ink - v2 [Illustrious]"]);
+      await page.locator(".dflb .top input").fill("");
+      await page.locator(".dflb .top select").last().selectOption("downloads");
+      expect((await cardTitles(page)).slice(0, 2)).toEqual(["Ink - v2 [Illustrious]", "Glow - v1 [Pony]"]);
+      await page.keyboard.press("Escape");
+      // Model info: the tags and counts by the title, the versions (yours marked, the newer one new).
+      await addNodes(page, [{ type: "LoraLoader", pos: [500, 40], widgets: { lora_name: "style/ink.safetensors" } }]);
+      const id = await page.evaluate(() => window.app.graph.nodes.at(-1).id);
+      await clickMenu(page, id, "DiceForge.ModelInfo", "Model info");
+      await expect(page.locator(".dfmi .tag.t3")).toHaveText(["anime", "ink", "lineart"]);
+      await expect(page.locator(".dfmi .stats .stat").first()).toHaveText("👍 2.8K");
+      await expect(page.locator(".dfmi .version")).toHaveText(["🆕 v3", "● v2"]);
+      await expect(page.locator(".dfmi")).toContainText("by inkmaker");
+      await page.keyboard.press("Escape");
+    });
+
     test("KSampler presets: the right-click submenu, Auto from the checkpoint's base model, saving and deleting your own", async ({ page, request }) => {
       await lookUp(request, "checkpoints", "illustrious_base.safetensors");
       const [checkpoint, sampler] = await addNodes(page, [
