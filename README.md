@@ -62,16 +62,24 @@ DiceForge was called *ResolutionForge* while it was a resolution pack. To update
 
 ## Installation
 
-Copy the `DiceForge` folder into `ComfyUI/custom_nodes` and restart ComfyUI:
+**ComfyUI Manager:** open *Manager → Custom Nodes Manager*, search for **DiceForge**, click *Install* and restart ComfyUI.
+
+**comfy-cli:**
 
 ```sh
-git clone https://github.com/DeduxOnline/ComfyUI-DiceForge.git
-cp -r ComfyUI-DiceForge/DiceForge ComfyUI/custom_nodes/
+comfy node install comfyui-diceforge
 ```
 
-Cloning the whole repository straight into `custom_nodes` does not work: the nodes are in the `DiceForge` subfolder, so ComfyUI does not find them.
+**git:** clone the repository into `custom_nodes` and restart ComfyUI:
 
-`DiceForge/__init__.py` registers all the nodes. Each node is one file, and all of them share `DiceForge/seed_modes.py` (the seed modes and their memory file), so install the whole folder. The live previews also use the small frontend extension in `DiceForge/web`, which only loads with the whole folder: without it, *SDXL Resolution List (Latent)* shows "—" and *Resolution Selector (Random, Latent)* shows fixed ratios only, like the core node.
+```sh
+cd ComfyUI/custom_nodes
+git clone https://github.com/DeduxOnline/ComfyUI-DiceForge.git
+```
+
+The nodes and the frontend are in the `DiceForge` subfolder; the repository's own `__init__.py` loads them, so the whole repository goes into `custom_nodes`. If you installed an earlier version by copying only the `DiceForge` folder into `custom_nodes`, delete that copy: two copies would register the same nodes twice. Your wildcards, presets, styles, favorites, tag lists and seed memory are in `ComfyUI/user/DiceForge` and `ComfyUI/models/wildcards`, so they stay.
+
+Every version is listed in [CHANGELOG.md](CHANGELOG.md) and released on [GitHub](https://github.com/DeduxOnline/ComfyUI-DiceForge/releases) and the [ComfyUI Registry](https://registry.comfy.org); ComfyUI Manager shows when an update is out.
 
 **Requirements:** a recent ComfyUI that includes `comfy_api.latest` (the V3 node API). *Resolution Selector (Random, Latent)* also needs the resolution preview widget, which ships with the core *Resolution Selector* node. Older ComfyUI versions will not load these nodes.
 
@@ -544,6 +552,14 @@ Right-click **KSampler**, **KSampler (Advanced)** or any other node with `steps`
 The same browser for the files of `models/text_encoders` and `models/vae`. Right-click **Load CLIP**, **DualCLIPLoader**, **Load Diffusion Model + CLIP** (one entry per text encoder list) and choose **🔤 Text Encoder Browser**, or **Load VAE**, **Load VAE + Decode + Save** and **Random VAE** for **🎨 VAE Browser**. **Use** puts the file in the list the browser was opened for; **Use folder** in the tree sets Random VAE's folder. Cards, folders, search, favorites, Model info, **✎**, **⇄** and **🗑** work as in the other browsers. **＋ Find on Civitai** is in the VAE Browser only: Civitai has no model type for text encoders.
 
 The browsers are offered for every node whose list holds model files, whatever the node pack. They also work when another extension keeps the list in its own form, or when ComfyUI's experimental Asset API replaces the list: then the current file is enough, as for Model info.
+
+## Releasing
+
+1. Under `## [Unreleased]` in [CHANGELOG.md](CHANGELOG.md), list what changed; then rename it to `## [x.y.z] - date` (with a new empty `[Unreleased]` above it) and set the same version in `pyproject.toml` and `DiceForge/__init__.py` (`tests/test_release.py` checks they agree).
+2. Commit, push, and when the tests are green, tag it: `git tag vx.y.z && git push origin vx.y.z`.
+3. The *Release* workflow runs the tests again, makes the GitHub release with that version's changelog section as its notes, and publishes the pack to the ComfyUI Registry.
+
+Publishing to the Registry needs, once: a publisher on [registry.comfy.org](https://registry.comfy.org) with the `PublisherId` of `pyproject.toml` (`deduxonline`), an API key of that publisher, and that key as the repository secret `REGISTRY_ACCESS_TOKEN` (GitHub → Settings → Secrets and variables → Actions). Without the secret, the release is still made on GitHub and the workflow warns that the Registry step was skipped.
 
 ## Tests
 

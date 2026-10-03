@@ -9,6 +9,7 @@ on:
   pull_request:
   schedule:
     - cron: "17 5 * * 1" # Mondays: against ComfyUI master.
+  workflow_call: # From the Release workflow: a tag is only released when the tests pass.
   workflow_dispatch:
     inputs:
       comfyui_ref:

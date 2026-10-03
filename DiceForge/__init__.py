@@ -25,6 +25,7 @@ from . import tag_autocomplete # Server routes of the Danbooru / e621 tag autoco
 from . import prompt_styles # Server routes of the prompt styles in CLIP Dual Text Encode's menu (web/prompt_styles.js).
 from . import sampler_presets # Server routes of the KSampler presets in the node menu (web/sampler_presets.js).
 from . import model_manager # Server routes that manage LoRA files: Civitai search and download, rename and delete (web/civitai.js, web/model_browser.js).
+__version__ = "1.0.0" # As in pyproject.toml and CHANGELOG.md (tests/test_release.py).
 WEB_DIRECTORY = "./web" # Frontend extension: feeds the live size previews of the resolution nodes.
 class DiceForgeExtension(ComfyExtension):
     @override

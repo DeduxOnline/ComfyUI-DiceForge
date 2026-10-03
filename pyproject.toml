@@ -1,0 +1,26 @@
+# DiceForge for the ComfyUI Registry (registry.comfy.org), which ComfyUI Manager and comfy-cli install from. A tag v<version> publishes it
+# (.github/workflows/release.yml); the version here, DiceForge.__version__ and the top of CHANGELOG.md must match (tests/test_release.py).
+[project]
+name = "comfyui-diceforge"
+version = "1.0.0"
+description = "Controlled randomness for ComfyUI: seed modes (deck, shuffle, balanced, combinations, mutate) for prompts, wildcards, sizes, numbers and models; wildcards with autocomplete and Danbooru tags; LoRA Stack; model browsers with Civitai; XY Plot, Dice Grid, Hires Fix and variation seeds."
+license = { file = "LICENSE" }
+readme = "README.md"
+requires-python = ">=3.10"
+# Everything DiceForge imports comes with ComfyUI (aiohttp, numpy, Pillow, PyYAML, torch): nothing to install.
+dependencies = []
+classifiers = [
+    "Operating System :: OS Independent",
+    "Environment :: GPU",
+]
+
+[project.urls]
+Repository = "https://github.com/DeduxOnline/ComfyUI-DiceForge"
+Documentation = "https://github.com/DeduxOnline/ComfyUI-DiceForge#readme"
+"Bug Tracker" = "https://github.com/DeduxOnline/ComfyUI-DiceForge/issues"
+Changelog = "https://github.com/DeduxOnline/ComfyUI-DiceForge/blob/main/CHANGELOG.md"
+
+[tool.comfy]
+PublisherId = "deduxonline"
+DisplayName = "DiceForge"
+Icon = ""

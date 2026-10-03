@@ -1,0 +1,59 @@
+# A release of DiceForge: push a tag v<version> (git tag v1.1.0 && git push origin v1.1.0) after setting that version in pyproject.toml,
+# DiceForge/__init__.py and CHANGELOG.md. The tests run first (the Tests workflow); then the release is made on GitHub with the version's
+# section of CHANGELOG.md as its notes, and DiceForge is published to the ComfyUI Registry, which ComfyUI Manager and comfy-cli install from.
+# Publishing needs the repository secret REGISTRY_ACCESS_TOKEN (an API key of the publisher in pyproject.toml, from registry.comfy.org); without
+# it that step is skipped and says so.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Check the version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - name: The tag, pyproject.toml, DiceForge.__version__ and CHANGELOG.md agree
+        run: python .github/scripts/release_notes.py "$GITHUB_REF_NAME" > /dev/null
+
+  tests:
+    name: Tests
+    needs: check
+    uses: ./.github/workflows/tests.yml
+    secrets: inherit
+
+  release:
+    name: Release on GitHub and the ComfyUI Registry
+    needs: tests
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # To make the GitHub release.
+    env:
+      REGISTRY_ACCESS_TOKEN: ${{ secrets.REGISTRY_ACCESS_TOKEN }} # Here, not on the step: a step's condition can't see secrets.
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - name: Release on GitHub, with the changelog's notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python .github/scripts/release_notes.py "$GITHUB_REF_NAME" > notes.md
+          gh release create "$GITHUB_REF_NAME" --title "DiceForge ${GITHUB_REF_NAME#v}" --notes-file notes.md --verify-tag
+      - name: Publish to the ComfyUI Registry
+        if: env.REGISTRY_ACCESS_TOKEN != ''
+        uses: Comfy-Org/publish-node-action@v1
+        with:
+          personal_access_token: ${{ secrets.REGISTRY_ACCESS_TOKEN }}
+      - name: No Registry token
+        if: env.REGISTRY_ACCESS_TOKEN == ''
+        run: echo "::warning::Not published to the ComfyUI Registry: add the repository secret REGISTRY_ACCESS_TOKEN (an API key from registry.comfy.org) and run this workflow again."
