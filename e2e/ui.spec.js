@@ -177,6 +177,37 @@ for (const vue of [true, false]) {
       await page.keyboard.press("Escape");
     });
 
+    test("Wildcard Browser moves files: Move picks a folder, a file dropped on a folder moves there", async ({ page }) => {
+      const top = `wmove_${vue ? "vue" : "classic"}`, wildcards = (...parts) => basePath("models", "wildcards", ...parts);
+      writeFile(`models/wildcards/${top}/from/x.txt`, "one\ntwo\n");
+      writeFile(`models/wildcards/${top}/to/y.txt`, "y\n");
+      try {
+        const [id] = await addNodes(page, [{ type: "CLIPTextEncodePositiveNegative", pos: [300, 60] }]);
+        await clickMenu(page, id, "DiceForge.Wildcards", "Wildcard Browser");
+        await page.locator(".dfwc button.open-all").click();
+        await page.locator(`.dfwc .row[data-name="${top}/from/x"] .name`).click();
+        await page.locator(".dfwc .edit textarea").fill("one\ntwo\nthree"); // Unsaved: stays in the editor through the move.
+        await page.locator(".dfwc button.move").click();
+        await page.locator(`.dfmv .item[data-folder="${top}/to"]`).click();
+        await expect(page.locator(".dfwc .status")).toContainText(`Moved ${top}/from/x to ${top}/to/x`);
+        await expect(page.locator(".dfwc .edit textarea")).toHaveValue("one\ntwo\nthree");
+        await expect(page.locator(".dfwc button.save")).toHaveText("Save •");
+        expect(fs.readFileSync(wildcards(top, "to", "x.txt"), "utf8")).toBe("one\ntwo\n");
+        expect(fs.existsSync(wildcards(top, "from"))).toBe(false);
+        await page.locator(`.dfwc .row[data-name="${top}/to/y"]`).dragTo(page.locator(`.dfwc .folder[data-path="${top}"] > .row`));
+        await expect(page.locator(".dfwc .status")).toContainText(`Moved ${top}/to/y to ${top}/y`);
+        expect(fs.existsSync(wildcards(top, "y.txt"))).toBe(true);
+        await page.locator(".dfwc button.move").click();
+        await page.keyboard.press("Escape"); // Cancels the picker only.
+        await expect(page.locator(".dfmv")).toHaveCount(0);
+        await expect(page.locator(".dfwc")).toHaveCount(1);
+        await page.locator(".dfwc button.close-all").click();
+        await page.keyboard.press("Escape");
+      } finally {
+        fs.rmSync(wildcards(top), { recursive: true, force: true });
+      }
+    });
+
     test("Wildcard Browser creates, renames and deletes files", async ({ page }) => {
       const tag = vue ? "vue" : "classic", wildcards = (...parts) => basePath("models", "wildcards", ...parts);
       const [id] = await addNodes(page, [{ type: "CLIPTextEncodePositiveNegative", pos: [300, 60] }]);
@@ -300,6 +331,36 @@ for (const vue of [true, false]) {
         await page.keyboard.press("Escape");
       } finally {
         fs.rmSync(basePath("models", "loras", top), { recursive: true, force: true });
+      }
+    });
+
+    test("LoRA Browser moves LoRAs: Move picks a folder, a card dropped on a folder moves there", async ({ page }) => {
+      const top = `move_${vue ? "vue" : "classic"}`, loras = (...parts) => basePath("models", "loras", ...parts);
+      writeFile(`models/loras/${top}/a/one.safetensors`, `${top} one`);
+      writeFile(`models/loras/${top}/b/two.safetensors`, `${top} two`);
+      try {
+        const [loader] = await addNodes(page, [{ type: "LoraLoader" }]);
+        await clickMenu(page, loader, "DiceForge.ModelBrowser", "LoRA Browser");
+        await page.locator(".dflb .card", { hasText: "one.safetensors" }).locator("button.move").click();
+        const picker = page.locator(".dfmv");
+        await expect(picker.locator(`.item[data-folder="${top}/a"]`)).toHaveClass(/here/); // Where it is now.
+        await picker.locator(`.item[data-folder="${top}/b"]`).click();
+        await expect(page.locator(".dflb .status")).toContainText(`Moved ${top}/a/one.safetensors to ${top}/b/one.safetensors`);
+        expect(fs.existsSync(loras(top, "b", "one.safetensors")) && !fs.existsSync(loras(top, "a"))).toBe(true); // The empty folder went too.
+        await page.locator(".dflb .card", { hasText: "one.safetensors" }).locator("button.move").click();
+        await picker.locator("input").fill(`${top}/new place`); // A new folder.
+        await picker.locator("input").press("Enter");
+        await expect(page.locator(".dflb .status")).toContainText(`to ${top}/new place/one.safetensors`);
+        await page.locator(".dflb .card", { hasText: "two.safetensors" }).dragTo(page.locator(`.dflb .tree .row[data-path="${top}"]`));
+        await expect(page.locator(".dflb .status")).toContainText(`Moved ${top}/b/two.safetensors to ${top}/two.safetensors`);
+        expect(fs.existsSync(loras(top, "two.safetensors"))).toBe(true);
+        await page.locator(".dflb .card", { hasText: "two.safetensors" }).locator("button.move").click();
+        await page.keyboard.press("Escape"); // Cancels the picker only.
+        await expect(picker).toHaveCount(0);
+        await expect(page.locator(".dflb")).toHaveCount(1);
+        await page.keyboard.press("Escape");
+      } finally {
+        fs.rmSync(loras(top), { recursive: true, force: true });
       }
     });
 

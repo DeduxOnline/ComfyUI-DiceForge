@@ -3,13 +3,14 @@ import { api } from "../../scripts/api.js";
 import { openModelInfo } from "./model_info.js";
 import { insertIntoNode } from "./wildcards.js";
 import { openCivitaiSearch } from "./civitai.js";
+import { dragSource, dropTarget, pickFolder } from "./move_dialog.js";
 import { addStyleOnce, background, element } from "./dom.js";
 
 // Model browsers (node menu): LoRA, Checkpoint and Diffusion Model Browser. The model files as cards with a preview, name, base model and trigger words from Civitai
 // (looked up by the file's hash, as in Model info), a folder tree, search and filters. What a card's button does depends on the node it was opened
 // from: "Use" puts the file in a loader's list, "Use folder" puts a folder in Random LoRA / Random Checkpoint, "+ Triggers" inserts a LoRA's trigger
 // words into CLIP Dual Text Encode's prompt. The browsers also manage the files (manage: true): ＋ Find on Civitai downloads new ones (civitai.js),
-// ✎ renames or moves one and 🗑 deletes one, with its preview and Model info.
+// ✎ renames one, ⇄ moves one to another folder (or drag its card onto a folder in the tree) and 🗑 deletes one, with its preview and Model info.
 const CLIP_NODE = "CLIPTextEncodePositiveNegative";
 const BROWSERS = [
   { kind: "loras", icon: "🎴", title: "LoRA", one: "LoRA", plural: "LoRAs", widget: /lora/i, random: "DiceForgeRandomLora", randomName: "Random LoRA", triggers: true, manage: true },
@@ -60,7 +61,7 @@ const STYLE = `
 .dflb .main{display:flex;gap:12px;flex:1;min-height:0}.dflb .tree{width:230px;flex:none;overflow:auto;border:1px solid #4a4a4a;border-radius:6px;padding:6px}
 .dflb .tree .row{display:flex;align-items:center;gap:6px;padding:3px 6px;border-radius:4px;cursor:pointer}.dflb .tree .row:hover{background:#2c2c2c}
 .dflb .tree .row.sel{background:#2f3f55}.dflb .tree .twist{width:14px;flex:none;color:#999;text-align:center}.dflb .tree .twist:hover{color:#fff}
-.dflb .tree .tools{display:flex;gap:6px;margin-bottom:6px}.dflb .tree .tools button{flex:1}.dflb .tree .row .name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dflb .tree button{padding:0 6px;font-size:12px}
+.dflb .tree .tools{display:flex;gap:6px;margin-bottom:6px}.dflb .tree .tools button{flex:1}.dflb .tree .row.drop{background:#35584a;outline:1px dashed #8fd0a8}.dflb .tree .row .name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dflb .tree button{padding:0 6px;font-size:12px}
 .dflb .grid{flex:1;overflow:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;align-content:start;grid-auto-rows:max-content}
 .dflb .card{background:#2a2a2a;border:1px solid #474747;border-radius:8px;overflow:hidden;display:flex;flex-direction:column}.dflb .card.sel{border-color:#6a9ad8}
 .dflb .pic{aspect-ratio:3/4;background:#1e1e1e;display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative}
@@ -103,7 +104,7 @@ async function openBrowser(node, spec, target = targetOf(node, spec)) {
   const grid = element("div", { class: "grid" });
   const lookAll = element("button", { title: `Compute the hash of every ${what} not looked up yet and ask Civitai about it, one by one` }, "Look up all on Civitai");
   const back = element("div", { class: "dflb-back" });
-  const onKey = (event) => { if (event.key === "Escape" && !document.querySelector(".dfmi-back, .dfcv-back")) { event.stopPropagation(); close(); } };
+  const onKey = (event) => { if (event.key === "Escape" && !document.querySelector(".dfmi-back, .dfcv-back, .dfmv-back")) { event.stopPropagation(); close(); } };
   function close() {
     stopLookUp?.();
     back.remove();
@@ -191,10 +192,11 @@ async function openBrowser(node, spec, target = targetOf(node, spec)) {
     } }, "🛈 Info");
     const link = entry.url ? [element("button", { onclick: () => window.open(entry.url, "_blank", "noopener") }, "Civitai ↗")] : [];
     const manage = spec.manage ? [
-      element("button", { class: "rename", title: `Rename or move this ${what} (with its preview and info); a / puts it in a folder`, onclick: () => background(renameFile(entry)) }, "✎"),
+      element("button", { class: "rename", title: `Rename this ${what} (with its preview and info); a / puts it in a folder`, onclick: () => background(renameFile(entry)) }, "✎"),
+      element("button", { class: "move", title: `Move this ${what} to another folder (or drag the card onto a folder in the tree)`, onclick: () => background(moveFile(entry)) }, "⇄"),
       element("button", { class: "delete", title: `Delete this ${what} file, its preview and info`, onclick: () => background(deleteFile(entry)) }, "🗑")] : [];
     const note = !entry.checked ? "Not looked up yet" : entry.found ? "" : "Not on Civitai";
-    return element("div", { class: "card" + (entry.file === selectedFile ? " sel" : "") },
+    const box = element("div", { class: "card" + (entry.file === selectedFile ? " sel" : "") },
       picture(entry),
       element("div", { class: "body" },
         element("div", { class: "title" }, entry.name || shortName(entry.file)),
@@ -202,6 +204,8 @@ async function openBrowser(node, spec, target = targetOf(node, spec)) {
         words,
         ...(entry.settings ? [element("div", { class: "muted", title: "Your recommended settings, from Model info" }, `⚙ ${entry.settings}`)] : []),
         element("div", { class: "buttons" }, ...action(entry), info, lookUpButton, ...link, ...manage)));
+    if (spec.manage) dragSource(box, kind, entry.file);
+    return box;
   }
   // Update and Delete: the server moves or removes the file with its companions; the loader lists are refreshed, and a loader of this browser that
   // used the file follows it to its new name.
@@ -210,17 +214,28 @@ async function openBrowser(node, spec, target = targetOf(node, spec)) {
     draw();
     background(app.refreshComboInNodes?.());
   }
-  async function renameFile(entry) {
-    const to = prompt(`New name for ${entry.file} (the extension stays; folders with /):`, entry.file.replace(/\.[^./\\]+$/, ""))?.trim();
-    if (!to) return;
-    const response = await api.fetchApi("/diceforge/models/rename", { method: "POST", body: JSON.stringify({ kind, file: entry.file, to }) });
+  async function renameTo(file, to, moved) {
+    const response = await api.fetchApi("/diceforge/models/rename", { method: "POST", body: JSON.stringify({ kind, file, to }) });
     if (!response.ok) return say(await response.text());
     const result = await response.json();
-    if (result.to === entry.file) return;
-    if (target?.model?.value === entry.file) setWidget(node, target.model, result.to);
-    if (selectedFile === entry.file) selectedFile = result.to;
+    if (result.to === file) return;
+    if (target?.model?.value === file) setWidget(node, target.model, result.to);
+    if (selectedFile === file) selectedFile = result.to;
     await reload();
-    say(`Renamed ${entry.file} to ${result.to}. Workflows that use the old name need the new one.`);
+    say(`${moved ? "Moved" : "Renamed"} ${file} to ${result.to}. Workflows that use the old name need the new one.`);
+  }
+  async function renameFile(entry) {
+    const to = prompt(`New name for ${entry.file} (the extension stays; folders with /):`, entry.file.replace(/\.[^./\\]+$/, ""))?.trim();
+    if (to) await renameTo(entry.file, to, false);
+  }
+  // Move: the same file name in another folder ("" for the top folder), picked in the folder picker or by dropping the card on the tree.
+  async function moveFile(entry, to) {
+    const from = folderOf(entry.file);
+    const folders = [...new Set(files.flatMap((item) => { const parts = pathParts(item.file).slice(0, -1); return parts.map((_, index) => parts.slice(0, index + 1).join("/")); }))]
+      .sort((a, b) => a.localeCompare(b));
+    const destination = to ?? await pickFolder({ title: `Move ${pathParts(entry.file).pop()} to…`, folders, current: from });
+    if (destination == null || destination === from) return;
+    await renameTo(entry.file, `${destination ? `${destination}/` : ""}${pathParts(entry.file).pop()}`, true);
   }
   async function deleteFile(entry) {
     if (!confirm(`Delete ${entry.file}, its preview and its info? This can't be undone.`)) return;
@@ -276,8 +291,16 @@ async function openBrowser(node, spec, target = targetOf(node, spec)) {
             drawTree();
           } }, target.folder.value === path ? "In use" : "Use folder")]
         : [];
-      return element("div", { class: "row" + (path === folder ? " sel" : ""), "data-path": path, style: `padding-left:${6 + depth * 12}px`, onclick: () => { folder = path; draw(); } },
+      const row = element("div", { class: "row" + (path === folder ? " sel" : ""), "data-path": path, style: `padding-left:${6 + depth * 12}px`, onclick: () => { folder = path; draw(); } },
         ...(path ? [twist] : []), element("span", { class: "name" }, path ? `📁 ${path.split("/").pop()}` : `All ${spec.plural}`), element("span", { class: "muted" }, counts.get(path)), ...useFolder);
+      if (spec.manage) { // A card dropped on a folder moves there; on "All", to the top folder.
+        dropTarget(row, kind, (file) => {
+          const entry = files.find((item) => item.file === file);
+          if (entry) background(moveFile(entry, path));
+        });
+        row.title = `Drop a card here to move it to ${path || "the top folder"}`;
+      }
+      return row;
     }));
   }
   function draw() {

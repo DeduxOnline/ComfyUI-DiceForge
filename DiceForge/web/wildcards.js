@@ -1,6 +1,7 @@
 import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
 import { addStyleOnce, background, element } from "./dom.js";
+import { dragSource, dropTarget, pickFolder } from "./move_dialog.js";
 
 // Wildcards in CLIP Dual Text Encode: autocomplete after "__" in the prompt fields, and the Wildcard Browser (node menu) with a folder tree,
 // "+ Add" buttons that insert __name__ (or __folder/*__) where the cursor was, and an editor for the files.
@@ -109,7 +110,7 @@ const STYLE = `
 .dfwc .row{display:flex;align-items:center;gap:6px;padding:3px 6px;border-radius:4px}.dfwc .row:hover{background:#2c2c2c}
 .dfwc .row .name{flex:1;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dfwc .row.sel{background:#2f3f55}
 .dfwc .folder>.row .name{font-weight:600}.dfwc .folder>.row .name::before{content:"▸ ";color:#999}.dfwc .folder.open>.row .name::before{content:"▾ "}
-.dfwc .kids{margin-left:16px}.dfwc .folder:not(.open)>.kids{display:none}.dfwc .muted{color:#999;font-size:12px}
+.dfwc .kids{margin-left:16px}.dfwc .row.drop,.dfwc .tree.drop{background:#35584a;outline:1px dashed #8fd0a8}.dfwc .folder:not(.open)>.kids{display:none}.dfwc .muted{color:#999;font-size:12px}
 .dfwc button{background:#222;color:#eee;border:1px solid #666;border-radius:6px;padding:5px 12px;cursor:pointer;font:inherit}.dfwc button:hover{background:#2c2c2c}
 .dfwc button:disabled{opacity:.5;cursor:default}.dfwc button.delete:not(:disabled){border-color:#8a4a4a;color:#f0b0b0}.dfwc textarea[readonly]{color:#aaa}.dfwc button.add{padding:1px 8px;font-size:12px;border-color:#4a7a4a;color:#bfe8bf}.dfwc .status{color:#9c9;min-height:18px;font-size:13px}
 `;
@@ -215,7 +216,7 @@ function keepOpenFolders(folders) {
 }
 
 // Wildcard Browser: folder tree (click a folder to open or close it) with search, "+ Add" for files (__name__) and folders (__folder/*__), and the selected file's editor: create, save
-// (button or Ctrl+S; • marks unsaved changes), rename or move (a / puts it in a folder) and delete.
+// (button or Ctrl+S; • marks unsaved changes), rename, move to another folder (Move, or drag a file onto a folder) and delete.
 async function openBrowser(node) {
   addStyle();
   const search = element("input", { placeholder: "Search wildcards…" });
@@ -225,6 +226,7 @@ async function openBrowser(node) {
   const status = element("div", { class: "status" });
   const save = element("button", { class: "save" }, "Save");
   const rename = element("button", { class: "rename", disabled: true }, "Rename");
+  const move = element("button", { class: "move", disabled: true, title: "Move the file to another folder (or drag it onto a folder in the tree)" }, "⇄ Move");
   const remove = element("button", { class: "delete", disabled: true }, "Delete");
   let selected = null, saved = "";
   const showDirty = () => { save.textContent = selected && !editor.readOnly && editor.value !== saved ? "Save •" : "Save"; };
@@ -234,7 +236,7 @@ async function openBrowser(node) {
   });
   const back = element("div", { class: "dfwc-back" });
   const close = () => { back.remove(); document.removeEventListener("keydown", onKey, true); };
-  const onKey = (event) => { if (event.key === "Escape") { event.stopPropagation(); close(); } };
+  const onKey = (event) => { if (event.key === "Escape" && !document.querySelector(".dfmv-back")) { event.stopPropagation(); close(); } }; // The folder picker closes first.
   back.addEventListener("mousedown", (event) => { if (event.target === back) close(); });
   document.addEventListener("keydown", onKey, true);
   const say = (text) => { status.textContent = text; };
@@ -250,7 +252,7 @@ async function openBrowser(node) {
     title.replaceChildren(element("b", {}, `__${name}__`), " ", element("span", { class: "muted" }, file.path));
     editor.value = saved = file.text;
     editor.readOnly = !!file.readonly; // A yaml wildcard is one key of a yaml file: edited in that file.
-    save.disabled = rename.disabled = remove.disabled = !!file.readonly;
+    save.disabled = rename.disabled = move.disabled = remove.disabled = !!file.readonly;
     showDirty();
     say(file.readonly ? "From a yaml file: read-only here, edit the yaml file to change it." : "");
     draw();
@@ -265,19 +267,31 @@ async function openBrowser(node) {
     await wildcardList(true);
     draw();
   });
+  async function renameTo(name, to, moved) {
+    const response = await api.fetchApi("/diceforge/wildcards/rename", { method: "POST", body: JSON.stringify({ name, to }) });
+    if (!response.ok) return say(await response.text());
+    const result = await response.json();
+    await wildcardList(true);
+    if (name === selected) { // The open file: it stays open under its new name, with its unsaved changes.
+      const edited = editor.value !== saved ? editor.value : null;
+      await open(result.to);
+      if (edited != null) editor.value = edited, showDirty();
+    } else draw();
+    say(`${moved ? "Moved" : "Renamed"} ${result.renamed} to ${result.to}. Prompts that use __${result.renamed}__ need the new name.`);
+  }
   rename.addEventListener("click", async () => {
     if (!selected) return;
     const to = prompt("New name (folders with /, for example hair/color):", selected)?.trim();
-    if (!to || to === selected) return;
-    const response = await api.fetchApi("/diceforge/wildcards/rename", { method: "POST", body: JSON.stringify({ name: selected, to }) });
-    if (!response.ok) return say(await response.text());
-    const result = await response.json();
-    const edited = editor.value !== saved ? editor.value : null; // Unsaved changes stay in the editor under the new name.
-    await wildcardList(true);
-    await open(result.to);
-    if (edited != null) editor.value = edited, showDirty();
-    say(`Renamed ${result.renamed} to ${result.to}. Prompts that use __${result.renamed}__ need the new name.`);
+    if (to && to !== selected) await renameTo(selected, to, false);
   });
+  // Move: the same file name in another folder ("" for the top folder), picked in the folder picker or by dropping the file on a folder.
+  async function moveFile(name, to) {
+    const parts = name.split("/"), from = parts.slice(0, -1).join("/");
+    const destination = to ?? await pickFolder({ title: `Move ${parts.at(-1)} to…`, folders: folderNames(listCache?.files ?? []), current: from });
+    if (destination == null || destination === from) return;
+    await renameTo(name, `${destination ? `${destination}/` : ""}${parts.at(-1)}`, true);
+  }
+  move.addEventListener("click", () => { if (selected) background(moveFile(selected)); });
   remove.addEventListener("click", async () => {
     if (!selected || !confirm(`Delete the wildcard file ${selected}.txt? This can't be undone.`)) return;
     const response = await api.fetchApi(`/diceforge/wildcards/file?name=${encodeURIComponent(selected)}`, { method: "DELETE" });
@@ -286,7 +300,7 @@ async function openBrowser(node) {
     selected = null;
     editor.value = saved = "";
     editor.readOnly = false;
-    rename.disabled = remove.disabled = true;
+    rename.disabled = move.disabled = remove.disabled = true;
     showDirty();
     title.replaceChildren("Select a file to see and edit its lines, one option per line (# starts a comment).");
     await wildcardList(true);
@@ -328,24 +342,31 @@ async function openBrowser(node) {
       level.files.push(file);
     }
     const drawLevel = (level) => [
-      ...[...level.folders.entries()].map(([part, folder]) => element("div", { class: "folder" + (query || opened.has(folder.path) ? " open" : ""), "data-path": folder.path },
-        element("div", { class: "row" }, element("span", { class: "name", title: "Open or close the folder", onclick: () => toggle(folder.path) }, `📁 ${part}`), element("span", { class: "muted" }, "all files"),
-          element("button", { class: "add", title: `Insert __${folder.path}/*__`, onclick: () => add(`${folder.path}/*`) }, "+ Add")),
-        element("div", { class: "kids" }, ...drawLevel(folder)))),
-      ...level.files.map((file) => element("div", { class: "row" + (file.name === selected ? " sel" : ""), title: file.error || file.preview.join("\n") },
-        element("span", { class: "name", onclick: () => open(file.name) }, file.name.split("/").pop()),
-        element("span", { class: "muted", title: file.error || (file.yaml ? `From ${file.yaml}` : "") },
-          file.error ? "⚠ can't be read" : `${file.yaml ? "yaml · " : ""}${file.lines} ${file.lines === 1 ? "line" : "lines"}`),
-        element("button", { class: "add", title: `Insert __${file.name}__`, onclick: () => add(file.name) }, "+ Add"))),
+      ...[...level.folders.entries()].map(([part, folder]) => {
+        const row = element("div", { class: "row" }, element("span", { class: "name", title: "Open or close the folder", onclick: () => toggle(folder.path) }, `📁 ${part}`), element("span", { class: "muted" }, "all files"),
+          element("button", { class: "add", title: `Insert __${folder.path}/*__`, onclick: () => add(`${folder.path}/*`) }, "+ Add"));
+        dropTarget(row, "wildcards", (name) => background(moveFile(name, folder.path))); // A file dropped on a folder moves into it.
+        return element("div", { class: "folder" + (query || opened.has(folder.path) ? " open" : ""), "data-path": folder.path }, row, element("div", { class: "kids" }, ...drawLevel(folder)));
+      }),
+      ...level.files.map((file) => {
+        const row = element("div", { class: "row" + (file.name === selected ? " sel" : ""), "data-name": file.name, title: file.error || file.preview.join("\n") },
+          element("span", { class: "name", onclick: () => open(file.name) }, file.name.split("/").pop()),
+          element("span", { class: "muted", title: file.error || (file.yaml ? `From ${file.yaml}` : "") },
+            file.error ? "⚠ can't be read" : `${file.yaml ? "yaml · " : ""}${file.lines} ${file.lines === 1 ? "line" : "lines"}`),
+          element("button", { class: "add", title: `Insert __${file.name}__`, onclick: () => add(file.name) }, "+ Add"));
+        if (!file.yaml) dragSource(row, "wildcards", file.name); // A yaml wildcard moves with its yaml file only.
+        return row;
+      }),
     ];
     const items = drawLevel(root);
     tree.replaceChildren(...(items.length ? items : [element("div", { class: "muted" }, files.length ? "No wildcard matches the search." : "No wildcard files yet: create one with + New file (they go to ComfyUI/models/wildcards).")]));
   }
+  dropTarget(tree, "wildcards", (name) => background(moveFile(name, ""))); // Dropped on the tree, not on a folder: to the top folder.
   search.addEventListener("input", draw);
   back.append(element("div", { class: "dfwc" },
     element("h2", {}, "Wildcards"),
     element("div", { class: "top" }, search, expandAll, collapseAll, create, element("button", { onclick: close }, "Close")),
-    element("div", { class: "main" }, tree, element("div", { class: "edit" }, title, editor, element("div", { class: "top" }, status, element("span", { style: "flex:1" }), remove, rename, save)))));
+    element("div", { class: "main" }, tree, element("div", { class: "edit" }, title, editor, element("div", { class: "top" }, status, element("span", { style: "flex:1" }), remove, move, rename, save)))));
   document.body.append(back);
   await wildcardList(true);
   draw();
