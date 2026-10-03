@@ -12,7 +12,7 @@ from aiohttp import web
 from typing_extensions import override
 from comfy_api.latest import ComfyExtension, io
 from .model_info import KINDS, json_body, read_info, info_file
-from .seed_modes import MEMORY, SEED_MODES, make_picker, pick_index, seed_mode_tooltip, fingerprint
+from .seed_modes import MEMORY, SEED_MODES, make_picker, pick_index, seed_mode_tooltip
 # LoRA Stack: several LoRAs in one node, like rgthree's Power Lora Loader, with the DiceForge seed modes. The rows live in the "loras" input as JSON,
 # edited by the frontend (web/lora_stack.js):
 #   {"rows": [{"on": true, "lora": "x.safetensors", "strength": 1.0, "clip": 1.0, "random": false, "min": 0.6, "max": 1.0, "group": ""}, ...],
@@ -120,15 +120,15 @@ class LoraStack(io.ComfyNode):
                 io.String.Output(display_name="lora_info", tooltip="The applied LoRAs and strengths, for example 'detail 0.8, style_a 1.0', for a file name or a note."),
             ],
         )
-    # Runs again when trigger words change in Model info, and every time in the modes that remember earlier runs.
+    # Runs again when trigger words change in Model info.
     @classmethod
-    def fingerprint_inputs(cls, loras="", seed_mode="random", **kwargs):
+    def fingerprint_inputs(cls, loras="", **kwargs):
         rows, _groups, _separate = parse_stack(loras)
         info_times = []
         for row in rows:
             path = info_file("loras", row["lora"])
             info_times.append(os.path.getmtime(path) if os.path.isfile(path) else None)
-        return info_times, fingerprint(seed_mode)
+        return info_times
     @classmethod
     def load(cls, path):
         if path not in cls.cache:

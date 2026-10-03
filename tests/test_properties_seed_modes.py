@@ -1,7 +1,6 @@
 # Invariants of the seed modes (DiceForge/seed_modes.py), checked on many generated inputs: what every pick must satisfy whatever the options,
 # weights, counts and seeds, and the long-run promises of deck, shuffle and balanced.
 import itertools
-import json
 import math
 import random
 import threading
@@ -9,7 +8,7 @@ from collections import Counter
 import pytest
 from hypothesis import assume, given, settings, strategies as st
 from DiceForge import seed_modes
-from DiceForge.seed_modes import (INDEX_LIMIT, BalancedPicker, DeckPicker, RandomPicker, SeedMemory, ShufflePicker, deck_cards, fingerprint,
+from DiceForge.seed_modes import (INDEX_LIMIT, BalancedPicker, DeckPicker, RandomPicker, SeedMemory, ShufflePicker, deck_cards,
                                   make_picker, pick_in_range, pick_index, pick_label, stable_seed)
 scaled = lambda count: max(1, count * settings.default.max_examples // 200) # Explicit budgets follow the profile (thorough: 15 times).
 
@@ -219,14 +218,12 @@ def test_stable_seed_is_a_64_bit_number_that_depends_on_the_parts(parts):
     assert stable_seed(*parts, "x") != value
 
 
-@given(mode=st.sampled_from(MODES + ["combinations", "mutate", "nonsense"]))
-def test_fingerprint_is_none_or_a_fresh_json_string(mode):
-    first, second = fingerprint(mode), fingerprint(mode)
-    json.dumps([first, second])
-    if mode in seed_modes.REMEMBERING_MODES:
-        assert isinstance(first, str) and first != second
-    else:
-        assert first is None and second is None
+# Every seed mode: a seed that came before gives the same picks again, whatever came in between.
+@settings(max_examples=scaled(60))
+@given(weighted=weighted_options(), seeds=st.lists(seeds, min_size=1, max_size=6, unique=True), mode=st.sampled_from(["random", "deck", "shuffle", "balanced"]))
+def test_every_mode_gives_a_seed_its_picks_again(weighted, seeds, mode):
+    first = [picked(make_picker(mode, seed), weighted) for seed in seeds]
+    assert [picked(make_picker(mode, seed), weighted) for seed in reversed(seeds)] == first[::-1]
 
 
 def test_seed_memory_is_safe_with_many_threads(tmp_path):

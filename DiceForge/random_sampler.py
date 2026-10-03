@@ -3,7 +3,7 @@ import re
 import comfy.samplers
 from typing_extensions import override
 from comfy_api.latest import ComfyExtension, io
-from .seed_modes import MEMORY, SEED_MODES, make_picker, pick_label, seed_mode_tooltip, fingerprint
+from .seed_modes import MEMORY, SEED_MODES, make_picker, pick_label, seed_mode_tooltip
 SAMPLERS, SCHEDULERS = comfy.samplers.KSampler.SAMPLERS, comfy.samplers.KSampler.SCHEDULERS
 # A list typed in a text field: names separated by commas or new lines, duplicates dropped; "*" (or "all") is every known name.
 def parse_names(text, known, what, node="Random Sampler"):
@@ -72,10 +72,6 @@ class RandomSampler(io.ComfyNode):
                 io.String.Output(display_name="scheduler_text", tooltip="The scheduler name as text, for example for the label of an XY Dice Grid."),
             ],
         )
-    # Method to run the node every time in the modes that remember earlier runs, instead of using ComfyUI's cache.
-    @classmethod
-    def fingerprint_inputs(cls, seed_mode="random", **kwargs):
-        return fingerprint(seed_mode)
     # Main method: every listed sampler with every listed scheduler is one option; the seed mode picks one pair.
     @classmethod
     def execute(cls, samplers="", schedulers="", seed=0, seed_mode="random"):

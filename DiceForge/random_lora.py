@@ -36,10 +36,10 @@ class RandomLoraLoader(io.ComfyNode):
                 io.String.Output(display_name="lora_name", tooltip="The picked LoRA file, for example for the file name of the image."),
             ],
         )
-    # Method to run the node again when the files in the folder change, and every time in the modes that remember earlier runs.
+    # Method to run the node again when the files in the folder change.
     @classmethod
-    def fingerprint_inputs(cls, folder="(all)", seed_mode="random", **kwargs):
-        return folder_fingerprint("loras", folder, seed_mode, kwargs.get("include_none"))
+    def fingerprint_inputs(cls, folder="(all)", **kwargs):
+        return folder_fingerprint("loras", folder, kwargs.get("include_none"))
     # Main method: picks a LoRA file of the folder by the seed mode, then applies it with the core Load LoRA.
     @classmethod
     def execute(cls, model, folder="(all)", strength_model=1.0, strength_clip=1.0, seed=0, seed_mode="random", include_none=False, clip=None):

@@ -24,7 +24,6 @@ const STYLE = `
 .dfpp .entry button:disabled{opacity:.4;cursor:default}.dfpp .entry button.on{border-color:#b8962e;color:#ffd24a}
 `;
 const HISTORY = 20; // Kept runs, the pinned ones not counted.
-const SAME_SEED_SAME_PROMPTS = ["random", "deck", "combinations"]; // The modes where a seed gives its prompts again (not shuffle, balanced, mutate).
 // The history with a new run first: a run like the newest one (a cached run, or the same seed again) is not added twice; past HISTORY, the oldest
 // unpinned ones go.
 export function addToHistory(history, entry, limit = HISTORY) {
@@ -68,7 +67,6 @@ app.registerExtension({
       node.graph?.setDirtyCanvas?.(true, true);
     };
     function historyEntry(item, index) {
-      const repeatable = SAME_SEED_SAME_PROMPTS.includes(item.seed_mode);
       const when = item.time ? new Date(item.time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "";
       const update = (change) => {
         const history = [...(node.properties?.dice_forge_history ?? [])];
@@ -80,9 +78,8 @@ app.registerExtension({
           element("span", { class: "when" }, `${when} · seed ${item.seed} (${item.seed_mode})`),
           element("button", { class: "pin" + (item.pinned ? " on" : ""), title: item.pinned ? "Pinned: kept past the last 20 (click to unpin)" : "Pin: keep it past the last 20",
             onclick: () => update((history) => { history[index] = { ...item, pinned: !item.pinned }; }) }, "📌"),
-          element("button", { class: "reseed", ...(repeatable ? {} : { disabled: "" }),
-            title: repeatable ? "Put back its prompts, seed and mode (control after generate: fixed): the next run gives these prompts again"
-              : `In ${item.seed_mode} the same seed doesn't give the same prompts: use Use text instead`,
+          element("button", { class: "reseed", // Every seed mode gives the same prompts for the same seed.
+            title: "Put back its prompts, seed and mode (control after generate: fixed): the next run gives these prompts again",
             onclick: () => {
               if (item.source_positive != null) setField(node, "positive", item.source_positive);
               if (item.source_negative != null) setField(node, "negative", item.source_negative);

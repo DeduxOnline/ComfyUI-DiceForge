@@ -878,7 +878,7 @@ for (const vue of [true, false]) {
       expect(before).toBeGreaterThan(0);
       await setWidget(page, encode, "seed_mode", "shuffle");
       await queueFromPage(page, request);
-      await expect(entries.first().locator(".reseed")).toBeDisabled(); // In shuffle a seed doesn't give its prompts again.
+      await expect(entries.first().locator(".reseed")).toBeEnabled(); // In shuffle too, a seed gives its prompts again.
       const workflow = await page.evaluate(() => window.app.graph.serialize()); // Kept with the workflow.
       expect(workflow.nodes.find((node) => String(node.id) === String(encode)).properties.dice_forge_history).toHaveLength(21);
     });

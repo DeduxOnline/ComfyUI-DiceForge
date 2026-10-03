@@ -90,10 +90,11 @@ class DeckPicker(Picker):
             self.rng.randint(*count_range) # Same randomness as without the lock, for the multi-pick counts after it.
         return super().lock(weighted, count_range, plain, locked)
 # Memory for shuffle, balanced and mutate: kept in a SQLite file in the ComfyUI user folder, so it survives restarts and doesn't fill up RAM (only the
-# list being picked from is read). Delete the file to start over. The least recently used entries are forgotten past MEMORY_LIMIT.
+# list being picked from is read). Delete the file to start over. The least recently used entries are forgotten past MEMORY_LIMIT. Besides where each
+# list is now, it keeps where it was when each seed came, so a seed gives its picks again (recall).
 MEMORY_FILE = os.path.join(folder_paths.get_user_directory(), "DiceForge", "seed_memory.sqlite")
 OLD_MEMORY_FILE = os.path.join(folder_paths.get_user_directory(), "ResolutionForge", "seed_memory.sqlite") # Where it was before the rename to DiceForge.
-MEMORY_LIMIT = 20000
+MEMORY_LIMIT = 100000
 class SeedMemory:
     def __init__(self, path):
         self.path, self.lock, self.connection, self.writes, self.opened = path, threading.Lock(), None, 0, None
@@ -152,6 +153,31 @@ class SeedMemory:
                 self.connection.commit() # Once per run, not per pick.
                 self.writes = 0
 MEMORY = SeedMemory(MEMORY_FILE)
+# The remembered state a remembering mode (shuffle, balanced, mutate) picks from, and whether this is a seed that came before. A new seed picks from
+# where the list is now and goes on from there; the state is also kept under that seed, so the same seed later picks from the same state again and,
+# with its choices drawn from the seed, gives the same result (without moving the list on). occurrence: the same list picked again in one run.
+# A picker without a seed (seed None) only uses the state of now, as before seeds counted.
+def recall(mode, key, seed, occurrence=0):
+    if seed is None:
+        return MEMORY.get(mode, key), False
+    snapshot = MEMORY.key(key, seed, occurrence)
+    saved = MEMORY.get(f"{mode}@seed", snapshot)
+    if isinstance(saved, dict) and "state" in saved:
+        return saved["state"], True
+    state = MEMORY.get(mode, key)
+    MEMORY.set(f"{mode}@seed", snapshot, {"state": state})
+    return state, False
+# Base of shuffle and balanced: the seed, the random numbers drawn from it, and how often each list was picked from in this run.
+class RememberingPicker(Picker):
+    mode = ""
+    def __init__(self, seed=None):
+        self.seed, self.calls = seed, {}
+        self.rng = random.Random() if seed is None else random.Random(stable_seed(self.mode, seed)) # NOSONAR: picks options, not security.
+    def recall(self, key):
+        occurrence = self.calls[key] = self.calls.get(key, -1) + 1
+        state, replay = recall(self.mode, key, self.seed, occurrence)
+        rng = self.rng if self.seed is None else random.Random(stable_seed(self.mode, self.seed, key, occurrence)) # NOSONAR: as above.
+        return state, replay, rng
 # A remembered shuffle state, or a new one when it is damaged (wrong shape, or cards that aren't in the list).
 def shuffle_state(state, cards):
     fresh = {"order": None, "position": 0, "last": None, "previous": None, "pending": []}
@@ -166,15 +192,15 @@ def shuffle_state(state, cards):
         return fresh
     return state
 # shuffle: like shuffle in a music player. The node remembers where it is in a shuffled order of the options and picks the next one, so every option
-# comes once before any repeats, whatever the seed does. Not reproducible: the same seed gives a different prompt each run. The order is stored as
-# the seed that shuffled it and a position, so even a long wildcard file takes a few bytes.
-class ShufflePicker(Picker):
-    def __init__(self):
-        self.rng = random.Random()
+# comes once before any repeats with any new seeds (increment or randomize). The same seed again gives the same picks (recall). The order is stored
+# as the seed that shuffled it and a position, so even a long wildcard file takes a few bytes.
+class ShufflePicker(RememberingPicker):
+    mode = "shuffle"
     def pick(self, weighted, count, plain):
         cards = deck_cards(weighted)
         key = MEMORY.key(cards)
-        state = shuffle_state(MEMORY.get("shuffle", key), cards)
+        remembered, replay, rng = self.recall(key)
+        state = shuffle_state(remembered, cards)
         decks, picked, skipped = {}, [], []
         for _ in range(2 * len(cards)):
             if len(picked) == count:
@@ -183,7 +209,7 @@ class ShufflePicker(Picker):
                 card = state["pending"].pop(0)
             else:
                 if state["order"] is None or state["position"] >= len(cards):
-                    state.update(order=self.rng.getrandbits(63), position=0, previous=state["last"]) # New round.
+                    state.update(order=rng.getrandbits(63), position=0, previous=state["last"]) # New round.
                 if state["order"] not in decks:
                     deck = list(cards)
                     random.Random(state["order"]).shuffle(deck) # NOSONAR: a shuffled order of prompt options, not security.
@@ -193,41 +219,41 @@ class ShufflePicker(Picker):
             state["last"] = card
             (skipped if card in picked else picked).append(card)
         state["pending"] = skipped + state["pending"] # Skipped duplicates of a multi-pick come first next time.
-        if cards:
+        if cards and not replay:
             MEMORY.set("shuffle", key, state)
         return [(card, self) for card in picked]
 # balanced: like the pseudo-random distribution in games. Each option earns credit for every pick (its share of the weights) and spends 1 when picked;
 # its chance is its weight x e^(5 x credit). An option just picked gets a low chance, one missed for a while a higher one, so repeats are rare but
 # possible, nothing waits too long, and in the long run every option comes exactly as often as its weight says. The node remembers the credits
-# (in the memory file), whatever the seed. Not reproducible: the same seed gives a different prompt each run.
+# (in the memory file) over new seeds; the same seed again gives the same picks (recall).
 BALANCE_STRENGTH = 5.0 # Higher: fewer repeats, less randomness.
 def valid_credits(credits, size):
     return isinstance(credits, list) and len(credits) == size and all(isinstance(credit, (int, float)) and not isinstance(credit, bool) and abs(credit) <= 100 for credit in credits) # Credits stay within a few units; far beyond is damage.
-class BalancedPicker(Picker):
-    def __init__(self):
-        self.rng = random.Random()
+class BalancedPicker(RememberingPicker):
+    mode = "balanced"
     def pick(self, weighted, count, plain):
         key = MEMORY.key(weighted)
         total = sum(weight for weight, _ in weighted) or 1
-        credits = MEMORY.get("balanced", key)
+        credits, replay, rng = self.recall(key)
         credits = credits if valid_credits(credits, len(weighted)) else [0.0] * len(weighted) # None yet, or damaged: start over.
         candidates, picked = list(range(len(weighted))), []
         while candidates and len(picked) < count:
             weights = [weighted[index][0] * math.exp(min(BALANCE_STRENGTH * credits[index], 600.0)) for index in candidates] # Capped: no overflow.
             if sum(weights) <= 0:
                 break
-            index = candidates.pop(self.rng.choices(range(len(candidates)), weights=weights)[0])
+            index = candidates.pop(rng.choices(range(len(candidates)), weights=weights)[0])
             picked.append(index)
             credits = [credit + weighted[option][0] / total - (option == index) for option, credit in enumerate(credits)]
-        MEMORY.set("balanced", key, [round(credit, 6) for credit in credits])
+        if not replay:
+            MEMORY.set("balanced", key, [round(credit, 6) for credit in credits])
         return [(weighted[index][1], self) for index in picked]
 # Seed modes of the resolution nodes (CLIP Dual Text Encode has these without sequential, plus combinations and mutate).
 SEED_MODES = ["random", "deck", "shuffle", "balanced", "sequential"]
 SEED_MODE_TOOLTIP = ("How random sizes change from run to run.\n"
     "random: every pick is independent, so the same size can come up again soon.\n"
     "deck: the seed steps through a shuffled order; with control after generate on increment, every size comes once before any repeats. Reproducible.\n"
-    "shuffle: like shuffle in a music player, the node remembers the sizes already used and picks from the rest, whatever the seed; remembered in a file, so it continues after a restart. Not reproducible.\n"
-    "balanced: a size just picked gets a low chance, and sizes not picked for a while get a higher one, so repeats are rare but possible. Remembered in a file. Not reproducible.\n"
+    "shuffle: like shuffle in a music player, the node remembers the sizes already used and picks from the rest with each new seed (increment or randomize); remembered in a file, so it continues after a restart. The same seed gives the same size again.\n"
+    "balanced: a size just picked gets a low chance, and sizes not picked for a while get a higher one, so repeats are rare but possible. Remembered in a file. The same seed gives the same size again.\n"
     "sequential: the seed is the position in the list, so seeds 0, 1, 2... go through the sizes in order. Reproducible.\n"
     "Random Chaos: the aspect range is split into equal parts that take turns (in order for sequential), with a random ratio inside each part.")
 # Seed mode tooltip for a node picking one of a list of things (files for the random loaders).
@@ -235,17 +261,17 @@ def seed_mode_tooltip(things):
     return (f"How the pick changes from run to run.\n"
         f"random: every pick is independent, so the same one can come up again soon.\n"
         f"deck: the seed steps through a shuffled order of the {things}; with control after generate on increment, every one comes once before any repeats. Reproducible.\n"
-        f"shuffle: like shuffle in a music player, the node remembers the {things} already used and picks from the rest, whatever the seed; remembered in a file, so it continues after a restart. Not reproducible.\n"
-        f"balanced: one just picked gets a low chance, and those not picked for a while get a higher one, so repeats are rare but possible. Remembered in a file. Not reproducible.\n"
+        f"shuffle: like shuffle in a music player, the node remembers the {things} already used and picks from the rest with each new seed (increment or randomize); remembered in a file, so it continues after a restart. The same seed gives the same pick again.\n"
+        f"balanced: one just picked gets a low chance, and those not picked for a while get a higher one, so repeats are rare but possible. Remembered in a file. The same seed gives the same pick again.\n"
         f"sequential: the seed is the position in the list (sorted by name), so seeds 0, 1, 2... go through the {things} in order. Reproducible.")
 # Picker for a seed mode (the modes every node has; CLIP Dual Text Encode adds its own), or None for sequential.
 def make_picker(seed_mode, seed):
     if seed_mode == "deck":
         return DeckPicker(random.Random(seed), seed, {})
     if seed_mode == "shuffle":
-        return ShufflePicker()
+        return ShufflePicker(seed)
     if seed_mode == "balanced":
-        return BalancedPicker()
+        return BalancedPicker(seed)
     if seed_mode == "sequential":
         return None
     return RandomPicker(random.Random(seed)) # Seed behavior for reproducible picks.
@@ -280,7 +306,6 @@ def pick_index(count, picker, seed, name):
     labels = [f"{name} {part + 1}/{INDEX_PARTS}" for part in range(INDEX_PARTS)]
     part = labels.index(pick_label(labels, picker, seed))
     return picker.rng.randrange(part * count // INDEX_PARTS, (part + 1) * count // INDEX_PARTS)
-# Modes that remember earlier runs instead of using the seed: nodes using them run every time instead of using ComfyUI's cache.
+# Modes that remember earlier runs (in the memory file). Like every mode, they give the same result for the same seed, so ComfyUI's cache can stand
+# in for a run with the same seed and inputs.
 REMEMBERING_MODES = ("shuffle", "balanced", "mutate")
-def fingerprint(seed_mode):
-    return os.urandom(8).hex() if seed_mode in REMEMBERING_MODES else None # A string: the value ends up in the prompt that saved images store as JSON.

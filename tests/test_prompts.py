@@ -160,22 +160,30 @@ def test_deck_same_list_twice_in_a_prompt_gives_different_options():
 
 
 def test_shuffle_mode_goes_through_every_option():
-    assert sorted(run("{a|b|c|d|e}", mode="shuffle")[2] for _ in range(5)) == list("abcde")
+    assert sorted(run("{a|b|c|d|e}", seed=seed, mode="shuffle")[2] for seed in range(5)) == list("abcde")
 
 
 def test_mutate_changes_exactly_one_choice_per_run():
     text = "{a1|a2|a3|a4} {b1|b2|b3|b4} {c1|c2|c3|c4}"
     previous = run(text, mode="mutate")[2].split(" ")
-    for _ in range(10):
-        current = run(text, mode="mutate")[2].split(" ")
+    for seed in range(1, 11):
+        current = run(text, seed=seed, mode="mutate")[2].split(" ")
         assert sum(a != b for a, b in zip(previous, current)) == 1, (previous, current)
         previous = current
 
 
-def test_remembering_modes_never_use_the_cache():
-    assert Node.fingerprint_inputs(seed_mode="random")[1] is None
-    first, second = Node.fingerprint_inputs(seed_mode="shuffle")[1], Node.fingerprint_inputs(seed_mode="shuffle")[1]
-    assert first != second
+@pytest.mark.parametrize("mode", ["shuffle", "balanced", "mutate"])
+def test_remembering_modes_give_a_seed_its_prompt_again(mode):
+    text = "{a|b|c|d|e} {x|y|z}"
+    first = [run(text, seed=seed, mode=mode)[2] for seed in range(5)]
+    assert [run(text, seed=seed, mode=mode)[2] for seed in (3, 0, 4)] == [first[3], first[0], first[4]] # Older seeds again: their prompts.
+    assert run(text, seed=5, mode=mode)[2] == run(text, seed=5, mode=mode)[2]
+    if mode == "shuffle": # Replaying didn't move the shuffle on: the next new seeds still finish the round.
+        assert sorted(prompt.split(" ")[0] for prompt in first) == list("abcde")
+
+
+def test_the_cache_is_only_skipped_when_wildcard_files_change():
+    assert Node.fingerprint_inputs(seed_mode="shuffle") == Node.fingerprint_inputs(seed_mode="random") # Same seed, same prompts: the cache is right.
 
 
 def test_the_node_sends_its_prompts_to_the_page_preview(wildcards):

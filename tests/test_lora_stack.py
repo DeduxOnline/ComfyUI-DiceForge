@@ -114,11 +114,11 @@ def test_trigger_words_per_row(loras, applied):
 
 def test_the_node_runs_again_when_model_info_changes(loras):
     text = stack({"lora": "style/a.safetensors"})
-    before = LoraStack.fingerprint_inputs(text, "random")
+    before = LoraStack.fingerprint_inputs(text)
     model_info.write_info("loras", "style/a.safetensors", {"user": {"trigger_words": "new"}})
     path = model_info.info_file("loras", "style/a.safetensors")
     os.utime(path, (os.path.getmtime(path) + 10,) * 2)
-    assert LoraStack.fingerprint_inputs(text, "random") != before
+    assert LoraStack.fingerprint_inputs(text) != before
 
 
 def test_loras_no_longer_used_leave_memory(loras, monkeypatch):

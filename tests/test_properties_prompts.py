@@ -304,9 +304,10 @@ def test_trim_spaces_is_idempotent_and_keeps_every_other_character(text):
 @given(sizes=st.lists(st.integers(2, 4), min_size=1, max_size=5))
 def test_mutate_changes_exactly_one_choice_per_run(sizes):
     text = " ".join("{" + "|".join(f"c{index}o{option}" for option in range(size)) + "}" for index, size in enumerate(sizes))
-    last = run(text, mode="mutate")[0].split(" ")
-    for _ in range(8):
-        now = run(text, mode="mutate")[0].split(" ")
+    base = random.randrange(1 << 40) # New seeds each example: a seed that came before would give its prompt again.
+    last = run(text, seed=base, mode="mutate")[0].split(" ")
+    for step in range(1, 9):
+        now = run(text, seed=base + step, mode="mutate")[0].split(" ")
         assert sum(a != b for a, b in zip(last, now)) == 1, (last, now)
         last = now
 

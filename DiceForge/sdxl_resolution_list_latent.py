@@ -3,7 +3,7 @@ import math
 import nodes
 from typing_extensions import override
 from comfy_api.latest import ComfyExtension, io
-from .seed_modes import MEMORY, SEED_MODES, SEED_MODE_TOOLTIP, make_picker, pick_label, pick_in_range, fingerprint
+from .seed_modes import MEMORY, SEED_MODES, SEED_MODE_TOOLTIP, make_picker, pick_label, pick_in_range
 # Resolution groups for the nested list: fixed SDXL sizes, high-res sizes, random picks from those lists, and random chaos sizes.
 STANDARD = {
     "1024 x 1024": (1024, 1024),
@@ -190,11 +190,6 @@ class SDXLResolutionListLatent(io.ComfyNode):
         high = 0.0 if orientation == "Portrait" else math.log(max_aspect)
         ratio = math.exp(pick_in_range(low, high, 8 if orientation == "Any" else 4, picker, seed, f"Chaos {orientation} {max_aspect}"))
         return math.sqrt(pixels * ratio), math.sqrt(pixels / ratio)
-    # Method to run the node every time for random sizes in the modes that remember earlier runs, instead of using ComfyUI's cache.
-    @classmethod
-    def fingerprint_inputs(cls, resolution=None, seed_mode="random", **kwargs):
-        group = resolution.get("resolution") if isinstance(resolution, dict) else None
-        return fingerprint(seed_mode) if group in ("Random", "Random Chaos") else None
     # Main method to get the resolution based on the selected option, applying randomization and rounding as needed, then building the empty latent with Empty Latent Image.
     @classmethod
     def execute(cls, resolution=None, seed=0, rescale=None, multiple=8, batch=1, seed_mode="random", preview=None):

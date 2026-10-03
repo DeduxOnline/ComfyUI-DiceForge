@@ -125,10 +125,10 @@ def test_the_run_reports_its_size_for_the_preview():
     assert (last["rescale"], last["percent"], last["rescale_width"], last["longer_side"]) == ("by percentage", 150, None, None)
 
 
-def test_listed_random_fingerprint_only_changes_for_remembering_modes():
-    assert SDXL.fingerprint_inputs({"resolution": "Standard"}, "shuffle") is None
-    assert SDXL.fingerprint_inputs({"resolution": "Random"}, "deck") is None
-    assert SDXL.fingerprint_inputs({"resolution": "Random"}, "shuffle") is not None
+@pytest.mark.parametrize("mode", ["shuffle", "balanced"])
+def test_remembering_modes_give_a_seed_its_size_again(mode):
+    sizes = {seed: Selector.execute("Random Any", seed=seed, seed_mode=mode).result[1:3] for seed in range(8)}
+    assert {seed: Selector.execute("Random Any", seed=seed, seed_mode=mode).result[1:3] for seed in (7, 2, 0)} == {seed: sizes[seed] for seed in (7, 2, 0)}
 
 
 def test_selector_fixed_ratio_and_megapixels():

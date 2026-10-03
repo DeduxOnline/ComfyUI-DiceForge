@@ -13,13 +13,13 @@
 |---|---|---|
 | `random` | Every pick is independent, as usual. | Yes |
 | `deck` | The seed deals from a shuffled deck: with *increment*, every option comes once per round. | Yes |
-| `shuffle` | Like shuffle in a music player: remembers what came up and picks from the rest, whatever the seed. | No |
-| `balanced` | Like pseudo-random odds in games: repeats are rare but possible, nothing waits too long. | No |
+| `shuffle` | Like shuffle in a music player: remembers what came up and picks from the rest with each new seed. | Yes |
+| `balanced` | Like pseudo-random odds in games: repeats are rare but possible, nothing waits too long. | Yes |
 | `sequential` | The seed is the position in the list: seeds 0, 1, 2… in order (sizes and numbers). | Yes |
 | `combinations` | Seeds 0, 1, 2… go through every combination of the whole prompt (prompts). | Yes |
-| `mutate` | Keeps the last prompt and changes one choice per run (prompts). | No |
+| `mutate` | Keeps the last prompt and changes one choice per run (prompts). | Yes |
 
-The remembering modes keep their memory in a small file, so they continue after a restart. Details: [seed modes for prompts](#seed-modes), [seed modes for sizes and numbers](#seed-modes-for-sizes), [memory file](#memory-file).
+Every mode gives the same result for the same seed, so an image can be made again from its seed. The remembering modes (`shuffle`, `balanced`, `mutate`) keep their memory in a small file, so they continue after a restart; a new seed (*increment* or *randomize*) moves them on, and a seed that came before gives its result again. Details: [seed modes for prompts](#seed-modes), [seed modes for sizes and numbers](#seed-modes-for-sizes), [memory file](#memory-file).
 
 | Node | Menu | File | Use it when |
 |---|---|---|---|
@@ -83,7 +83,7 @@ Cloning the whole repository straight into `custom_nodes` does not work: the nod
 - To compare samplers, connect **Random Sampler** to KSampler's `sampler_name` and `scheduler`, and its `label` to **Dice Grid**.
 - To see a series side by side, connect the image and the loader's file name output to **Dice Grid**: it saves a labeled grid after each round.
 - To try a range of values, convert a KSampler input such as `cfg` to an input and connect **Random Float** (`min` 4, `max` 8, `step` 0.5) to it.
-- For a series of images without repeats, set `seed_mode` to `deck` and *control after generate* to *increment* on each DiceForge node (reproducible), or use `shuffle` with any seed (not reproducible, continues after a restart).
+- For a series of images without repeats, set `seed_mode` to `deck` and *control after generate* to *increment* on each DiceForge node (reproducible), or use `shuffle` with *increment* or *randomize* (it continues after a restart). Both give an image's result again from its seed.
 
 ## SDXL Resolution List (Latent)
 
@@ -199,13 +199,13 @@ Both resolution nodes (and [Random Int and Random Float](#random-int-and-random-
 |---|---|---|
 | `random` | Every pick is random, so a size can come up twice in a row. Same as before seed modes existed. | The same seed gives the same size. |
 | `deck` | The seed is a position in a shuffled order: with *control after generate* on *increment*, every size comes once per round (9 runs for Any Listed), then a new order. | The same seed gives the same size. |
-| `shuffle` | Like shuffle in a music player: the node remembers which sizes were used and picks from the rest, whatever the seed. | Not used. |
-| `balanced` | A size that just came up gets a low chance, and the longer one is missed, the higher its chance: repeats are rare but possible. | Not used. |
+| `shuffle` | Like shuffle in a music player: the node remembers which sizes were used and picks from the rest with each new seed (*increment* or *randomize*). | The same seed gives the same size again. |
+| `balanced` | A size that just came up gets a low chance, and the longer one is missed, the higher its chance: repeats are rare but possible. | The same seed gives the same size again. |
 | `sequential` | The seed is the position in the list: seeds 0, 1, 2… go through the sizes in order, then start over. | The same seed gives the same size. |
 
 **Random Chaos** has no list, so the modes other than `random` split the aspect range into 8 equal parts (4 for Portrait or Landscape), take turns between the parts as above, and pick a random ratio inside the part. Runs then cover tall, square-ish and wide shapes evenly: in 8 runs about 8 of the 8 parts, against about 5 with `random`. `sequential` takes the middle of each part in order, sweeping from the tallest to the widest shape (at 1 MP and `max_aspect` 2.0: 752x1384, 824x1264 … 1384x752).
 
-`shuffle` and `balanced` keep their memory in the same [memory file](#memory-file) as CLIP Dual Text Encode, so they continue after a restart; with them the node runs every time instead of using ComfyUI's cache (only while a random option is selected).
+`shuffle` and `balanced` keep their memory in the same [memory file](#memory-file) as CLIP Dual Text Encode, so they continue after a restart.
 
 ## Random Int and Random Float
 
@@ -521,7 +521,7 @@ Without `COMFYUI_PATH`, the tests look for `ComfyUI` next to this repository. Th
 The `e2e` folder has end-to-end tests with [Playwright](https://playwright.dev): they start a real ComfyUI with DiceForge and drive it like a user would.
 
 - **Workflows** (`api.spec.js`, no browser): workflows queued through ComfyUI's own queue, as the Run button does: every node is loaded, CLIP Dual Text Encode fills in wildcards, yaml keys, weights and variables; deck and combinations deal every option over runs; the same inputs come from ComfyUI's cache until a wildcard file changes; shuffle remembers between runs; the resolution nodes make latents of the right size; VAE Decode + Save writes PNG files with the workflow; Dice Grid saves a finished grid; Random Image loads a folder; Random Sampler's outputs are accepted by KSampler; and the server routes of the Wildcard Browser, Model info, the model browsers and LoRA Stack presets.
-- **Robustness on the real server** (`robustness.spec.js`, no browser): junk HTTP requests to every DiceForge route (always a 4xx answer, never a server error) and names that try to reach outside DiceForge's folders (`../`, absolute paths, encoded slashes: nothing read, written or deleted outside); an error in a node stops only that prompt, with a clear message, and the next prompt runs; prompts with invalid inputs are refused by ComfyUI; the seed memory file damaged or replaced while ComfyUI runs, damaged wildcard (BOM, other encodings, broken yaml), model info, preset and Dice Grid files; many prompts queued at once; every seed mode through the queue (the reproducible ones from ComfyUI's cache, the remembering ones every time, mutate changing one choice per run, combinations listing every prompt once); text in any script and emoji; a 50 000-line wildcard; Random Chaos keeping its orientation and the side `rescale` sets.
+- **Robustness on the real server** (`robustness.spec.js`, no browser): junk HTTP requests to every DiceForge route (always a 4xx answer, never a server error) and names that try to reach outside DiceForge's folders (`../`, absolute paths, encoded slashes: nothing read, written or deleted outside); an error in a node stops only that prompt, with a clear message, and the next prompt runs; prompts with invalid inputs are refused by ComfyUI; the seed memory file damaged or replaced while ComfyUI runs, damaged wildcard (BOM, other encodings, broken yaml), model info, preset and Dice Grid files; many prompts queued at once; every seed mode through the queue (the same seed from ComfyUI's cache with the same prompt, mutate changing one choice per new seed, combinations listing every prompt once); text in any script and emoji; a 50 000-line wildcard; Random Chaos keeping its orientation and the side `rescale` sets.
 - **Browser** (`ui.spec.js`, in both node designs, Nodes 2.0 and classic): every node can be added, the resolution preview, the `__` autocomplete (also with non-Latin names, and with a slow server), the Wildcard Browser (adding and editing), Model info, the LoRA and Checkpoint Browsers, LoRA Stack (adding from the browser, 🎲, groups, 🏷 trigger words, the base model marks, presets, reloading the workflow), a workflow run from the page, and node heights with advanced inputs. `ui-robustness.spec.js`, in both designs too: every DiceForge node keeps every value through saving and loading a workflow twice; damaged workflows (too few, too many or wrong values, junk LoRA Stack data) open without breaking the page; copied nodes are independent; after a failed run the page keeps working; the Wildcard Browser marks an unreadable file; the autocomplete with the mouse, in the negative prompt and after another wildcard; random series of changes to both resolution nodes, after which the preview must show exactly the size the run makes; 64 nodes at once. Any error in the page fails the test.
 
 ```sh
@@ -625,10 +625,10 @@ In `random` mode every pick is independent, so `blue sky` can come up twice in a
 |---|---|---|
 | `random` | Every pick is random. Same as before seed modes existed. | The same seed gives the same prompt. |
 | `deck` | Like dealing cards: the seed is a position in a shuffled deck of the options. Set *control after generate* to *increment*: each run takes the next card, every option comes once per round, then the deck is reshuffled (never starting with the option that just came). Rounds start at seeds that are multiples of the number of options (0, 5, 10… for 5 options), so start from such a seed (for example 0) to get no repeats from the first run. Options inside a picked option (`{cat {small\|big}\|dog}`, lines of a wildcard inside a wildcard) also take turns. | The same seed gives the same prompt, so a good result can be repeated. |
-| `shuffle` | Like shuffle in a music player: the node remembers which options were already used and picks from the rest; when all were used, it starts over. Works with any *control after generate*, even *fixed*. The memory is kept in a file, so it continues after a restart. | Not used: the prompt is different every run and cannot be repeated from the seed (the filled-in prompt is in the console). |
-| `balanced` | Like the pseudo-random distribution in games: an option that just came up gets a low chance, and the longer an option is missed, the higher its chance grows. Repeats are rare but possible (with 5 options: about 4% in a row instead of 20% in `random`, and no option waits more than about 13 runs instead of 40+). In the long run every option comes exactly as often as its weight says (`{3::cat\|dog}`: 75% / 25%). Works with any *control after generate*; the memory is kept in a file, as in `shuffle`. | Not used, as in `shuffle`. |
+| `shuffle` | Like shuffle in a music player: the node remembers which options were already used and picks from the rest; when all were used, it starts over. Works with *increment* and with *randomize*: every new seed takes the next option. The memory is kept in a file, so it continues after a restart. | A seed that came before gives the same prompt again (from the memory file), and doesn't move the shuffle on. *fixed* gives the same prompt every run. |
+| `balanced` | Like the pseudo-random distribution in games: an option that just came up gets a low chance, and the longer an option is missed, the higher its chance grows. Repeats are rare but possible (with 5 options: about 4% in a row instead of 20% in `random`, and no option waits more than about 13 runs instead of 40+). In the long run every option comes exactly as often as its weight says (`{3::cat\|dog}`: 75% / 25%). Works with *increment* and *randomize*; the memory is kept in a file, as in `shuffle`. | The same seed gives the same prompt again, as in `shuffle`. |
 | `combinations` | The seed numbers every combination of all the choices, wildcards and variables in both prompts, so seeds 0, 1, 2… go through each combination exactly once, then start over (the seed is taken modulo the number of combinations). For example `{sky\|sea}, __color__ hair` with 3 colors has 6 combinations: seeds 0–5. The first choice changes fastest. The console shows the number, for example *combination 4 of 6*. Weights only matter as `0::` (never used); `{2$$a\|b\|c}` counts every set of 2 options once. Good for trying every character in every style: set *control after generate* to *increment* and start from 0. | The same seed gives the same prompt. |
-| `mutate` | The first run picks at random; every next run keeps the last prompt and changes just one choice to a different option (a choice inside a newly picked option is picked fresh). Good for exploring variations of a result you like: keep running, and every image differs from the one before in one detail. The node remembers the last picks for these prompts in the memory file, so it continues after a restart; editing the prompt starts from a fresh random pick. | Not used, as in `shuffle`. |
+| `mutate` | The first run picks at random; every next run keeps the last prompt and changes just one choice to a different option (a choice inside a newly picked option is picked fresh). Good for exploring variations of a result you like: keep running, and every image differs from the one before in one detail. The node remembers the last picks for these prompts in the memory file, so it continues after a restart; editing the prompt starts from a fresh random pick. Each new seed is a new mutation. | The same seed gives the same prompt again, as in `shuffle`. |
 
 In `deck` and `shuffle` modes:
 
@@ -641,8 +641,9 @@ In `deck` and `shuffle` modes:
 `shuffle`, `balanced` and `mutate` remember what came up before in `ComfyUI/user/DiceForge/seed_memory.sqlite`, so they continue where they stopped after ComfyUI restarts, and the memory doesn't take RAM: only the list being picked from is read, when it is picked from.
 
 - One entry per list of options (a `{a|b}` choice or a wildcard file) and mode, plus one per prompt for `mutate`. Editing a list or a wildcard file starts that list over.
+- For every seed, where each list was when that seed came. The same seed then picks from there again, with its choices drawn from the seed, so it gives the same result, and the list doesn't move on. A seed is made again this way as long as the file remembers it: deleting the file, or a seed forgotten among the oldest entries, picks from where the list is now.
 - `shuffle` stores just its place in the shuffled order, a few bytes even for a wildcard file with thousands of lines. `balanced` stores a number per option (about 7 bytes each).
-- The least recently used entries are forgotten past 20,000 entries.
+- The least recently used entries are forgotten past 100,000 entries.
 - To start everything over, delete the file (ComfyUI can stay running).
 
 ### Wildcard files
@@ -667,7 +668,7 @@ After each run the node shows, under its inputs, the **positive** and **negative
 
 **▸ History** under the preview lists the last 20 runs' prompts (newest first, with the time, seed and mode; hover one for the whole text). A run with the same prompts and seed as the newest one is not added again. For each entry:
 
-- **↺ Seed** puts back that run's prompts, seed and seed mode, and sets *control after generate* to *fixed*: the next run gives exactly those prompts again. Only in `random`, `deck` and `combinations`, where a seed always gives the same prompts (as long as the wildcard files are the same); in `shuffle`, `balanced` and `mutate` use *Use text*.
+- **↺ Seed** puts back that run's prompts, seed and seed mode, and sets *control after generate* to *fixed*: the next run gives exactly those prompts again. In every mode a seed gives the same prompts (as long as the wildcard files are the same and, in `shuffle`, `balanced` and `mutate`, the memory file remembers the seed).
 - **Use text** puts the prompts as encoded in the fields: every choice and wildcard fixed as in that run.
 - **📌** pins it: pinned entries stay past the 20. **✕** removes it.
 

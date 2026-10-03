@@ -166,13 +166,13 @@ test.describe("@api robustness on the real server", () => {
     const broken = () => fs.readdirSync(DICEFORGE()).filter((name) => name.startsWith("seed_memory.sqlite.broken-"));
     const before = broken().length;
     fs.writeFileSync(memory, "not a database ".repeat(500)); // Overwritten in place while the server has it open.
-    for (const mode of ["shuffle", "balanced"]) expect((await runPrompt(request, randomInt({ seed_mode: mode }))).status, mode).toBe("success");
-    expect((await runPrompt(request, clip("{a|b|c}", "", { mode: "mutate" }))).status).toBe("success");
+    for (const [index, mode] of ["shuffle", "balanced"].entries()) expect((await runPrompt(request, randomInt({ seed: 3000 + index, seed_mode: mode }))).status, mode).toBe("success");
+    expect((await runPrompt(request, clip("{a|b|c}", "", { seed: 3002, mode: "mutate" }))).status).toBe("success");
     fs.rmSync(memory);
     fs.writeFileSync(memory, Buffer.alloc(8192, 0x5a)); // Replaced by another file: a new file at the same place.
     const values = [];
     for (let run = 0; run < 5; run++) {
-      const result = await runPrompt(request, randomInt({ seed_mode: "shuffle", min: 10, max: 14 }));
+      const result = await runPrompt(request, randomInt({ seed: 4000 + run, seed_mode: "shuffle", min: 10, max: 14 }));
       expect(result.status).toBe("success");
       values.push(shown(result, "2"));
     }
@@ -291,22 +291,19 @@ test.describe("@api robustness on the real server", () => {
     }
   });
 
-  test("every seed mode runs through the queue, the reproducible ones from the cache and the remembering ones every time", async ({ request }) => {
+  test("every seed mode runs through the queue, and the same seed comes from the cache with the same prompt", async ({ request }) => {
     const text = "{red|green|blue} {cat|dog} __color__";
     for (const mode of MODES) {
       const first = await runPrompt(request, clip(text, "", { seed: 5, mode }));
       const second = await runPrompt(request, clip(text, "", { seed: 5, mode }));
       expect(first.status, mode).toBe("success");
       expect(shown(first, "2"), mode).toMatch(/^(red|green|blue) (cat|dog) (red|blue|green|white)$/);
-      if (["shuffle", "balanced", "mutate"].includes(mode)) expect(second.cached, mode).not.toContain("1");
-      else {
-        expect(second.cached, mode).toContain("1");
-        expect(shown(second, "2"), mode).toBe(shown(first, "2"));
-      }
+      expect(second.cached, mode).toContain("1"); // Every mode gives a seed its prompt again, so the cache is right.
+      expect(shown(second, "2"), mode).toBe(shown(first, "2"));
     }
-    let last = shown(await runPrompt(request, clip("{a|b|c} {x|y} {1|2|3}", "", { mode: "mutate" })), "2").split(" ");
-    for (let run = 0; run < 6; run++) {
-      const now = shown(await runPrompt(request, clip("{a|b|c} {x|y} {1|2|3}", "", { mode: "mutate" })), "2").split(" ");
+    let last = shown(await runPrompt(request, clip("{a|b|c} {x|y} {1|2|3}", "", { seed: 500, mode: "mutate" })), "2").split(" ");
+    for (let run = 1; run <= 6; run++) { // Each run a new seed (increment): one change each.
+      const now = shown(await runPrompt(request, clip("{a|b|c} {x|y} {1|2|3}", "", { seed: 500 + run, mode: "mutate" })), "2").split(" ");
       expect(now.filter((part, index) => part !== last[index]), `${last} -> ${now}`).toHaveLength(1); // Exactly one choice changes per run.
       last = now;
     }

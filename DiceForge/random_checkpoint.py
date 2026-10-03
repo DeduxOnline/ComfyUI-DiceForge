@@ -25,10 +25,10 @@ class RandomCheckpointLoader(io.ComfyNode):
                 io.String.Output(display_name="ckpt_name", tooltip="The picked checkpoint file, for example for the file name of the image."),
             ],
         )
-    # Method to run the node again when the files in the folder change, and every time in the modes that remember earlier runs.
+    # Method to run the node again when the files in the folder change.
     @classmethod
-    def fingerprint_inputs(cls, folder="(all)", seed_mode="random", **kwargs):
-        return folder_fingerprint("checkpoints", folder, seed_mode)
+    def fingerprint_inputs(cls, folder="(all)", **kwargs):
+        return folder_fingerprint("checkpoints", folder)
     # Main method: picks a checkpoint file of the folder by the seed mode, then loads it with the core Load Checkpoint.
     @classmethod
     def execute(cls, folder="(all)", seed=0, seed_mode="random"):

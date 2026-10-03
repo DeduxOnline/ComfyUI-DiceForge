@@ -1,10 +1,9 @@
 # Seed modes (DiceForge/seed_modes.py): how picks follow the seed, and the memory of shuffle and balanced.
-import json
 import random
 from collections import Counter
 import pytest
 from DiceForge import seed_modes
-from DiceForge.seed_modes import (BalancedPicker, DeckPicker, RandomPicker, SeedMemory, ShufflePicker, deck_cards, fingerprint, make_picker,
+from DiceForge.seed_modes import (BalancedPicker, DeckPicker, RandomPicker, SeedMemory, ShufflePicker, deck_cards, make_picker,
                                   pick_in_range, pick_index, pick_label, stable_seed)
 
 OPTIONS = [(1.0, name) for name in "abcde"]
@@ -103,11 +102,26 @@ def test_pick_index_deck_and_sequential_cover_every_position():
     assert all(0 <= pick_index(big, DeckPicker(random.Random(seed), seed, {}), seed, "x") < big for seed in range(50))
 
 
-def test_fingerprint_is_json_safe_and_only_changes_for_remembering_modes():
-    assert fingerprint("random") is None and fingerprint("deck") is None
-    first, second = fingerprint("shuffle"), fingerprint("balanced")
-    assert isinstance(first, str) and first != second
-    json.dumps([first, second])
+@pytest.mark.parametrize("picker, key", [(ShufflePicker, deck_cards), (BalancedPicker, list)])
+def test_a_seed_gives_its_picks_again_without_moving_the_memory_on(picker, key):
+    options = [(1.0, name) for name in "abcdef"]
+    def names(seed):
+        return [option for option, _ in picker(seed).pick(options, 2, False)]
+    first = {seed: names(seed) for seed in range(6)}
+    now = seed_modes.MEMORY.get(picker.mode, seed_modes.MEMORY.key(key(options)))
+    assert {seed: names(seed) for seed in (5, 0, 3)} == {seed: first[seed] for seed in (5, 0, 3)}
+    assert seed_modes.MEMORY.get(picker.mode, seed_modes.MEMORY.key(key(options))) == now # Replays leave the memory where it was.
+    assert names(6) != names(7) or picker is BalancedPicker # New seeds go on (shuffle: the next cards of the round).
+    assert make_picker("shuffle", 12).seed == 12 and make_picker("balanced", 12).seed == 12
+
+
+def test_the_same_list_twice_in_one_run_is_replayed_pick_by_pick():
+    options = [(1.0, name) for name in "abcd"]
+    def run(seed):
+        picker = ShufflePicker(seed) # One run: the same list picked twice (__color__ hair, __color__ eyes).
+        return [picker.pick(options, 1, True)[0][0] for _ in range(2)]
+    first = run(1)
+    assert first[0] != first[1] and run(1) == first
 
 
 def test_seed_memory_keeps_values_and_forgets_the_oldest_past_the_limit(tmp_path, monkeypatch):

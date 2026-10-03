@@ -23,10 +23,10 @@ class RandomVAELoader(io.ComfyNode):
                 io.String.Output(display_name="vae_name", tooltip="The picked VAE file, for example for the label of Dice Grid."),
             ],
         )
-    # Method to run the node again when the files in the folder change, and every time in the modes that remember earlier runs.
+    # Method to run the node again when the files in the folder change.
     @classmethod
-    def fingerprint_inputs(cls, folder="(all)", seed_mode="random", **kwargs):
-        return folder_fingerprint("vae", folder, seed_mode)
+    def fingerprint_inputs(cls, folder="(all)", **kwargs):
+        return folder_fingerprint("vae", folder)
     # Main method: picks a VAE file of the folder by the seed mode, then loads it with the core Load VAE.
     @classmethod
     def execute(cls, folder="(all)", seed=0, seed_mode="random"):

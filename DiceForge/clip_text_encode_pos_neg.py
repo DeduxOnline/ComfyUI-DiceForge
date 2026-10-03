@@ -10,7 +10,7 @@ import folder_paths
 import yaml
 from typing_extensions import override
 from comfy_api.latest import ComfyExtension, io
-from .seed_modes import MEMORY, Picker, RandomPicker, DeckPicker, ShufflePicker, BalancedPicker, fingerprint
+from .seed_modes import MEMORY, Picker, RandomPicker, DeckPicker, ShufflePicker, BalancedPicker, recall, stable_seed
 # Wildcards: __name__ in a prompt is replaced by a random line of name.txt from the wildcards folders (ComfyUI/models/wildcards by default, more can be added in extra_model_paths.yaml).
 folder_paths.add_model_folder_path("wildcards", os.path.join(folder_paths.models_dir, "wildcards"), is_default=True)
 # * and ? match several files (__hair/*__, __*/color__); ${name} takes a variable's value (__outfit/${gender}__; \x00name\x00 once the prompt is scanned).
@@ -317,8 +317,8 @@ class CombinationPicker(Picker):
         return self.child(self.take(count_combinations(text, self.memo, self.depth + 1)))
     def lock(self, weighted, count_range, plain, locked):
         return [(option, self.sub(option)) for option in locked] # A locked choice counts once, so it doesn't repeat combinations.
-# mutate: the first run picks at random; every next run keeps the last prompt and changes just one choice (a different option), to explore variations
-# of a good result. The node remembers the last picks for these prompts (in the memory file), whatever the seed. Not reproducible.
+# mutate: the first run picks at random; every next run (a new seed) keeps the last prompt and changes just one choice (a different option), to explore
+# variations of a good result. The node remembers the last picks for these prompts (in the memory file); the same seed again gives the same prompt.
 class MutatePicker(Picker):
     def __init__(self, state, path=()):
         self.state, self.path, self.ordinal, self.rng = state, path, 0, state["rng"]
@@ -451,7 +451,7 @@ class CLIPTextEncodePositiveNegative(io.ComfyNode):
                     min=0,
                     max=0xFFFFFFFFFFFFFFFF,
                     control_after_generate=True,
-                    tooltip="Seed for {a|b} choices and __name__ wildcards. The same seed always gives the same prompts (except in shuffle, balanced and mutate modes).",
+                    tooltip="Seed for {a|b} choices and __name__ wildcards. The same seed always gives the same prompts, in every mode.",
                     advanced=True,
                 ),
                 io.Combo.Input(
@@ -461,10 +461,10 @@ class CLIPTextEncodePositiveNegative(io.ComfyNode):
                     tooltip="How choices and wildcards change from run to run.\n"
                     "random: every pick is independent, so the same option can come up again soon.\n"
                     "deck: the seed steps through a shuffled order of the options; with control after generate on increment, every option comes once before any repeats. Reproducible.\n"
-                    "shuffle: like shuffle in a music player, the node remembers the options already used and picks from the rest, whatever the seed; remembered in a file, so it continues after a restart. Not reproducible.\n"
-                    "balanced: an option just picked gets a low chance, and options not picked for a while get a higher one, so repeats are rare but possible. Remembered in a file, so it continues after a restart. Not reproducible.\n"
+                    "shuffle: like shuffle in a music player, the node remembers the options already used and picks from the rest with each new seed (increment or randomize); remembered in a file, so it continues after a restart. The same seed gives the same result again.\n"
+                    "balanced: an option just picked gets a low chance, and options not picked for a while get a higher one, so repeats are rare but possible. Remembered in a file, so it continues after a restart. The same seed gives the same result again.\n"
                     "combinations: the seed numbers every combination of the options, so seeds 0, 1, 2... go through all of them once (the console shows how many). Reproducible.\n"
-                    "mutate: keeps the last prompt and changes just one choice each run, to explore variations of a good result. Remembered in a file, so it continues after a restart. Not reproducible.",
+                    "mutate: keeps the last prompt and changes just one choice each run with a new seed, to explore variations of a good result. Remembered in a file, so it continues after a restart. The same seed gives the same result again.",
                     advanced=True,
                 ),
                 io.Boolean.Input(
@@ -485,8 +485,8 @@ class CLIPTextEncodePositiveNegative(io.ComfyNode):
         )
     # Method to run the node again when a wildcard file changes, even if the inputs are the same.
     @classmethod
-    def fingerprint_inputs(cls, seed_mode="random", **kwargs):
-        return wildcards_signature(), fingerprint(seed_mode) # shuffle, balanced and mutate give a new prompt every run, so they never use the cache.
+    def fingerprint_inputs(cls, **kwargs):
+        return wildcards_signature()
     # Encoding method, same as CLIP Text Encode (Prompt).
     @staticmethod
     def encode(clip, text):
@@ -504,15 +504,16 @@ class CLIPTextEncodePositiveNegative(io.ComfyNode):
             note = f", combination {seed % total + 1} of {total}"
         elif seed_mode == "mutate":
             key = MEMORY.key(positive, negative)
-            last = mutate_memory(MEMORY.get("mutate", key))
-            rng = random.Random() # NOSONAR: picks prompt options, not security.
+            remembered, replay = recall("mutate", key, seed)
+            last = mutate_memory(remembered)
+            rng = random.Random(stable_seed("mutate", seed, key)) # NOSONAR: picks prompt options from the seed, not security.
             changeable = [address for address, (_picked, options) in last.items() if options > 1]
             state = {"rng": rng, "last": last, "now": {}, "mutate": rng.choice(changeable) if changeable else None}
             picker = MutatePicker(state)
         elif seed_mode == "shuffle":
-            picker = ShufflePicker()
+            picker = ShufflePicker(seed)
         elif seed_mode == "balanced":
-            picker = BalancedPicker()
+            picker = BalancedPicker(seed)
         elif seed_mode == "deck":
             picker = DeckPicker(random.Random(seed), seed, {})
         else:
@@ -520,7 +521,7 @@ class CLIPTextEncodePositiveNegative(io.ComfyNode):
         positive_text, negative_text = resolve_prompts((positive, negative), picker)
         if trim:
             positive_text, negative_text = trim_spaces(positive_text), trim_spaces(negative_text)
-        if seed_mode == "mutate":
+        if seed_mode == "mutate" and not replay: # A seed that came before gives its prompt again without moving mutate on.
             MEMORY.set("mutate", key, [[list(address), picked, options] for address, (picked, options) in state["now"].items()])
         MEMORY.save()
         # Logging the prompts when choices or wildcards changed them, for debugging and verification purposes.

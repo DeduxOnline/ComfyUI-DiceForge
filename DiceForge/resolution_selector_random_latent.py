@@ -3,7 +3,7 @@ import math
 import nodes
 from typing_extensions import override
 from comfy_api.latest import ComfyExtension, io
-from .seed_modes import MEMORY, SEED_MODES, SEED_MODE_TOOLTIP, make_picker, pick_label, pick_in_range, fingerprint
+from .seed_modes import MEMORY, SEED_MODES, SEED_MODE_TOOLTIP, make_picker, pick_label, pick_in_range
 from .sdxl_resolution_list_latent import describe_rescale, keep_orientation, rescale_input, rescale_settings, rescaled
 # Aspect ratios for the canvas, in the "W:H (Name)" form the frontend resolution preview reads.
 ASPECT_RATIOS = {
@@ -130,10 +130,6 @@ class ResolutionSelectorRandomLatent(io.ComfyNode):
         low = 0.0 if orientation == "landscape" else -math.log(max_aspect)
         high = 0.0 if orientation == "portrait" else math.log(max_aspect)
         return math.exp(pick_in_range(low, high, 8 if orientation == "any" else 4, picker, seed, f"Chaos {orientation} {max_aspect}")), 1.0
-    # Method to run the node every time for random options in the modes that remember earlier runs, instead of using ComfyUI's cache.
-    @classmethod
-    def fingerprint_inputs(cls, aspect_ratio="", seed_mode="random", **kwargs):
-        return fingerprint(seed_mode) if str(aspect_ratio).startswith("Random") else None
     # Main method to get the resolution based on the selected option, applying randomization as needed, then building the empty latent with Empty Latent Image.
     @classmethod
     def execute(cls, aspect_ratio, megapixels=1.0, seed=0, multiple=8, batch=1, max_aspect=2.0, seed_mode="random", preview=None, rescale=None):

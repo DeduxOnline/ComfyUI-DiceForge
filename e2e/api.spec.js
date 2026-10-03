@@ -68,14 +68,16 @@ test.describe("@api workflows and routes", () => {
     writeFile("models/wildcards/hair/style.txt", "bob cut\nlong hair\n");
   });
 
-  test("shuffle runs every time and remembers between runs on the server", async ({ request }) => {
+  test("shuffle remembers between runs on the server, and a seed that came before gives its value again", async ({ request }) => {
     const values = [];
-    for (let run = 0; run < 5; run++) {
-      const result = await runPrompt(request, randomInt({ seed_mode: "shuffle" }));
+    for (const seed of [901, 47, 3, 1999, 650]) { // Any new seeds (randomize): a whole round without repeats.
+      const result = await runPrompt(request, randomInt({ seed, seed_mode: "shuffle" }));
       expect(result.cached).not.toContain("1");
       values.push(shown(result, "2"));
     }
-    expect(values.sort()).toEqual(["1", "2", "3", "4", "5"]);
+    expect([...values].sort()).toEqual(["1", "2", "3", "4", "5"]);
+    const again = await runPrompt(request, randomInt({ seed: 3, seed_mode: "shuffle" }));
+    expect(shown(again, "2")).toBe(values[2]);
   });
 
   test("a missing wildcard stops the run with a clear message", async ({ request }) => {

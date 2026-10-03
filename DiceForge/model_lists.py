@@ -23,7 +23,7 @@ def folder_input(kind, what):
         tooltip=f"The folder to pick the {what} from, subfolders included. (all): every {what}. Refresh the node definitions (R) after adding folders.",
     )
 # What the random loaders share: the seed inputs, the pick of a file of the folder by the seed mode, and the fingerprint that runs the node again
-# when the folder's files change (and every time in the modes that remember earlier runs).
+# when the folder's files change.
 def seed_inputs(things):
     from comfy_api.latest import io
     from .seed_modes import SEED_MODES, seed_mode_tooltip
@@ -40,9 +40,8 @@ def pick_model_file(kind, folder, seed, seed_mode, what, extra=()):
     name = pick_label(files + list(extra), make_picker(seed_mode, seed), seed)
     MEMORY.save()
     return name
-def folder_fingerprint(kind, folder, seed_mode, *more):
-    from .seed_modes import fingerprint
-    return tuple(files_in_folder(kind, folder)), *more, fingerprint(seed_mode)
+def folder_fingerprint(kind, folder, *more):
+    return tuple(files_in_folder(kind, folder)), *more
 # Image files for Random Image: the images under a folder (subfolders included, hidden folders and the mask editor's clipspace left out), as paths
 # relative to it with "/", sorted by name.
 IMAGE_EXTENSIONS = (".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif", ".tif", ".tiff")

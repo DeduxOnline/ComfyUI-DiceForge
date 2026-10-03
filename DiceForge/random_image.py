@@ -9,7 +9,7 @@ from PIL import Image, ImageOps, ImageSequence
 from typing_extensions import override
 from comfy_api.latest import ComfyExtension, InputImpl, io, ui
 from .model_lists import ALL_FOLDERS, image_folders, images_in_folder
-from .seed_modes import MEMORY, SEED_MODES, make_picker, pick_label, seed_mode_tooltip, fingerprint
+from .seed_modes import MEMORY, SEED_MODES, make_picker, pick_label, seed_mode_tooltip
 # Image loading with the same steps as Load Image (which only opens files inside ComfyUI's input folder): first the video reader (animated GIFs and
 # most formats), then Pillow (frames of the first frame's size, EXIF rotation, RGB, mask from the alpha channel, 1 where transparent). Pillow also
 # takes over when the video reader fails, as it does on some WebP files that Load Image can't open.
@@ -94,14 +94,14 @@ class RandomImageLoader(io.ComfyNode):
             return root, images_in_folder(root, ALL_FOLDERS)
         root = folder_paths.get_input_directory()
         return root, images_in_folder(root, folder)
-    # Method to run the node again when images in the folder are added, removed or changed, and every time in the modes that remember earlier runs.
+    # Method to run the node again when images in the folder are added, removed or changed.
     @classmethod
-    def fingerprint_inputs(cls, folder=ALL_FOLDERS, path="", seed_mode="random", **kwargs):
+    def fingerprint_inputs(cls, folder=ALL_FOLDERS, path="", **kwargs):
         try:
             root, files = cls.source(folder, path)
         except ValueError:
             return None # The run reports the error.
-        return tuple((name, os.path.getmtime(os.path.join(root, name))) for name in files), fingerprint(seed_mode)
+        return tuple((name, os.path.getmtime(os.path.join(root, name))) for name in files)
     # Main method: picks an image of the folder by the seed mode, then loads it like Load Image and shows it on the node.
     @classmethod
     def execute(cls, folder=ALL_FOLDERS, seed=0, seed_mode="random", path=""):

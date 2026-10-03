@@ -1,12 +1,12 @@
 import logging
 from typing_extensions import override
 from comfy_api.latest import ComfyExtension, io
-from .seed_modes import MEMORY, SEED_MODES, make_picker, pick_index, fingerprint
+from .seed_modes import MEMORY, SEED_MODES, make_picker, pick_index
 SEED_MODE_TOOLTIP = ("How the value changes from run to run.\n"
     "random: every pick is independent, so the same value can come up again soon.\n"
     "deck: the seed steps through a shuffled order of the values; with control after generate on increment, every value comes once before any repeats. Reproducible.\n"
-    "shuffle: like shuffle in a music player, the node remembers the values already used and picks from the rest, whatever the seed; remembered in a file, so it continues after a restart. Not reproducible.\n"
-    "balanced: a value just picked gets a low chance, and values not picked for a while get a higher one, so repeats are rare but possible. Remembered in a file. Not reproducible.\n"
+    "shuffle: like shuffle in a music player, the node remembers the values already used and picks from the rest with each new seed (increment or randomize); remembered in a file, so it continues after a restart. The same seed gives the same result again.\n"
+    "balanced: a value just picked gets a low chance, and values not picked for a while get a higher one, so repeats are rare but possible. Remembered in a file. The same seed gives the same result again.\n"
     "sequential: the seed is the position, so seeds 0, 1, 2... give min, min + step, min + 2 x step... then start over. Reproducible.\n"
     "Past 1000 possible values, deck, shuffle and balanced take turns between 100 equal parts of the range instead, with a random value inside each part.")
 # Node schema (V3 / Nodes 2.0): a random whole number between min and max (in steps of step), picked from the seed with the same seed modes as the
@@ -62,10 +62,6 @@ class RandomIntSeedModes(io.ComfyNode):
                 io.Int.Output(display_name="value", tooltip="The random value."),
             ],
         )
-    # Method to run the node every time in the modes that remember earlier runs, instead of using ComfyUI's cache.
-    @classmethod
-    def fingerprint_inputs(cls, seed_mode="random", **kwargs):
-        return fingerprint(seed_mode)
     # Main method: the possible values are min, min + step... up to max; the seed mode picks the position of one of them.
     @classmethod
     def execute(cls, min=0, max=10, step=1, seed=0, seed_mode="random"):

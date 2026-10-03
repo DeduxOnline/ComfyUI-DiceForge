@@ -108,7 +108,7 @@ def test_mutate_with_a_damaged_memory_picks_afresh(last):
     seed_modes.MEMORY.set("mutate", seed_modes.MEMORY.key(text, ""), last)
     first = run(text, mode="mutate")[0].split(" ")
     assert first[0] in "abc" and first[1] in "xy"
-    second = run(text, mode="mutate")[0].split(" ")
+    second = run(text, seed=1, mode="mutate")[0].split(" ")
     assert sum(a != b for a, b in zip(first, second)) == 1 # And mutating works again from there.
 
 
@@ -442,5 +442,5 @@ def test_mutate_multi_pick_follows_a_wildcard_file_that_grows(wildcards):
     wildcards("grow.txt", "only\n")
     assert run("{3$$__grow__}", mode="mutate")[0] == "only"
     wildcards("grow.txt", "only\nb\nc\nd\ne\n")
-    picked = run("{3$$__grow__}", mode="mutate")[0].split(", ")
+    picked = run("{3$$__grow__}", seed=1, mode="mutate")[0].split(", ")
     assert len(picked) == len(set(picked)) == 3

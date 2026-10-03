@@ -32,7 +32,8 @@ def test_random_int_deck_and_sequential_go_through_every_value():
 
 
 def test_random_int_shuffle_remembers_between_runs():
-    assert sorted(value(RandomInt, min=1, max=6, seed=0, seed_mode="shuffle") for _ in range(6)) == [1, 2, 3, 4, 5, 6]
+    assert sorted(value(RandomInt, min=1, max=6, seed=seed, seed_mode="shuffle") for seed in (9, 4, 77, 1, 2024, 5)) == [1, 2, 3, 4, 5, 6]
+    assert value(RandomInt, min=1, max=6, seed=77, seed_mode="shuffle") == value(RandomInt, min=1, max=6, seed=77, seed_mode="shuffle") # A seed again: its value.
 
 
 def test_random_float_with_a_step_hits_the_grid_including_max():
