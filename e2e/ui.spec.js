@@ -191,7 +191,10 @@ for (const vue of [true, false]) {
       const file = `edit_${vue ? "vue" : "classic"}`; // A file of its own: the tests share the server's files.
       await page.locator(".dfwc .row", { hasText: file }).locator(".name").click();
       await expect(page.locator(".dfwc .edit textarea")).toHaveValue("one\ntwo");
+      const numbers = () => page.locator(".dfwc .code .lines").evaluate((gutter) => gutter.textContent);
+      await expect.poll(numbers).toBe("1\n2"); // A line number next to each line.
       await page.locator(".dfwc .edit textarea").fill("one\ntwo\n2::three");
+      await expect.poll(numbers).toBe("1\n2\n3"); // Numbered again as you type.
       await page.locator(".dfwc button", { hasText: "Save" }).click();
       await expect(page.locator(".dfwc .status")).toContainText(`Saved ${file}.txt`);
       expect(fs.readFileSync(basePath("models", "wildcards", `${file}.txt`), "utf8")).toBe("one\ntwo\n2::three\n");

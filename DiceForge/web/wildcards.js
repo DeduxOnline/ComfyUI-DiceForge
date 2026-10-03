@@ -109,7 +109,11 @@ const STYLE = `
 .dfwc input,.dfwc textarea{background:#262626;color:#eee;border:1px solid #555;border-radius:4px;padding:6px 8px;font:inherit;box-sizing:border-box}
 .dfwc .top input{flex:1}.dfwc .main{display:flex;gap:12px;flex:1;min-height:0}
 .dfwc .tree{width:45%;overflow:auto;border:1px solid #4a4a4a;border-radius:6px;padding:6px}
-.dfwc .edit{flex:1;display:flex;flex-direction:column;gap:8px;min-width:0}.dfwc .edit textarea{flex:1;resize:none;font:13px ui-monospace,monospace}
+.dfwc .edit{flex:1;display:flex;flex-direction:column;gap:8px;min-width:0}
+.dfwc .code{flex:1;display:flex;min-height:0;border:1px solid #555;border-radius:4px;background:#262626;overflow:hidden}
+.dfwc .code .lines,.dfwc .code textarea{font:13px/20px ui-monospace,monospace;padding-top:6px;background-image:linear-gradient(to bottom,transparent 19px,#323232 19px);background-size:100% 20px;background-position:0 6px;background-attachment:local}
+.dfwc .code .lines{flex:none;box-sizing:content-box;padding:6px 8px 40px 10px;text-align:right;color:#6f6f6f;white-space:pre;overflow:hidden;user-select:none;background-color:#212121;border-right:1px solid #444}
+.dfwc .code textarea{flex:1;min-width:0;resize:none;border:none;border-radius:0;padding:6px 8px;white-space:pre;overflow:auto;background-color:#262626}
 .dfwc .row{display:flex;align-items:center;gap:6px;padding:3px 6px;border-radius:4px}.dfwc .row:hover{background:#2c2c2c}
 .dfwc .row .name{flex:1;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dfwc .row.sel{background:#2f3f55}
 .dfwc .folder>.row .name{font-weight:600}.dfwc .folder>.row .name::before{content:"▸ ";color:#999}.dfwc .folder.open>.row .name::before{content:"▾ "}
@@ -264,7 +268,20 @@ async function openBrowser(node) {
   const search = element("input", { placeholder: "Search wildcards…" });
   const tree = element("div", { class: "tree" });
   const title = element("div", { class: "muted" }, "Select a file to see and edit its lines, one option per line (# starts a comment).");
-  const editor = element("textarea", { placeholder: "One option per line" });
+  const editor = element("textarea", { placeholder: "One option per line", wrap: "off", spellcheck: "false" });
+  // Line numbers next to the editor, as in a code editor, scrolled with it; lines don't wrap, so each number stays next to its line.
+  const lines = element("div", { class: "lines", "aria-hidden": "true" }, "1");
+  const numberLines = () => {
+    const count = editor.value.split("\n").length;
+    if (lines.dataset.count !== String(count)) {
+      lines.dataset.count = String(count);
+      lines.textContent = Array.from({ length: count }, (_, index) => index + 1).join("\n");
+      lines.style.width = `${String(count).length}ch`;
+    }
+    lines.scrollTop = editor.scrollTop;
+  };
+  editor.addEventListener("input", numberLines);
+  editor.addEventListener("scroll", () => { lines.scrollTop = editor.scrollTop; });
   const status = element("div", { class: "status" });
   const save = element("button", { class: "save" }, "Save");
   const rename = element("button", { class: "rename", disabled: true }, "Rename");
@@ -293,6 +310,8 @@ async function openBrowser(node) {
     keepOpenFolders(opened);
     title.replaceChildren(element("b", {}, `__${name}__`), " ", element("span", { class: "muted" }, file.path));
     editor.value = saved = file.text;
+    editor.scrollTop = 0;
+    numberLines();
     editor.readOnly = !!file.readonly; // A yaml wildcard is one key of a yaml file: edited in that file.
     save.disabled = rename.disabled = move.disabled = remove.disabled = !!file.readonly;
     showDirty();
@@ -318,6 +337,7 @@ async function openBrowser(node) {
       const edited = editor.value !== saved ? editor.value : null;
       await open(result.to);
       if (edited != null) editor.value = edited, showDirty();
+      numberLines();
     } else draw();
     say(`${moved ? "Moved" : "Renamed"} ${result.renamed} to ${result.to}. Prompts that use __${result.renamed}__ need the new name.`);
   }
@@ -341,6 +361,7 @@ async function openBrowser(node) {
     const name = selected;
     selected = null;
     editor.value = saved = "";
+    numberLines();
     editor.readOnly = false;
     rename.disabled = move.disabled = remove.disabled = true;
     showDirty();
@@ -425,7 +446,7 @@ async function openBrowser(node) {
   back.append(element("div", { class: "dfwc" },
     element("h2", {}, "Wildcards"),
     element("div", { class: "top" }, search, favoritesButton, expandAll, collapseAll, create, element("button", { onclick: close }, "Close")),
-    element("div", { class: "main" }, tree, element("div", { class: "edit" }, title, editor, element("div", { class: "top" }, status, element("span", { style: "flex:1" }), remove, move, rename, save)))));
+    element("div", { class: "main" }, tree, element("div", { class: "edit" }, title, element("div", { class: "code" }, lines, editor), element("div", { class: "top" }, status, element("span", { style: "flex:1" }), remove, move, rename, save)))));
   document.body.append(back);
   await wildcardList(true);
   draw();
