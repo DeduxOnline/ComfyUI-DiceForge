@@ -1,6 +1,7 @@
 # Tag autocomplete (DiceForge/tag_autocomplete.py): tag lists in tagcomplete's CSV format, the search, merging lists, and the download.
 import os
 import threading
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import pytest
 from DiceForge import tag_autocomplete
@@ -58,15 +59,21 @@ def tag_server(monkeypatch):
             pass
 
         def do_GET(self):
-            data = (DANBOORU if self.path.endswith("danbooru.csv") else "<html>not found</html>").encode()
+            text = DANBOORU + "".join(f"extra_tag_{number},0,{number},\n" for number in range(self.server.extra))
+            data = (text if self.path.endswith("danbooru.csv") else "<html>not found</html>").encode()
             self.send_response(200)
             self.send_header("Content-Length", str(len(data)))
             self.end_headers()
-            self.wfile.write(data)
+            for start in range(0, len(data), 4096): # In pieces with pauses, as a real host sends a big file.
+                self.wfile.write(data[start:start + 4096])
+                self.wfile.flush()
+                if self.server.extra:
+                    time.sleep(0.005)
     server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    server.extra = 0
     threading.Thread(target=server.serve_forever, daemon=True).start()
     monkeypatch.setattr(tag_autocomplete, "TAGS_URL", f"http://127.0.0.1:{server.server_port}/tags/{{name}}.csv")
-    yield
+    yield server
     server.shutdown()
 
 
@@ -77,6 +84,13 @@ def test_download_saves_the_list_and_refuses_what_is_not_one(api, tag_server):
     assert api("GET", "/diceforge/tags?q=1g")[1]["tags"][0]["tag"] == "1girl"
     status, text = api("POST", "/diceforge/tags/download", json={"list": "e621"})
     assert status == 502 and "not a tag list" in text and not os.path.exists(os.path.join(tag_autocomplete.TAGS_FOLDER, "e621.csv"))
+
+
+def test_download_reads_a_big_list_to_the_end(api, tag_server):
+    tag_server.extra = 20000 # About 450 KB in 4 KB pieces: a list cut after the first piece would have a hundred tags or so.
+    status, body = api("POST", "/diceforge/tags/download", json={"list": "danbooru"})
+    assert status == 200 and body == {"list": "danbooru", "tags": 20007}
+    assert TagIndex().load().browse()["total"] == 20007
 
 
 def test_download_without_the_host_says_so(api):

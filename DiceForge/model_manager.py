@@ -10,6 +10,7 @@ from urllib.parse import urlsplit
 import aiohttp
 import folder_paths
 from aiohttp import web
+from .http_read import read_up_to
 from .model_info import PREVIEW_ENDINGS, civitai_details, civitai_summary, info_file, json_body, local_preview, read_info, thumbnail, write_info
 # Managing the model files of the LoRA, Checkpoint and Diffusion Model Browsers (web/model_browser.js, web/civitai.js): Create is finding a model on
 # Civitai and downloading it (with its Civitai data and a preview, so the browser shows it at once), Read is the browser and Model info, Update is
@@ -30,6 +31,7 @@ SORTS = ("Highest Rated", "Most Downloaded", "Newest")
 COMPANIONS = PREVIEW_ENDINGS + (".civitai.info", ".metadata.json", ".json") # Files next to a model that belong to it (as other managers save them).
 FORBIDDEN = re.compile(r'[<>:"|?*\x00-\x1f]') # Not allowed in file names on Windows (and control characters anywhere).
 MAX_DOWNLOADS = 3 # Downloads running at the same time.
+PREVIEW_BYTES = 20 * 1024 * 1024 # A Civitai preview image at most.
 JOBS, TASKS = {}, {} # Downloads of this session by id: what the browser shows, and the task doing it.
 
 
@@ -330,7 +332,9 @@ async def save_preview(version, path):
         async with session() as client, client.get(image["url"]) as response:
             response.raise_for_status()
             extension = {"image/png": ".png", "image/webp": ".webp"}.get(response.content_type, ".jpg")
-            data = await response.content.read(20 * 1024 * 1024)
+            data = await read_up_to(response, PREVIEW_BYTES)
+        if len(data) > PREVIEW_BYTES:
+            raise ValueError(f"the image is over {PREVIEW_BYTES // (1024 * 1024)} MB")
         await asyncio.get_running_loop().run_in_executor(None, write_bytes, os.path.splitext(path)[0] + ".preview" + extension, data)
     except Exception as error: # The model is there; only its preview is missing (the browser shows Civitai's image instead).
         logging.warning(f"[DiceForge] Civitai preview of {os.path.basename(path)} not saved: {error}")

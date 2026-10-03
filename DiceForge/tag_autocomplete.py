@@ -11,6 +11,7 @@ import threading
 import aiohttp
 import folder_paths
 from aiohttp import web
+from .http_read import read_up_to
 from .model_info import json_body
 # Tag autocomplete for the prompt fields (web/tag_autocomplete.js): Danbooru and e621 tags, the way anime models (Illustrious, NoobAI, Anima) were
 # trained on them, with how often each is used and its aliases. The lists are CSV files in the format of a1111-sd-webui-tagcomplete
@@ -152,7 +153,7 @@ async def download(name):
     try:
         async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=300), trust_env=True) as session, session.get(url) as response:
             response.raise_for_status()
-            data = await response.content.read(MAX_BYTES + 1)
+            data = await read_up_to(response, MAX_BYTES)
     except aiohttp.ClientError as error:
         raise web.HTTPBadGateway(text=f"Tag autocomplete: can't download the {name} list: {error}.") from None
     except asyncio.TimeoutError:
