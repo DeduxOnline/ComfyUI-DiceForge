@@ -37,6 +37,7 @@ Every mode gives the same result for the same seed, so an image can be made agai
 | **Load VAE + Decode + Save** | utils | `DiceForge/load_vae_decode_save.py` | You want Load VAE, VAE Decode and Save Image in one node: it decodes the latent with the chosen VAE and saves PNG files with the workflow, like Save Image, and passes the images on. The VAE stays loaded between runs while its name stays the same. `image_output` decides what happens to the images, as in Easy-Use's samplers: *Hide* (only passed on), *Preview* (shown, not saved), *Save* (saved and shown, the default) or *Hide&Save* (saved, not shown). The `vae` output passes the VAE on (for VAE Encode in a hires fix or inpaint). |
 | **VAE Decode + Save** | utils | `DiceForge/load_vae_decode_save.py` | The same without Load VAE: VAE Decode and Save Image in one node, with the VAE from its `vae` input (the VAE of Load Checkpoint, Load VAE, Random VAE…). Saves PNG files with the workflow, like Save Image, and passes the images and the VAE on. The same `image_output` choice (Hide, Preview, Save, Hide&Save). |
 | **Load Diffusion Model + CLIP** | utils | `DiceForge/load_diffusion_model_clip.py` | You want Load Diffusion Model and Load CLIP in one node, for models that come as separate files (Flux, Anima, Qwen-Image...): the model from `models/diffusion_models` and one text encoder, or two like DualCLIPLoader when `clip_name2` is set. The CLIP type is checked against the number of files before anything loads. |
+| **Hires Fix** | DiceForge/sampling | `DiceForge/hires_fix.py` | You want a bigger image with new detail in one node: the first pass's latent made bigger (by a factor, or to the size of an SDXL Resolution List with rescale; in the latent, or in pixels with an upscale model) and sampled again at low denoise. |
 | **XY Plot** | DiceForge/sampling | `DiceForge/xy_plot.py` | You want an X/Y comparison in one node: seed, steps, CFG, sampler, scheduler, LoRA, LoRA strength or denoise on each axis, every combination queued with one button, laid out by Dice Grid with the values as headers. |
 | **Dice Grid** | DiceForge/image | `DiceForge/dice_grid.py` | You want the images of a series side by side with labels: a LoRA, checkpoint or setting comparison, or an XY grid. |
 | **Random Diffusion Model** | DiceForge/loaders | `DiceForge/random_diffusion_model.py` | The same for diffusion models (`models/diffusion_models`, Flux and the like), like **Load Diffusion Model**. |
@@ -360,6 +361,26 @@ How to connect it:
 - `index` is the cell of a run, row by row. **▶ Queue** sets it for each run and puts it back to 0; Run alone makes the cell at `index`.
 - Up to 64 values per axis and 256 images in all. A field the node can't read is shown in red under it, and stops the run with the same message.
 - Set KSampler's own *control after generate* to *fixed*, or connect `seed`: otherwise every cell gets another seed.
+
+## Hires Fix
+
+The second pass of a hires fix in one node: the latent of the first KSampler is made bigger, then sampled again at a low `denoise`, so the bigger image gets new detail instead of blur.
+
+1. Connect the first KSampler's `LATENT` to `samples`, and `model`, `positive` and `negative` as for the first KSampler.
+2. Set the size: `upscale_by` (1.5: 1024×1024 becomes 1536×1536), or `width` and `height`. To take the size from DiceForge, connect `width` and `height` of a second SDXL Resolution List or Resolution Selector with `rescale` (the same size as the first, at 150%, or to a longest side).
+3. Decode `latent` with VAE Decode (+ Save), or connect `vae` and use the `image` output.
+
+| Input | Default | Description |
+|---|---|---|
+| `upscale_by` | `1.5` | Each side times this, when `width` and `height` are 0. |
+| `width`, `height` | `0` | The size of the second pass; one of them alone keeps the aspect ratio. Rounded to multiples of 8. |
+| `upscale_method` | `bislerp` | How the latent is made bigger (`nearest-exact`, `bilinear`, `area`, `bicubic`, `bislerp`). |
+| `seed`, `steps`, `cfg`, `sampler_name`, `scheduler` | `15` steps, CFG `6` | The second pass's settings. Connect the first pass's seed for the same noise, or XY Plot's outputs. |
+| `denoise` | `0.45` | How much the second pass changes: 0.3–0.5 adds detail and keeps the picture. A latent upscale needs about 0.5 or more; with an upscale model, less is enough. |
+| `vae` | | Optional: for `upscale_model`, and for the `image` output. |
+| `upscale_model` | | Optional: an upscale model (**Load Upscale Model**: ESRGAN, 4x-UltraSharp…). The image is made bigger in pixels with it (sharper than a latent upscale), resized to the second pass's size, and encoded again. Needs `vae`. |
+
+Outputs: `latent`, `image` (only with `vae`), `width` and `height` of the second pass. The console shows the sizes and settings of each run.
 
 ## Model info
 

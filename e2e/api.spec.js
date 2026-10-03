@@ -7,7 +7,7 @@ const { MODELS, DOWNLOADS } = require("./fixtures");
 
 const NODES = ["SDXLResolutionListLatent", "ResolutionSelectorRandomLatent", "CLIPTextEncodePositiveNegative", "DiceForgeRandomInt", "DiceForgeRandomFloat",
   "DiceForgeRandomLora", "DiceForgeRandomCheckpoint", "DiceForgeRandomDiffusionModel", "DiceForgeRandomImage", "DiceForgeGrid", "DiceForgeRandomSampler",
-  "DiceForgeRandomVAE", "LoadVAEDecodeSave", "VAEDecodeSave", "LoadDiffusionModelCLIP", "DiceForgeLoraStack", "DiceForgeXYPlot"];
+  "DiceForgeRandomVAE", "LoadVAEDecodeSave", "VAEDecodeSave", "LoadDiffusionModelCLIP", "DiceForgeLoraStack", "DiceForgeXYPlot", "DiceForgeHiresFix"];
 const clip = (positive, negative = "", { seed = 0, mode = "random" } = {}) => ({
   1: { class_type: "CLIPTextEncodePositiveNegative", inputs: { positive, negative, seed, seed_mode: mode, trim: true } },
   2: { class_type: "PreviewAny", inputs: { source: ["1", 2] } },
@@ -218,6 +218,19 @@ test.describe("@api workflows and routes", () => {
     expect(outputFiles("e2e", "xy_")).toHaveLength(1);
     const bad = await runPrompt(request, { 1: { class_type: "DiceForgeXYPlot", inputs: { ...xy(0), x_values: "4, x" } }, 2: { class_type: "PreviewAny", inputs: { source: ["1", 8] } } });
     expect(JSON.stringify(bad.rejected ?? bad.error)).toContain("not a number");
+  });
+
+  test("Hires Fix takes its size from SDXL Resolution List and its sampler settings from XY Plot", async ({ request }) => {
+    const result = await runPrompt(request, {
+      1: { class_type: "SDXLResolutionListLatent", inputs: { resolution: "Standard", "resolution.size": "1024 x 1024", seed: 0, rescale: "by percentage", "rescale.percent": 150, multiple: 8, batch: 1, seed_mode: "random" } },
+      2: { class_type: "DiceForgeXYPlot", inputs: { index: 0, x_type: "cfg", x_values: "4", y_type: "none", y_values: "", seed: 1, steps: 2, cfg: 6, sampler_name: "euler", scheduler: "normal", denoise: 1, lora_name: "None", lora_strength: 1 } },
+      3: { class_type: "DiceForgeHiresFix", inputs: { samples: ["1", 0], width: ["1", 1], height: ["1", 2], upscale_by: 1.5, upscale_method: "bislerp", seed: ["2", 2], steps: ["2", 3], cfg: ["2", 4],
+        sampler_name: ["2", 5], scheduler: ["2", 6], denoise: 0.45 } },
+      4: { class_type: "PreviewAny", inputs: { source: ["3", 2] } },
+    });
+    const errors = result.rejected.node_errors["3"].errors.map((error) => `${error.type} ${error.extra_info?.input_name ?? ""}`);
+    expect(errors.join()).toContain("required_input_missing model"); // No model here: only the links are checked.
+    expect(errors.join()).not.toContain("return_type_mismatch");
   });
 
   test("Wildcard Browser routes", async ({ request }) => {
