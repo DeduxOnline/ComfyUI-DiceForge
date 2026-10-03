@@ -2,10 +2,13 @@ import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
 import { addStyleOnce, background, element } from "./dom.js";
 
-// "Find on Civitai" in the LoRA Browser (the Create of its files): search Civitai's LoRAs, pick a version, download it into a LoRA folder. The server
+// "Find on Civitai" in the LoRA, Checkpoint and Diffusion Model Browsers (the Create of their files): search Civitai, pick a version, download it
+// into a model folder. The server
 // (model_manager.py) does the download, checks it against Civitai's sha256 and saves its Civitai data and a preview, so the browser shows it at once.
 // Downloads keep running when this dialog closes; it shows them again when opened.
-const BASES = ["SD 1.5", "SDXL 1.0", "Pony", "Illustrious", "NoobAI", "Flux.1 D", "Flux.1 S", "SD 3.5", "Wan Video", "Hunyuan Video"];
+// Civitai's own base model names (a name it doesn't know is refused).
+const BASES = ["SD 1.5", "SDXL 1.0", "Pony", "Pony V7", "Illustrious", "NoobAI", "Flux.1 D", "Flux.1 S", "Flux.1 Krea", "Flux.1 Kontext", "Flux.2 D", "Chroma",
+  "HiDream", "Qwen", "SD 3.5", "ZImageTurbo", "Wan Video", "Hunyuan Video"];
 const SORTS = ["Highest Rated", "Most Downloaded", "Newest"];
 
 const STYLE = `
@@ -39,16 +42,17 @@ async function call(path, options) {
 
 // kind: the model kind; folders: the existing folders, offered for "Save to"; base: the connected model's base model, to search for it first;
 // onChange(): called when a download is done, so the opener shows the new file.
-export async function openCivitaiSearch({ kind = "loras", folders = [], base = "", onChange = () => {} } = {}) {
+// title / plural / icon: what the dialog calls the models ("LoRA", "LoRAs", 🎴); hint: a line about what to pick (diffusion models).
+export async function openCivitaiSearch({ kind = "loras", title = "LoRA", plural = "LoRAs", icon = "🎴", hint = "", folders = [], base = "", onChange = () => {} } = {}) {
   addStyle();
-  const query = element("input", { class: "query", placeholder: "Search LoRAs on Civitai…" });
+  const query = element("input", { class: "query", placeholder: `Search ${plural} on Civitai…` });
   const baseSelect = element("select", { title: "Base model" }, element("option", { value: "" }, "All base models"), ...BASES.map((name) => element("option", { value: name }, name)));
   baseSelect.value = BASES.includes(base) ? base : "";
   const sort = element("select", { title: "Order" }, ...SORTS.map((name) => element("option", { value: name }, name)));
   const nsfw = element("input", { type: "checkbox" });
   const folderList = element("datalist", { id: "dfcv-folders" }, ...folders.map((folder) => element("option", { value: folder })));
-  const folder = element("input", { placeholder: "(top folder)", list: "dfcv-folders", title: "The folder (inside models/loras) the downloads go to; / for subfolders" });
-  const keyButton = element("button", { title: "Some LoRAs can only be downloaded with your Civitai API key (Civitai → Account settings → API keys)" }, "🔑 API key");
+  const folder = element("input", { placeholder: "(top folder)", list: "dfcv-folders", title: `The folder (inside models/${kind}) the downloads go to; / for subfolders` });
+  const keyButton = element("button", { title: `Some ${plural} can only be downloaded with your Civitai API key (Civitai → Account settings → API keys)` }, "🔑 API key");
   const status = element("div", { class: "status" });
   const grid = element("div", { class: "grid" });
   const jobsBox = element("div", { class: "jobs" });
@@ -86,14 +90,14 @@ export async function openCivitaiSearch({ kind = "loras", folders = [], base = "
   function picture(version) {
     const box = element("div", { class: "pic" });
     const image = version?.images?.[0];
-    if (!image) box.append(element("span", { class: "none" }, "🎴"));
+    if (!image) box.append(element("span", { class: "none" }, icon));
     else {
       const media = image.type === "video" ? element("video", { src: image.url, muted: "", loop: "", autoplay: "", playsinline: "" }) : element("img", { src: image.url, loading: "lazy" });
       if ((image.nsfwLevel ?? 1) >= 4) { // Civitai's R and up: blurred until clicked.
         media.classList.add("blur");
         media.addEventListener("click", () => media.classList.remove("blur"));
       }
-      media.addEventListener("error", () => media.replaceWith(element("span", { class: "none" }, "🎴")));
+      media.addEventListener("error", () => media.replaceWith(element("span", { class: "none" }, icon)));
       box.append(media);
     }
     if (version?.base_model) box.append(element("span", { class: "base" }, version.base_model));
@@ -127,7 +131,7 @@ export async function openCivitaiSearch({ kind = "loras", folders = [], base = "
   }
   function drawGrid() {
     const more = next ? [element("button", { class: "more", onclick: () => background(search(true)) }, "Load more")] : [];
-    grid.replaceChildren(...(items.length ? items.map(card) : [element("div", { class: "muted" }, "No LoRA found: try other words or another base model.")]), ...more);
+    grid.replaceChildren(...(items.length ? items.map(card) : [element("div", { class: "muted" }, `No ${title} found: try other words or another base model.`)]), ...more);
   }
   async function search(more = false) {
     const run = ++searchRun;
@@ -139,7 +143,7 @@ export async function openCivitaiSearch({ kind = "loras", folders = [], base = "
       if (run !== searchRun) return; // A newer search was started meanwhile.
       items = more ? [...items, ...result.items] : result.items;
       next = result.next;
-      say(`${items.length} LoRA${items.length === 1 ? "" : "s"}${next ? ", more with Load more" : ""}.`);
+      say(`${items.length} ${items.length === 1 ? title : plural}${next ? ", more with Load more" : ""}.`);
       drawGrid();
     } catch (error) {
       if (run === searchRun) say(error.message);
@@ -172,13 +176,13 @@ export async function openCivitaiSearch({ kind = "loras", folders = [], base = "
     for (const job of jobs.filter((entry) => entry.status === "done" && !knownDone.has(entry.id))) {
       knownDone.add(job.id);
       changed = true;
-      say(`Downloaded ${job.file}: it is in the LoRA Browser and the LoRA lists.`);
+      say(`Downloaded ${job.file}: it is in the browser and the loaders' lists.`);
       for (const item of items) for (const version of item.versions) if (version.id === job.version_id) version.installed = job.file;
     }
     if (changed) {
       drawGrid();
       onChange();
-      background(app.refreshComboInNodes?.()); // The LoRA lists of the loader nodes get the new file.
+      background(app.refreshComboInNodes?.()); // The lists of the loader nodes get the new file.
     }
     if (jobs.some((job) => job.status === "downloading")) polling = setTimeout(() => background(poll()), 700);
   }
@@ -186,10 +190,11 @@ export async function openCivitaiSearch({ kind = "loras", folders = [], base = "
   query.addEventListener("keydown", (event) => { if (event.key === "Enter") background(search()); });
   for (const input of [baseSelect, sort, nsfw]) input.addEventListener("change", () => background(search()));
   back.append(element("div", { class: "dfcv" },
-    element("h2", {}, "Find LoRAs on Civitai"),
-    element("div", { class: "top" }, query, baseSelect, sort, element("label", { title: "Also show LoRAs Civitai marks as NSFW" }, nsfw, "NSFW"),
+    element("h2", {}, `Find ${plural} on Civitai`),
+    element("div", { class: "top" }, query, baseSelect, sort, element("label", { title: `Also show ${plural} Civitai marks as NSFW` }, nsfw, "NSFW"),
       element("button", { class: "go", onclick: () => background(search()) }, "Search"), keyButton, element("button", { onclick: close }, "Close")),
     element("div", { class: "top" }, element("span", { class: "muted" }, "Save to folder:"), folder, folderList, status),
+    ...(hint ? [element("div", { class: "muted hint" }, hint)] : []),
     grid, jobsBox));
   document.body.append(back);
   query.focus();

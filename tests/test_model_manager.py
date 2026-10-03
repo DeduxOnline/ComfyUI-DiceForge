@@ -43,6 +43,8 @@ class CivitaiStandIn(BaseHTTPRequestHandler):
         versions = {301: version(301, host=host), 302: version(302, model="Locked", file="locked.safetensors", content=b"locked", host=host),
                     303: version(303, model="Base model", kind="Checkpoint", host=host), 304: version(304, file="bad.safetensors", sha="0" * 64, host=host),
                     305: version(305, file="archive.zip", host=host), 306: version(306, file="slow.safetensors", content=b"s" * 4096, host=host)}
+        if url.path == "/api/v1/models" and parse_qs(url.query).get("baseModels") == ["Nope"]:
+            return self.answer(400, {"error": "Invalid enum value for baseModels: Nope"})
         if url.path == "/api/v1/models":
             item = {"id": 30, "name": "Neon", "type": "LORA", "nsfw": False, "creator": {"username": "maker"}, "stats": {"downloadCount": 5, "thumbsUpCount": 2},
                     "modelVersions": [versions[301], version(310, name="v0", file="neon_old.safetensors", content=b"old", host=host), "junk"]}
@@ -66,7 +68,7 @@ class CivitaiStandIn(BaseHTTPRequestHandler):
                     except OSError:
                         return
                 return
-            content = {301: NEON, 302: b"locked", 304: b"not what Civitai says"}[number]
+            content = {301: NEON, 302: b"locked", 303: NEON, 304: b"not what Civitai says"}[number]
             return self.answer(200, content, "application/octet-stream")
         if url.path.startswith("/image/"):
             return self.answer(200, PNG, "image/png")
@@ -114,7 +116,7 @@ def test_search_shapes_civitai_answer_and_marks_what_is_here(api, models, civita
 def test_search_without_civitai_is_a_clear_error(api, models):
     status, text = api("GET", "/diceforge/civitai/search?query=x")
     assert status == 502 and "Civitai could not be reached" in text
-    assert api("GET", "/diceforge/civitai/search?kind=checkpoints")[0] == 400 # LoRAs only.
+    assert api("GET", "/diceforge/civitai/search?kind=vae")[0] == 400 # LoRAs, checkpoints and diffusion models only.
 
 
 def test_download_saves_the_file_its_civitai_data_and_a_preview(api, models, civitai):
@@ -136,7 +138,7 @@ def test_download_saves_the_file_its_civitai_data_and_a_preview(api, models, civ
 @pytest.mark.parametrize("body, status", [
     ({"version_id": "301"}, 400), ({"version_id": True}, 400), ({"version_id": -1}, 400), ({"version_id": None}, 400),
     ({"version_id": 301, "folder": "../out"}, 400), ({"version_id": 301, "folder": "a//b"}, 400), ({"version_id": 301, "folder": 'a"b'}, 400),
-    ({"version_id": 301, "kind": "checkpoints"}, 400), ({"version_id": 303}, 400), ({"version_id": 305}, 400), ({"version_id": 999}, 404)])
+    ({"version_id": 301, "kind": "checkpoints"}, 400), ({"version_id": 303, "kind": "vae"}, 400), ({"version_id": 303}, 400), ({"version_id": 305}, 400), ({"version_id": 999}, 404)])
 def test_download_refusals(body, status, api, models, civitai):
     answer = api("POST", "/diceforge/civitai/download", body)
     assert answer[0] == status and answer[1]
@@ -224,7 +226,7 @@ def test_rename_moves_the_file_with_its_preview_and_info(api, models):
     ({"file": "a.safetensors", "to": "b"}, 409), ({"file": "a.safetensors", "to": "b.ckpt"}, 400), ({"file": "a.safetensors", "to": "../b"}, 400),
     ({"file": "a.safetensors", "to": ""}, 400), ({"file": "a.safetensors", "to": None}, 400), ({"file": "a.safetensors", "to": "c:d"}, 400),
     ({"file": "nope.safetensors", "to": "c"}, 404), ({"file": "../a.safetensors", "to": "c"}, 400), ({"file": 5, "to": "c"}, 400),
-    ({"file": "a.safetensors", "to": "c", "kind": "checkpoints"}, 400)])
+    ({"file": "a.safetensors", "to": "c", "kind": "vae"}, 400)])
 def test_rename_refusals(body, status, api, models):
     models("loras", "a.safetensors", b"a")
     models("loras", "b.safetensors", b"b")
@@ -258,6 +260,39 @@ def test_delete_removes_the_file_its_companions_and_info(api, models):
     assert os.listdir(models.root / "loras") == ["keep.safetensors"] and not os.path.exists(path)
     assert not os.path.exists(info_file("loras", "old/x.safetensors"))
     assert api("DELETE", "/diceforge/models/file?kind=loras&file=old/x.safetensors")[0] == 404
-    for query in ("kind=loras&file=../keep.safetensors", "kind=loras", "kind=checkpoints&file=keep.safetensors", "file=keep.safetensors"):
+    for query in ("kind=loras&file=../keep.safetensors", "kind=loras", "kind=vae&file=keep.safetensors", "file=keep.safetensors"):
         assert api("DELETE", f"/diceforge/models/file?{query}")[0] in (400, 404)
     assert os.listdir(models.root / "loras") == ["keep.safetensors"]
+
+
+@pytest.mark.parametrize("kind", ["checkpoints", "diffusion_models"])
+def test_checkpoints_and_diffusion_models_too(kind, api, models, civitai):
+    status, body = api("GET", f"/diceforge/civitai/search?kind={kind}&query=x")
+    assert status == 200 and civitai.requests[-1][1]["types"] == ["Checkpoint"] # Civitai has diffusion models as Checkpoints.
+    job = download_kind(api, kind, 303)
+    assert job["status"] == "done" and job["file"] == "base/neon_style.safetensors"
+    assert read_info(kind, "base/neon_style.safetensors")["civitai"]["model_name"] == "Base model"
+    assert api("POST", "/diceforge/models/rename", {"kind": kind, "file": "base/neon_style.safetensors", "to": "studio"})[1]["to"] == "studio.safetensors"
+    assert sorted(os.listdir(models.root / kind)) == ["studio.preview.png", "studio.safetensors"]
+    assert api("DELETE", f"/diceforge/models/file?kind={kind}&file=studio.safetensors")[0] == 200
+    assert os.listdir(models.root / kind) == []
+
+
+def download_kind(api, kind, version_id):
+    status, job = api("POST", "/diceforge/civitai/download", {"kind": kind, "version_id": version_id, "folder": "base"})
+    assert status == 200, job
+    return model_manager.JOBS[job["id"]]
+
+
+def test_civitai_refusing_a_filter_is_a_400(api, models, civitai):
+    status, text = api("GET", "/diceforge/civitai/search?base=Nope")
+    assert status == 400 and text.startswith("Civitai refused the search:") and "baseModels" in text
+
+
+def test_downloads_go_to_the_folder_named_like_the_kind(models, tmp_path, monkeypatch):
+    unet = tmp_path / "unet"
+    unet.mkdir()
+    monkeypatch.setitem(model_manager.folder_paths.folder_names_and_paths, "diffusion_models",
+                        ([str(unet), str(models.root / "diffusion_models")], model_manager.folder_paths.supported_pt_extensions))
+    assert model_manager.download_root("diffusion_models") == str(models.root / "diffusion_models") # Not the older models/unet listed first.
+    assert model_manager.download_root("loras") == str(models.root / "loras")

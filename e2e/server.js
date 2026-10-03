@@ -35,7 +35,8 @@ function startCivitai() {
     const url = new URL(request.url, "http://127.0.0.1");
     if (url.pathname === "/api/v1/models") {
       const query = (url.searchParams.get("query") || "").toLowerCase();
-      return json(response, 200, { items: CIVITAI_MODELS.filter((model) => model.name.toLowerCase().includes(query)), metadata: {} });
+      const types = url.searchParams.getAll("types"); // LORA, LoCon, DoRA for LoRAs; Checkpoint for checkpoints and diffusion models.
+      return json(response, 200, { items: CIVITAI_MODELS.filter((model) => model.name.toLowerCase().includes(query) && types.includes(model.type)), metadata: {} });
     }
     const version = /^\/api\/v1\/model-versions\/(\d+)$/.exec(url.pathname);
     if (version) return CIVITAI_VERSIONS[version[1]] ? json(response, 200, CIVITAI_VERSIONS[version[1]]) : json(response, 404, { error: "Model version not found" });

@@ -246,6 +246,23 @@ test.describe("@api workflows and routes", () => {
     expect((await request.get("/diceforge/civitai/key")).ok()).toBe(true);
   });
 
+  test("Checkpoint and diffusion model files: Civitai's Checkpoints, downloaded, renamed, deleted", async ({ request }) => {
+    for (const kind of ["checkpoints", "diffusion_models"]) {
+      const found = await (await request.get(`/diceforge/civitai/search?kind=${kind}`)).json();
+      expect(found.items.map((item) => item.name)).toEqual(["Studio XL"]); // Checkpoint type only, for both.
+      const job = await (await request.post("/diceforge/civitai/download", { data: { kind, version_id: 601, folder: "e2e_civitai" } })).json();
+      await expect.poll(async () => (await (await request.get("/diceforge/civitai/downloads")).json()).jobs.find((entry) => entry.id === job.id).status).toBe("done");
+      expect(fs.readFileSync(basePath("models", kind, "e2e_civitai", "studio_xl.safetensors"), "utf8")).toBe(DOWNLOADS[601]);
+      const renamed = await (await request.post("/diceforge/models/rename", { data: { kind, file: "e2e_civitai/studio_xl.safetensors", to: "e2e_studio" } })).json();
+      expect(renamed.to).toBe("e2e_studio.safetensors");
+      const card = (await (await request.get(`/diceforge/model-browser?kind=${kind}`)).json()).files.find((entry) => entry.file === "e2e_studio.safetensors");
+      expect(card).toMatchObject({ found: true, name: "Studio XL - v1", base_model: "SDXL 1.0", preview: true });
+      expect((await request.delete(`/diceforge/models/file?kind=${kind}&file=e2e_studio.safetensors`)).ok()).toBe(true);
+      expect(fs.existsSync(basePath("models", kind, "e2e_civitai"))).toBe(false);
+    }
+    expect((await request.post("/diceforge/civitai/download", { data: { kind: "checkpoints", version_id: 501 } })).status()).toBe(400); // A LoRA is no checkpoint.
+  });
+
   test("LoRA Stack presets are saved as files and listed", async ({ request }) => {
     const stack = { rows: [{ lora: "style/ink.safetensors", strength: 0.8, random: true, min: 0.5, max: 0.9 }], groups: {}, separate_clip: false };
     expect((await request.post("/diceforge/lora-presets", { data: { name: "e2e set", stack } })).ok()).toBe(true);

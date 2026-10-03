@@ -29,6 +29,7 @@ const MODELS = {
   "checkpoints/illustrious_base.safetensors": { content: "checkpoint", civitai: { model: "Base", version: "v1", base: "Illustrious", words: [] } },
   "checkpoints/sdxl/other.safetensors": { content: "other checkpoint" },
   "diffusion_models/flux1-dev.safetensors": { content: "diffusion model" },
+  "diffusion_models/flux/flux1-schnell.safetensors": { content: "schnell diffusion model" },
   "text_encoders/clip_l.safetensors": { content: "clip l" },
   "text_encoders/t5xxl_fp16.safetensors": { content: "t5xxl" },
 };
@@ -52,21 +53,23 @@ const CIVITAI = Object.fromEntries(Object.values(MODELS).filter((model) => model
 // LoRAs to find on Civitai (the Create of the LoRA Browser): Neon has two versions, the files the stand-in serves for download; Ink is the test
 // LoRA style/ink.safetensors, already here (found by its hash).
 const host = `http://127.0.0.1:${CIVITAI_PORT}`;
-const DOWNLOADS = { 501: "neon lora v2", 502: "neon lora v1" };
-const civitaiVersion = (id, name, file, content, base) => ({
-  id, modelId: 50, name, baseModel: base, trainedWords: ["neon glow"], availability: "Public", model: { name: "Neon", type: "LORA" },
+const DOWNLOADS = { 501: "neon lora v2", 502: "neon lora v1", 601: "studio checkpoint" };
+const civitaiVersion = (id, name, file, content, base, model = { name: "Neon", type: "LORA" }) => ({
+  id, modelId: model.type === "LORA" ? 50 : 60, name, baseModel: base, trainedWords: model.type === "LORA" ? ["neon glow"] : [], availability: "Public", model,
   files: [{ id, name: file, sizeKB: content.length / 1024, primary: true, type: "Model", hashes: { SHA256: sha256(content).toUpperCase() }, downloadUrl: `${host}/download/${id}` }],
   images: [{ url: `${host}/image/original=true/neon.png`, type: "image", nsfwLevel: 1, width: 8, height: 8 }],
 });
 const CIVITAI_VERSIONS = {
   501: civitaiVersion(501, "v2", "neon_glow.safetensors", DOWNLOADS[501], "Illustrious"),
   502: civitaiVersion(502, "v1", "neon_glow_v1.safetensors", DOWNLOADS[502], "SDXL 1.0"),
+  601: civitaiVersion(601, "v1", "studio_xl.safetensors", DOWNLOADS[601], "SDXL 1.0", { name: "Studio XL", type: "Checkpoint" }),
 };
 const ink = Object.entries(CIVITAI).find(([, version]) => version.model.name === "Ink");
 const CIVITAI_MODELS = [
   { id: 50, name: "Neon", type: "LORA", nsfw: false, creator: { username: "e2e" }, stats: { downloadCount: 1234, thumbsUpCount: 56 }, modelVersions: [CIVITAI_VERSIONS[501], CIVITAI_VERSIONS[502]] },
   { id: ink[1].modelId, name: "Ink", type: "LORA", nsfw: false, creator: { username: "e2e" }, stats: { downloadCount: 7, thumbsUpCount: 1 },
     modelVersions: [{ ...ink[1], files: [{ id: 9, name: "ink.safetensors", sizeKB: 1, primary: true, type: "Model", hashes: { SHA256: ink[0] }, downloadUrl: `${host}/download/9` }] }] },
+  { id: 60, name: "Studio XL", type: "Checkpoint", nsfw: false, creator: { username: "e2e" }, stats: { downloadCount: 99, thumbsUpCount: 9 }, modelVersions: [CIVITAI_VERSIONS[601]] },
 ];
 
 module.exports = { MODELS, WILDCARDS, CIVITAI, CIVITAI_MODELS, CIVITAI_VERSIONS, DOWNLOADS, png, sha256 };

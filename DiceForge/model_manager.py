@@ -11,11 +11,13 @@ import aiohttp
 import folder_paths
 from aiohttp import web
 from .model_info import PREVIEW_ENDINGS, civitai_summary, info_file, json_body, local_preview, read_info, thumbnail, write_info
-# Managing the model files of the LoRA Browser (web/model_browser.js, web/civitai.js): Create is finding a LoRA on Civitai and downloading it (with
-# its Civitai data and a preview, so the browser shows it at once), Read is the browser and Model info, Update is renaming or moving a file (its
-# preview and info go with it) and Delete is removing it. LoRAs only for now: MANAGED_KINDS lists the kinds the routes accept.
-MANAGED_KINDS = ("loras",)
-CIVITAI_TYPES = {"loras": ("LORA", "LoCon", "DoRA")} # Civitai's model types that load as each kind.
+# Managing the model files of the LoRA, Checkpoint and Diffusion Model Browsers (web/model_browser.js, web/civitai.js): Create is finding a model on
+# Civitai and downloading it (with its Civitai data and a preview, so the browser shows it at once), Read is the browser and Model info, Update is
+# renaming or moving a file (its preview and info go with it) and Delete is removing it. MANAGED_KINDS lists the kinds the routes accept.
+MANAGED_KINDS = ("loras", "checkpoints", "diffusion_models")
+# Civitai's model types that load as each kind. Civitai has no type of its own for diffusion models (Flux, Qwen... without their text encoders and
+# VAE): they are Checkpoints there, and the browser says to pick a version whose file is the diffusion model alone.
+CIVITAI_TYPES = {"loras": ("LORA", "LoCon", "DoRA"), "checkpoints": ("Checkpoint",), "diffusion_models": ("Checkpoint",)}
 CIVITAI_API = os.environ.get("DICEFORGE_CIVITAI_API", "https://civitai.com/api/v1") # Another server for tests (e2e/server.js).
 KEY_FILE = os.path.join(folder_paths.get_user_directory(), "DiceForge", "civitai.json")
 SORTS = ("Highest Rated", "Most Downloaded", "Newest")
@@ -156,6 +158,8 @@ async def civitai_json(path, params=()):
                 raise web.HTTPNotFound(text="Civitai: not found.")
             if response.status in (401, 403):
                 raise web.HTTPForbidden(text="Civitai refused the request: check the API key (🔑).")
+            if response.status == 400: # A filter Civitai doesn't know (a base model name...): its message says which.
+                raise web.HTTPBadRequest(text=f"Civitai refused the search: {(await response.text())[:300]}")
             response.raise_for_status()
             data = await response.json(content_type=None)
     except web.HTTPException:
@@ -219,6 +223,10 @@ def public(job):
 def safe_file_name(name):
     name = FORBIDDEN.sub("_", os.path.basename(str(name).replace("\\", "/"))).strip().strip(".") or "model.safetensors"
     return name
+# Where downloads go: the model folder named like the kind (models/diffusion_models, not the older models/unet ComfyUI lists first), else the first.
+def download_root(kind):
+    roots = [os.path.abspath(root) for root in folder_paths.get_folder_paths(kind)]
+    return next((root for root in roots if os.path.basename(root) == kind), roots[0])
 def open_for_writing(path):
     return open(path, "wb") # noqa: SIM115  (closed by run_download, which writes it chunk by chunk)
 def write_bytes(path, data):
@@ -239,7 +247,7 @@ async def start_download(kind, version_id, folder=""):
     url = file and (file.get("downloadUrl") or version.get("downloadUrl"))
     if not file or not isinstance(url, str) or urlsplit(url).scheme not in ("http", "https"):
         raise web.HTTPBadRequest(text="Civitai: this version has no file in a format ComfyUI loads.")
-    root = os.path.abspath(folder_paths.get_folder_paths(kind)[0])
+    root = download_root(kind)
     path = inside(root, *([*folder.split("/")] if folder else []), safe_file_name(file["name"]))
     name = relative_name(root, path)
     if os.path.splitext(path)[1].lower() not in extensions():

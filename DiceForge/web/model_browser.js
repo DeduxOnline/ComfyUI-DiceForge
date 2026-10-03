@@ -5,15 +5,18 @@ import { insertIntoNode } from "./wildcards.js";
 import { openCivitaiSearch } from "./civitai.js";
 import { addStyleOnce, background, element } from "./dom.js";
 
-// Model browsers (node menu): LoRA and Checkpoint Browser. The model files as cards with a preview, name, base model and trigger words from Civitai
+// Model browsers (node menu): LoRA, Checkpoint and Diffusion Model Browser. The model files as cards with a preview, name, base model and trigger words from Civitai
 // (looked up by the file's hash, as in Model info), a folder tree, search and filters. What a card's button does depends on the node it was opened
 // from: "Use" puts the file in a loader's list, "Use folder" puts a folder in Random LoRA / Random Checkpoint, "+ Triggers" inserts a LoRA's trigger
-// words into CLIP Dual Text Encode's prompt. The LoRA Browser also manages the files (manage: true): ＋ Find on Civitai downloads new ones (civitai.js),
+// words into CLIP Dual Text Encode's prompt. The browsers also manage the files (manage: true): ＋ Find on Civitai downloads new ones (civitai.js),
 // ✎ renames or moves one and 🗑 deletes one, with its preview and Model info.
 const CLIP_NODE = "CLIPTextEncodePositiveNegative";
 const BROWSERS = [
   { kind: "loras", icon: "🎴", title: "LoRA", one: "LoRA", plural: "LoRAs", widget: /lora/i, random: "DiceForgeRandomLora", randomName: "Random LoRA", triggers: true, manage: true },
-  { kind: "checkpoints", icon: "🗃️", title: "Checkpoint", one: "checkpoint", plural: "checkpoints", widget: /ckpt|checkpoint/i, random: "DiceForgeRandomCheckpoint", randomName: "Random Checkpoint", triggers: false },
+  { kind: "checkpoints", icon: "🗃️", title: "Checkpoint", one: "checkpoint", plural: "checkpoints", widget: /ckpt|checkpoint/i, random: "DiceForgeRandomCheckpoint", randomName: "Random Checkpoint", triggers: false, manage: true },
+  { kind: "diffusion_models", icon: "🧊", title: "Diffusion Model", one: "diffusion model", plural: "diffusion models", widget: /unet|diffusion/i, random: "DiceForgeRandomDiffusionModel",
+    randomName: "Random Diffusion Model", triggers: false, manage: true,
+    civitaiHint: "Civitai lists diffusion models as Checkpoints: pick a version whose file is the diffusion model alone (often marked fp8, unet or \"model only\"); a full checkpoint belongs in the Checkpoint Browser." },
 ];
 
 // What a browser can do for a node: set a model list widget, set a folder widget, or insert trigger words. null when the node has none of them.
@@ -296,7 +299,7 @@ async function openBrowser(node, spec, target = targetOf(node, spec)) {
     element("h2", {}, `${spec.title} Browser`),
     element("div", { class: "top" }, search, base, sort, lookAll,
       ...(spec.manage ? [element("button", { class: "go find", title: `Search Civitai and download ${spec.plural} into models/${kind}`, onclick: () => background(openCivitaiSearch({
-        kind, base: target?.base, folders: [...new Set(files.map((entry) => folderOf(entry.file)).filter(Boolean))].sort((a, b) => a.localeCompare(b)),
+        kind, title: spec.title, plural: spec.plural, icon: spec.icon, hint: spec.civitaiHint ?? "", base: target?.base, folders: [...new Set(files.map((entry) => folderOf(entry.file)).filter(Boolean))].sort((a, b) => a.localeCompare(b)),
         onChange: () => background(reload().then(() => say("The download is done: it is in the list."))),
       })) }, "＋ Find on Civitai")] : []),
       element("button", { onclick: close }, "Close")),

@@ -264,9 +264,49 @@ for (const vue of [true, false]) {
       expect(await menuItems(page, loader, "DiceForge.ModelBrowser")).toEqual(["🗃️ Checkpoint Browser"]);
       await clickMenu(page, loader, "DiceForge.ModelBrowser", "Checkpoint Browser");
       await expect(page.locator(".dflb .tree")).toContainText("sdxl");
-      await expect(page.locator(".dflb button.find, .dflb button.rename, .dflb button.delete")).toHaveCount(0); // Managing files is for LoRAs only.
       await page.locator(".dflb .card", { hasText: "other" }).locator("button", { hasText: /^Use$/ }).click();
       await expect.poll(() => widgetValue(page, loader, "ckpt_name")).toMatch(/sdxl[\\/]other\.safetensors/);
+      await page.keyboard.press("Escape");
+    });
+
+    test("Checkpoint Browser downloads a checkpoint from Civitai, uses and deletes it", async ({ page }) => {
+      const folder = `ckpt_${vue ? "vue" : "classic"}`, checkpoints = (...parts) => basePath("models", "checkpoints", ...parts);
+      const [loader] = await addNodes(page, [{ type: "CheckpointLoaderSimple" }]);
+      await clickMenu(page, loader, "DiceForge.ModelBrowser", "Checkpoint Browser");
+      await page.locator(".dflb button.find").click();
+      const dialog = page.locator(".dfcv");
+      await expect(dialog.locator("h2")).toHaveText("Find checkpoints on Civitai");
+      await expect(dialog.locator(".card")).toHaveCount(1); // Civitai's Checkpoints only: no LoRA.
+      await dialog.locator("input[list]").fill(folder);
+      await dialog.locator(".card", { hasText: "Studio XL" }).locator("button", { hasText: "Download" }).click();
+      await expect(dialog.locator(".job.done", { hasText: `${folder}/studio_xl.safetensors` })).toContainText("Done");
+      expect(fs.readFileSync(checkpoints(folder, "studio_xl.safetensors"), "utf8")).toBe(DOWNLOADS[601]);
+      await page.keyboard.press("Escape");
+      const card = page.locator(".dflb .card", { hasText: "Studio XL - v1" });
+      await card.locator("button", { hasText: /^Use$/ }).click();
+      await expect.poll(() => widgetValue(page, loader, "ckpt_name")).toMatch(new RegExp(`${folder}[\\\\/]studio_xl\\.safetensors`));
+      page.on("dialog", (prompt) => prompt.accept());
+      await card.locator("button.delete").click();
+      await expect(page.locator(".dflb .status")).toContainText(`Deleted ${folder}/studio_xl.safetensors`);
+      expect(fs.existsSync(checkpoints(folder))).toBe(false);
+      await page.keyboard.press("Escape");
+    });
+
+    test("Diffusion Model Browser puts a model in Load Diffusion Model and a folder in Random Diffusion Model", async ({ page }) => {
+      const [loader, random, both] = await addNodes(page, [{ type: "UNETLoader" }, { type: "DiceForgeRandomDiffusionModel", pos: [500, 40] }, { type: "LoadDiffusionModelCLIP", pos: [900, 40] }]);
+      for (const id of [loader, random, both]) expect(await menuItems(page, id, "DiceForge.ModelBrowser")).toEqual(["🧊 Diffusion Model Browser"]);
+      await clickMenu(page, loader, "DiceForge.ModelBrowser", "Diffusion Model Browser");
+      await expect(page.locator(".dflb h2")).toHaveText("Diffusion Model Browser");
+      await page.locator(".dflb .card", { hasText: "flux1-schnell" }).locator("button", { hasText: /^Use$/ }).click();
+      await expect.poll(() => widgetValue(page, loader, "unet_name")).toMatch(/flux[\\/]flux1-schnell\.safetensors/);
+      await page.locator(".dflb button.find").click();
+      await expect(page.locator(".dfcv h2")).toHaveText("Find diffusion models on Civitai");
+      await expect(page.locator(".dfcv .hint")).toContainText("diffusion model alone"); // Civitai has them as Checkpoints.
+      await page.keyboard.press("Escape");
+      await page.keyboard.press("Escape");
+      await clickMenu(page, random, "DiceForge.ModelBrowser", "Diffusion Model Browser");
+      await page.locator(".dflb .tree .row", { hasText: "flux" }).locator("button", { hasText: "Use folder" }).click();
+      await expect.poll(() => widgetValue(page, random, "folder")).toBe("flux");
       await page.keyboard.press("Escape");
     });
 

@@ -404,14 +404,14 @@ What a card's button does depends on where the browser was opened:
 
 The browser only shows what is already known, so it opens at once even with hundreds of LoRAs. **🔍 Civitai** on a card computes that file's hash and asks Civitai; **Look up all on Civitai** does it for every LoRA not looked up yet, one by one (click again to stop). **🛈 Info** opens the Model info dialog, where you can add your own name and trigger words; the card shows them when the dialog closes.
 
-### Managing LoRA files: find on Civitai, rename, delete
+### Managing model files: find on Civitai, rename, delete
 
 <img src="docs/images/civitai_search.png" width="1300" alt="Find LoRAs on Civitai: search results with versions, a finished download">
 
-The LoRA Browser also manages the files themselves (the Checkpoint Browser does not):
+The LoRA, [Checkpoint](#checkpoint-browser) and [Diffusion Model](#diffusion-model-browser) Browsers also manage the files themselves:
 
-- **＋ Find on Civitai** searches Civitai's LoRAs (also LoCon and DoRA): words, a base model, *Highest Rated*, *Most Downloaded* or *Newest*, and NSFW off by default. A card shows the images (R and up blurred until clicked), the creator, downloads and likes, the trigger words, and a list of the versions with their base model. A version you already have, by its sha256 or by its file name, is marked *✓ Already here*. When the browser was opened from a node with a model connected (LoRA Stack), the search starts on that base model.
-- **⬇ Download** saves the version's file in `models/loras`, or in the folder typed in *Save to folder* (`styles/neon`; it is made if needed). The download is written as `name.part` and checked against Civitai's sha256 before it gets its name, so a stopped or damaged download never shows up as a LoRA. It also saves the Civitai data (so Model info and the card know it at once, no hashing) and the first image as `name.preview.png`. The progress is shown at the bottom, with **Stop**; up to 3 downloads run at a time, and they go on when the dialog is closed. The LoRA lists of the nodes get the new file without a restart.
+- **＋ Find on Civitai** searches Civitai: LoRAs (also LoCon and DoRA) in the LoRA Browser, Checkpoints in the other two: words, a base model, *Highest Rated*, *Most Downloaded* or *Newest*, and NSFW off by default. A card shows the images (R and up blurred until clicked), the creator, downloads and likes, the trigger words, and a list of the versions with their base model. A version you already have, by its sha256 or by its file name, is marked *✓ Already here*. When the browser was opened from a node with a model connected (LoRA Stack), the search starts on that base model.
+- **⬇ Download** saves the version's file in `models/loras` (`models/checkpoints`, `models/diffusion_models`), or in the folder typed in *Save to folder* (`styles/neon`; it is made if needed). The download is written as `name.part` and checked against Civitai's sha256 before it gets its name, so a stopped or damaged download never shows up as a LoRA. It also saves the Civitai data (so Model info and the card know it at once, no hashing) and the first image as `name.preview.png`. The progress is shown at the bottom, with **Stop**; up to 3 downloads run at a time, and they go on when the dialog is closed. The LoRA lists of the nodes get the new file without a restart.
 - **🔑 API key**: some LoRAs (early access, or ones that need a login) download only with your Civitai API key (Civitai → Account settings → API keys). It is saved in `ComfyUI/user/DiceForge/civitai.json`, or set `CIVITAI_API_KEY` in ComfyUI's environment instead. It is only sent to civitai.com, never to the images' servers, and never shown again in the browser.
 - **✎** on a card renames or moves the LoRA (`styles/ink v2` moves it to `styles`; the extension stays). Its preview, other info files next to it (`.civitai.info`, `.metadata.json`) and its Model info (notes, Civitai data, hash) go with it. A name that is taken is refused. A Load LoRA node the browser was opened from follows the file to its new name; other workflows that use the old name need the new one.
 - **🗑** deletes the LoRA, with its preview, info files and Model info, after a confirmation. Folders left empty go too.
@@ -425,7 +425,20 @@ The same browser for checkpoints: right-click **Load Checkpoint** (or another no
 | Load Checkpoint and other checkpoint loaders | **Use** | Puts the checkpoint in the node's list. The current one is marked *In use*. |
 | Random Checkpoint | **Use folder** (in the tree) | Makes Random Checkpoint pick from that folder. |
 
+**＋ Find on Civitai**, **✎** and **🗑** work as in the LoRA Browser ([Managing model files](#managing-model-files-find-on-civitai-rename-delete)): the search shows Civitai's Checkpoints.
+
 Your **recommended settings** from Model info (steps, CFG, sampler…) are shown on the card (⚙), so you can see how to use a checkpoint while picking it; LoRA cards show them too. A checkpoint is several GB, so its first Civitai lookup takes longer (the hash is read from the whole file); the browser stays usable while **Look up all** runs, and closing it stops the lookups (the ones already done are kept).
+
+## Diffusion Model Browser
+
+The same browser for diffusion models (`models/diffusion_models`, and the older `models/unet`): Flux, Qwen, Wan and other models that come without their text encoders and VAE. Right-click **Load Diffusion Model**, **Load Diffusion Model + CLIP** (or another node with a diffusion model list) or **Random Diffusion Model** and choose **🧊 Diffusion Model Browser**.
+
+| Opened from | Button | What it does |
+|---|---|---|
+| Load Diffusion Model, Load Diffusion Model + CLIP and other diffusion model loaders | **Use** | Puts the model in the node's `unet_name` list. The current one is marked *In use*. |
+| Random Diffusion Model | **Use folder** (in the tree) | Makes Random Diffusion Model pick from that folder. |
+
+Cards, previews, folder tree, search, filters, Civitai lookups, **＋ Find on Civitai**, **✎** and **🗑** work as in the other browsers. Civitai has no model type of its own for diffusion models: they are *Checkpoints* there, so the search shows Checkpoints. Pick a version whose file is the diffusion model alone (often marked fp8, unet or "model only"); a full checkpoint (with its text encoder and VAE) belongs in the Checkpoint Browser. Downloads go to `models/diffusion_models`, even where ComfyUI also has the older `models/unet`.
 
 ## Tests
 
