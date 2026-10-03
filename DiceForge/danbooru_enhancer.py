@@ -15,7 +15,7 @@ RATING_CHOICES = ["general", "general + sensitive", "up to questionable", "any"]
 RATING_TERMS = {"general": "rating:g", "general + sensitive": "rating:g,s", "up to questionable": "rating:g,s,q", "any": ""}
 DEFAULT_EXCLUDE = "signature, watermark, artist_name, twitter_username, web_address, dated, speech_bubble, comic, english_text, text_focus"
 GROUPS = ("general", "character", "copyright", "artist", "meta")
-USER_AGENT = "DiceForge (ComfyUI custom nodes; https://github.com/DeduxOnline/ComfyUI-DiceForge)"
+USER_AGENT = "DiceForge/1.0" # Short: Danbooru's Cloudflare answers a longer one (with parentheses, a link or "ComfyUI") with a challenge page (403).
 
 
 # The prompt's tags as Danbooru writes them: one per comma or line, weights and escapes taken off ("(long hair:1.2)" -> long_hair), lower case.
