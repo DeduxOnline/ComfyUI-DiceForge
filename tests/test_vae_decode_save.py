@@ -79,3 +79,33 @@ def test_a_failed_load_is_tried_again_next_run(monkeypatch):
     with pytest.raises(RuntimeError):
         LoadVAEDecodeSave.load_vae("c.safetensors")
     assert _vae_cache["name"] is None
+
+
+def output_files(prefix):
+    folder = os.path.join(folder_paths.get_output_directory(), "DiceForge")
+    return sorted(name for name in os.listdir(folder) if name.startswith(prefix)) if os.path.isdir(folder) else []
+
+
+def test_image_output_hide_preview_save_hide_and_save(with_workflow):
+    for node, args in ((VAEDecodeSave, (FakeVAE(),)), (LoadVAEDecodeSave, ())):
+        if node is LoadVAEDecodeSave:
+            _vae_cache.update(name="fake.safetensors", vae=FakeVAE()) # Already loaded: no file needed.
+            args = ("fake.safetensors",)
+        tag = node.__name__
+        hidden = node.execute(latent(batch=2), *args, f"DiceForge/io_hide_{tag}", image_output="Hide")
+        assert tuple(hidden.result[0].shape) == (2, 48, 64, 3) and hidden.ui is None and output_files(f"io_hide_{tag}") == []
+        assert hidden.result[1] is (args[0] if node is VAEDecodeSave else _vae_cache["vae"]) # The VAE used, passed on.
+        preview = node.execute(latent(), *args, f"DiceForge/io_preview_{tag}", image_output="Preview")
+        shown = preview.ui.as_dict()["images"]
+        assert len(shown) == 1 and shown[0]["type"] == "temp" and output_files(f"io_preview_{tag}") == [] # Shown, not saved.
+        saved = node.execute(latent(), *args, f"DiceForge/io_save_{tag}", image_output="Save")
+        assert saved.ui.as_dict()["images"][0]["type"] == "output" and len(output_files(f"io_save_{tag}")) == 1
+        quiet = node.execute(latent(batch=2), *args, f"DiceForge/io_quiet_{tag}", image_output="Hide&Save")
+        assert quiet.ui is None and len(output_files(f"io_quiet_{tag}")) == 2 # Saved, not shown.
+        default = node.execute(latent(), *args, f"DiceForge/io_default_{tag}") # Workflows made before image_output: Save.
+        assert len(output_files(f"io_default_{tag}")) == 1
+    vae = FakeVAE()
+    with pytest.raises(ValueError, match="unknown image_output"):
+        VAEDecodeSave.execute(latent(), vae, "DiceForge/io_bad", image_output="Sideways")
+    assert vae.decoded == [] # Refused before decoding.
+    _vae_cache.update(name=None, vae=None)

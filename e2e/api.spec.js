@@ -136,6 +136,22 @@ test.describe("@api workflows and routes", () => {
     result = await runPrompt(request, { ...pixelSpace, 1: { class_type: "LoadVAEDecodeSave", inputs: { samples: ["12", 0], vae_name: "pixel_space", filename_prefix: "e2e/load_vds" } } });
     expect(result.status).toBe("success");
     expect(outputFiles("e2e", "load_vds_")).toHaveLength(2);
+    // image_output: Preview shows without saving, Hide&Save saves without showing, Hide does neither; the vae output feeds the next nodes.
+    result = await runPrompt(request, { ...pixelSpace, 1: { class_type: "VAEDecodeSave", inputs: { samples: ["12", 0], vae: ["11", 0], filename_prefix: "e2e/io_preview", image_output: "Preview" } } });
+    expect(result.outputs["1"].images.every((image) => image.type === "temp")).toBe(true);
+    expect(outputFiles("e2e", "io_preview")).toHaveLength(0);
+    result = await runPrompt(request, { ...pixelSpace, 1: { class_type: "LoadVAEDecodeSave", inputs: { samples: ["12", 0], vae_name: "pixel_space", filename_prefix: "e2e/io_quiet", image_output: "Hide&Save" } } });
+    expect(result.status).toBe("success");
+    expect(result.outputs["1"]?.images ?? []).toHaveLength(0);
+    expect(outputFiles("e2e", "io_quiet")).toHaveLength(2);
+    result = await runPrompt(request, { ...pixelSpace,
+      1: { class_type: "LoadVAEDecodeSave", inputs: { samples: ["12", 0], vae_name: "pixel_space", filename_prefix: "e2e/io_hidden", image_output: "Hide" } },
+      2: { class_type: "VAEEncode", inputs: { pixels: ["1", 0], vae: ["1", 1] } }, // The loaded VAE, passed on.
+      3: { class_type: "VAEDecodeSave", inputs: { samples: ["2", 0], vae: ["1", 1], filename_prefix: "e2e/io_again_%width%x%height%" } } });
+    expect(result.status).toBe("success");
+    expect(outputFiles("e2e", "io_hidden")).toHaveLength(0);
+    expect(outputFiles("e2e", "io_again_64x48")).toHaveLength(2);
+    expect((await request.post("/prompt", { data: { prompt: { ...pixelSpace, 1: { class_type: "VAEDecodeSave", inputs: { samples: ["12", 0], vae: ["11", 0], filename_prefix: "x", image_output: "Sideways" } } } } })).status()).toBe(400);
   });
 
   test("Dice Grid collects runs and saves the finished grid", async ({ request }) => {
