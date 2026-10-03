@@ -2,6 +2,7 @@ import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
 import { addStyleOnce, element } from "./dom.js";
 import { dateText, statsChips } from "./civitai_meta.js";
+import { applySettings, settingsOf } from "./apply_settings.js";
 
 // "Model info" in the node menu, for every node with a model file picked in a list (Load Checkpoint, Load Diffusion Model, Load LoRA, Load VAE,
 // Load CLIP and the DiceForge loaders): a dialog like rgthree's LoRA info, with the file's sha256, what Civitai knows about it, and your own notes.
@@ -50,6 +51,7 @@ const STYLE = `
 .dfmi .meta .chip{display:inline-block;border:1px solid #555;border-radius:5px;padding:2px 7px;margin:0 5px 5px 0;cursor:copy}.dfmi .meta .chip b{color:#999;font-weight:400;margin-right:5px}
 .dfmi .meta a.chip{cursor:pointer;color:#fff}.dfmi .meta .prompt{border:1px solid #4a4a4a;border-radius:5px;padding:6px 8px;margin-top:4px;white-space:pre-wrap;word-break:break-word;cursor:copy}
 .dfmi .meta .prompt b{color:#999;font-weight:400;margin-right:5px}
+.dfmi .meta button.use{background:#24402a;border-color:#4a7a4a;color:#d6f5dc;padding:3px 10px;margin:0 5px 5px 0;font-size:13px}.dfmi .meta .applied{color:#9c9;margin-top:4px;white-space:pre-wrap}
 .dfmi .row{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
 .dfmi button{background:#222;color:#eee;border:1px solid #666;border-radius:6px;padding:7px 16px;cursor:pointer;font:inherit}
 .dfmi button:hover{background:#2c2c2c}.dfmi .muted{color:#999}.dfmi .words span{display:inline-block;background:#262626;border:1px solid #555;border-radius:4px;padding:1px 6px;margin:0 4px 4px 0;cursor:copy}
@@ -91,9 +93,16 @@ function metaPanel(image) {
   const prompts = [["prompt", "positive"], ["negativePrompt", "negative"]].filter(([key]) => meta[key]).map(([key, label]) =>
     element("div", { class: "prompt", title: "Click to copy", onclick: () => copy(meta[key]) }, element("b", {}, label), meta[key]));
   const link = image.page ? [element("a", { class: "chip", href: image.page, target: "_blank", rel: "noopener" }, "civitai 🔗")] : [];
+  const result = element("div", { class: "applied" });
+  const settings = settingsOf(meta);
+  const use = Object.keys(settings).length ? [element("button", { class: "use", title: "Put this image's prompts, seed, steps, CFG, sampler, scheduler and size into the workflow",
+    onclick: () => {
+      const { done, skipped } = applySettings(settings);
+      result.textContent = [done.length ? `Set: ${done.join("; ")}.` : "Nothing in the workflow to put them in.", skipped.length ? `Not set: ${skipped.join("; ")}.` : ""].filter(Boolean).join("\n");
+    } }, "⤵ Use these settings")] : [];
   const none = chips.length || prompts.length ? []
     : [element("span", { class: "muted" }, image.hasMeta !== false ? "Refresh from Civitai to see how this image was made." : "Civitai has no generation data for this image.")];
-  return element("div", { class: "meta" }, element("div", {}, ...link, ...chips, ...none), ...prompts);
+  return element("div", { class: "meta" }, element("div", {}, ...use, ...link, ...chips, ...none), ...prompts, result);
 }
 function slider(images) {
   if (!images.length) return element("div");

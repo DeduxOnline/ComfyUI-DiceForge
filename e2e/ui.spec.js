@@ -682,6 +682,37 @@ for (const vue of [true, false]) {
       await page.keyboard.press("Escape");
     });
 
+    test("Model info: Use these settings puts an example image's prompts and settings into the workflow", async ({ page, request }) => {
+      await lookUp(request, "loras", "style/ink.safetensors");
+      const [lora, encode, sampler, latent] = await addNodes(page, [
+        { type: "LoraLoader", widgets: { lora_name: "style/ink.safetensors" } },
+        { type: "CLIPTextEncodePositiveNegative", pos: [420, 40] },
+        { type: "KSampler", pos: [840, 40], widgets: { sampler_name: "euler", scheduler: "simple" } },
+        { type: "EmptyLatentImage", pos: [420, 480] },
+      ]);
+      await connect(page, encode, 0, sampler, "positive");
+      await connect(page, encode, 1, sampler, "negative");
+      await clickMenu(page, lora, "DiceForge.ModelInfo", "Model info");
+      const stage = page.locator(".dfmi .stage");
+      await stage.hover();
+      await stage.locator("button.use").click();
+      await expect(stage.locator(".applied")).toContainText("prompts in");
+      expect(await widgetValue(page, encode, "positive")).toBe("Ink test prompt, 1girl");
+      expect(await widgetValue(page, encode, "negative")).toBe("lowres");
+      expect(await Promise.all(["seed", "steps", "cfg", "sampler_name", "scheduler"].map((name) => widgetValue(page, sampler, name))))
+        .toEqual([3032258275, 30, 4, "euler_ancestral", "simple"]); // Euler a; no schedule given: the scheduler stays.
+      await page.keyboard.press("Escape");
+      // The name mapping: A1111 names with their schedule, ComfyUI's own names as they are.
+      const mapped = await page.evaluate(async () => {
+        const { comfySampler, settingsOf } = await import("/extensions/DiceForge/apply_settings.js");
+        return [comfySampler("DPM++ 2M Karras"), comfySampler("DPM++ 2M", "Karras"), comfySampler("dpmpp_2m_sde", "exponential"), comfySampler("Euler a", "Automatic"),
+          settingsOf({ Size: "832x1216", steps: "28", cfgScale: 5.5, seed: -1 })];
+      });
+      expect(mapped).toEqual([{ sampler_name: "dpmpp_2m", scheduler: "karras" }, { sampler_name: "dpmpp_2m", scheduler: "karras" },
+        { sampler_name: "dpmpp_2m_sde", scheduler: "exponential" }, { sampler_name: "euler_ancestral", scheduler: null }, { width: 832, height: 1216, steps: 28, cfg: 5.5 }]);
+      expect(latent).toBeTruthy();
+    });
+
     test("XY Plot shows the plot under its fields and queues every cell into Dice Grid", async ({ page, request }) => {
       const [xy, image, grid] = await addNodes(page, [
         { type: "DiceForgeXYPlot", widgets: { x_type: "steps", x_values: "10, 20", y_type: "scheduler", y_values: "normal, karras" } },
