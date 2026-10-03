@@ -162,7 +162,7 @@ def api():
     body instead (text or bytes, for requests that aren't JSON)."""
     from aiohttp import web
     from aiohttp.test_utils import TestClient, TestServer
-    from DiceForge import lora_stack, model_info, model_manager, prompt_styles, sampler_presets, tag_autocomplete, wildcards_api, xy_plot
+    from DiceForge import dice_grid, lora_stack, model_info, model_manager, prompt_styles, sampler_presets, tag_autocomplete, wildcards_api, xy_plot
 
     routes = web.RouteTableDef()
     fake_server = types.ModuleType("server")
@@ -170,7 +170,7 @@ def api():
     real_server = sys.modules.get("server")
     sys.modules["server"] = fake_server
     try:
-        for module in (wildcards_api, model_info, lora_stack, model_manager, sampler_presets, xy_plot, prompt_styles, tag_autocomplete):
+        for module in (wildcards_api, model_info, lora_stack, model_manager, sampler_presets, xy_plot, prompt_styles, tag_autocomplete, dice_grid):
             module.register_routes()
     finally:
         if real_server is None:

@@ -89,3 +89,50 @@ def test_cells_survive_on_disk_between_runs():
 def test_the_node_runs_every_time():
     first, second = DiceGrid.fingerprint_inputs(), DiceGrid.fingerprint_inputs()
     assert first != second
+
+
+def test_each_cell_keeps_its_image_at_full_size_too():
+    run("full", img=image(height=96, width=144))
+    store = GridStore(dice_grid.grid_key("full", ""))
+    cell = store.state["cells"][0]
+    assert cell["kept"] is False
+    with Image.open(os.path.join(store.folder, dice_grid.full_name(cell["file"]))) as full, Image.open(os.path.join(store.folder, cell["file"])) as small:
+        assert full.size == (144, 96) and small.size == (64, 43) # The cell for the grid, and the image as it came.
+
+
+def kept_grid():
+    from PIL.PngImagePlugin import PngInfo
+    store = GridStore(dice_grid.grid_key("pick", "7"))
+    store.clear()
+    for index, label in enumerate(("ink", "glow", "film")):
+        metadata = PngInfo()
+        metadata.add_text("prompt", f'{{"run": {index}}}')
+        store.add(Image.new("RGB", (64, 64)), label, "euler", Image.new("RGB", (512, 512), (index * 80, 0, 0)), metadata)
+    store.save()
+    return store
+
+
+def test_cells_panel_routes_star_and_save_the_best(api):
+    store = kept_grid()
+    status, body = api("GET", "/diceforge/grid?node=7&name=pick")
+    assert status == 200 and [(cell["label"], cell["kept"], cell["full"]) for cell in body["cells"]] == [("ink", False, True), ("glow", False, True), ("film", False, True)]
+    status, data = api("GET", "/diceforge/grid/image?node=7&name=pick&file=00001.png&full=1")
+    assert status == 200 and data[:8] == b"\x89PNG\r\n\x1a\n"
+    assert api("POST", "/diceforge/grid/save", json={"node": "7", "name": "pick"})[0] == 400 # Nothing starred yet.
+    assert api("POST", "/diceforge/grid/keep", json={"node": "7", "name": "pick", "files": ["00000.png", "00002.png"], "kept": True})[1] == {"kept": ["00000.png", "00002.png"]}
+    assert api("POST", "/diceforge/grid/keep", json={"node": "7", "name": "pick", "file": "00000.png", "kept": False})[1] == {"kept": ["00002.png"]}
+    assert GridStore(dice_grid.grid_key("pick", "7")).cell("00002.png")["kept"] is True # Kept in the manifest.
+    status, body = api("POST", "/diceforge/grid/save", json={"node": "7", "name": "pick"})
+    assert status == 200 and len(body["saved"]) == 1 and body["saved"][0].startswith("DiceForge/kept/kept_") and body["saved"][0].endswith("_euler_film.png")
+    with Image.open(os.path.join(folder_paths.get_output_directory(), body["saved"][0])) as saved_image:
+        assert saved_image.size == (512, 512) and saved_image.text["prompt"] == '{"run": 2}' # Full size, with its run's workflow.
+    store.clear()
+
+
+@pytest.mark.parametrize("method, path, body, status", [
+    ("GET", "/diceforge/grid?name=pick", None, 400), ("GET", "/diceforge/grid/image?node=7&name=pick&file=../manifest.json", None, 404),
+    ("GET", "/diceforge/grid/image?node=7&name=pick&file=99999.png", None, 404), ("POST", "/diceforge/grid/keep", {"node": "7", "name": "pick", "file": "00000.png"}, 400),
+    ("POST", "/diceforge/grid/keep", {"node": "7", "name": "pick", "file": "nope.png", "kept": True}, 400), ("POST", "/diceforge/grid/save", {"name": "pick"}, 400)])
+def test_cells_panel_refuses_what_is_not_a_cell(api, method, path, body, status):
+    kept_grid()
+    assert api(method, path, json=body)[0] == status

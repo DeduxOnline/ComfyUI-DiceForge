@@ -327,7 +327,15 @@ Collects the image of each run into a grid with labels, and saves the grid to th
 | `grid` | The grid so far, this run's image included (also shown on the node). |
 | `cells` | Images in the grid so far. |
 
-- The cells wait between runs as small PNG files in `ComfyUI/user/DiceForge/grids`, not in RAM, so an unfinished grid survives a restart.
+### Keeping the best images
+
+Under the node, the cells of the grid being made (or of the last finished one, until the next run starts a new grid) are shown small:
+
+- Click a cell to star it (★); click again to unstar it.
+- **💾 Save N kept** saves the starred ones at full size in `output/DiceForge/kept` (`kept_00001_<row>_<label>.png`), each with the workflow and prompt of its own run in it, like **Save Image**.
+- **↺** on a cell opens the workflow of its run (its prompts and seeds included), as dropping its image on ComfyUI would: to make it again, or go on from it with Hires Fix.
+
+- The cells wait between runs as small PNG files in `ComfyUI/user/DiceForge/grids`, not in RAM, so an unfinished grid survives a restart. Next to each is the image at full size with its run's workflow, for keeping; they go when the next grid starts.
 - The node adds a cell on every run, even if nothing else changed, so queueing the same image twice adds it twice (and, with `count` 0 and a label, finishes the grid).
 
 ## XY Plot

@@ -7,9 +7,13 @@ import shutil
 import numpy as np
 import torch
 import folder_paths
+from aiohttp import web
+from comfy.cli_args import args
 from PIL import Image, ImageDraw, ImageFont
+from PIL.PngImagePlugin import PngInfo
 from typing_extensions import override
 from comfy_api.latest import ComfyExtension, io, ui
+from .model_info import json_body
 # Dice Grid collects one image per run (the runs of a DiceForge series) and lays them out in a labeled grid. The cells are kept as small PNG files
 # in the ComfyUI user folder between runs, not in RAM, so a grid survives a restart. Finished grids are saved to the output folder.
 GRID_FOLDER = os.path.join(folder_paths.get_user_directory(), "DiceForge", "grids")
@@ -120,10 +124,16 @@ def render(cells, columns, cell_width, legend="", position="top", numbered=False
     return framed
 def to_tensor(image):
     return torch.from_numpy(np.array(image).astype(np.float32) / 255.0)[None,]
+def full_pil(tensor):
+    return Image.fromarray(np.clip(255.0 * tensor.cpu().float().numpy(), 0, 255).astype(np.uint8)).convert("RGB")
 def to_pil(tensor, cell_width):
-    image = Image.fromarray(np.clip(255.0 * tensor.cpu().float().numpy(), 0, 255).astype(np.uint8)).convert("RGB")
+    image = full_pil(tensor)
     return image.resize((cell_width, max(1, round(image.height * cell_width / image.width))), Image.LANCZOS)
-# One grid's cells on disk: grids/<name>-<node id>/, with manifest.json listing the cells (file, label, row) in order.
+# One grid's cells on disk: grids/<name>-<node id>/, with manifest.json listing the cells (file, label, row, kept) in order. Next to each cell, its
+# image at full size with the run's workflow in it (00001.full.png), for the best ones kept from the grid (the cells panel, web/dice_grid.js).
+CELL_FILE = re.compile(r"\d+\.png")
+def grid_key(name, node_id):
+    return f"{name}-{node_id}"
 class GridStore:
     def __init__(self, key):
         self.folder = os.path.join(GRID_FOLDER, re.sub(r"[^\w.-]+", "_", key))
@@ -138,8 +148,9 @@ class GridStore:
     def checked(state):
         if not isinstance(state, dict):
             raise ValueError("not a grid manifest")
-        cells = [{"file": cell["file"], "label": cell.get("label") if isinstance(cell.get("label"), str) else "", "row": cell.get("row") if isinstance(cell.get("row"), str) else ""}
-                 for cell in state.get("cells") if isinstance(cell, dict) and isinstance(cell.get("file"), str) and re.fullmatch(r"\d+\.png", cell["file"])] \
+        cells = [{"file": cell["file"], "label": cell.get("label") if isinstance(cell.get("label"), str) else "", "row": cell.get("row") if isinstance(cell.get("row"), str) else "",
+                  "kept": cell.get("kept") is True}
+                 for cell in state.get("cells") if isinstance(cell, dict) and isinstance(cell.get("file"), str) and CELL_FILE.fullmatch(cell["file"])] \
             if isinstance(state.get("cells"), list) else []
         used = max((int(cell["file"][:-4]) + 1 for cell in cells), default=0)
         following = state.get("next") if isinstance(state.get("next"), int) and not isinstance(state.get("next"), bool) else 0
@@ -147,12 +158,16 @@ class GridStore:
     def clear(self):
         shutil.rmtree(self.folder, ignore_errors=True)
         self.state = {"cells": [], "done": False, "next": 0}
-    def add(self, image, label, row):
+    def add(self, image, label, row, full=None, metadata=None):
         os.makedirs(self.folder, exist_ok=True)
         name = f"{self.state['next']:05}.png"
         self.state["next"] += 1
         image.save(os.path.join(self.folder, name), compress_level=1)
-        self.state["cells"].append({"file": name, "label": label, "row": row})
+        if full is not None:
+            full.save(os.path.join(self.folder, full_name(name)), pnginfo=metadata, compress_level=4)
+        self.state["cells"].append({"file": name, "label": label, "row": row, "kept": False})
+    def cell(self, file):
+        return next((cell for cell in self.state["cells"] if cell["file"] == file), None)
     def has(self, label, row):
         return any(cell["label"] == label and cell["row"] == row for cell in self.state["cells"])
     def cells(self, cell_width):
@@ -174,6 +189,18 @@ class GridStore:
         os.makedirs(self.folder, exist_ok=True)
         with open(self.manifest, "w", encoding="utf-8") as file:
             json.dump(self.state, file)
+# The run's prompt and workflow, for a kept image (as Save Image writes them), unless ComfyUI runs with --disable-metadata.
+def run_metadata(hidden):
+    if hidden is None or args.disable_metadata:
+        return None
+    metadata = PngInfo()
+    if hidden.prompt is not None:
+        metadata.add_text("prompt", json.dumps(hidden.prompt))
+    for key, value in (hidden.extra_pnginfo or {}).items():
+        metadata.add_text(key, json.dumps(value))
+    return metadata
+def full_name(file):
+    return file[:-4] + ".full.png"
 # Node schema (V3 / Nodes 2.0): collects the image of each run into a grid with labels (for example the LoRA or checkpoint name from the random
 # loaders), and saves the grid when it is finished: after `count` images, or, with count 0, when a label comes again (a deck round is over).
 class DiceGrid(io.ComfyNode):
@@ -221,7 +248,7 @@ class DiceGrid(io.ComfyNode):
     @classmethod
     def execute(cls, image, count=0, columns=0, cell_width=384, save=True, filename_prefix="DiceForge/grid", name="grid", new_grid=False, legend="", legend_position="top", numbered=False, label=None, row_label=None):
         layout = (legend or "", legend_position, numbered) # Legend settings for every render of this run.
-        store = GridStore(f"{name}-{cls.hidden.unique_id if cls.hidden else ''}")
+        store = GridStore(grid_key(name, cls.hidden.unique_id if cls.hidden else ""))
         if store.state["done"] or new_grid:
             store.clear()
         label, row = clean_label(label), clean_label(row_label)
@@ -233,7 +260,7 @@ class DiceGrid(io.ComfyNode):
                 if save and store.state["cells"]:
                     saved = cls.save_grid(render(store.cells(cell_width), columns, cell_width, *layout), filename_prefix) # A round is over: the grid is finished.
                 store.clear()
-            store.add(to_pil(image[index], cell_width), cell_label, row)
+            store.add(to_pil(image[index], cell_width), cell_label, row, full_pil(image[index]), run_metadata(cls.hidden))
         grid = render(store.cells(cell_width), columns, cell_width, *layout)
         if count and len(store.state["cells"]) >= count:
             store.state["done"] = True # Full: saved now, and the next run starts a new grid.
@@ -244,6 +271,70 @@ class DiceGrid(io.ComfyNode):
         logging.info(f"[DiceForge] Dice Grid | {cells} cell(s){' of ' + str(count) if count else ''} | {row + ' / ' if row else ''}{label}")
         shown = ui.SavedImages(saved) if saved and store.state["done"] else ui.PreviewImage(to_tensor(grid), cls=cls)
         return io.NodeOutput(to_tensor(grid), cells, ui=shown)
+# The cells panel under the node (web/dice_grid.js): the cells of the node's grid, their images, ★ to keep the best ones, and saving those at full
+# size (with the run's workflow in them, like Save Image) to the output folder.
+KEPT_PREFIX = "DiceForge/kept/kept"
+def store_of(query):
+    node, name = query.get("node"), query.get("name") or "grid"
+    if not isinstance(node, str) or not node or not isinstance(name, str):
+        raise web.HTTPBadRequest(text="Dice Grid: which node's grid (node and name).")
+    return GridStore(grid_key(name, node))
+def save_kept(store):
+    saved = []
+    for cell in store.state["cells"]:
+        source = os.path.join(store.folder, full_name(cell["file"]))
+        if not cell["kept"] or not os.path.isfile(source):
+            continue
+        folder, filename, counter, subfolder, _ = folder_paths.get_save_image_path(KEPT_PREFIX, folder_paths.get_output_directory())
+        label = re.sub(r"[^\w.-]+", "_", " ".join(part for part in (cell["row"], cell["label"]) if part)).strip("_")[:60]
+        file = f"{filename}_{counter:05}_{label}.png" if label else f"{filename}_{counter:05}_.png"
+        os.makedirs(folder, exist_ok=True)
+        shutil.copyfile(source, os.path.join(folder, file)) # The PNG as made: its workflow and prompt stay in it.
+        saved.append(f"{subfolder}/{file}" if subfolder else file)
+    return saved
+def register_routes():
+    try:
+        from server import PromptServer
+        routes = PromptServer.instance.routes
+    except Exception: # Loaded outside the ComfyUI server (tests): no routes.
+        return
+    @routes.get("/diceforge/grid")
+    async def grid_cells(request):
+        store = store_of(request.rel_url.query)
+        cells = [{**cell, "full": os.path.isfile(os.path.join(store.folder, full_name(cell["file"])))} for cell in store.state["cells"]]
+        return web.json_response({"cells": cells, "done": store.state["done"]})
+    @routes.get("/diceforge/grid/image")
+    async def grid_image(request):
+        query = request.rel_url.query
+        store, file = store_of(query), query.get("file", "")
+        if not CELL_FILE.fullmatch(file) or store.cell(file) is None:
+            raise web.HTTPNotFound(text="Dice Grid: no such cell.")
+        path = os.path.join(store.folder, full_name(file) if query.get("full") == "1" else file)
+        if not os.path.isfile(path):
+            raise web.HTTPNotFound(text="Dice Grid: that image is gone.")
+        return web.FileResponse(path, headers={"Cache-Control": "no-cache"})
+    @routes.post("/diceforge/grid/keep")
+    async def grid_keep(request):
+        body = await json_body(request)
+        store, kept = store_of(body), body.get("kept")
+        files = body.get("files") if isinstance(body.get("files"), list) else [body.get("file")]
+        if not isinstance(kept, bool) or not files or not all(isinstance(file, str) and store.cell(file) for file in files):
+            raise web.HTTPBadRequest(text="Dice Grid: keep needs the cells (file or files) and kept true or false.")
+        for file in files:
+            store.cell(file)["kept"] = kept
+        store.save()
+        return web.json_response({"kept": [cell["file"] for cell in store.state["cells"] if cell["kept"]]})
+    @routes.post("/diceforge/grid/save")
+    async def grid_save(request):
+        store = store_of(await json_body(request))
+        try:
+            saved = save_kept(store)
+        except OSError as error:
+            raise web.HTTPBadRequest(text=f"Dice Grid: can't save the kept images: {error.strerror or error}.") from None
+        if not saved:
+            raise web.HTTPBadRequest(text="Dice Grid: no kept cells to save (★ a cell first).")
+        return web.json_response({"saved": saved})
+register_routes()
 # Extension entry point for ComfyUI V3 node registration.
 class DiceGridExtension(ComfyExtension):
     @override

@@ -784,6 +784,35 @@ for (const vue of [true, false]) {
       }
     });
 
+    test("Dice Grid's cells panel: star the best cells, save them at full size with their workflow, open a cell's run", async ({ page, request }) => {
+      const [image, grid] = await addNodes(page, [
+        { type: "EmptyImage", widgets: { width: 96, height: 64 } },
+        { type: "DiceForgeGrid", pos: [460, 40], widgets: { count: 0, cell_width: 64, save: false, name: `cells-${vue}` } },
+      ]);
+      await connect(page, image, 0, grid, "image");
+      for (let run = 0; run < 3; run++) {
+        await setWidget(page, image, "color", run * 4000000);
+        await queueFromPage(page, request);
+      }
+      const panel = page.locator(".dfdg").first();
+      await expect(panel.locator(".cell")).toHaveCount(3);
+      await expect(panel.locator("button.save")).toBeDisabled();
+      await panel.locator(".cell").nth(1).click();
+      await expect(panel.locator(".cell.kept")).toHaveCount(1);
+      await expect(panel.locator(".title")).toHaveText("3 cells · 1 kept");
+      await panel.locator("button.save").click();
+      await expect(panel.locator(".status")).toContainText("Saved 1 in output: DiceForge/kept/kept_");
+      const kept = fs.readdirSync(basePath("output", "DiceForge", "kept"));
+      expect(kept.length).toBeGreaterThan(0);
+      const saved = fs.readFileSync(basePath("output", "DiceForge", "kept", kept.sort().at(-1)));
+      expect(saved.includes(Buffer.from("workflow"))).toBe(true); // The run's workflow is in the PNG.
+      // ↺ opens that run's workflow, as dropping its image would: the run's two nodes, with that run's color.
+      page.once("dialog", (dialog) => dialog.accept());
+      await panel.locator(".cell").nth(1).locator("button.open").click();
+      await expect.poll(() => page.evaluate(() => window.app.graph.nodes.map((node) => node.comfyClass).sort().join())).toBe("DiceForgeGrid,EmptyImage");
+      expect(await page.evaluate(() => window.app.graph.nodes.find((node) => node.comfyClass === "EmptyImage").widgets.find((widget) => widget.name === "color").value)).toBe(4000000);
+    });
+
     test("XY Plot shows the plot under its fields and queues every cell into Dice Grid", async ({ page, request }) => {
       const [xy, image, grid] = await addNodes(page, [
         { type: "DiceForgeXYPlot", widgets: { x_type: "steps", x_values: "10, 20", y_type: "scheduler", y_values: "normal, karras" } },
