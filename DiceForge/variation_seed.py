@@ -14,10 +14,9 @@ WRAPPER_KEY = "diceforge_variation"
 
 
 def slerp(a, b, t):
-    if t <= 0:
-        return a
-    if t >= 1:
-        return b
+    t = min(max(float(t), 0.0), 1.0)
+    if t in (0.0, 1.0): # The ends exactly, without rounding.
+        return b if t else a
     flat_a, flat_b = a.reshape(a.shape[0], -1).float(), b.reshape(b.shape[0], -1).float()
     unit_a = flat_a / flat_a.norm(dim=1, keepdim=True).clamp_min(1e-8)
     unit_b = flat_b / flat_b.norm(dim=1, keepdim=True).clamp_min(1e-8)

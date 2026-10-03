@@ -34,7 +34,7 @@ export function pickFolder({ title, folders, current = "" }) {
     };
     const field = element("input", { placeholder: "New folder, for example styles/anime" });
     const go = () => {
-      const folder = field.value.trim().replace(/\\/g, "/").replace(/^\/+|\/+$/g, "");
+      const folder = field.value.trim().replace(/\\/g, "/").split("/").filter(Boolean).join("/"); // No slashes at the ends, nor doubled.
       if (folder && folder !== current) done(folder);
     };
     field.addEventListener("keydown", (event) => { if (event.key === "Enter") go(); });

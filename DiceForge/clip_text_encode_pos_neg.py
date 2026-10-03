@@ -363,12 +363,17 @@ def mutate_memory(entries):
 # LoRAs in the prompt, as in A1111: <lora:name:weight> (or <lora:name:model weight:clip weight>, <lyco:...>), after choices and wildcards are
 # filled in, so a wildcard or {a|b} can pick the LoRA too. The tags are taken out of the text; the LoRAs go on the model and on the CLIP that
 # encodes the prompts. The name is the file name, with or without folder and extension.
-LORA_TAG = re.compile(r"<\s*(?:lora|lyco)\s*:\s*([^:<>]+?)\s*(?::\s*(-?\d*\.?\d+)\s*)?(?::\s*(-?\d*\.?\d+)\s*)?>", re.IGNORECASE)
+# The tag's parts are split by the colons and checked here (a name, then numbers), so the pattern has nothing to backtrack over.
+LORA_TAG = re.compile(r"<\s*(?:lora|lyco)\s*:([^:<>]*)(?::([^:<>]*))?(?::([^:<>]*))?>", re.IGNORECASE)
+WEIGHT = re.compile(r"-?(?:\d+(?:\.\d+)?|\.\d+)")
 def lora_tags(text):
     loras = []
     def take(match):
-        model = float(match.group(2)) if match.group(2) else 1.0
-        loras.append((match.group(1), model, float(match.group(3)) if match.group(3) else model))
+        name, weights = match.group(1).strip(), [(part or "").strip() for part in match.group(2, 3)]
+        if not name or any(part and not WEIGHT.fullmatch(part) for part in weights) or (match.group(2) is not None and not weights[0]):
+            return match.group(0) # Not a LoRA tag: left as text.
+        model = float(weights[0]) if weights[0] else 1.0
+        loras.append((name, model, float(weights[1]) if weights[1] else model))
         return ""
     stripped = LORA_TAG.sub(take, text)
     return (tidy_commas(stripped) if loras else stripped), loras

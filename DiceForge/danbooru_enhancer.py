@@ -23,7 +23,7 @@ def prompt_tags(text):
     tags = []
     for part in re.split(r"[,\n]", text or ""):
         part = re.sub(r"<[^>]*>", "", part) # <lora:...> tags.
-        part = re.sub(r":\s*-?\d+(?:\.\d+)?\s*\)?\s*$", "", part.strip()) # (tag:1.2) weights.
+        part = re.sub(r":\s*-?\d+(?:\.\d+)?\s*\)?$", "", part.strip()) # (tag:1.2) weights.
         part = part.replace("\\(", "\u0001").replace("\\)", "\u0002").strip(" ()[]{}").replace("\u0001", "(").replace("\u0002", ")")
         key = tag_key(part)
         if key and key not in tags and not key.startswith(("embedding:", "__")):

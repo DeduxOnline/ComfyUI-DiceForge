@@ -30,7 +30,7 @@ const TOKENS = new RegExp([
   String.raw`(?<embed>\bembedding:[^\s,()]+)`,
   String.raw`(?<open>\{)`, String.raw`(?<close>\})`, String.raw`(?<bar>\|)`,
 ].join("|"), "gu");
-const COUNT = /^\s*(?:\d+(?:-\d*)?|-\d+)\$\$(?:[^{}]*?\$\$)?/; // {2$$, {1-3$$ and $$ (a choice's start only)
+const COUNT = /^\s*(?:\d+(?:-\d*)?|-\d+)\$\$(?:[^{}$]*\$\$)?/; // {2$$, {1-3$$ and $$ (a choice's start only)
 const OPTION = /^\s*(?:!\s*)?(?:\d+(?:\.\d+)?::)?(?:\s*!)?/; // 3::  !  !3::  3::! (an option's start)
 const escapeHTML = (text) => text.replace(/[&<>"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[char]);
 function globTest(pattern) {
@@ -149,7 +149,7 @@ function sync(textarea) {
   const scrollbar = Math.max(0, textarea.offsetWidth - textarea.clientWidth - 2 * textarea.clientLeft);
   Object.assign(layer.style, {
     left: `${textarea.offsetLeft + textarea.clientLeft}px`, top: `${textarea.offsetTop + textarea.clientTop}px`,
-    width: `${textarea.clientWidth + scrollbar}px`, height: `${textarea.clientHeight}px`, paddingRight: `${parseFloat(style.paddingRight) + scrollbar}px`,
+    width: `${textarea.clientWidth + scrollbar}px`, height: `${textarea.clientHeight}px`, paddingRight: `${Number.parseFloat(style.paddingRight) + scrollbar}px`,
     background: state.background, color: state.color,
   });
   layer.innerHTML = highlightPrompt(textarea.value, names);

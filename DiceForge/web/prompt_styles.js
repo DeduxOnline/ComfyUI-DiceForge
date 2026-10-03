@@ -25,7 +25,13 @@ function toast(severity, summary, detail) {
 }
 
 // The pieces of a style's text around {prompt} (or after the prompt), without the commas that join them.
-const trimJoin = (text) => text.replace(/^[\s,]+|[\s,]+$/g, "");
+const JOINING = /[\s,]/;
+function trimJoin(text) {
+  let start = 0, end = text.length;
+  while (start < end && JOINING.test(text[start])) start++;
+  while (end > start && JOINING.test(text[end - 1])) end--;
+  return text.slice(start, end);
+}
 export function stylePieces(style) {
   if (!style?.trim()) return { before: "", after: "" };
   if (!style.includes("{prompt}")) return { before: "", after: trimJoin(style) };
@@ -46,7 +52,7 @@ export function withStyle(prompt, style) {
 export function withoutStyle(prompt, style) {
   let text = prompt;
   for (const piece of Object.values(stylePieces(style))) if (piece) text = text.split(piece).join("");
-  return trimJoin(text.replace(/\s*,(\s*,)+/g, ",").replace(/[ \t]{2,}/g, " "));
+  return trimJoin(text.replace(/[ \t]{2,}/g, " ").replace(/,(?:\s*,)+/g, ",").split(" ,").join(",")); // "a , , b" -> "a, b"
 }
 const fieldText = (node, name) => node.widgets?.find((widget) => widget.name === name)?.value ?? "";
 const applied = (node, style) => (style.prompt.trim() || style.negative_prompt.trim()) && hasStyle(fieldText(node, "positive"), style.prompt) && hasStyle(fieldText(node, "negative"), style.negative_prompt);

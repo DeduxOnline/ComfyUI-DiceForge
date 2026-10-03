@@ -177,7 +177,8 @@ def test_remembering_modes_give_a_seed_its_prompt_again(mode):
     text = "{a|b|c|d|e} {x|y|z}"
     first = [run(text, seed=seed, mode=mode)[2] for seed in range(5)]
     assert [run(text, seed=seed, mode=mode)[2] for seed in (3, 0, 4)] == [first[3], first[0], first[4]] # Older seeds again: their prompts.
-    assert run(text, seed=5, mode=mode)[2] == run(text, seed=5, mode=mode)[2]
+    fifth = run(text, seed=5, mode=mode)[2]
+    assert run(text, seed=5, mode=mode)[2] == fifth
     if mode == "shuffle": # Replaying didn't move the shuffle on: the next new seeds still finish the round.
         assert sorted(prompt.split(" ")[0] for prompt in first) == list("abcde")
 
