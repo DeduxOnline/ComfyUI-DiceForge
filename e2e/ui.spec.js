@@ -754,9 +754,10 @@ for (const vue of [true, false]) {
       await setWidget(page, encode, "negative", "cartoon");
       page.on("dialog", (dialog) => (dialog.type() === "prompt" ? dialog.accept(`E2E film ${vue}`) : dialog.accept()));
       await click("Save the prompts as a style");
-      await expect.poll(items).toContain(`★ E2E film ${vue}`);
+      await expect.poll(items).toContain(`✓ E2E film ${vue}`); // Saved from these prompts: they have it.
       await setWidget(page, encode, "positive", "a cat");
       await setWidget(page, encode, "negative", "");
+      await expect.poll(items).toContain(`★ E2E film ${vue}`); // Other prompts: your style (★), not in them.
       await click(`★ E2E film ${vue}`);
       expect(await prompts()).toEqual(["a cat, film grain", "cartoon"]);
       await click(`🗑 Delete E2E film ${vue}`);
