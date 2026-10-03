@@ -7,7 +7,7 @@ const { MODELS, DOWNLOADS } = require("./fixtures");
 
 const NODES = ["SDXLResolutionListLatent", "ResolutionSelectorRandomLatent", "CLIPTextEncodePositiveNegative", "DiceForgeRandomInt", "DiceForgeRandomFloat",
   "DiceForgeRandomLora", "DiceForgeRandomCheckpoint", "DiceForgeRandomDiffusionModel", "DiceForgeRandomImage", "DiceForgeGrid", "DiceForgeRandomSampler",
-  "DiceForgeRandomVAE", "LoadVAEDecodeSave", "VAEDecodeSave", "LoadDiffusionModelCLIP", "DiceForgeLoraStack", "DiceForgeXYPlot", "DiceForgeHiresFix"];
+  "DiceForgeRandomVAE", "LoadVAEDecodeSave", "VAEDecodeSave", "LoadDiffusionModelCLIP", "DiceForgeLoraStack", "DiceForgeXYPlot", "DiceForgeHiresFix", "DiceForgeVariationSeed"];
 const clip = (positive, negative = "", { seed = 0, mode = "random" } = {}) => ({
   1: { class_type: "CLIPTextEncodePositiveNegative", inputs: { positive, negative, seed, seed_mode: mode, trim: true } },
   2: { class_type: "PreviewAny", inputs: { source: ["1", 2] } },
@@ -230,6 +230,20 @@ test.describe("@api workflows and routes", () => {
     });
     const errors = result.rejected.node_errors["3"].errors.map((error) => `${error.type} ${error.extra_info?.input_name ?? ""}`);
     expect(errors.join()).toContain("required_input_missing model"); // No model here: only the links are checked.
+    expect(errors.join()).not.toContain("return_type_mismatch");
+  });
+
+  test("Variation Seed's model goes to KSampler and its label to Dice Grid", async ({ request }) => {
+    const result = await runPrompt(request, {
+      1: { class_type: "DiceForgeVariationSeed", inputs: { variation_seed: 3, variation_strength: 0.1 } },
+      2: { class_type: "KSampler", inputs: { model: ["1", 0], seed: 0, steps: 1, cfg: 1, sampler_name: "euler", scheduler: "normal", denoise: 1 } },
+      3: { class_type: "EmptyImage", inputs: { width: 64, height: 64, batch_size: 1, color: 0 } },
+      4: { class_type: "DiceForgeGrid", inputs: { image: ["3", 0], label: ["1", 1], count: 0, columns: 0, cell_width: 64, save: false, filename_prefix: "e2e/var", name: "var",
+        new_grid: false, legend: "", legend_position: "top", numbered: false } },
+      5: { class_type: "PreviewAny", inputs: { source: ["2", 0] } },
+    });
+    const errors = Object.values(result.rejected.node_errors).flatMap((node) => node.errors.map((error) => `${error.type} ${error.extra_info?.input_name ?? ""}`));
+    expect(errors.join()).toContain("required_input_missing model"); // No checkpoint here: only the links are checked.
     expect(errors.join()).not.toContain("return_type_mismatch");
   });
 

@@ -8,15 +8,16 @@ from comfy_api.latest import ComfyExtension, io
 from .model_info import json_body
 from .model_lists import matching_files
 from .random_sampler import SAMPLERS, SCHEDULERS, options_output, parse_names
-# XY Plot: one node gives KSampler the settings of one cell of an X/Y comparison (seed, steps, CFG, sampler, scheduler, LoRA, LoRA strength or
-# denoise on each axis) and Dice Grid its labels; the node's ▶ Queue button (web/xy_plot.js) queues every cell, index 0 to count - 1, and Dice Grid
+from .variation_seed import with_variation
+# XY Plot: one node gives KSampler the settings of one cell of an X/Y comparison (seed, steps, CFG, sampler, scheduler, LoRA, LoRA strength,
+# denoise, variation seed or variation strength on each axis) and Dice Grid its labels; the node's ▶ Queue button (web/xy_plot.js) queues every cell, index 0 to count - 1, and Dice Grid
 # lays the images out with the values as column and row headers.
-AXES = ("none", "seed", "steps", "cfg", "sampler", "scheduler", "lora", "lora strength", "denoise")
+AXES = ("none", "seed", "steps", "cfg", "sampler", "scheduler", "lora", "lora strength", "denoise", "variation seed", "variation strength")
 MAX_VALUES, MAX_CELLS = 64, 256 # Per axis, and in all: a typo like 1-100000 doesn't queue a night of images.
 NUMBER = r"-?\d+(?:\.\d+)?"
 RANGE = re.compile(rf"^({NUMBER})\s*(?:\.\.|-)\s*({NUMBER})(?:\s*:\s*({NUMBER}))?$") # 1-5, 3.5-7:0.5, -1..1:0.5
 NUMBER_AXES = {"seed": (int, 0, 0xFFFFFFFFFFFFFFFF), "steps": (int, 1, 10000), "cfg": (float, 0.0, 100.0), "lora strength": (float, -100.0, 100.0),
-               "denoise": (float, 0.0, 1.0)}
+               "denoise": (float, 0.0, 1.0), "variation seed": (int, 0, 0xFFFFFFFFFFFFFFFF), "variation strength": (float, 0.0, 1.0)}
 
 
 def short(value):
@@ -100,6 +101,8 @@ def label(axis, value):
         return f"CFG {short(value)}"
     if axis in ("lora strength", "denoise"):
         return f"{'strength' if axis == 'lora strength' else 'denoise'} {short(value)}"
+    if axis.startswith("variation"):
+        return f"variation {short(value)}"
     return "no LoRA" if axis == "lora" and value == "None" else str(value) # A LoRA file: Dice Grid shows it without folder and extension.
 # Both axes, checked: their values and labels, and the number of cells. Y alone is taken as X (one row of images).
 def plan(x_type, x_values, y_type, y_values):
@@ -112,7 +115,7 @@ def plan(x_type, x_values, y_type, y_values):
         raise ValueError(f"XY Plot: {len(xs)} x {len(ys)} = {len(xs) * len(ys)} images, more than {MAX_CELLS}.")
     return {"x_type": x_type, "y_type": y_type, "xs": xs, "ys": ys, "count": len(xs) * len(ys)}
 FIELDS = {"seed": "seed", "steps": "steps", "cfg": "cfg", "sampler": "sampler_name", "scheduler": "scheduler", "lora": "lora_name", "lora strength": "lora_strength",
-          "denoise": "denoise"}
+          "denoise": "denoise", "variation seed": "variation_seed", "variation strength": "variation_strength"}
 
 
 class XYPlot(io.ComfyNode):
@@ -145,6 +148,9 @@ class XYPlot(io.ComfyNode):
                 io.Combo.Input("lora_name", options=["None", *folder_paths.get_filename_list("loras")], default="None",
                                tooltip="LoRA of every cell (for a lora strength axis), unless an axis is lora. Applied to model and clip.", advanced=True),
                 io.Float.Input("lora_strength", default=1.0, min=-100.0, max=100.0, step=0.05, tooltip="LoRA strength, unless an axis is lora strength.", advanced=True),
+                io.Int.Input("variation_seed", default=0, min=0, max=0xFFFFFFFFFFFFFFFF, tooltip="Variation seed of every cell (as Variation Seed), unless an axis is variation seed.", advanced=True, optional=True),
+                io.Float.Input("variation_strength", default=0.0, min=0.0, max=1.0, step=0.01,
+                               tooltip="Variation strength of every cell (0: none). A variation seed axis with strength 0.1: variations of one picture.", advanced=True, optional=True),
                 io.Model.Input("model", optional=True, tooltip="The model, for a LoRA (lora_name, or a lora axis). Passed through otherwise."),
                 io.Clip.Input("clip", optional=True, tooltip="The CLIP, for a LoRA. Passed through otherwise."),
             ],
@@ -175,12 +181,12 @@ class XYPlot(io.ComfyNode):
 
     @classmethod
     def execute(cls, x_type, x_values, y_type, y_values, index=0, seed=0, steps=28, cfg=6.0, sampler_name="euler", scheduler="normal", denoise=1.0,
-                lora_name="None", lora_strength=1.0, model=None, clip=None):
+                lora_name="None", lora_strength=1.0, model=None, clip=None, variation_seed=0, variation_strength=0.0):
         layout = plan(x_type, x_values, y_type, y_values)
         cell = index % layout["count"]
         x, y = layout["xs"][cell % len(layout["xs"])], layout["ys"][cell // len(layout["xs"])]
         values = {"seed": seed, "steps": steps, "cfg": cfg, "sampler_name": sampler_name, "scheduler": scheduler, "denoise": denoise, "lora_name": lora_name,
-                  "lora_strength": lora_strength}
+                  "lora_strength": lora_strength, "variation_seed": variation_seed, "variation_strength": variation_strength}
         for axis, value in ((layout["x_type"], x), (layout["y_type"], y)):
             if axis != "none":
                 values[FIELDS[axis]] = value
@@ -190,6 +196,10 @@ class XYPlot(io.ComfyNode):
             strength = values["lora_strength"]
             model, lora_clip = cls.loader.load_lora(model, clip, values["lora_name"], strength, strength if clip is not None else 0)
             clip = lora_clip if clip is not None else None
+        if values["variation_strength"] > 0:
+            if model is None:
+                raise ValueError("XY Plot: a variation needs the model input connected (its output goes to KSampler).")
+            model = with_variation(model, values["variation_seed"], values["variation_strength"])
         return io.NodeOutput(model, clip, values["seed"], values["steps"], values["cfg"], values["sampler_name"], values["scheduler"], values["denoise"],
                              label(layout["x_type"], x), label(layout["y_type"], y), layout["count"], len(layout["xs"]), cell == 0)
 

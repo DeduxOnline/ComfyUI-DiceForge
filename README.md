@@ -37,6 +37,7 @@ Every mode gives the same result for the same seed, so an image can be made agai
 | **Load VAE + Decode + Save** | utils | `DiceForge/load_vae_decode_save.py` | You want Load VAE, VAE Decode and Save Image in one node: it decodes the latent with the chosen VAE and saves PNG files with the workflow, like Save Image, and passes the images on. The VAE stays loaded between runs while its name stays the same. `image_output` decides what happens to the images, as in Easy-Use's samplers: *Hide* (only passed on), *Preview* (shown, not saved), *Save* (saved and shown, the default) or *Hide&Save* (saved, not shown). The `vae` output passes the VAE on (for VAE Encode in a hires fix or inpaint). |
 | **VAE Decode + Save** | utils | `DiceForge/load_vae_decode_save.py` | The same without Load VAE: VAE Decode and Save Image in one node, with the VAE from its `vae` input (the VAE of Load Checkpoint, Load VAE, Random VAE…). Saves PNG files with the workflow, like Save Image, and passes the images and the VAE on. The same `image_output` choice (Hide, Preview, Save, Hide&Save). |
 | **Load Diffusion Model + CLIP** | utils | `DiceForge/load_diffusion_model_clip.py` | You want Load Diffusion Model and Load CLIP in one node, for models that come as separate files (Flux, Anima, Qwen-Image...): the model from `models/diffusion_models` and one text encoder, or two like DualCLIPLoader when `clip_name2` is set. The CLIP type is checked against the number of files before anything loads. |
+| **Variation Seed** | DiceForge/sampling | `DiceForge/variation_seed.py` | You like a picture and want it again with small differences (folds, hair, background, a hand), as A1111's variation seed: same seed and prompt, the noise blended with a second seed's. |
 | **Hires Fix** | DiceForge/sampling | `DiceForge/hires_fix.py` | You want a bigger image with new detail in one node: the first pass's latent made bigger (by a factor, or to the size of an SDXL Resolution List with rescale; in the latent, or in pixels with an upscale model) and sampled again at low denoise. |
 | **XY Plot** | DiceForge/sampling | `DiceForge/xy_plot.py` | You want an X/Y comparison in one node: seed, steps, CFG, sampler, scheduler, LoRA, LoRA strength or denoise on each axis, every combination queued with one button, laid out by Dice Grid with the values as headers. |
 | **Dice Grid** | DiceForge/image | `DiceForge/dice_grid.py` | You want the images of a series side by side with labels: a LoRA, checkpoint or setting comparison, or an XY grid. |
@@ -355,12 +356,33 @@ How to connect it:
 | `cfg`, `lora strength`, `denoise` | Numbers and ranges `start-end:step` (step 1 unless given) | `4, 5.5, 7` · `3.5-7:0.5` · `-1..1:0.5` |
 | `sampler`, `scheduler` | Names from KSampler's lists, `*` for all | `euler, dpmpp_2m` |
 | `lora` | LoRA files, with or without folder and extension; patterns; `None` for the image without a LoRA | `style/*, None` · `ink` |
+| `variation seed`, `variation strength` | As [Variation Seed](#variation-seed): seeds (`1-8`), strengths (`0-0.3:0.05`); the other one is set under **Advanced** (`variation_strength` 0.1 for a seed axis). Needs `model` connected, its output to KSampler. | `1-8` · `0, 0.05, 0.1, 0.2` |
 | `none` | Nothing changes (Y `none`: one row of images) | |
 
 - The other settings (`seed`, `steps`, `cfg`, `sampler_name`, `scheduler`, and under **Advanced** `denoise`, `lora_name`, `lora_strength`) are used for every cell, except the ones on an axis. With a `lora strength` axis, `lora_name` is the LoRA it changes.
 - `index` is the cell of a run, row by row. **▶ Queue** sets it for each run and puts it back to 0; Run alone makes the cell at `index`.
 - Up to 64 values per axis and 256 images in all. A field the node can't read is shown in red under it, and stops the run with the same message.
 - Set KSampler's own *control after generate* to *fixed*, or connect `seed`: otherwise every cell gets another seed.
+
+## Variation Seed
+
+Variations of a picture, as A1111's *variation seed* (subseed): the same composition with small differences. KSampler starts from noise made from its seed; Variation Seed blends that noise with the noise of a second seed, the variation seed, by `variation_strength`. The blend is spherical (slerp), so the noise keeps the size the model expects.
+
+1. Put it on the model line, right before KSampler: the loader's (or LoRA Stack's) `model` in, its `model` out to KSampler.
+2. Set KSampler's seed to the picture you like and its *control after generate* to *fixed*.
+3. Set Variation Seed's *control after generate* to *increment* and queue: every run is another variation. Connect `label` to Dice Grid to see them side by side, and keep the best with ★.
+
+| `variation_strength` | What changes |
+|---|---|
+| `0` | Nothing: KSampler's seed's own picture. |
+| `0.05`–`0.15` | The same pose, composition and character; other folds, strands of hair, background details, expression. |
+| `0.2`–`0.4` | Visibly different details; the picture is still recognizable. |
+| `1` | The variation seed's own picture. |
+
+- Reproducible: the same seed, variation seed and strength always give the same picture.
+- It works with the plain KSampler for every model (SD 1.5, SDXL, Illustrious, NoobAI eps and v-pred, Pony, Flux, Anima…), since it changes the noise the sampling starts from, not the latent: flow models (Flux, Anima, Qwen) don't read the latent at full denoise.
+- With several Variation Seed nodes in a row, the last one counts.
+- [XY Plot](#xy-plot) has `variation seed` and `variation strength` axes: a grid of variations of one picture (with `variation_strength` 0.1 under Advanced), or of strengths.
 
 ## Hires Fix
 

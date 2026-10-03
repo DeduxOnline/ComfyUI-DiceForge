@@ -17,6 +17,7 @@ from .load_vae_decode_save import LoadVAEDecodeSave, VAEDecodeSave
 from .load_diffusion_model_clip import LoadDiffusionModelCLIP
 from .lora_stack import LoraStack
 from .hires_fix import HiresFix
+from .variation_seed import VariationSeed
 from .xy_plot import XYPlot # Also the route of its preview on the node (web/xy_plot.js).
 from . import model_info # Server routes of the Model info dialog (web/model_info.js).
 from . import wildcards_api # Server routes of the Wildcard Browser and the __ autocomplete (web/wildcards.js).
@@ -28,6 +29,6 @@ WEB_DIRECTORY = "./web" # Frontend extension: feeds the live size previews of th
 class DiceForgeExtension(ComfyExtension):
     @override
     async def get_node_list(self):
-        return [SDXLResolutionListLatent, ResolutionSelectorRandomLatent, CLIPTextEncodePositiveNegative, RandomIntSeedModes, RandomFloatSeedModes, RandomLoraLoader, RandomCheckpointLoader, RandomDiffusionModelLoader, RandomImageLoader, DiceGrid, RandomSampler, RandomVAELoader, LoadVAEDecodeSave, VAEDecodeSave, LoadDiffusionModelCLIP, LoraStack, XYPlot, HiresFix]
+        return [SDXLResolutionListLatent, ResolutionSelectorRandomLatent, CLIPTextEncodePositiveNegative, RandomIntSeedModes, RandomFloatSeedModes, RandomLoraLoader, RandomCheckpointLoader, RandomDiffusionModelLoader, RandomImageLoader, DiceGrid, RandomSampler, RandomVAELoader, LoadVAEDecodeSave, VAEDecodeSave, LoadDiffusionModelCLIP, LoraStack, XYPlot, HiresFix, VariationSeed]
 async def comfy_entrypoint():
     return DiceForgeExtension()
