@@ -2,6 +2,7 @@
 // real server. Each test builds its own graph.
 const fs = require("fs");
 const { test, expect, basePath, writeFile, openComfy, addNodes, connect, widgetValue, setWidget, menuItems, clickMenu, queueFromPage, nodeElement } = require("./helpers");
+const { DOWNLOADS } = require("./fixtures");
 
 const ALL_NODES = ["SDXLResolutionListLatent", "ResolutionSelectorRandomLatent", "CLIPTextEncodePositiveNegative", "DiceForgeRandomInt", "DiceForgeRandomFloat",
   "DiceForgeRandomLora", "DiceForgeRandomCheckpoint", "DiceForgeRandomDiffusionModel", "DiceForgeRandomImage", "DiceForgeGrid", "DiceForgeRandomSampler",
@@ -216,11 +217,54 @@ for (const vue of [true, false]) {
       await page.keyboard.press("Escape");
     });
 
+    test("LoRA Browser finds and downloads LoRAs on Civitai, renames and deletes them", async ({ page }) => {
+      const tag = vue ? "vue" : "classic", folder = `civitai_${tag}`, loras = (...parts) => basePath("models", "loras", ...parts);
+      const [loader] = await addNodes(page, [{ type: "LoraLoader" }]);
+      await clickMenu(page, loader, "DiceForge.ModelBrowser", "LoRA Browser");
+      await page.locator(".dflb button.find").click();
+      const dialog = page.locator(".dfcv");
+      await expect(dialog.locator(".card", { hasText: "Ink" })).toContainText("Already here: style/ink.safetensors"); // Known by its hash.
+      await dialog.locator("input.query").fill("neon");
+      await dialog.locator("input.query").press("Enter");
+      await expect(dialog.locator(".card")).toHaveCount(1);
+      const neon = dialog.locator(".card", { hasText: "Neon" });
+      await expect(neon).toContainText("by e2e");
+      await expect(neon.locator(".base")).toHaveText("Illustrious");
+      await neon.locator("select").selectOption({ label: "v1 · SDXL 1.0" }); // The other version.
+      await expect(neon.locator(".base")).toHaveText("SDXL 1.0");
+      await dialog.locator("input[list]").fill(folder);
+      await neon.locator("button", { hasText: "Download" }).click();
+      await expect(dialog.locator(".job.done", { hasText: `${folder}/neon_glow_v1.safetensors` })).toContainText("Done"); // Earlier downloads are listed too.
+      await expect(neon).toContainText(`Already here: ${folder}/neon_glow_v1.safetensors`);
+      await expect(neon.locator("button", { hasText: "Download" })).toBeDisabled();
+      expect(fs.readFileSync(loras(folder, "neon_glow_v1.safetensors"), "utf8")).toBe(DOWNLOADS[502]);
+      await page.keyboard.press("Escape"); // Closes only the Civitai dialog: the browser shows the new LoRA.
+      await expect(dialog).toHaveCount(0);
+      const card = page.locator(".dflb .card", { hasText: "Neon - v1" });
+      await expect(card).toContainText("SDXL 1.0");
+      await expect(card.locator("img")).toHaveJSProperty("naturalWidth", 8); // Its preview was saved with it.
+      await expect.poll(() => page.evaluate((id) => window.app.graph.getNodeById(id).widgets.find((widget) => widget.name === "lora_name").options.values.join("|"), loader))
+        .toContain("neon_glow_v1.safetensors"); // Load LoRA's list has it without a restart.
+      page.on("dialog", (prompt) => (prompt.type() === "confirm" ? prompt.accept() : prompt.accept(`${folder}_moved/neon`)));
+      await card.locator("button.rename").click();
+      await expect(page.locator(".dflb .status")).toContainText(`to ${folder}_moved/neon.safetensors`);
+      expect(fs.existsSync(loras(folder))).toBe(false);
+      expect(fs.readdirSync(loras(`${folder}_moved`)).sort()).toEqual(["neon.preview.png", "neon.safetensors"]);
+      await expect(page.locator(".dflb .card", { hasText: "Neon - v1" })).toContainText(`${folder}_moved/neon.safetensors`); // Its Civitai data moved too.
+      await page.locator(".dflb .card", { hasText: "Neon - v1" }).locator("button.delete").click();
+      await expect(page.locator(".dflb .status")).toContainText(`Deleted ${folder}_moved/neon.safetensors`);
+      await expect(page.locator(".dflb .card", { hasText: "Neon" })).toHaveCount(0);
+      expect(fs.existsSync(loras(`${folder}_moved`))).toBe(false);
+      await page.keyboard.press("Escape");
+      await expect(page.locator(".dflb")).toHaveCount(0);
+    });
+
     test("Checkpoint Browser puts a checkpoint in Load Checkpoint", async ({ page }) => {
       const [loader] = await addNodes(page, [{ type: "CheckpointLoaderSimple" }]);
       expect(await menuItems(page, loader, "DiceForge.ModelBrowser")).toEqual(["🗃️ Checkpoint Browser"]);
       await clickMenu(page, loader, "DiceForge.ModelBrowser", "Checkpoint Browser");
       await expect(page.locator(".dflb .tree")).toContainText("sdxl");
+      await expect(page.locator(".dflb button.find, .dflb button.rename, .dflb button.delete")).toHaveCount(0); // Managing files is for LoRAs only.
       await page.locator(".dflb .card", { hasText: "other" }).locator("button", { hasText: /^Use$/ }).click();
       await expect.poll(() => widgetValue(page, loader, "ckpt_name")).toMatch(/sdxl[\\/]other\.safetensors/);
       await page.keyboard.press("Escape");

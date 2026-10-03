@@ -128,6 +128,20 @@ test.describe("README screenshots (Nodes 2.0)", () => {
     await page.locator(".dfmi").first().screenshot({ path: path.join(OUT, "model_info.png") });
   });
 
+  test("Find LoRAs on Civitai", async ({ page, request }) => {
+    const [loader] = await addNodes(page, [{ type: "LoraLoader", pos: [400, 220] }]);
+    await clickMenu(page, loader, "DiceForge.ModelBrowser", "LoRA Browser");
+    await page.locator(".dflb button.find").click();
+    const dialog = page.locator(".dfcv");
+    await expect(dialog.locator(".card", { hasText: "Ink" })).toContainText("Already here");
+    await dialog.locator("input[list]").fill("styles/neon");
+    await dialog.locator(".card", { hasText: "Neon" }).locator("button", { hasText: "Download" }).click();
+    await expect(dialog.locator(".job.done")).toContainText("styles/neon/neon_glow.safetensors");
+    await page.waitForTimeout(800);
+    await dialog.screenshot({ path: path.join(OUT, "civitai_search.png") });
+    expect((await request.delete("/diceforge/models/file?kind=loras&file=styles/neon/neon_glow.safetensors")).ok()).toBe(true);
+  });
+
   test("utility nodes", async ({ page }) => {
     const ids = await addNodes(page, [
       { type: "VAEDecodeSave", pos: [400, 220] },

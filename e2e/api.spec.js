@@ -3,7 +3,7 @@
 const fs = require("fs");
 const path = require("path");
 const { test, expect, runPrompt, shown, basePath, writeFile } = require("./helpers");
-const { MODELS } = require("./fixtures");
+const { MODELS, DOWNLOADS } = require("./fixtures");
 
 const NODES = ["SDXLResolutionListLatent", "ResolutionSelectorRandomLatent", "CLIPTextEncodePositiveNegative", "DiceForgeRandomInt", "DiceForgeRandomFloat",
   "DiceForgeRandomLora", "DiceForgeRandomCheckpoint", "DiceForgeRandomDiffusionModel", "DiceForgeRandomImage", "DiceForgeGrid", "DiceForgeRandomSampler",
@@ -215,6 +215,35 @@ test.describe("@api workflows and routes", () => {
     expect((await request.get("/diceforge/model-preview?kind=loras&file=detail.safetensors")).headers()["content-type"]).toContain("image/png");
     const bases = await (await request.post("/diceforge/model-bases", { data: { items: [{ kind: "loras", file: "style/ink.safetensors" }, { kind: "loras", file: "style/pony_glow.safetensors" }] } })).json();
     expect(bases.bases).toEqual(["Illustrious", null]); // Pony not looked up yet.
+  });
+
+  test("LoRA files: found and downloaded from Civitai, renamed, deleted", async ({ request }) => {
+    const loras = (...parts) => basePath("models", "loras", ...parts);
+    const found = await (await request.get("/diceforge/civitai/search?kind=loras&query=")).json();
+    const byName = Object.fromEntries(found.items.map((item) => [item.name, item]));
+    expect(byName.Neon.versions.map((version) => [version.name, version.base_model, version.installed])).toEqual([["v2", "Illustrious", null], ["v1", "SDXL 1.0", null]]);
+    expect(byName.Ink.versions[0].installed).toBe("style/ink.safetensors"); // Already here: known by its hash.
+    const job = await (await request.post("/diceforge/civitai/download", { data: { kind: "loras", version_id: 502, folder: "e2e_civitai" } })).json();
+    expect(job).toMatchObject({ status: "downloading", file: "e2e_civitai/neon_glow_v1.safetensors" });
+    await expect.poll(async () => (await (await request.get("/diceforge/civitai/downloads")).json()).jobs.find((entry) => entry.id === job.id).status).toBe("done");
+    expect(fs.readFileSync(loras("e2e_civitai", "neon_glow_v1.safetensors"), "utf8")).toBe(DOWNLOADS[502]);
+    expect(fs.existsSync(loras("e2e_civitai", "neon_glow_v1.preview.png"))).toBe(true);
+    const card = (await (await request.get("/diceforge/model-browser?kind=loras")).json()).files.find((entry) => entry.file.replace(/\\/g, "/") === "e2e_civitai/neon_glow_v1.safetensors");
+    expect(card).toMatchObject({ found: true, checked: true, preview: true, name: "Neon - v1", base_model: "SDXL 1.0", trigger_words: ["neon glow"] });
+    const loraNode = await (await request.get("/object_info/DiceForgeRandomLora")).json(); // ComfyUI's lists have it, without a restart.
+    expect(JSON.stringify(loraNode.DiceForgeRandomLora.input)).toContain("e2e_civitai");
+    expect((await request.post("/diceforge/civitai/download", { data: { version_id: 502, folder: "e2e_civitai" } })).status()).toBe(409);
+    const renamed = await (await request.post("/diceforge/models/rename", { data: { kind: "loras", file: "e2e_civitai/neon_glow_v1.safetensors", to: "e2e_civitai_moved/neon" } })).json();
+    expect(renamed).toEqual({ renamed: "e2e_civitai/neon_glow_v1.safetensors", to: "e2e_civitai_moved/neon.safetensors" });
+    expect(fs.existsSync(loras("e2e_civitai"))).toBe(false);
+    expect(fs.readdirSync(loras("e2e_civitai_moved")).sort()).toEqual(["neon.preview.png", "neon.safetensors"]);
+    const info = await (await request.get("/diceforge/model-info?kind=loras&file=e2e_civitai_moved/neon.safetensors")).json();
+    expect(info.civitai).toMatchObject({ found: true, model_name: "Neon" }); // Its info moved with it.
+    expect((await request.post("/diceforge/models/rename", { data: { kind: "loras", file: "e2e_civitai_moved/neon.safetensors", to: "style/ink" } })).status()).toBe(409);
+    expect((await request.delete("/diceforge/models/file?kind=loras&file=e2e_civitai_moved/neon.safetensors")).ok()).toBe(true);
+    expect(fs.existsSync(loras("e2e_civitai_moved"))).toBe(false);
+    expect((await request.delete("/diceforge/models/file?kind=loras&file=e2e_civitai_moved/neon.safetensors")).status()).toBe(404);
+    expect((await request.get("/diceforge/civitai/key")).ok()).toBe(true);
   });
 
   test("LoRA Stack presets are saved as files and listed", async ({ request }) => {

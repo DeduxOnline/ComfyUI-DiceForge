@@ -2,15 +2,17 @@ import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
 import { openModelInfo } from "./model_info.js";
 import { insertIntoNode } from "./wildcards.js";
+import { openCivitaiSearch } from "./civitai.js";
 import { addStyleOnce, background, element } from "./dom.js";
 
 // Model browsers (node menu): LoRA and Checkpoint Browser. The model files as cards with a preview, name, base model and trigger words from Civitai
 // (looked up by the file's hash, as in Model info), a folder tree, search and filters. What a card's button does depends on the node it was opened
 // from: "Use" puts the file in a loader's list, "Use folder" puts a folder in Random LoRA / Random Checkpoint, "+ Triggers" inserts a LoRA's trigger
-// words into CLIP Dual Text Encode's prompt.
+// words into CLIP Dual Text Encode's prompt. The LoRA Browser also manages the files (manage: true): ＋ Find on Civitai downloads new ones (civitai.js),
+// ✎ renames or moves one and 🗑 deletes one, with its preview and Model info.
 const CLIP_NODE = "CLIPTextEncodePositiveNegative";
 const BROWSERS = [
-  { kind: "loras", icon: "🎴", title: "LoRA", one: "LoRA", plural: "LoRAs", widget: /lora/i, random: "DiceForgeRandomLora", randomName: "Random LoRA", triggers: true },
+  { kind: "loras", icon: "🎴", title: "LoRA", one: "LoRA", plural: "LoRAs", widget: /lora/i, random: "DiceForgeRandomLora", randomName: "Random LoRA", triggers: true, manage: true },
   { kind: "checkpoints", icon: "🗃️", title: "Checkpoint", one: "checkpoint", plural: "checkpoints", widget: /ckpt|checkpoint/i, random: "DiceForgeRandomCheckpoint", randomName: "Random Checkpoint", triggers: false },
 ];
 
@@ -97,7 +99,7 @@ async function openBrowser(node, spec, target = targetOf(node, spec)) {
   const grid = element("div", { class: "grid" });
   const lookAll = element("button", { title: `Compute the hash of every ${what} not looked up yet and ask Civitai about it, one by one` }, "Look up all on Civitai");
   const back = element("div", { class: "dflb-back" });
-  const onKey = (event) => { if (event.key === "Escape" && !document.querySelector(".dfmi-back")) { event.stopPropagation(); close(); } };
+  const onKey = (event) => { if (event.key === "Escape" && !document.querySelector(".dfmi-back, .dfcv-back")) { event.stopPropagation(); close(); } };
   function close() {
     stopLookUp?.();
     back.remove();
@@ -184,6 +186,9 @@ async function openBrowser(node, spec, target = targetOf(node, spec)) {
       }, 300);
     } }, "🛈 Info");
     const link = entry.url ? [element("button", { onclick: () => window.open(entry.url, "_blank", "noopener") }, "Civitai ↗")] : [];
+    const manage = spec.manage ? [
+      element("button", { class: "rename", title: `Rename or move this ${what} (with its preview and info); a / puts it in a folder`, onclick: () => background(renameFile(entry)) }, "✎"),
+      element("button", { class: "delete", title: `Delete this ${what} file, its preview and info`, onclick: () => background(deleteFile(entry)) }, "🗑")] : [];
     const note = !entry.checked ? "Not looked up yet" : entry.found ? "" : "Not on Civitai";
     return element("div", { class: "card" + (entry.file === selectedFile ? " sel" : "") },
       picture(entry),
@@ -192,7 +197,33 @@ async function openBrowser(node, spec, target = targetOf(node, spec)) {
         element("div", { class: "muted" }, entry.file, ` · ${(entry.size / 1024 ** 2).toFixed(0)} MB`, note ? ` · ${note}` : ""),
         words,
         ...(entry.settings ? [element("div", { class: "muted", title: "Your recommended settings, from Model info" }, `⚙ ${entry.settings}`)] : []),
-        element("div", { class: "buttons" }, ...action(entry), info, lookUpButton, ...link)));
+        element("div", { class: "buttons" }, ...action(entry), info, lookUpButton, ...link, ...manage)));
+  }
+  // Update and Delete: the server moves or removes the file with its companions; the loader lists are refreshed, and a loader of this browser that
+  // used the file follows it to its new name.
+  async function reload() {
+    files = await fetchList(kind);
+    draw();
+    background(app.refreshComboInNodes?.());
+  }
+  async function renameFile(entry) {
+    const to = prompt(`New name for ${entry.file} (the extension stays; folders with /):`, entry.file.replace(/\.[^./\\]+$/, ""))?.trim();
+    if (!to) return;
+    const response = await api.fetchApi("/diceforge/models/rename", { method: "POST", body: JSON.stringify({ kind, file: entry.file, to }) });
+    if (!response.ok) return say(await response.text());
+    const result = await response.json();
+    if (result.to === entry.file) return;
+    if (target?.model?.value === entry.file) setWidget(node, target.model, result.to);
+    if (selectedFile === entry.file) selectedFile = result.to;
+    await reload();
+    say(`Renamed ${entry.file} to ${result.to}. Workflows that use the old name need the new one.`);
+  }
+  async function deleteFile(entry) {
+    if (!confirm(`Delete ${entry.file}, its preview and its info? This can't be undone.`)) return;
+    const response = await api.fetchApi(`/diceforge/models/file?kind=${kind}&file=${encodeURIComponent(entry.file)}`, { method: "DELETE" });
+    if (!response.ok) return say(await response.text());
+    await reload();
+    say(`Deleted ${entry.file}.`);
   }
   function matches(entry) {
     const query = search.value.trim().toLowerCase();
@@ -263,7 +294,12 @@ async function openBrowser(node, spec, target = targetOf(node, spec)) {
   const hint = target?.pick ? target.hint : target?.model ? `Use puts a ${what} in ${target.model.name}.` : target?.folder ? `Use folder sets the folder ${spec.randomName} picks from.` : target?.triggers ? `+ Triggers inserts a ${what}'s trigger words where the cursor was in the prompt.` : "";
   back.append(element("div", { class: "dflb" },
     element("h2", {}, `${spec.title} Browser`),
-    element("div", { class: "top" }, search, base, sort, lookAll, element("button", { onclick: close }, "Close")),
+    element("div", { class: "top" }, search, base, sort, lookAll,
+      ...(spec.manage ? [element("button", { class: "go find", title: `Search Civitai and download ${spec.plural} into models/${kind}`, onclick: () => background(openCivitaiSearch({
+        kind, base: target?.base, folders: [...new Set(files.map((entry) => folderOf(entry.file)).filter(Boolean))].sort((a, b) => a.localeCompare(b)),
+        onChange: () => background(reload().then(() => say("The download is done: it is in the list."))),
+      })) }, "＋ Find on Civitai")] : []),
+      element("button", { onclick: close }, "Close")),
     element("div", { class: "top" }, element("span", { class: "muted" }, hint), status),
     element("div", { class: "main" }, tree, grid)));
   document.body.append(back);

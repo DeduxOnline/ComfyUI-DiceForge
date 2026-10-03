@@ -82,6 +82,21 @@ def fresh_memory():
     yield
 
 
+@pytest.fixture(autouse=True)
+def offline_civitai(monkeypatch, tmp_path):
+    """No test goes online: Civitai is a closed local port unless a test starts the stand-in (civitai_server). No API key, no downloads left over."""
+    from DiceForge import model_manager
+    monkeypatch.setattr(model_manager, "CIVITAI_API", "http://127.0.0.1:9/api/v1")
+    monkeypatch.setattr(model_manager, "KEY_FILE", str(tmp_path / "civitai.json"))
+    for variable in ("CIVITAI_API_KEY", "DICEFORGE_CIVITAI_KEY"):
+        monkeypatch.delenv(variable, raising=False)
+    for variable in ("NO_PROXY", "no_proxy"):
+        monkeypatch.setenv(variable, ",".join(filter(None, ["127.0.0.1", "localhost", os.environ.get(variable)])))
+    model_manager.JOBS.clear()
+    yield
+    model_manager.JOBS.clear()
+
+
 def write(path, text=""):
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8") as file:
@@ -131,7 +146,7 @@ def api():
     body instead (text or bytes, for requests that aren't JSON)."""
     from aiohttp import web
     from aiohttp.test_utils import TestClient, TestServer
-    from DiceForge import lora_stack, model_info, wildcards_api
+    from DiceForge import lora_stack, model_info, model_manager, wildcards_api
 
     routes = web.RouteTableDef()
     fake_server = types.ModuleType("server")
@@ -139,7 +154,7 @@ def api():
     real_server = sys.modules.get("server")
     sys.modules["server"] = fake_server
     try:
-        for module in (wildcards_api, model_info, lora_stack):
+        for module in (wildcards_api, model_info, lora_stack, model_manager):
             module.register_routes()
     finally:
         if real_server is None:
@@ -154,6 +169,7 @@ def api():
             async with TestClient(TestServer(app)) as client:
                 response = await (client.request(method, path, data=data) if data is not None else client.request(method, path, json=json))
                 raw = await response.read()
+                await asyncio.gather(*model_manager.TASKS.values(), return_exceptions=True) # Downloads it started finish before this loop closes.
                 try:
                     text = raw.decode("utf-8")
                 except UnicodeDecodeError:

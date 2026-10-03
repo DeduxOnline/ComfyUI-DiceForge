@@ -36,7 +36,7 @@ test.describe("@api robustness on the real server", () => {
     const bodies = ["not json", "", "[]", "5", "null", '"text"', '{"loras": 5}', '{"loras": [1, null, {"a": 1}]}', '{"items": [1, null, {"kind": 5, "file": []}]}',
       '{"kind": "loras", "file": "x", "user": [1]}', '{"name": 5}', '{"name": "ok", "stack": 5}', '{"name": "ok", "stack": {"rows": "x"}}', '{"name": ["a"]}',
       '{"name": "' + "x".repeat(5000) + '", "text": "y"}', '{"name": "' + "x".repeat(5000) + '", "stack": {"rows": []}}', "{".repeat(10000)];
-    const posts = ["/diceforge/wildcards/file", "/diceforge/wildcards/rename", "/diceforge/lora-presets", "/diceforge/lora-triggers", "/diceforge/model-bases", "/diceforge/model-info"];
+    const posts = ["/diceforge/wildcards/file", "/diceforge/wildcards/rename", "/diceforge/models/rename", "/diceforge/civitai/download", "/diceforge/civitai/key", "/diceforge/lora-presets", "/diceforge/lora-triggers", "/diceforge/model-bases", "/diceforge/model-info"];
     for (const route of posts) {
       for (const body of bodies) {
         const response = await request.post(route, { data: body, headers: { "Content-Type": "application/json" } });
@@ -49,7 +49,9 @@ test.describe("@api robustness on the real server", () => {
       "/diceforge/wildcards/file?name=", "/diceforge/wildcards/file?name=%00", "/diceforge/lora-presets/file?name=", "/diceforge/lora-presets/file?name=%00x"];
     for (const route of gets) expect((await request.get(route)).status(), route).toBeLessThan(500);
     expect((await request.delete("/diceforge/lora-presets?name=")).status()).toBeLessThan(500);
-    for (const route of ["/diceforge/wildcards/file", "/diceforge/wildcards/file?name=", "/diceforge/wildcards/file?name=%00", "/diceforge/wildcards/file?name=nope"])
+    for (const route of ["/diceforge/wildcards/file", "/diceforge/wildcards/file?name=", "/diceforge/wildcards/file?name=%00", "/diceforge/wildcards/file?name=nope",
+      "/diceforge/models/file", "/diceforge/models/file?kind=loras&file=", "/diceforge/models/file?kind=loras&file=%00", "/diceforge/models/file?kind=vae&file=x",
+      "/diceforge/civitai/downloads", "/diceforge/civitai/downloads?id=nope"])
       expect((await request.delete(route)).status(), route).toBeLessThan(500);
     await stillWorks(request);
   });
@@ -79,8 +81,30 @@ test.describe("@api robustness on the real server", () => {
           await request.delete(`/diceforge/wildcards/file?name=${encoded}`),
           await request.post("/diceforge/wildcards/rename", { data: { name, to: "escaped" } }),
           await request.post("/diceforge/wildcards/rename", { data: { name: "weighted", to: name } }),
+          await request.delete(`/diceforge/models/file?kind=loras&file=${encoded}`),
+          await request.post("/diceforge/models/rename", { data: { kind: "loras", file: name, to: "escaped" } }),
         ]) expect(response.status(), name).toBeGreaterThanOrEqual(400);
+        // A new name or a download folder: refused, or (a name like "..%2Fx" is a real file name) a file inside models/loras, put back afterwards.
+        const loras = basePath("models", "loras"), isInside = (file) => path.resolve(loras, file).startsWith(loras + path.sep);
+        writeFile("models/loras/e2e_escape.safetensors", "x");
+        const renamed = await request.post("/diceforge/models/rename", { data: { kind: "loras", file: "e2e_escape.safetensors", to: name } });
+        if (renamed.ok()) {
+          const { to } = await renamed.json();
+          expect(isInside(to), `${name} -> ${to}`).toBe(true);
+          expect((await request.delete(`/diceforge/models/file?kind=loras&file=${encodeURIComponent(to)}`)).ok()).toBe(true);
+        } else {
+          expect(renamed.status(), name).toBeGreaterThanOrEqual(400);
+          expect((await request.delete("/diceforge/models/file?kind=loras&file=e2e_escape.safetensors")).ok()).toBe(true);
+        }
+        const download = await request.post("/diceforge/civitai/download", { data: { kind: "loras", version_id: 501, folder: name } });
+        if (download.ok()) {
+          const job = await download.json();
+          expect(isInside(job.file), `${name} -> ${job.file}`).toBe(true);
+          await expect.poll(async () => (await (await request.get("/diceforge/civitai/downloads")).json()).jobs.find((entry) => entry.id === job.id).status).toBe("done");
+          expect((await request.delete(`/diceforge/models/file?kind=loras&file=${encodeURIComponent(job.file)}`)).ok()).toBe(true);
+        } else expect(download.status(), name).toBeGreaterThanOrEqual(400);
       }
+      expect(fs.readdirSync(basePath("models", "loras")).sort()).toEqual(["detail.preview.png", "detail.safetensors", "style"]); // All put back.
       expect(JSON.parse(fs.readFileSync(outside, "utf8")).secret).toBe(true); // Not overwritten or deleted.
       const strays = fs.readdirSync(path.dirname(BASE)).filter((name) => /escaped|^x\.(txt|json)$/.test(name));
       expect(strays).toEqual([]);
