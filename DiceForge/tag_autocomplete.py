@@ -3,6 +3,7 @@ import bisect
 import csv
 import heapq
 import io
+import json
 import logging
 import os
 import re
@@ -20,6 +21,9 @@ TAGS_URL = os.environ.get("DICEFORGE_TAGS_URL", "https://raw.githubusercontent.c
 LISTS = {"danbooru": "Danbooru (anime: Illustrious, NoobAI, Anima, Pony)", "e621": "e621 (furry: NoobAI, Pony)"}
 MAX_BYTES = 64 * 1024 * 1024 # A tag list is a few MB; anything far bigger is not one.
 TYPES = {0: "general", 1: "artist", 3: "copyright", 4: "character", 5: "meta"}
+TYPE_NUMBERS = {name: number for number, name in TYPES.items()}
+FAVORITES_FILE = os.path.join(folder_paths.get_user_directory(), "DiceForge", "tag_favorites.json")
+SORTS = ("count", "name")
 
 
 def tag_key(text):
@@ -43,7 +47,7 @@ def parse_tags(text):
 # The tags of every list in the folder, read again when a file changes: names and aliases sorted, for prefix search by bisection.
 class TagIndex:
     def __init__(self):
-        self.lock, self.signature, self.tags, self.names, self.aliases = threading.Lock(), None, [], [], []
+        self.lock, self.signature, self.tags, self.names, self.aliases, self.by_count = threading.Lock(), None, [], [], [], []
 
     def files(self):
         try:
@@ -72,6 +76,7 @@ class TagIndex:
             self.tags = list(merged.values())
             self.names = sorted((tag_key(tag[0]), index) for index, tag in enumerate(self.tags))
             self.aliases = sorted((tag_key(alias), index, alias) for index, tag in enumerate(self.tags) for alias in tag[3])
+            self.by_count = sorted(range(len(self.tags)), key=lambda index: (-self.tags[index][2], self.tags[index][0].lower()))
             self.signature = signature
         return self
 
@@ -95,7 +100,49 @@ class TagIndex:
             best += heapq.nlargest(limit - len(best), more, key=lambda index: self.tags[index][2])
         return [{"tag": self.tags[index][0], "type": TYPES.get(self.tags[index][1], "general"), "count": self.tags[index][2], "alias": found.get(index)}
                 for index in best]
+    def entry(self, index, favorites=frozenset()):
+        tag, kind, count, aliases = self.tags[index]
+        return {"tag": tag, "type": TYPES.get(kind, "general"), "count": count, "aliases": aliases[:8], "favorite": tag in favorites}
+
+    # The Tag Browser's page of tags: those whose name or an alias contains what is typed (all without), of one type or the favorites, most used
+    # first or by name; offset and limit page through them.
+    def browse(self, typed="", kind="", sort="count", offset=0, limit=100, favorites=frozenset()):
+        key = tag_key(typed)
+        number = TYPE_NUMBERS.get(kind)
+        def fits(index):
+            tag, tag_kind, _count, aliases = self.tags[index]
+            if kind == "favorites" and tag not in favorites:
+                return False
+            if number is not None and tag_kind != number:
+                return False
+            return not key or key in tag_key(tag) or any(key in tag_key(alias) for alias in aliases)
+        found = [index for index in self.by_count if fits(index)]
+        if sort == "name":
+            found.sort(key=lambda index: self.tags[index][0].lower())
+        elif key: # Most used first, but the tags that start with what is typed before the ones that only contain it.
+            found.sort(key=lambda index: not tag_key(self.tags[index][0]).startswith(key))
+        return {"tags": [self.entry(index, favorites) for index in found[offset:offset + limit]], "total": len(found)}
 INDEX = TagIndex()
+
+
+def read_favorites():
+    try:
+        with open(FAVORITES_FILE, encoding="utf-8") as file:
+            names = json.load(file)
+    except (OSError, ValueError):
+        return [] # None yet, or damaged: none.
+    return [name for name in names if isinstance(name, str) and name.strip()][:10000] if isinstance(names, list) else []
+def set_favorite(tag, favorite):
+    names = [name for name in read_favorites() if name != tag] + ([tag] if favorite else [])
+    os.makedirs(os.path.dirname(FAVORITES_FILE), exist_ok=True)
+    with open(FAVORITES_FILE, "w", encoding="utf-8") as file:
+        json.dump(sorted(names, key=str.lower), file, ensure_ascii=False, indent=1)
+    return names
+def number_query(query, name, default, low, high):
+    try:
+        return max(low, min(int(query.get(name, default)), high))
+    except ValueError:
+        return default
 
 
 async def download(name):
@@ -133,12 +180,34 @@ def register_routes():
     @routes.get("/diceforge/tags")
     async def search_tags(request):
         query = request.rel_url.query
-        try:
-            limit = max(1, min(int(query.get("limit", "12")), 50))
-        except ValueError:
-            limit = 12
+        limit = number_query(query, "limit", 12, 1, 50)
         index = await asyncio.get_running_loop().run_in_executor(None, INDEX.load)
         return web.json_response({"tags": index.search(query.get("q", "")[:100], limit), "ready": bool(index.tags)})
+    @routes.get("/diceforge/tags/browse")
+    async def browse_tags(request):
+        query = request.rel_url.query
+        kind, sort = query.get("type", ""), query.get("sort", "count")
+        if kind and kind not in TYPE_NUMBERS and kind != "favorites":
+            raise web.HTTPBadRequest(text=f"Tag Browser: no tag type {kind!r} (there are {', '.join(TYPE_NUMBERS)} and favorites).")
+        if sort not in SORTS:
+            raise web.HTTPBadRequest(text=f"Tag Browser: sort by {' or '.join(SORTS)}.")
+        loop = asyncio.get_running_loop()
+        index = await loop.run_in_executor(None, INDEX.load)
+        favorites = frozenset(await loop.run_in_executor(None, read_favorites))
+        page = await loop.run_in_executor(None, lambda: index.browse(query.get("q", "")[:100], kind, sort, number_query(query, "offset", 0, 0, 10 ** 7),
+                                                                     number_query(query, "limit", 100, 1, 500), favorites))
+        return web.json_response({**page, "ready": bool(index.tags)})
+    @routes.post("/diceforge/tags/favorite")
+    async def favorite_tag(request):
+        body = await json_body(request)
+        tag, favorite = body.get("tag"), body.get("favorite")
+        if not isinstance(tag, str) or not tag.strip() or len(tag) > 200 or not isinstance(favorite, bool):
+            raise web.HTTPBadRequest(text="Tag Browser: a favorite needs the tag and favorite true or false.")
+        try:
+            names = await asyncio.get_running_loop().run_in_executor(None, set_favorite, tag.strip(), favorite)
+        except OSError as error:
+            raise web.HTTPBadRequest(text=f"Tag Browser: can't save the favorites: {error.strerror or error}.") from None
+        return web.json_response({"favorites": len(names)})
     @routes.get("/diceforge/tags/lists")
     async def tag_lists(request):
         files = await asyncio.get_running_loop().run_in_executor(None, INDEX.files)

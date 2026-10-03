@@ -83,8 +83,11 @@ function setField(node, name, text, caret) {
   }
   node.setDirtyCanvas?.(true, true);
 }
-function insertIntoNode(node, token) {
-  const cursor = lastCursor.get(node) ?? { name: "positive" };
+// Inserts at the cursor last in the node's prompt fields (or at the end of the positive prompt), or at the end of the field asked for (field) when
+// the cursor wasn't in it.
+function insertIntoNode(node, token, field) {
+  const last = lastCursor.get(node);
+  const cursor = (field && last?.name !== field ? { name: field } : last) ?? { name: "positive" };
   const current = String(node.widgets?.find((widget) => widget.name === cursor.name)?.value ?? "");
   let start = cursor.start ?? current.length, end = cursor.end ?? current.length;
   // Commas around the token when it would touch other text (no cursor yet: added at the end, after a comma).

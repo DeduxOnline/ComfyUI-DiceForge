@@ -779,8 +779,27 @@ for (const vue of [true, false]) {
         await expect(page.locator(".dfwc-pop div").first()).toContainText("miku → hatsune_miku"); // By its alias.
         await page.keyboard.press("Escape");
         await expect(page.locator(".dfwc-pop")).toHaveCount(0);
+        // The Tag Browser: search, a type, + Add and − Neg, ★ favorites.
+        await clickMenu(page, id, "DiceForge.TagBrowser", "Tag Browser");
+        const browser = page.locator(".dftb");
+        await expect(browser.locator(".row .name b")).toHaveText(["1girl", "long_hair", "smile", "long_sleeves", "hatsune_miku"]); // Most used first.
+        await browser.locator(".top input").fill("long");
+        await expect(browser.locator(".row .name b")).toHaveText(["long_hair", "long_sleeves"]);
+        await browser.locator(".row", { hasText: "long_sleeves" }).locator("button.neg").click();
+        await expect.poll(() => widgetValue(page, id, "negative")).toBe("long sleeves");
+        await browser.locator(".top input").fill("");
+        await browser.locator(".types button", { hasText: "Characters" }).click();
+        await expect(browser.locator(".row .name b")).toHaveText(["hatsune_miku"]);
+        await browser.locator(".row button.fav").click();
+        await browser.locator(".types button", { hasText: "Favorites" }).click();
+        await expect(browser.locator(".row .name b")).toHaveText(["hatsune_miku"]);
+        await browser.locator(".row button.add").click();
+        await expect(browser.locator(".status")).toContainText("Added hatsune miku to the");
+        await page.keyboard.press("Escape");
+        await expect(browser).toHaveCount(0);
       } finally {
         fs.rmSync(basePath("user", "DiceForge", "tags"), { recursive: true, force: true }); // No tag suggestions in the other tests.
+        fs.rmSync(basePath("user", "DiceForge", "tag_favorites.json"), { force: true });
       }
     });
 

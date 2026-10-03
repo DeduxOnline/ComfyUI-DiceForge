@@ -732,6 +732,15 @@ Anime models (Illustrious, NoobAI, Anima, Pony) were trained on Danbooru tags: w
 - They are kept in `ComfyUI/user/DiceForge/tags` in that project's CSV format (`tag,type,count,aliases`); any list in that format can be put there by hand. Every list there is used.
 - Turn it off in ComfyUI's settings: *DiceForge → Prompts → Tags*.
 
+### Tag Browser
+
+Right-click CLIP Dual Text Encode and choose **🏷 Tag Browser** to look through the downloaded tag lists:
+
+- **Search** by name or alias (spaces or underscores), most used first (or by name); tags that start with what you typed come first.
+- **Types**: General, 👤 Characters, ©️ Series, 🎨 Artists, ⚙️ Meta, and your **★ Favorites** (☆ next to a tag stars it; kept in `ComfyUI/user/DiceForge/tag_favorites.json`).
+- **+ Add** puts the tag where the cursor was last in the node's prompts (as the autocomplete writes it: spaces, escaped parentheses), **− Neg** at the end of the negative prompt, **↗** opens it on Danbooru.
+- 100 tags at a time; **Show more** loads the next ones.
+
 ### Prompt styles
 
 Right-click CLIP Dual Text Encode and choose **🎨 Prompt styles**: named pieces of positive and negative prompt, put in with one click, as A1111's styles. A style already in the prompts is marked ✓, and a second click takes it out again.

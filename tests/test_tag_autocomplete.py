@@ -82,3 +82,33 @@ def test_download_saves_the_list_and_refuses_what_is_not_one(api, tag_server):
 def test_download_without_the_host_says_so(api):
     status, text = api("POST", "/diceforge/tags/download", json={"list": "danbooru"})
     assert status == 502 and "can't download" in text
+
+
+def test_browse_by_type_text_and_order():
+    write_list("danbooru.csv", DANBOORU)
+    index = TagIndex().load()
+    everything = index.browse()
+    assert everything["total"] == 7 and [tag["tag"] for tag in everything["tags"][:3]] == ["1girl", "long_hair", "short_hair"] # Most used first.
+    assert [tag["tag"] for tag in index.browse(kind="character")["tags"]] == ["hatsune_miku"]
+    assert [tag["tag"] for tag in index.browse("hair")["tags"]] == ["long_hair", "short_hair"]
+    assert [tag["tag"] for tag in index.browse("long")["tags"]] == ["long_hair", "long_sleeves"]
+    assert [tag["tag"] for tag in index.browse("miku")["tags"]] == ["hatsune_miku"] # By its alias.
+    assert [tag["tag"] for tag in index.browse(sort="name", limit=3)["tags"]] == ["1girl", "^_^", "hatsune_miku"]
+    page = index.browse(offset=5, limit=10)
+    assert page["total"] == 7 and len(page["tags"]) == 2
+    favorites = index.browse(kind="favorites", favorites=frozenset({"lo", "smile"}))
+    assert [(tag["tag"], tag["favorite"]) for tag in favorites["tags"]] == [("lo", True)] # A favorite not in the lists isn't shown.
+
+
+def test_browse_and_favorite_routes(api):
+    write_list("danbooru.csv", DANBOORU)
+    assert api("POST", "/diceforge/tags/favorite", json={"tag": "long_hair", "favorite": True})[1] == {"favorites": 1}
+    status, body = api("GET", "/diceforge/tags/browse?type=favorites")
+    assert status == 200 and body["ready"] and [tag["tag"] for tag in body["tags"]] == ["long_hair"] and body["tags"][0]["favorite"]
+    assert api("POST", "/diceforge/tags/favorite", json={"tag": "long_hair", "favorite": False})[1] == {"favorites": 0}
+    assert api("GET", "/diceforge/tags/browse?type=favorites")[1]["total"] == 0
+    assert api("GET", "/diceforge/tags/browse?q=hair&limit=1")[1]["total"] == 2
+    for query in ("type=nope", "sort=nope"):
+        assert api("GET", f"/diceforge/tags/browse?{query}")[0] == 400
+    for body in ({"tag": "", "favorite": True}, {"tag": "x"}, {"tag": 5, "favorite": True}):
+        assert api("POST", "/diceforge/tags/favorite", json=body)[0] == 400

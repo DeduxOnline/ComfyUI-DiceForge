@@ -109,6 +109,7 @@ def own_sampler_presets(monkeypatch, tmp_path):
     monkeypatch.setattr(tag_autocomplete, "TAGS_FOLDER", str(tmp_path / "tags"))
     monkeypatch.setattr(tag_autocomplete, "TAGS_URL", "http://127.0.0.1:9/tags/{name}.csv")
     monkeypatch.setattr(tag_autocomplete, "INDEX", tag_autocomplete.TagIndex())
+    monkeypatch.setattr(tag_autocomplete, "FAVORITES_FILE", str(tmp_path / "tag_favorites.json"))
 
 
 def write(path, text=""):
