@@ -444,6 +444,24 @@ The same browser for diffusion models (`models/diffusion_models`, and the older 
 
 Cards, previews, folder tree, search, filters, Civitai lookups, **＋ Find on Civitai**, **✎** and **🗑** work as in the other browsers. Civitai has no model type of its own for diffusion models: they are *Checkpoints* there, so the search shows Checkpoints. Pick a version whose file is the diffusion model alone (often marked fp8, unet or "model only"); a full checkpoint (with its text encoder and VAE) belongs in the Checkpoint Browser. Downloads go to `models/diffusion_models`, even where ComfyUI also has the older `models/unet`.
 
+## KSampler presets
+
+<img src="docs/images/sampler_presets.png" width="955" alt="The Sampler presets submenu in the right-click menu of KSampler">
+
+Right-click **KSampler**, **KSampler (Advanced)** or any other node with `steps`, `cfg`, `sampler_name` and `scheduler`, and choose **🎲 Sampler presets**. A preset sets those four widgets at once; the seed, denoise and the rest stay as they are. A message says what was set.
+
+| Preset | Steps | CFG | Sampler | Scheduler | For |
+|---|---|---|---|---|---|
+| **Anima** | 30 | 4.5 | er_sde | simple | Anima base and aesthetic: 30-50 steps, CFG 4-6. `euler_ancestral` gives softer images. |
+| **Anima Turbo** | 10 | 1 | euler | simple | The distilled Anima: CFG 1, 8-12 steps. |
+| **Illustrious** | 28 | 6 | euler_ancestral | normal | Illustrious XL and its merges: 20-30 steps, CFG 5-7. |
+| **NoobAI (eps)** | 28 | 5 | euler_ancestral | normal | NoobAI-XL epsilon versions. |
+| **NoobAI (v-pred)** | 30 | 4.5 | euler | normal | NoobAI-XL v-prediction: Euler only (other samplers and Karras don't work well with it). A checkpoint not marked as v-pred needs **ModelSamplingDiscrete** (`v_prediction`) in front of KSampler. |
+
+- **✨ Auto** picks the preset for the model connected to the sampler's `model` input. It follows the connection back through LoRA loaders and other nodes in between to Load Checkpoint or Load Diffusion Model. It uses the model's Civitai base model from [Model info](#model-info), and falls back to the file name: *anima*, *turbo*, *noob*, *vpred* / *v-pred*, *illustrious*, *ilxl*. For any other model it says that it doesn't know one, and changes nothing.
+- **💾 Save current as preset…** saves the node's four values under a name of your choice. Your presets come after the built-in ones (★); **🗑 Delete** removes one. They are kept in `ComfyUI/user/DiceForge/sampler_presets.json`, so every workflow has them. The built-in names can't be reused.
+- A sampler or scheduler that your ComfyUI doesn't have is left unchanged, and the message names it.
+
 ## Tests
 
 Two test suites, next to `DiceForge` (not copied into ComfyUI). Both need a ComfyUI checkout with its Python packages installed, and never touch your own ComfyUI folders.

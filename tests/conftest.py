@@ -97,6 +97,13 @@ def offline_civitai(monkeypatch, tmp_path):
     model_manager.JOBS.clear()
 
 
+@pytest.fixture(autouse=True)
+def own_sampler_presets(monkeypatch, tmp_path):
+    """Saved sampler presets go to the test's folder, not the ComfyUI user folder."""
+    from DiceForge import sampler_presets
+    monkeypatch.setattr(sampler_presets, "PRESETS_FILE", str(tmp_path / "sampler_presets.json"))
+
+
 def write(path, text=""):
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8") as file:
@@ -148,7 +155,7 @@ def api():
     body instead (text or bytes, for requests that aren't JSON)."""
     from aiohttp import web
     from aiohttp.test_utils import TestClient, TestServer
-    from DiceForge import lora_stack, model_info, model_manager, wildcards_api
+    from DiceForge import lora_stack, model_info, model_manager, sampler_presets, wildcards_api
 
     routes = web.RouteTableDef()
     fake_server = types.ModuleType("server")
@@ -156,7 +163,7 @@ def api():
     real_server = sys.modules.get("server")
     sys.modules["server"] = fake_server
     try:
-        for module in (wildcards_api, model_info, lora_stack, model_manager):
+        for module in (wildcards_api, model_info, lora_stack, model_manager, sampler_presets):
             module.register_routes()
     finally:
         if real_server is None:

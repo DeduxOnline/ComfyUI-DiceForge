@@ -21,6 +21,11 @@ async function promptField(page, id, name) {
 }
 const lookUp = (request, kind, file) => request.get(`/diceforge/model-info?kind=${kind}&file=${encodeURIComponent(file)}`);
 const cardTitles = (page) => page.$$eval(".dflb .card", (cards) => cards.map((card) => card.querySelector(".title").innerText + (card.querySelector(".base") ? ` [${card.querySelector(".base").innerText}]` : "")));
+// The entries of the Sampler presets submenu, and clicking one of them (as the right-click menu does).
+const submenu = (page, id) => page.evaluate((id) => window.app.extensions.find((item) => item.name === "DiceForge.SamplerPresets")
+  .getNodeMenuItems(window.app.graph.getNodeById(id))[0].submenu.options.filter(Boolean).map((item) => item.content), id);
+const clickSubmenu = (page, id, content) => page.evaluate(([id, content]) => window.app.extensions.find((item) => item.name === "DiceForge.SamplerPresets")
+  .getNodeMenuItems(window.app.graph.getNodeById(id))[0].submenu.options.find((item) => item?.content.includes(content)).callback(), [id, content]);
 
 for (const vue of [true, false]) {
   test.describe(vue ? "Nodes 2.0" : "classic nodes", () => {
@@ -614,6 +619,55 @@ for (const vue of [true, false]) {
       await page.locator(".dflb .tree .row", { hasText: "flux" }).locator("button", { hasText: "Use folder" }).click();
       await expect.poll(() => widgetValue(page, random, "folder")).toBe("flux");
       await page.keyboard.press("Escape");
+    });
+
+    test("KSampler presets: the right-click submenu, Auto from the checkpoint's base model, saving and deleting your own", async ({ page, request }) => {
+      await lookUp(request, "checkpoints", "illustrious_base.safetensors");
+      const [checkpoint, sampler] = await addNodes(page, [
+        { type: "CheckpointLoaderSimple", widgets: { ckpt_name: "illustrious_base.safetensors" } },
+        { type: "KSampler", pos: [460, 200] },
+      ]);
+      expect(await menuItems(page, sampler, "DiceForge.SamplerPresets")).toEqual(["🎲 Sampler presets"]);
+      expect(await menuItems(page, checkpoint, "DiceForge.SamplerPresets")).toEqual([]);
+      const values = () => Promise.all(["steps", "cfg", "sampler_name", "scheduler"].map((name) => widgetValue(page, sampler, name)));
+      // The real right-click menu: the submenu lists the built-in presets.
+      if (vue) {
+        await nodeElement(page, sampler).locator(".lg-node-header, [data-testid='node-title']").first().click({ button: "right" });
+      } else {
+        const point = await page.evaluate((id) => {
+          const canvas = window.app.canvas, node = window.app.graph.getNodeById(id), box = canvas.canvas.getBoundingClientRect();
+          const [x, y] = canvas.ds.convertCanvasToOffset([node.pos[0] + 60, node.pos[1] + 40]);
+          return { x: box.left + x, y: box.top + y };
+        }, sampler);
+        await page.mouse.click(point.x, point.y, { button: "right" });
+      }
+      await page.getByText("Sampler presets").first()[vue ? "hover" : "click"](); // Nodes 2.0 opens submenus on hover, the classic menu on click.
+      await page.getByText(/Illustrious · 28 steps/).first().click();
+      await expect.poll(values).toEqual([28, 6, "euler_ancestral", "normal"]);
+      // Auto: the connected checkpoint is Illustrious on Civitai; with nothing connected it says so and changes nothing.
+      await setWidget(page, sampler, "steps", 7);
+      await page.evaluate(() => window.app.extensionManager.toast.removeAll?.());
+      await clickSubmenu(page, sampler, "Auto");
+      await expect(page.getByText(/connected to the model input/).first()).toBeVisible();
+      expect((await values())[0]).toBe(7);
+      await connect(page, checkpoint, 0, sampler, 0);
+      await clickSubmenu(page, sampler, "NoobAI (v-pred)");
+      await expect.poll(values).toEqual([30, 4.5, "euler", "normal"]);
+      await clickSubmenu(page, sampler, "Auto");
+      await expect.poll(values).toEqual([28, 6, "euler_ancestral", "normal"]);
+      // Your own: saved from the node's values, then in the menu, then deleted.
+      await setWidget(page, sampler, "steps", 21);
+      await setWidget(page, sampler, "scheduler", "karras");
+      page.on("dialog", (dialog) => (dialog.type() === "prompt" ? dialog.accept("E2E mine") : dialog.accept()));
+      await clickSubmenu(page, sampler, "Save current");
+      await expect.poll(async () => (await (await request.get("/diceforge/sampler-presets")).json()).user.map((item) => item.name)).toContain("E2E mine");
+      await expect.poll(() => submenu(page, sampler)).toContain("★ E2E mine · 21 steps · CFG 6");
+      await setWidget(page, sampler, "steps", 5);
+      await clickSubmenu(page, sampler, "★ E2E mine");
+      await expect.poll(values).toEqual([21, 6, "euler_ancestral", "karras"]);
+      await clickSubmenu(page, sampler, "🗑 Delete E2E mine");
+      await expect.poll(() => submenu(page, sampler)).not.toContain("★ E2E mine · 21 steps · CFG 6");
+      expect((await (await request.get("/diceforge/sampler-presets")).json()).user).toEqual([]);
     });
 
     test("LoRA Stack: rows, random strength, groups, trigger words, base check and presets", async ({ page, request }) => {

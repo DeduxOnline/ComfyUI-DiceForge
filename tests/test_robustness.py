@@ -199,14 +199,16 @@ ROUTES = [("POST", "/diceforge/wildcards/file"), ("POST", "/diceforge/lora-prese
           ("DELETE", "/diceforge/wildcards/file?name=nope"), ("POST", "/diceforge/models/rename"), ("DELETE", "/diceforge/models/file?kind=loras&file=../x"),
           ("DELETE", "/diceforge/models/file"), ("POST", "/diceforge/civitai/download"), ("POST", "/diceforge/civitai/key"), ("GET", "/diceforge/civitai/key"),
           ("GET", "/diceforge/civitai/downloads"), ("DELETE", "/diceforge/civitai/downloads?id=x"),
-          ("POST", "/diceforge/model-favorite"), ("POST", "/diceforge/wildcards/favorite")]
+          ("POST", "/diceforge/model-favorite"), ("POST", "/diceforge/wildcards/favorite"), ("POST", "/diceforge/sampler-presets"),
+          ("GET", "/diceforge/sampler-presets"), ("DELETE", "/diceforge/sampler-presets?name=nope"), ("DELETE", "/diceforge/sampler-presets")]
 JUNK_BODIES = ["not json", "", "[]", "5", "null", '"text"', '{"loras": 5}', '{"loras": [1, null, {"a": 1}, "x.safetensors"]}', '{"items": 5}',
                '{"items": [1, null, "x", {"kind": 5, "file": []}, {"kind": "loras", "file": "../../x"}]}', '{"kind": "loras", "file": "x", "user": [1]}',
                '{"kind": "loras", "file": "x", "user": {"name": {"a": 1}}}', '{"name": 5}', '{"name": "ok", "stack": 5}', '{"name": "ok", "stack": {"rows": "x"}}',
                '{"name": "../../evil", "text": "x"}', '{"name": "ok", "text": 5}', '{"name": ["a"]}', '{"name": "ok", "to": 5}',
                '{"name": "ok", "to": "../../evil"}', '{"name": "ok", "text": "x", "create": "yes"}', '{"kind": "loras", "file": "x.safetensors", "to": 5}',
                '{"kind": "loras", "file": "x.safetensors", "to": "../../evil"}', '{"kind": "loras", "file": "../x.safetensors", "to": "y"}', '{"key": 5}',
-               '{"key": "x\\u0000y"}', '{"version_id": "1"}', '{"version_id": 1.5}', '{"version_id": -3}', '{"version_id": 1, "folder": "../../x"}']
+               '{"key": "x\\u0000y"}', '{"version_id": "1"}', '{"version_id": 1.5}', '{"version_id": -3}', '{"version_id": 1, "folder": "../../x"}',
+               '{"name": "x", "steps": "5", "cfg": 5, "sampler_name": "euler", "scheduler": "normal"}', '{"name": "x", "steps": 5, "cfg": 1e308}']
 
 
 @pytest.mark.parametrize("method, path", ROUTES)
@@ -220,7 +222,7 @@ def test_junk_requests_never_cause_a_server_error(method, path, api, wildcards, 
     shutil.rmtree(lora_stack.PRESET_FOLDER, ignore_errors=True)
 
 
-KEYS = ["name", "stack", "rows", "text", "loras", "items", "kind", "file", "user", "overwrite", "lora", "groups", "to", "create", "favorite"]
+KEYS = ["name", "stack", "rows", "text", "loras", "items", "kind", "file", "user", "overwrite", "lora", "groups", "to", "create", "favorite", "steps", "cfg", "sampler_name", "scheduler"]
 
 
 def json_children(children):

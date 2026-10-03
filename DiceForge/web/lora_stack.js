@@ -425,3 +425,5 @@ app.registerExtension({
     if (node.comfyClass === NODE_TYPE) setUp(node);
   },
 });
+
+export { modelSource, fetchBases, baseOf }; // The connected model and its base, for the sampler presets' Auto (sampler_presets.js).

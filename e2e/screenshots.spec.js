@@ -149,6 +149,26 @@ test.describe("README screenshots (Nodes 2.0)", () => {
     expect((await request.delete("/diceforge/models/file?kind=loras&file=styles/neon/neon_glow.safetensors")).ok()).toBe(true);
   });
 
+  test("KSampler presets in the right-click menu", async ({ page, request }) => {
+    await lookUp(request, "checkpoints", "illustrious_base.safetensors");
+    const [checkpoint, sampler] = await addNodes(page, [
+      { type: "CheckpointLoaderSimple", pos: [400, 260], widgets: { ckpt_name: "illustrious_base.safetensors" } },
+      { type: "KSampler", pos: [760, 260] },
+    ]);
+    await connect(page, checkpoint, 0, sampler, 0);
+    await nodeElement(page, sampler).locator(".lg-node-header").first().click({ button: "right" });
+    await page.getByText("Sampler presets").first().hover();
+    const last = page.getByText(/NoobAI \(v-pred\) ·/).first();
+    await expect(last).toBeVisible();
+    await page.waitForTimeout(600);
+    const boxes = [await nodeElement(page, checkpoint).boundingBox(), await nodeElement(page, sampler).boundingBox(),
+      await page.getByText("Sampler presets").first().boundingBox(), await last.boundingBox(), await page.getByText("Save current as preset").first().boundingBox()];
+    const left = Math.min(...boxes.map((box) => box.x)) - 24, top = Math.min(...boxes.map((box) => box.y)) - 24;
+    const right = Math.max(...boxes.map((box) => box.x + box.width)) + 40, bottom = Math.max(...boxes.map((box) => box.y + box.height)) + 40;
+    await page.screenshot({ path: path.join(OUT, "sampler_presets.png"), clip: { x: left, y: top, width: right - left, height: bottom - top } });
+    expect(right - left).toBeGreaterThan(400);
+  });
+
   test("utility nodes", async ({ page }) => {
     const ids = await addNodes(page, [
       { type: "VAEDecodeSave", pos: [400, 220] },

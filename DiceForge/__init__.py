@@ -18,6 +18,7 @@ from .load_diffusion_model_clip import LoadDiffusionModelCLIP
 from .lora_stack import LoraStack
 from . import model_info # Server routes of the Model info dialog (web/model_info.js).
 from . import wildcards_api # Server routes of the Wildcard Browser and the __ autocomplete (web/wildcards.js).
+from . import sampler_presets # Server routes of the KSampler presets in the node menu (web/sampler_presets.js).
 from . import model_manager # Server routes that manage LoRA files: Civitai search and download, rename and delete (web/civitai.js, web/model_browser.js).
 WEB_DIRECTORY = "./web" # Frontend extension: feeds the live size previews of the resolution nodes.
 class DiceForgeExtension(ComfyExtension):
