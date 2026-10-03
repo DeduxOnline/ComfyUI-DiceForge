@@ -2,6 +2,7 @@ import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
 import { addStyleOnce, background, element } from "./dom.js";
 import { dragSource, dropTarget, pickFolder } from "./move_dialog.js";
+import { addHighlightStyle, highlightEnabled, highlightWildcardFile } from "./prompt_highlight.js";
 
 // Wildcards in CLIP Dual Text Encode: autocomplete after "__" in the prompt fields, and the Wildcard Browser (node menu) with a folder tree,
 // "+ Add" buttons that insert __name__ (or __folder/*__) where the cursor was, and an editor for the files.
@@ -111,10 +112,17 @@ const STYLE = `
 .dfwc .tree{width:45%;overflow:auto;border:1px solid #4a4a4a;border-radius:6px;padding:6px}
 .dfwc .edit{flex:1;display:flex;flex-direction:column;gap:8px;min-width:0}
 .dfwc .code{--current-line:-40px;flex:1;display:flex;min-height:0;border:1px solid #555;border-radius:4px;background:#262626;overflow:hidden}
-.dfwc .code .lines,.dfwc .code textarea{font:13px/20px ui-monospace,monospace;padding-top:6px;background-image:linear-gradient(#2e3846,#2e3846),linear-gradient(to bottom,transparent 19px,#323232 19px);
+.dfwc .code .lines,.dfwc .code .hl,.dfwc .code textarea{font:13px/20px ui-monospace,monospace;letter-spacing:normal}
+.dfwc .code .lines,.dfwc .code .hl{background-image:linear-gradient(#2e3846,#2e3846),linear-gradient(to bottom,transparent 19px,#323232 19px);
   background-size:100% 20px;background-position:0 var(--current-line),0 6px;background-repeat:no-repeat,repeat;background-attachment:local}
 .dfwc .code .lines{flex:none;box-sizing:content-box;padding:6px 8px 40px 10px;text-align:right;color:#6f6f6f;white-space:pre;overflow:hidden;user-select:none;background-color:#212121;border-right:1px solid #444}
-.dfwc .code textarea{flex:1;min-width:0;resize:none;border:none;border-radius:0;padding:6px 8px;white-space:pre;overflow:auto;background-color:#262626}
+.dfwc .code .text{flex:1;min-width:0;position:relative;display:flex}
+.dfwc .code .hl{position:absolute;inset:0;margin:0;padding:6px 48px 46px 8px;white-space:pre;overflow:hidden;color:#eee;background-color:#262626;pointer-events:none;z-index:0}
+.dfwc .code .hl span{font-weight:inherit}
+.dfwc .code textarea.src{flex:1;min-width:0;resize:none;border:none;border-radius:0;padding:6px 8px;white-space:pre;overflow:auto;position:relative;z-index:1;outline:none;
+  background:transparent;color:transparent;-webkit-text-fill-color:transparent;caret-color:#eee}
+.dfwc .code textarea.src::placeholder{color:#888;-webkit-text-fill-color:#888}.dfwc .code textarea.src::selection{background:rgba(90,140,230,.4)}
+.dfwc .code.readonly .hl{color:#aaa}
 .dfwc .row{display:flex;align-items:center;gap:6px;padding:3px 6px;border-radius:4px}.dfwc .row:hover{background:#2c2c2c}
 .dfwc .row .name{flex:1;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dfwc .row.sel{background:#2f3f55}
 .dfwc .folder>.row .name{font-weight:600}.dfwc .folder>.row .name::before{content:"▸ ";color:#999}.dfwc .folder.open>.row .name::before{content:"▾ "}
@@ -266,10 +274,21 @@ function keepOpenFolders(folders) {
 // (button or Ctrl+S; • marks unsaved changes), rename, move to another folder (Move, or drag a file onto a folder) and delete.
 async function openBrowser(node) {
   addStyle();
+  addHighlightStyle();
   const search = element("input", { placeholder: "Search wildcards…" });
   const tree = element("div", { class: "tree" });
   const title = element("div", { class: "muted" }, "Select a file to see and edit its lines, one option per line (# starts a comment).");
-  const editor = element("textarea", { placeholder: "One option per line", wrap: "off", spellcheck: "false" });
+  const editor = element("textarea", { class: "src", placeholder: "One option per line", wrap: "off", spellcheck: "false" });
+  // The text is drawn, with its syntax colored as in the prompt fields, by a layer behind the editor, whose own text is transparent (it keeps
+  // the caret, selection and editing). The layer also draws the lines under the rows and the caret's line.
+  const highlight = element("div", { class: "dfhl hl", "aria-hidden": "true" });
+  const paint = () => {
+    const text = editor.value;
+    if (highlightEnabled() && text.length <= 300000) highlight.innerHTML = highlightWildcardFile(text, knownWildcards()); // A huge file: plain.
+    else highlight.textContent = text + "\n";
+    highlight.scrollTop = editor.scrollTop;
+    highlight.scrollLeft = editor.scrollLeft;
+  };
   // Line numbers next to the editor, as in a code editor, scrolled with it; lines don't wrap, so each number stays next to its line.
   const lines = element("div", { class: "lines", "aria-hidden": "true" }, "1");
   const numberLines = () => {
@@ -280,11 +299,15 @@ async function openBrowser(node) {
       lines.style.width = `${String(count).length}ch`;
     }
     lines.scrollTop = editor.scrollTop;
+    paint();
   };
   editor.addEventListener("input", numberLines);
-  editor.addEventListener("scroll", () => { lines.scrollTop = editor.scrollTop; });
+  editor.addEventListener("scroll", () => {
+    lines.scrollTop = highlight.scrollTop = editor.scrollTop;
+    highlight.scrollLeft = editor.scrollLeft;
+  });
   // The line with the caret is highlighted, in the text and its number (a background row, scrolled with the text).
-  const code = element("div", { class: "code" }, lines, editor);
+  const code = element("div", { class: "code" }, lines, element("div", { class: "text" }, highlight, editor));
   const markCurrentLine = () => {
     let line = 0;
     for (let at = editor.value.indexOf("\n"); at !== -1 && at < editor.selectionStart; at = editor.value.indexOf("\n", at + 1)) line++;
@@ -326,6 +349,7 @@ async function openBrowser(node) {
     numberLines();
     markCurrentLine();
     editor.readOnly = !!file.readonly; // A yaml wildcard is one key of a yaml file: edited in that file.
+    code.classList.toggle("readonly", editor.readOnly);
     save.disabled = rename.disabled = move.disabled = remove.disabled = !!file.readonly;
     showDirty();
     say(file.readonly ? "From a yaml file: read-only here, edit the yaml file to change it." : "");
@@ -378,6 +402,7 @@ async function openBrowser(node) {
     numberLines();
     markCurrentLine();
     editor.readOnly = false;
+    code.classList.remove("readonly");
     rename.disabled = move.disabled = remove.disabled = true;
     showDirty();
     title.replaceChildren("Select a file to see and edit its lines, one option per line (# starts a comment).");

@@ -195,6 +195,7 @@ for (const vue of [true, false]) {
       await expect.poll(numbers).toBe("1\n2"); // A line number next to each line.
       await page.locator(".dfwc .edit textarea").fill("one\ntwo\n2::three");
       await expect.poll(numbers).toBe("1\n2\n3"); // Numbered again as you type.
+      await expect(page.locator(".dfwc .code .hl .weight")).toHaveText("2::"); // The syntax colored, as in the prompt fields: the line's weight.
       const currentLine = () => page.locator(".dfwc .code").evaluate((code) => code.style.getPropertyValue("--current-line"));
       await expect.poll(currentLine).toBe("46px"); // The caret's line (the third, after typing) is highlighted.
       await page.locator(".dfwc .edit textarea").press("Control+Home");

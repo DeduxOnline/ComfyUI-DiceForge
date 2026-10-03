@@ -5,7 +5,7 @@ import { knownWildcards, PROMPT_FIELDS, PROMPT_NODE_TYPE, textareaOf, wildcardLi
 // Syntax highlighting in the prompt fields of CLIP Dual Text Encode: __wildcards__ (red and wavy when no file has that name), {a|b} choices with
 // their braces colored by depth, counts (2$$), weights (3::), locks (!), ${variables}, // and /* */ comments, \ escapes, (word:1.2) weights,
 // embeddings and <lora:name:weight>. The text is drawn by a layer behind the field, which shows through it (the field keeps the caret, the selection and the editing).
-// A setting turns it off.
+// The Wildcard Browser's editor uses it too, with the wildcard files' # comment lines and 3:: line weights. A setting turns it off.
 const SETTING = "DiceForge.PromptHighlight";
 const STYLE = `
 .dfhl{position:absolute;overflow:hidden;pointer-events:none;white-space:pre-wrap;overflow-wrap:break-word;word-break:normal;box-sizing:border-box;margin:0;border:0;z-index:0}
@@ -77,15 +77,35 @@ export function promptMarks(text, names) {
   for (const open of stack) marks[open.mark][2] = "bad"; // Never closed.
   return marks.sort((a, b) => a[0] - b[0]);
 }
-export function highlightPrompt(text, names) {
+// The marks for a wildcard file: every line is one option, read as a prompt of its own, after a # comment line or a 3:: line weight.
+const LINE_WEIGHT = /^\s*\d+(?:\.\d+)?::/;
+export function wildcardFileMarks(text, names) {
+  const marks = [];
+  let offset = 0;
+  for (const line of text.split("\n")) {
+    if (/^\s*#/.test(line)) marks.push([offset, offset + line.length, "comment"]);
+    else {
+      const weight = LINE_WEIGHT.exec(line), from = weight ? weight[0].length : 0;
+      if (weight) marks.push([offset + weight[0].search(/\d/), offset + from, "weight"]);
+      for (const [start, end, kind] of promptMarks(line.slice(from), names)) marks.push([offset + from + start, offset + from + end, kind]);
+    }
+    offset += line.length + 1;
+  }
+  return marks;
+}
+function marksHTML(text, marks) {
   let html = "", at = 0;
-  for (const [start, end, kind] of promptMarks(text, names)) {
+  for (const [start, end, kind] of marks) {
     if (start < at) continue; // Marks never overlap, but a weight inside another mark is skipped rather than drawn twice.
     html += escapeHTML(text.slice(at, start)) + `<span class="${kind}">${escapeHTML(text.slice(start, end))}</span>`;
     at = end;
   }
   return html + escapeHTML(text.slice(at)) + "\n"; // The last line break keeps its height, as in the field.
 }
+export const highlightPrompt = (text, names) => marksHTML(text, promptMarks(text, names));
+export const highlightWildcardFile = (text, names) => marksHTML(text, wildcardFileMarks(text, names));
+export const highlightEnabled = () => app.extensionManager?.setting?.get?.(SETTING) !== false;
+export const addHighlightStyle = () => addStyleOnce("dfhl-style", STYLE);
 export function missingWildcards(text, names) {
   return promptMarks(text, names).filter(([, , kind]) => kind === "wc-missing").map(([start, end]) => text.slice(start, end));
 }
@@ -139,11 +159,10 @@ function sync(textarea) {
   else if (state.title == null) textarea.removeAttribute("title");
   else textarea.setAttribute("title", state.title);
 }
-const enabled = () => app.extensionManager?.setting?.get?.(SETTING) !== false;
 // Every half second: fields of new nodes get a layer, moved or resized ones follow, gone ones are let go; with the setting off, all are let go.
 function scan() {
   const fields = new Set();
-  if (enabled()) {
+  if (highlightEnabled()) {
     for (const node of app.graph?.nodes ?? []) {
       if (node.comfyClass !== PROMPT_NODE_TYPE) continue;
       for (const name of PROMPT_FIELDS) {
@@ -167,13 +186,13 @@ app.registerExtension({
   settings: [{
     id: SETTING,
     category: ["DiceForge", "Prompts", "Highlight"],
-    name: "Highlight the prompt syntax in CLIP Dual Text Encode",
-    tooltip: "Colors __wildcards__ (red when no file has that name), {a|b} choices, weights, ${variables} and comments in the prompt fields.",
+    name: "Highlight the prompt syntax in CLIP Dual Text Encode and the Wildcard Browser",
+    tooltip: "Colors __wildcards__ (red when no file has that name), {a|b} choices, weights, ${variables} and comments in the prompt fields and the wildcard editor.",
     type: "boolean",
     defaultValue: true,
   }],
   setup() {
-    addStyleOnce("dfhl-style", STYLE);
+    addHighlightStyle();
     setInterval(scan, 500);
   },
 });
