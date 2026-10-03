@@ -6,15 +6,15 @@ from comfy_api.latest import ComfyExtension, io
 from .seed_modes import MEMORY, SEED_MODES, make_picker, pick_label, seed_mode_tooltip, fingerprint
 SAMPLERS, SCHEDULERS = comfy.samplers.KSampler.SAMPLERS, comfy.samplers.KSampler.SCHEDULERS
 # A list typed in a text field: names separated by commas or new lines, duplicates dropped; "*" (or "all") is every known name.
-def parse_names(text, known, what):
+def parse_names(text, known, what, node="Random Sampler"):
     names = list(dict.fromkeys(name.strip() for name in re.split(r"[,\n]", text) if name.strip()))
     if any(name.lower() in ("*", "all") for name in names):
         return list(known)
     unknown = [name for name in names if name not in known]
     if unknown:
-        raise ValueError(f"Random Sampler: unknown {what} {', '.join(unknown)}. Known {what}s: {', '.join(known)}.")
+        raise ValueError(f"{node}: unknown {what} {', '.join(unknown)}. Known {what}s: {', '.join(known)}.")
     if not names:
-        raise ValueError(f"Random Sampler: no {what}s listed (use * for all).")
+        raise ValueError(f"{node}: no {what}s listed (use * for all).")
     return names
 # Output for a list input of another node (KSampler's sampler_name and scheduler). Its type is the list of options itself, as in V1 nodes: ComfyUI's
 # link check accepts that for list inputs, but not the plain "COMBO" type of a V3 Combo output ("Return type mismatch between linked nodes").

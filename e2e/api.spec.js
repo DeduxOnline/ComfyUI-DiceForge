@@ -7,7 +7,7 @@ const { MODELS, DOWNLOADS } = require("./fixtures");
 
 const NODES = ["SDXLResolutionListLatent", "ResolutionSelectorRandomLatent", "CLIPTextEncodePositiveNegative", "DiceForgeRandomInt", "DiceForgeRandomFloat",
   "DiceForgeRandomLora", "DiceForgeRandomCheckpoint", "DiceForgeRandomDiffusionModel", "DiceForgeRandomImage", "DiceForgeGrid", "DiceForgeRandomSampler",
-  "DiceForgeRandomVAE", "LoadVAEDecodeSave", "VAEDecodeSave", "LoadDiffusionModelCLIP", "DiceForgeLoraStack"];
+  "DiceForgeRandomVAE", "LoadVAEDecodeSave", "VAEDecodeSave", "LoadDiffusionModelCLIP", "DiceForgeLoraStack", "DiceForgeXYPlot"];
 const clip = (positive, negative = "", { seed = 0, mode = "random" } = {}) => ({
   1: { class_type: "CLIPTextEncodePositiveNegative", inputs: { positive, negative, seed, seed_mode: mode, trim: true } },
   2: { class_type: "PreviewAny", inputs: { source: ["1", 2] } },
@@ -182,6 +182,31 @@ test.describe("@api workflows and routes", () => {
     const errors = result.rejected.node_errors["2"].errors.map((error) => `${error.type} ${error.extra_info?.input_name ?? ""}`);
     expect(errors.join()).toContain("required_input_missing model"); // No model in this test: only the links are checked.
     expect(errors.join()).not.toContain("return_type_mismatch");
+  });
+
+  test("XY Plot: KSampler takes its outputs; each index is one cell, and Dice Grid finishes the grid after the last", async ({ request }) => {
+    const xy = (index) => ({ index, x_type: "cfg", x_values: "4, 5", y_type: "sampler", y_values: "euler, dpmpp_2m", seed: 3, steps: 2, cfg: 6, sampler_name: "euler",
+      scheduler: "normal", denoise: 1, lora_name: "None", lora_strength: 1 });
+    const linked = await runPrompt(request, { 1: { class_type: "DiceForgeXYPlot", inputs: xy(0) },
+      2: { class_type: "KSampler", inputs: { seed: ["1", 2], steps: ["1", 3], cfg: ["1", 4], sampler_name: ["1", 5], scheduler: ["1", 6], denoise: ["1", 7] } },
+      3: { class_type: "PreviewAny", inputs: { source: ["2", 0] } } });
+    const errors = linked.rejected.node_errors["2"].errors.map((error) => `${error.type} ${error.extra_info?.input_name ?? ""}`);
+    expect(errors.join()).toContain("required_input_missing model"); // No model here: only the links are checked.
+    expect(errors.join()).not.toContain("return_type_mismatch");
+    const grid = (index) => ({ 1: { class_type: "DiceForgeXYPlot", inputs: xy(index) }, 2: { class_type: "EmptyImage", inputs: { width: 64, height: 64, batch_size: 1, color: 0x33cc66 } },
+      3: { class_type: "DiceForgeGrid", inputs: { image: ["2", 0], label: ["1", 8], row_label: ["1", 9], count: ["1", 10], columns: ["1", 11], new_grid: ["1", 12], cell_width: 64, save: true,
+        filename_prefix: "e2e/xy", name: "xy", legend: "", legend_position: "top", numbered: false } },
+      4: { class_type: "PreviewAny", inputs: { source: ["1", 8] } }, 5: { class_type: "PreviewAny", inputs: { source: ["3", 1] } } });
+    const runs = [];
+    for (let index = 0; index < 4; index++) {
+      const result = await runPrompt(request, grid(index));
+      expect(result.status).toBe("success");
+      runs.push(`${shown(result, "4")}=${shown(result, "5")}`);
+    }
+    expect(runs).toEqual(["CFG 4=1", "CFG 5=2", "CFG 4=3", "CFG 5=4"]);
+    expect(outputFiles("e2e", "xy_")).toHaveLength(1);
+    const bad = await runPrompt(request, { 1: { class_type: "DiceForgeXYPlot", inputs: { ...xy(0), x_values: "4, x" } }, 2: { class_type: "PreviewAny", inputs: { source: ["1", 8] } } });
+    expect(JSON.stringify(bad.rejected ?? bad.error)).toContain("not a number");
   });
 
   test("Wildcard Browser routes", async ({ request }) => {

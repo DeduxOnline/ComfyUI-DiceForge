@@ -6,7 +6,7 @@ const { DOWNLOADS } = require("./fixtures");
 
 const ALL_NODES = ["SDXLResolutionListLatent", "ResolutionSelectorRandomLatent", "CLIPTextEncodePositiveNegative", "DiceForgeRandomInt", "DiceForgeRandomFloat",
   "DiceForgeRandomLora", "DiceForgeRandomCheckpoint", "DiceForgeRandomDiffusionModel", "DiceForgeRandomImage", "DiceForgeGrid", "DiceForgeRandomSampler",
-  "DiceForgeRandomVAE", "LoadVAEDecodeSave", "VAEDecodeSave", "LoadDiffusionModelCLIP", "DiceForgeLoraStack"];
+  "DiceForgeRandomVAE", "LoadVAEDecodeSave", "VAEDecodeSave", "LoadDiffusionModelCLIP", "DiceForgeLoraStack", "DiceForgeXYPlot"];
 
 // A prompt field of CLIP Dual Text Encode, marked so a locator finds it in either design (Nodes 2.0: the node's textareas in order; classic: the
 // widget's own textarea).
@@ -680,6 +680,32 @@ for (const vue of [true, false]) {
       await expect(page.locator(".dfmi .version")).toHaveText(["🆕 v3", "● v2"]);
       await expect(page.locator(".dfmi")).toContainText("by inkmaker");
       await page.keyboard.press("Escape");
+    });
+
+    test("XY Plot shows the plot under its fields and queues every cell into Dice Grid", async ({ page, request }) => {
+      const [xy, image, grid] = await addNodes(page, [
+        { type: "DiceForgeXYPlot", widgets: { x_type: "steps", x_values: "10, 20", y_type: "scheduler", y_values: "normal, karras" } },
+        { type: "EmptyImage", pos: [460, 40], widgets: { width: 64, height: 64 } },
+        { type: "DiceForgeGrid", pos: [860, 40], widgets: { count: 4, cell_width: 64, name: `xy-ui-${vue}`, filename_prefix: `e2e/xyui${vue ? "v" : "c"}` } },
+      ]);
+      await connect(page, image, 0, grid, "image");
+      await connect(page, xy, 8, grid, "label");
+      await connect(page, xy, 9, grid, "row_label");
+      const panel = page.locator(".dfxy").first();
+      await expect(panel.locator(".axis").first()).toContainText("X · steps10 steps20 steps");
+      await expect(panel.locator(".axis").nth(1)).toContainText("Y · schedulernormalkarras");
+      await expect(panel).toContainText("2 × 2 = 4 images");
+      await setWidget(page, xy, "x_values", "10, x");
+      await expect(panel.locator(".error")).toContainText("not a number");
+      await expect(panel.locator("button")).toHaveCount(0);
+      await setWidget(page, xy, "x_values", "10, 20");
+      await panel.locator("button", { hasText: "▶ Queue 4 images" }).click();
+      await expect(panel.locator("button")).toHaveText("▶ Queue 4 images", { timeout: 30_000 }); // All queued.
+      expect(await widgetValue(page, xy, "index")).toBe(0);
+      const folder = basePath("output", "e2e");
+      await expect.poll(() => fs.existsSync(folder) && fs.readdirSync(folder).some((name) => name.startsWith(`xyui${vue ? "v" : "c"}_`)), { timeout: 60_000 }).toBe(true);
+      const queue = async () => { const body = await (await request.get("/queue")).json(); return body.queue_running.length + body.queue_pending.length; };
+      await expect.poll(queue, { timeout: 60_000 }).toBe(0);
     });
 
     test("KSampler presets: the right-click submenu, Auto from the checkpoint's base model, saving and deleting your own", async ({ page, request }) => {
