@@ -12,6 +12,8 @@ import { addStyleOnce, background, element } from "./dom.js";
 // words into CLIP Dual Text Encode's prompt. The browsers also manage the files (manage: true): ＋ Find on Civitai downloads new ones (civitai.js),
 // ✎ renames one, ⇄ moves one to another folder (or drag its card onto a folder in the tree) and 🗑 deletes one, with its preview and Model info.
 // ☆ on a card makes it a favorite (kept in its Model info, so it goes with the file); ★ Favorites in the tree shows only those.
+// Several at once: Ctrl+click picks cards (Shift+click a range, or ☐ Select to pick with plain clicks), and the bar above the cards stars, moves,
+// deletes or adds (LoRA Stack) all of them; dragging a picked card onto a folder moves every picked one.
 const CLIP_NODE = "CLIPTextEncodePositiveNegative";
 const BROWSERS = [
   { kind: "loras", icon: "🎴", title: "LoRA", one: "LoRA", plural: "LoRAs", widget: /lora/i, random: "DiceForgeRandomLora", randomName: "Random LoRA", triggers: true, manage: true },
@@ -64,7 +66,11 @@ const STYLE = `
 .dflb .tree .row.sel{background:#2f3f55}.dflb .tree .twist{width:14px;flex:none;color:#999;text-align:center}.dflb .tree .twist:hover{color:#fff}
 .dflb .tree .tools{display:flex;gap:6px;margin-bottom:6px}.dflb .tree .tools button{flex:1}.dflb .tree .row.drop{background:#35584a;outline:1px dashed #8fd0a8}
 .dflb .pic .fav{position:absolute;right:6px;top:6px;background:#000a;border:none;border-radius:5px;color:#ddd;font-size:18px;line-height:1;padding:3px 6px}
-.dflb .pic .fav.on{color:#ffd24a}.dflb .pic .fav:hover{background:#000d}.dflb .tree .row.favs .name{color:#ffd24a}.dflb .tree .row .name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dflb .tree button{padding:0 6px;font-size:12px}
+.dflb .pic .fav.on{color:#ffd24a}.dflb .card.picked{border-color:#ffd24a;box-shadow:0 0 0 2px #ffd24a}
+.dflb .card.picked .pic::after{content:"✓";position:absolute;left:6px;bottom:6px;background:#ffd24a;color:#222;border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-weight:700}
+.dflb .batch{display:flex;gap:6px;align-items:center;flex-wrap:wrap;background:#3d3a2a;border:1px solid #6b5e2c;border-radius:6px;padding:5px 8px;margin-bottom:8px}
+.dflb .batch[hidden]{display:none}.dflb .batch .count{font-weight:600;color:#ffd24a;margin-right:6px}.dflb .batch button{padding:3px 10px;font-size:13px}
+.dflb button.select-mode.on{border-color:#ffd24a;color:#ffd24a}.dflb .cards{flex:1;display:flex;flex-direction:column;min-width:0;min-height:0}.dflb .cards .grid{min-height:0}.dflb .pic .fav:hover{background:#000d}.dflb .tree .row.favs .name{color:#ffd24a}.dflb .tree .row .name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dflb .tree button{padding:0 6px;font-size:12px}
 .dflb .grid{flex:1;overflow:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;align-content:start;grid-auto-rows:max-content}
 .dflb .card{background:#2a2a2a;border:1px solid #474747;border-radius:8px;overflow:hidden;display:flex;flex-direction:column}.dflb .card.sel{border-color:#6a9ad8}
 .dflb .pic{aspect-ratio:3/4;background:#1e1e1e;display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative}
@@ -108,7 +114,12 @@ async function openBrowser(node, spec, target = targetOf(node, spec)) {
   const grid = element("div", { class: "grid" });
   const lookAll = element("button", { title: `Compute the hash of every ${what} not looked up yet and ask Civitai about it, one by one` }, "Look up all on Civitai");
   const back = element("div", { class: "dflb-back" });
-  const onKey = (event) => { if (event.key === "Escape" && !document.querySelector(".dfmi-back, .dfcv-back, .dfmv-back")) { event.stopPropagation(); close(); } };
+  const onKey = (event) => {
+    if (event.key !== "Escape" || document.querySelector(".dfmi-back, .dfcv-back, .dfmv-back")) return;
+    event.stopPropagation();
+    if (picked.size) clearPicked(); // The first Escape lets go of the picked cards, the next closes the browser.
+    else close();
+  };
   function close() {
     stopLookUp?.();
     back.remove();
@@ -117,6 +128,100 @@ async function openBrowser(node, spec, target = targetOf(node, spec)) {
   back.addEventListener("mousedown", (event) => { if (event.target === back) close(); });
   document.addEventListener("keydown", onKey, true);
   const say = (text) => { status.textContent = text; };
+
+  // Picked cards, for the batch bar: picked files, the last one clicked (for Shift ranges), the cards drawn (file -> element) in their order.
+  const picked = new Set();
+  let lastPicked = null, cardsByFile = new Map(), selecting = false;
+  const batch = element("div", { class: "batch", hidden: "" });
+  const selectMode = element("button", { class: "select-mode", title: "Pick cards with plain clicks (Ctrl+click and Shift+click work always)", onclick: () => {
+    selecting = !selecting;
+    selectMode.classList.toggle("on", selecting);
+    selectMode.textContent = selecting ? "☑ Selecting" : "☐ Select";
+  } }, "☐ Select");
+  function showPicked() {
+    for (const [file, box] of cardsByFile) box.classList.toggle("picked", picked.has(file));
+    drawBatch();
+  }
+  function clearPicked() {
+    picked.clear();
+    lastPicked = null;
+    showPicked();
+  }
+  function togglePick(file, range) {
+    const order = [...cardsByFile.keys()];
+    if (range && lastPicked && order.includes(lastPicked)) { // Shift: everything between the last pick and this card.
+      const [from, to] = [order.indexOf(lastPicked), order.indexOf(file)].sort((a, b) => a - b);
+      order.slice(from, to + 1).forEach((item) => picked.add(item));
+    } else if (picked.has(file)) picked.delete(file);
+    else picked.add(file);
+    lastPicked = file;
+    showPicked();
+  }
+  function drawBatch() {
+    for (const file of [...picked]) if (!files.some((entry) => entry.file === file)) picked.delete(file); // Moved or deleted meanwhile.
+    batch.hidden = !picked.size;
+    if (!picked.size) return batch.replaceChildren();
+    const plural = picked.size === 1 ? what : spec.plural;
+    batch.replaceChildren(element("span", { class: "count" }, `${picked.size} ${plural} picked`),
+      ...(target?.pick && target.multi ? [element("button", { class: "go batch-add", onclick: () => background(batchAdd()) }, `${target.label} all`)] : []),
+      element("button", { class: "batch-star", onclick: () => background(batchFavorite(true)) }, "★ Star"),
+      element("button", { class: "batch-unstar", onclick: () => background(batchFavorite(false)) }, "☆ Unstar"),
+      ...(spec.manage ? [element("button", { class: "batch-move", onclick: () => background(batchMove()) }, "⇄ Move…"),
+        element("button", { class: "batch-delete", onclick: () => background(batchDelete()) }, "🗑 Delete")] : []),
+      element("span", { style: "flex:1" }),
+      element("button", { class: "pick-all", title: "Pick every card shown (the search and filters apply)", onclick: () => { cardsByFile.forEach((_, file) => picked.add(file)); showPicked(); } }, "Pick all shown"),
+      element("button", { class: "pick-none", title: "Let go of the picked cards (Escape)", onclick: clearPicked }, "✕ Clear"));
+  }
+  // The batch actions, one file after the other; what failed is named at the end, the rest is done.
+  async function eachPicked(verb, step) {
+    const list = [...picked], failed = [];
+    for (const [index, file] of list.entries()) {
+      say(`${verb} ${index + 1} of ${list.length}: ${shortName(file)}…`);
+      try { await step(file); } catch (error) { failed.push(`${shortName(file)}: ${error.message}`); }
+    }
+    return { done: list.length - failed.length, failed };
+  }
+  const report = (verb, { done, failed }) => say(`${verb} ${done} ${done === 1 ? what : spec.plural}.${failed.length ? ` Not done: ${failed.join("; ")}` : ""}`);
+  async function call(path, options) {
+    const response = await api.fetchApi(path, options);
+    if (!response.ok) throw new Error(await response.text());
+    return response.json();
+  }
+  async function batchFavorite(favorite) {
+    const result = await eachPicked(favorite ? "Starring" : "Unstarring", async (file) => {
+      await call("/diceforge/model-favorite", { method: "POST", body: JSON.stringify({ kind, file, favorite }) });
+      files = files.map((item) => (item.file === file ? { ...item, favorite } : item));
+    });
+    draw();
+    report(favorite ? "Starred" : "Unstarred", result);
+  }
+  async function batchMove(destination) {
+    const from = new Set([...picked].map(folderOf));
+    destination ??= await pickFolder({ title: `Move ${picked.size} ${picked.size === 1 ? what : spec.plural} to…`, folders: allFolders(), current: from.size === 1 ? [...from][0] : null });
+    if (destination == null) return;
+    const result = await eachPicked("Moving", async (file) => {
+      if (folderOf(file) === destination) return;
+      const moved = await call("/diceforge/models/rename", { method: "POST", body: JSON.stringify({ kind, file, to: `${destination ? `${destination}/` : ""}${pathParts(file).pop()}` }) });
+      if (target?.model?.value === file) setWidget(node, target.model, moved.to);
+      if (selectedFile === file) selectedFile = moved.to;
+    });
+    picked.clear();
+    await reload();
+    report(`Moved to ${destination || "the top folder"}:`, result);
+  }
+  async function batchDelete() {
+    if (!confirm(`Delete ${picked.size} ${picked.size === 1 ? what : spec.plural}, with their previews and info? This can't be undone.`)) return;
+    const result = await eachPicked("Deleting", (file) => call(`/diceforge/models/file?kind=${kind}&file=${encodeURIComponent(file)}`, { method: "DELETE" }));
+    picked.clear();
+    await reload();
+    report("Deleted", result);
+  }
+  async function batchAdd() {
+    const list = [...picked];
+    for (const file of list) target.pick(file);
+    clearPicked();
+    say(`Added ${list.length} ${list.length === 1 ? what : spec.plural}.`);
+  }
 
   function replaceEntry(entry) {
     if (!entry) return;
@@ -211,6 +316,13 @@ async function openBrowser(node, spec, target = targetOf(node, spec)) {
         ...(entry.settings ? [element("div", { class: "muted", title: "Your recommended settings, from Model info" }, `⚙ ${entry.settings}`)] : []),
         element("div", { class: "buttons" }, ...action(entry), info, lookUpButton, ...link, ...manage)));
     if (spec.manage) dragSource(box, kind, entry.file);
+    box.classList.toggle("picked", picked.has(entry.file));
+    box.addEventListener("click", (event) => { // Picking: Ctrl (⌘) or Shift, or any click in ☐ Select mode; not on the card's buttons and links.
+      if (event.target.closest("button, a, .words span, .blur") || !(selecting || event.ctrlKey || event.metaKey || event.shiftKey)) return;
+      event.preventDefault();
+      togglePick(entry.file, event.shiftKey);
+    });
+    cardsByFile.set(entry.file, box);
     return box;
   }
   // Update and Delete: the server moves or removes the file with its companions; the loader lists are refreshed, and a loader of this browser that
@@ -234,12 +346,14 @@ async function openBrowser(node, spec, target = targetOf(node, spec)) {
     const to = prompt(`New name for ${entry.file} (the extension stays; folders with /):`, entry.file.replace(/\.[^./\\]+$/, ""))?.trim();
     if (to) await renameTo(entry.file, to, false);
   }
+  function allFolders() {
+    return [...new Set(files.flatMap((item) => { const parts = pathParts(item.file).slice(0, -1); return parts.map((_, index) => parts.slice(0, index + 1).join("/")); }))]
+      .sort((a, b) => a.localeCompare(b));
+  }
   // Move: the same file name in another folder ("" for the top folder), picked in the folder picker or by dropping the card on the tree.
   async function moveFile(entry, to) {
     const from = folderOf(entry.file);
-    const folders = [...new Set(files.flatMap((item) => { const parts = pathParts(item.file).slice(0, -1); return parts.map((_, index) => parts.slice(0, index + 1).join("/")); }))]
-      .sort((a, b) => a.localeCompare(b));
-    const destination = to ?? await pickFolder({ title: `Move ${pathParts(entry.file).pop()} to…`, folders, current: from });
+    const destination = to ?? await pickFolder({ title: `Move ${pathParts(entry.file).pop()} to…`, folders: allFolders(), current: from });
     if (destination == null || destination === from) return;
     await renameTo(entry.file, `${destination ? `${destination}/` : ""}${pathParts(entry.file).pop()}`, true);
   }
@@ -312,6 +426,7 @@ async function openBrowser(node, spec, target = targetOf(node, spec)) {
         ...(path ? [twist] : []), element("span", { class: "name" }, path ? `📁 ${path.split("/").pop()}` : `All ${spec.plural}`), element("span", { class: "muted" }, counts.get(path)), ...useFolder);
       if (spec.manage) { // A card dropped on a folder moves there; on "All", to the top folder.
         dropTarget(row, kind, (file) => {
+          if (picked.has(file) && picked.size > 1) return background(batchMove(path)); // A picked card takes the other picked ones along.
           const entry = files.find((item) => item.file === file);
           if (entry) background(moveFile(entry, path));
         });
@@ -333,11 +448,13 @@ async function openBrowser(node, spec, target = targetOf(node, spec)) {
       base: (a, b) => (a.base_model || "~").localeCompare(b.base_model || "~") || shortName(a.file).localeCompare(shortName(b.file)),
     }[sort.value];
     const shown = files.filter(matches).sort(order);
+    cardsByFile = new Map();
     grid.replaceChildren(...(shown.length ? shown.map(card) : [element("div", { class: "muted" }, files.length ? `No ${what} matches.` : `No ${what} files: put them in ComfyUI/models/${kind}.`)]));
     const missing = files.filter((entry) => !entry.checked).length;
     lookAll.textContent = missing ? `Look up all on Civitai (${missing})` : "All looked up";
     lookAll.disabled = !missing && !stopLookUp;
     drawTree();
+    drawBatch();
   }
   lookAll.addEventListener("click", async () => {
     if (stopLookUp) return stopLookUp();
@@ -361,14 +478,14 @@ async function openBrowser(node, spec, target = targetOf(node, spec)) {
   const hint = target?.pick ? target.hint : target?.model ? `Use puts a ${what} in ${target.model.name}.` : target?.folder ? `Use folder sets the folder ${spec.randomName} picks from.` : target?.triggers ? `+ Triggers inserts a ${what}'s trigger words where the cursor was in the prompt.` : "";
   back.append(element("div", { class: "dflb" },
     element("h2", {}, `${spec.title} Browser`),
-    element("div", { class: "top" }, search, base, sort, lookAll,
+    element("div", { class: "top" }, search, base, sort, selectMode, lookAll,
       ...(spec.manage ? [element("button", { class: "go find", title: `Search Civitai and download ${spec.plural} into models/${kind}`, onclick: () => background(openCivitaiSearch({
         kind, title: spec.title, plural: spec.plural, icon: spec.icon, hint: spec.civitaiHint ?? "", base: target?.base, folders: [...new Set(files.map((entry) => folderOf(entry.file)).filter(Boolean))].sort((a, b) => a.localeCompare(b)),
         onChange: () => background(reload().then(() => say("The download is done: it is in the list."))),
       })) }, "＋ Find on Civitai")] : []),
       element("button", { onclick: close }, "Close")),
     element("div", { class: "top" }, element("span", { class: "muted" }, hint), status),
-    element("div", { class: "main" }, tree, grid)));
+    element("div", { class: "main" }, tree, element("div", { class: "cards" }, batch, grid))));
   document.body.append(back);
   say("Loading…");
   try {

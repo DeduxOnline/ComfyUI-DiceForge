@@ -132,6 +132,44 @@ for (const vue of [true, false]) {
       expect(requests).toBe(1); // One shared request, not one per keystroke.
     });
 
+    test("the prompt fields highlight the syntax, with missing wildcards in red", async ({ page }) => {
+      const prompt = "${g={male|female}}a __color__ {2$$3::!hat|__nope__|bow} \\{x\\} (smile:1.2) ${g} // note\n/* block */ embedding:easy";
+      const [id] = await addNodes(page, [{ type: "CLIPTextEncodePositiveNegative", widgets: { positive: prompt } }]);
+      const field = await promptField(page, id, "positive");
+      const layer = field.locator("xpath=preceding-sibling::div[contains(concat(' ', @class, ' '), ' dfhl ')][1]");
+      await expect(layer).toHaveCount(1);
+      const marked = async (kind) => layer.locator(`span.${kind}`).allTextContents();
+      await expect.poll(() => marked("wc")).toEqual(["__color__"]);
+      expect(await marked("wc-missing")).toEqual(["__nope__"]); // No wildcard file nope.txt.
+      expect(await marked("count")).toEqual(["2$$"]);
+      expect(await marked("weight")).toEqual(["3::"]);
+      expect(await marked("lock")).toEqual(["!"]);
+      expect(await marked("var")).toEqual(["${g=", "}", "${g}"]);
+      expect(await marked("b0")).toEqual(["{", "|", "|", "}"]); // A choice at the top.
+      expect(await marked("b1")).toEqual(["{", "|", "}"]); // One inside ${g=...}: one level down, another color.
+      expect(await marked("esc")).toEqual(["\\{", "\\}"]);
+      expect(await marked("attn")).toEqual([":1.2"]);
+      expect(await marked("comment")).toEqual(["// note", "/* block */"]);
+      expect(await marked("embed")).toEqual(["embedding:easy"]);
+      expect(await layer.textContent()).toBe(`${prompt}\n`); // The same text, only colored.
+      await expect(field).toHaveAttribute("title", "No wildcard file for __nope__");
+      expect(await field.evaluate((element) => getComputedStyle(element).webkitTextFillColor)).toBe("rgba(0, 0, 0, 0)"); // The field shows the layer.
+      const [box, inner] = [await field.boundingBox(), await layer.boundingBox()];
+      expect(Math.abs(box.x - inner.x)).toBeLessThan(3);
+      expect(Math.abs(box.width - inner.width)).toBeLessThan(20); // Inside the field's border, without its scrollbar.
+      await field.click();
+      await page.keyboard.press("ControlOrMeta+a");
+      await page.keyboard.type("{a|{b|c}} {unclosed");
+      await expect.poll(() => marked("b1")).toEqual(["{", "|", "}"]); // Nested: another color.
+      expect(await marked("bad")).toEqual(["{"]); // Never closed.
+      await expect(field).not.toHaveAttribute("title", /No wildcard/);
+      await page.evaluate(() => window.app.extensionManager.setting.set("DiceForge.PromptHighlight", false));
+      await expect(layer).toHaveCount(0); // Off: the plain field again.
+      expect(await field.evaluate((element) => element.classList.contains("dfhl-input"))).toBe(false);
+      await page.evaluate(() => window.app.extensionManager.setting.set("DiceForge.PromptHighlight", true));
+      await expect(field.locator("xpath=preceding-sibling::div[contains(concat(' ', @class, ' '), ' dfhl ')][1]")).toHaveCount(1);
+    });
+
     test("Wildcard Browser adds wildcards to the prompt and edits files", async ({ page }) => {
       writeFile(`models/wildcards/edit_${vue ? "vue" : "classic"}.txt`, "one\ntwo\n");
       const [id] = await addNodes(page, [{ type: "CLIPTextEncodePositiveNegative", pos: [300, 60], widgets: { positive: "1girl" } }]);
@@ -408,6 +446,68 @@ for (const vue of [true, false]) {
       await page.keyboard.press("Escape");
     });
 
+    test("LoRA Browser batch actions: pick cards, then star, move and delete them all", async ({ page }) => {
+      const top = `batch_${vue ? "vue" : "classic"}`, loras = (...parts) => basePath("models", "loras", ...parts);
+      for (const name of ["batchy_a", "batchy_b", "batchy_c"]) writeFile(`models/loras/${top}/${name}.safetensors`, `${top} ${name}`);
+      try {
+        const [loader] = await addNodes(page, [{ type: "LoraLoader" }]);
+        await clickMenu(page, loader, "DiceForge.ModelBrowser", "LoRA Browser");
+        const card = (name) => page.locator(".dflb .card", { hasText: `${name}.safetensors` });
+        const bar = page.locator(".dflb .batch");
+        await expect(bar).toBeHidden();
+        await card("batchy_a").locator(".title").click({ modifiers: ["ControlOrMeta"] });
+        await expect(bar.locator(".count")).toHaveText("1 LoRA picked");
+        await card("batchy_c").locator(".title").click({ modifiers: ["Shift"] }); // A range: a, b and c.
+        await expect(bar.locator(".count")).toHaveText("3 LoRAs picked");
+        await expect(page.locator(".dflb .card.picked")).toHaveCount(3);
+        await card("batchy_b").locator(".title").click(); // A plain click (not in Select mode) picks nothing.
+        await expect(bar.locator(".count")).toHaveText("3 LoRAs picked");
+        await bar.locator(".batch-star").click();
+        await expect(page.locator(".dflb .status")).toContainText("Starred 3 LoRAs.");
+        await expect(page.locator(".dflb .tree .row.favs")).toContainText("★ Favorites3");
+        await bar.locator(".batch-move").click();
+        await page.locator(".dfmv input").fill(`${top}/moved`);
+        await page.locator(".dfmv input").press("Enter");
+        await expect(page.locator(".dflb .status")).toContainText(`Moved to ${top}/moved: 3 LoRAs.`);
+        expect(fs.readdirSync(loras(top, "moved")).sort()).toEqual(["batchy_a.safetensors", "batchy_b.safetensors", "batchy_c.safetensors"]);
+        await expect(bar).toBeHidden(); // The moved files are let go.
+        await card("batchy_a").locator(".title").click({ modifiers: ["ControlOrMeta"] });
+        await card("batchy_b").locator(".title").click({ modifiers: ["ControlOrMeta"] });
+        await card("batchy_a").dragTo(page.locator(`.dflb .tree .row[data-path="${top}"]`)); // Dragging a picked card takes the picked ones along.
+        await expect(page.locator(".dflb .status")).toContainText(`Moved to ${top}: 2 LoRAs.`);
+        expect(fs.readdirSync(loras(top)).sort()).toEqual(["batchy_a.safetensors", "batchy_b.safetensors", "moved"]);
+        await page.locator(".dflb button.select-mode").click(); // Select mode: plain clicks pick.
+        await card("batchy_a").locator(".title").click();
+        await card("batchy_b").locator(".title").click();
+        await expect(bar.locator(".count")).toHaveText("2 LoRAs picked");
+        await page.keyboard.press("Escape"); // The first Escape lets go of the picks, the browser stays.
+        await expect(bar).toBeHidden();
+        await expect(page.locator(".dflb")).toHaveCount(1);
+        await page.locator(".dflb .top input").first().fill("batchy");
+        await card("batchy_a").locator(".title").click();
+        await bar.locator(".pick-all").click(); // Every card shown by the search.
+        await expect(bar.locator(".count")).toHaveText("3 LoRAs picked");
+        page.once("dialog", (dialog) => dialog.accept());
+        await bar.locator(".batch-delete").click();
+        await expect(page.locator(".dflb .status")).toContainText("Deleted 3 LoRAs.");
+        expect(fs.existsSync(loras(top))).toBe(false);
+        await page.keyboard.press("Escape");
+      } finally {
+        fs.rmSync(loras(top), { recursive: true, force: true });
+      }
+    });
+
+    test("LoRA Stack adds several picked LoRAs at once", async ({ page }) => {
+      const [stack] = await addNodes(page, [{ type: "DiceForgeLoraStack" }]);
+      await page.locator(".dfls").first().locator("button.add").click();
+      await page.locator(".dflb select").first().selectOption("");
+      for (const name of ["ink", "detail"]) await page.locator(".dflb .card", { hasText: `${name}.safetensors` }).locator(".title").click({ modifiers: ["ControlOrMeta"] });
+      await page.locator(".dflb .batch .batch-add").click();
+      await expect(page.locator(".dflb .status")).toContainText("Added 2 LoRAs.");
+      await page.keyboard.press("Escape");
+      await expect(page.locator(".dfls").first().locator(".row .name")).toHaveText(["ink", "detail"]);
+    });
+
     test("LoRA Browser keeps its cards full size with many LoRAs", async ({ page }) => {
       const folder = `many_${vue ? "vue" : "classic"}`;
       for (let index = 0; index < 60; index++) writeFile(`models/loras/${folder}/lora_${String(index).padStart(2, "0")}.safetensors`, `${folder} ${index}`);
@@ -590,6 +690,56 @@ for (const vue of [true, false]) {
       expect(workflow.nodes.find((node) => String(node.id) === String(encode)).properties.dice_forge_prompts.positive).toBe(text);
       await page.evaluate(async (data) => { window.app.graph.clear(); await window.app.loadGraphData(data); }, workflow);
       await expect(page.locator(".dfpp").first().locator(".box").first()).toHaveText(`positive${text}`);
+    });
+
+    test("the prompt history keeps the last runs: put back a seed, use a text, pin, remove", async ({ page, request }) => {
+      const [encode, preview] = await addNodes(page, [
+        { type: "CLIPTextEncodePositiveNegative", widgets: { positive: "a {red|blue|green|white|black|pink} car", seed: 1, control_after_generate: "increment" } },
+        { type: "PreviewAny", pos: [500, 40] },
+      ]);
+      await connect(page, encode, 2, preview, 0);
+      for (let run = 0; run < 3; run++) await queueFromPage(page, request); // Seeds 1, 2, 3.
+      const panel = page.locator(".dfpp").first();
+      const lastRun = async () => (await panel.locator(".box").first().textContent()).replace(/^positive/, "");
+      const texts = (await page.evaluate((id) => window.app.graph.getNodeById(id).properties.dice_forge_history.map((item) => item.positive), encode)).reverse();
+      await panel.locator(".toggle").click();
+      await expect(panel.locator(".toggle")).toHaveText("▾ History (3)");
+      const entries = panel.locator(".entry");
+      await expect(entries.locator(".when")).toHaveText([/seed 3 \(random\)$/, /seed 2 \(random\)$/, /seed 1 \(random\)$/]); // Newest first.
+      await expect(entries.locator(".text")).toHaveText([texts[2], texts[1], texts[0]]);
+      await setWidget(page, encode, "control_after_generate", "fixed");
+      await setWidget(page, encode, "seed", 3);
+      await queueFromPage(page, request); // The same as the newest: not added again.
+      await expect(panel.locator(".toggle")).toHaveText("▾ History (3)");
+      await entries.nth(2).locator(".reseed").click(); // Seed 1 again: its prompts, seed and mode.
+      expect(await widgetValue(page, encode, "seed")).toBe(1);
+      expect(await widgetValue(page, encode, "control_after_generate")).toBe("fixed");
+      await queueFromPage(page, request);
+      await expect(panel.locator(".head")).toContainText("seed 1 (random)");
+      expect(await lastRun()).toBe(texts[0]); // The same prompts as that run.
+      await expect(panel.locator(".toggle")).toHaveText("▾ History (4)"); // That run is the newest now.
+      await entries.filter({ hasText: "seed 2 (random)" }).locator(".use-text").click();
+      expect(await widgetValue(page, encode, "positive")).toBe(texts[1]); // Every choice made.
+      await entries.last().locator(".pin").click();
+      await expect(entries.last()).toHaveClass(/pinned/);
+      await entries.first().locator(".forget").click();
+      await expect(panel.locator(".toggle")).toHaveText(/History \(\d+\)/);
+      const before = await entries.count();
+      await page.evaluate(([id, filler]) => { // Many unpinned runs: only the last 20 stay, a pinned one stays too.
+        const node = window.app.graph.getNodeById(id);
+        const pinned = node.properties.dice_forge_history.filter((item) => item.pinned);
+        node.properties.dice_forge_history = [...filler, ...pinned];
+      }, [encode, Array.from({ length: 25 }, (_, index) => ({ positive: `old ${index}`, negative: "", seed: 100 + index, seed_mode: "random" }))]);
+      await setWidget(page, encode, "positive", "a {big|small} boat");
+      await queueFromPage(page, request);
+      await expect(panel.locator(".toggle")).toHaveText("▾ History (21)");
+      await expect(entries.filter({ has: page.locator(".pin.on") })).toHaveCount(1);
+      expect(before).toBeGreaterThan(0);
+      await setWidget(page, encode, "seed_mode", "shuffle");
+      await queueFromPage(page, request);
+      await expect(entries.first().locator(".reseed")).toBeDisabled(); // In shuffle a seed doesn't give its prompts again.
+      const workflow = await page.evaluate(() => window.app.graph.serialize()); // Kept with the workflow.
+      expect(workflow.nodes.find((node) => String(node.id) === String(encode)).properties.dice_forge_history).toHaveLength(21);
     });
 
     test("Random Image shows the picked image, its file and seed, also from the cache and after a reload", async ({ page, request }) => {

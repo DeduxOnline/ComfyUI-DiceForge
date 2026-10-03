@@ -393,6 +393,7 @@ Right-click **Load LoRA** (or another node with a LoRA list), **Random LoRA** or
 
 - a **preview**: an image saved next to the LoRA (`name.preview.png`, `name.png`, `.jpg`, `.webp`, as Civitai Helper and LoRA Manager save them) or else the first Civitai image (blurred if Civitai rates it R or higher, until clicked);
 - the **name** (yours from Model info, or the Civitai model and version), the file, its size, the **base model** and the **trigger words** (click one to copy it; your own trigger words from Model info come first);
+- **batch actions**: Ctrl+click (⌘ on a Mac) picks cards, Shift+click picks every card between the last picked one and this one, and **☐ Select** lets plain clicks pick. The bar above the cards then works on all picked ones: **★ Star**, **☆ Unstar**, **⇄ Move…**, **🗑 Delete** (one confirmation), **Pick all shown** (the search and filters apply), **✕ Clear** (or Escape). Dragging a picked card onto a folder moves every picked one. Opened from LoRA Stack's *＋ Add LoRA*, **+ Add all** adds the picked LoRAs as rows. Each file is done in turn; any that fail are named at the end, the others are done;
 - **☆ favorites**: the star on a card's picture makes it a favorite (★), and **★ Favorites** under *All LoRAs* in the tree shows only them. The star is kept in the model's Model info on the server, so it is there in every browser and goes with the file when it is renamed, moved or deleted. The Checkpoint and Diffusion Model Browsers have favorites too;
 - a **folder tree** with the number of LoRAs in each folder (subfolders start closed: **▸** opens one, a click on the name shows that folder's LoRAs; **Expand all** / **Collapse all**; the browser remembers which folders are open, and opens the tree to the folder a Random loader uses), a **search** box (file, name or trigger words), a **base model** filter (SDXL, Pony, Illustrious…) and sorting by name, newest or base model.
 
@@ -606,9 +607,21 @@ In `deck` and `shuffle` modes:
 - The node runs again when a wildcard file changes, even if the prompts and the seed stay the same.
 - A `*` or `?` name (`__hair/*__`) joins the lines of every file it matches, in name order, so all seed modes (deck, shuffle, combinations…) treat them as one list. Empty files among them are skipped; a name that matches nothing stops the run with an error.
 
+### Syntax highlighting
+
+The prompt fields color the syntax as you type: `__wildcards__` (red with a wavy line when no wildcard file has that name; hover the field to see which), the braces and `|` of `{a|b}` choices (one color per nesting level, white on red when a brace is never closed or closes nothing), counts `2$$`, weights `3::`, locks `!`, `${variables}`, `//` and `/* */` comments, `\{` escapes, `(word:1.2)` weights and `embedding:` names. Only the colors change: typing, the caret, selecting and the `__` autocomplete work as before. Turn it off in ComfyUI's settings: *DiceForge → Prompts → Highlight the prompt syntax in CLIP Dual Text Encode*.
+
 ### Preview of the prompts as encoded
 
 After each run the node shows, under its inputs, the **positive** and **negative** prompts as they were encoded: choices, wildcards and variables filled in, with the seed and seed mode they came from (and *combination N of M* in `combinations`). Click a prompt to copy it. The preview is kept with the workflow, so it is still there after a reload and in a workflow loaded from an image; when you change a prompt it is dimmed and marked *prompt changed since* until the next run. It also updates when the node comes from ComfyUI's cache.
+
+**▸ History** under the preview lists the last 20 runs' prompts (newest first, with the time, seed and mode; hover one for the whole text). A run with the same prompts and seed as the newest one is not added again. For each entry:
+
+- **↺ Seed** puts back that run's prompts, seed and seed mode, and sets *control after generate* to *fixed*: the next run gives exactly those prompts again. Only in `random`, `deck` and `combinations`, where a seed always gives the same prompts (as long as the wildcard files are the same); in `shuffle`, `balanced` and `mutate` use *Use text*.
+- **Use text** puts the prompts as encoded in the fields: every choice and wildcard fixed as in that run.
+- **📌** pins it: pinned entries stay past the 20. **✕** removes it.
+
+The history is kept in the node, with the workflow.
 
 ### Autocomplete and the Wildcard Browser
 

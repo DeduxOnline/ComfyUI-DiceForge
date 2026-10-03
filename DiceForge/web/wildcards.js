@@ -398,4 +398,6 @@ app.registerExtension({
   },
 });
 
-export { insertIntoNode };
+// For the prompt syntax highlighting (prompt_highlight.js): the prompt fields of a node, and the wildcard names as last listed.
+const knownWildcards = () => listCache?.files?.map((file) => file.name) ?? null;
+export { insertIntoNode, setField, textareaOf, wildcardList, knownWildcards, NODE_TYPE as PROMPT_NODE_TYPE, FIELDS as PROMPT_FIELDS };

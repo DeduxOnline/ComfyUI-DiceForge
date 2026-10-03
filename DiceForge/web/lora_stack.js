@@ -357,7 +357,7 @@ function setUp(node) {
       ...(rows.length ? [] : [element("div", { class: "muted" }, "No LoRAs yet.")]),
       ...groups,
       element("button", { class: "add", onclick: () => browse({
-        label: "+ Add", hint: "+ Add adds a LoRA to the stack; add as many as you like, then close.",
+        label: "+ Add", multi: true, hint: "+ Add adds a LoRA to the stack; add as many as you like (or pick several with Ctrl+click and add them all), then close.",
         pick: (file) => { update((next) => { next.rows.push({ on: true, lora: file, strength: 1, clip: 1, random: false, group: "" }); }); return `${shortName(file)} added to the stack.`; },
       }) }, "＋ Add LoRA"),
       element("div", { class: "foot" },
