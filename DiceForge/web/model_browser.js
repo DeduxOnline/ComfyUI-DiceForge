@@ -7,7 +7,7 @@ import { dragSource, dropTarget, pickFolder } from "./move_dialog.js";
 import { addStyleOnce, background, element } from "./dom.js";
 import { dateText, statsChips } from "./civitai_meta.js";
 
-// Model browsers (node menu): LoRA, Checkpoint and Diffusion Model Browser. The model files as cards with a preview, name, base model and trigger words from Civitai
+// Model browsers (node menu): LoRA, Checkpoint, Diffusion Model, Text Encoder and VAE Browser. The model files as cards with a preview, name, base model and trigger words from Civitai
 // (looked up by the file's hash, as in Model info), a folder tree, search and filters. What a card's button does depends on the node it was opened
 // from: "Use" puts the file in a loader's list, "Use folder" puts a folder in Random LoRA / Random Checkpoint, "+ Triggers" inserts a LoRA's trigger
 // words into CLIP Dual Text Encode's prompt. The browsers also manage the files (manage: true): ＋ Find on Civitai downloads new ones (civitai.js),
@@ -22,19 +22,39 @@ const BROWSERS = [
   { kind: "diffusion_models", icon: "🧊", title: "Diffusion Model", one: "diffusion model", plural: "diffusion models", widget: /unet|diffusion/i, random: "DiceForgeRandomDiffusionModel",
     randomName: "Random Diffusion Model", triggers: false, manage: true,
     civitaiHint: "Civitai lists diffusion models as Checkpoints: pick a version whose file is the diffusion model alone (often marked fp8, unet or \"model only\"); a full checkpoint belongs in the Checkpoint Browser." },
+  { kind: "text_encoders", icon: "🔤", title: "Text Encoder", one: "text encoder", plural: "text encoders", widget: /clip|text_encoder/i, skip: /vision/i, triggers: false,
+    manage: true, civitai: false },
+  { kind: "vae", icon: "🎨", title: "VAE", one: "VAE", plural: "VAEs", widget: /vae/i, random: "DiceForgeRandomVAE", randomName: "Random VAE", triggers: false, manage: true },
 ];
+const MODEL_FILE = /\.(safetensors|ckpt|pt|pth|bin|gguf|sft)$/i;
 
-// What a browser can do for a node: set a model list widget, set a folder widget, or insert trigger words. null when the node has none of them.
-function targetOf(node, spec) {
-  if (node.comfyClass === CLIP_NODE) return spec.triggers ? { triggers: true } : null;
-  const combo = (widget) => Array.isArray(widget.options?.values);
-  if (node.comfyClass === spec.random) {
-    const folder = node.widgets?.find((widget) => widget.name === "folder" && combo(widget));
-    return folder ? { folder } : null;
+// The choices of a list widget, as names. The frontend keeps them as an array, but also takes a function or an object (its keys), and other
+// extensions put objects in the array ({ content }); the Asset API's model widgets have no list at all (null).
+function valuesOf(widget) {
+  let values = widget.options?.values;
+  if (typeof values === "function") {
+    try { values = values(widget); } catch { return null; }
   }
-  const model = node.widgets?.find((widget) => spec.widget.test(widget.name) && combo(widget) && widget.options.values.some((value) => /\.(safetensors|ckpt|pt|pth|bin|gguf|sft)$/i.test(value)));
-  return model ? { model } : null;
+  if (values && !Array.isArray(values) && typeof values === "object") values = Object.keys(values);
+  if (!Array.isArray(values)) return null;
+  return values.map((value) => (typeof value === "string" ? value : value?.content ?? value?.value ?? value?.name)).filter((value) => typeof value === "string");
 }
+// A model widget of the browser's kind: by its name, with a model file as its value (as Model info finds them) or model files in its list. The
+// value alone is enough: the Asset API's widgets have no list, and other extensions keep the list in their own form.
+const isModelWidget = (widget, spec) => spec.widget.test(widget.name)
+  && ((typeof widget.value === "string" && MODEL_FILE.test(widget.value)) || valuesOf(widget)?.some((value) => MODEL_FILE.test(value)) === true);
+// What a browser can do for a node: set a model list widget, set a folder widget, or insert trigger words. One target per model widget (Load
+// Diffusion Model + CLIP and DualCLIPLoader have two text encoders); none when the node has nothing for this browser.
+function targetsOf(node, spec) {
+  if (!node || spec.skip?.test(node.comfyClass ?? "")) return [];
+  if (node.comfyClass === CLIP_NODE) return spec.triggers ? [{ triggers: true }] : [];
+  if (spec.random && node.comfyClass === spec.random) {
+    const folder = node.widgets?.find((widget) => widget.name === "folder" && valuesOf(widget));
+    return folder ? [{ folder }] : [];
+  }
+  return (node.widgets ?? []).filter((widget) => isModelWidget(widget, spec)).map((model) => ({ model }));
+}
+const targetOf = (node, spec) => targetsOf(node, spec)[0] ?? null;
 // Base model families of Civitai's names: LoRAs of another family do not work on the model; within a family (SDXL, Pony, Illustrious, NoobAI) a LoRA
 // often works on another base's model, but not as well. Unknown bases compare as nothing.
 function family(base) {
@@ -439,7 +459,7 @@ async function openBrowser(node, spec, target = targetOf(node, spec)) {
       const twist = parents.has(path)
         ? element("span", { class: "twist", title: opened.has(path) ? "Close the folder" : "Open the folder", onclick: (event) => { event.stopPropagation(); toggle(path); } }, opened.has(path) ? "▾" : "▸")
         : element("span", { class: "twist" });
-      const useFolder = target?.folder && path && target.folder.options.values.includes(path)
+      const useFolder = target?.folder && path && valuesOf(target.folder)?.includes(path)
         ? [element("button", { title: `Pick the ${spec.plural} of ${path} in ${spec.randomName}`, onclick: (event) => {
             event.stopPropagation();
             setWidget(node, target.folder, path);
@@ -515,7 +535,7 @@ async function openBrowser(node, spec, target = targetOf(node, spec)) {
   back.append(element("div", { class: "dflb" },
     element("h2", {}, `${spec.title} Browser`),
     element("div", { class: "top" }, search, base, tagFilter, sort, selectMode, lookAll,
-      ...(spec.manage ? [element("button", { class: "go find", title: `Search Civitai and download ${spec.plural} into models/${kind}`, onclick: () => background(openCivitaiSearch({
+      ...(spec.manage && spec.civitai !== false ? [element("button", { class: "go find", title: `Search Civitai and download ${spec.plural} into models/${kind}`, onclick: () => background(openCivitaiSearch({
         kind, title: spec.title, plural: spec.plural, icon: spec.icon, hint: spec.civitaiHint ?? "", base: target?.base, folders: [...new Set(files.map((entry) => folderOf(entry.file)).filter(Boolean))].sort((a, b) => a.localeCompare(b)),
         onChange: () => background(reload().then(() => say("The download is done: it is in the list."))),
       })) }, "＋ Find on Civitai")] : []),
@@ -542,7 +562,11 @@ async function openBrowser(node, spec, target = targetOf(node, spec)) {
 app.registerExtension({
   name: "DiceForge.ModelBrowser",
   getNodeMenuItems(node) {
-    return BROWSERS.filter((spec) => targetOf(node, spec)).map((spec) => ({ content: `${spec.icon} ${spec.title} Browser`, callback: () => openBrowser(node, spec) }));
+    return BROWSERS.flatMap((spec) => {
+      const targets = targetsOf(node, spec);
+      return targets.map((target) => ({ content: `${spec.icon} ${spec.title} Browser${targets.length > 1 ? ` (${target.model.name})` : ""}`,
+        callback: () => openBrowser(node, spec, target) }));
+    });
   },
 });
 

@@ -605,7 +605,8 @@ for (const vue of [true, false]) {
 
     test("Diffusion Model Browser puts a model in Load Diffusion Model and a folder in Random Diffusion Model", async ({ page }) => {
       const [loader, random, both] = await addNodes(page, [{ type: "UNETLoader", widgets: { unet_name: "flux1-dev.safetensors" } }, { type: "DiceForgeRandomDiffusionModel", pos: [500, 40] }, { type: "LoadDiffusionModelCLIP", pos: [900, 40] }]);
-      for (const id of [loader, random, both]) expect(await menuItems(page, id, "DiceForge.ModelBrowser")).toEqual(["🧊 Diffusion Model Browser"]);
+      for (const id of [loader, random]) expect(await menuItems(page, id, "DiceForge.ModelBrowser")).toEqual(["🧊 Diffusion Model Browser"]);
+      expect(await menuItems(page, both, "DiceForge.ModelBrowser")).toEqual(["🧊 Diffusion Model Browser", "🔤 Text Encoder Browser (clip_name1)", "🔤 Text Encoder Browser (clip_name2)"]);
       await clickMenu(page, loader, "DiceForge.ModelBrowser", "Diffusion Model Browser");
       await expect(page.locator(".dflb h2")).toHaveText("Diffusion Model Browser");
       await page.locator(".dflb .card", { hasText: "flux1-schnell" }).locator("button", { hasText: /^Use$/ }).click();
@@ -618,6 +619,30 @@ for (const vue of [true, false]) {
       await clickMenu(page, random, "DiceForge.ModelBrowser", "Diffusion Model Browser");
       await page.locator(".dflb .tree .row", { hasText: "flux" }).locator("button", { hasText: "Use folder" }).click();
       await expect.poll(() => widgetValue(page, random, "folder")).toBe("flux");
+      await page.keyboard.press("Escape");
+    });
+
+    test("Model browsers find model lists in every form: a function, objects, or no list (Asset API); Text Encoder and VAE Browsers", async ({ page }) => {
+      const [checkpoint, diffusion, asset, both, vae] = await addNodes(page, [{ type: "CheckpointLoaderSimple" }, { type: "UNETLoader", pos: [420, 40] },
+        { type: "UNETLoader", pos: [820, 40], widgets: { unet_name: "flux1-dev.safetensors" } }, { type: "LoadDiffusionModelCLIP", pos: [40, 420] }, { type: "VAELoader", pos: [500, 420] }]);
+      await page.evaluate(([checkpoint, diffusion, asset]) => {
+        const widget = (id, name) => window.app.graph.getNodeById(id).widgets.find((item) => item.name === name);
+        const files = widget(checkpoint, "ckpt_name").options.values.slice();
+        widget(checkpoint, "ckpt_name").options.values = () => files; // A function, as some extensions set it.
+        const models = widget(diffusion, "unet_name").options.values.slice();
+        widget(diffusion, "unet_name").options.values = models.map((content) => ({ content })); // Objects.
+        delete widget(asset, "unet_name").options.values; // An Asset API widget: no list, only its value.
+      }, [checkpoint, diffusion, asset]);
+      expect(await menuItems(page, checkpoint, "DiceForge.ModelBrowser")).toEqual(["🗃️ Checkpoint Browser"]);
+      for (const id of [diffusion, asset]) expect(await menuItems(page, id, "DiceForge.ModelBrowser")).toEqual(["🧊 Diffusion Model Browser"]);
+      expect(await menuItems(page, vae, "DiceForge.ModelBrowser")).toEqual(["🎨 VAE Browser"]);
+      // Text encoders: Use puts one in the widget it was opened for; Civitai has none, so no Find.
+      await clickMenu(page, both, "DiceForge.ModelBrowser", "Text Encoder Browser (clip_name2)");
+      await expect(page.locator(".dflb h2")).toHaveText("Text Encoder Browser");
+      await expect(page.locator(".dflb button.find")).toHaveCount(0);
+      await page.locator(".dflb .card", { hasText: "t5xxl_fp16" }).locator("button", { hasText: /^Use$/ }).click();
+      await expect.poll(() => widgetValue(page, both, "clip_name2")).toBe("t5xxl_fp16.safetensors");
+      expect(await widgetValue(page, both, "clip_name1")).not.toBe("t5xxl_fp16.safetensors");
       await page.keyboard.press("Escape");
     });
 

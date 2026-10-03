@@ -14,10 +14,16 @@ from .model_info import PREVIEW_ENDINGS, civitai_details, civitai_summary, info_
 # Managing the model files of the LoRA, Checkpoint and Diffusion Model Browsers (web/model_browser.js, web/civitai.js): Create is finding a model on
 # Civitai and downloading it (with its Civitai data and a preview, so the browser shows it at once), Read is the browser and Model info, Update is
 # renaming or moving a file (its preview and info go with it) and Delete is removing it. MANAGED_KINDS lists the kinds the routes accept.
-MANAGED_KINDS = ("loras", "checkpoints", "diffusion_models")
+MANAGED_KINDS = ("loras", "checkpoints", "diffusion_models", "vae", "text_encoders")
 # Civitai's model types that load as each kind. Civitai has no type of its own for diffusion models (Flux, Qwen... without their text encoders and
-# VAE): they are Checkpoints there, and the browser says to pick a version whose file is the diffusion model alone.
-CIVITAI_TYPES = {"loras": ("LORA", "LoCon", "DoRA"), "checkpoints": ("Checkpoint",), "diffusion_models": ("Checkpoint",)}
+# VAE): they are Checkpoints there, and the browser says to pick a version whose file is the diffusion model alone. Nor has it one for text
+# encoders: they are renamed, moved and deleted here, not searched for.
+CIVITAI_TYPES = {"loras": ("LORA", "LoCon", "DoRA"), "checkpoints": ("Checkpoint",), "diffusion_models": ("Checkpoint",), "vae": ("VAE",), "text_encoders": ()}
+def civitai_types(kind):
+    types = CIVITAI_TYPES[managed_kind(kind)]
+    if not types:
+        raise web.HTTPBadRequest(text=f"Civitai has no model type for {kind}: they can't be searched or downloaded there.")
+    return types
 CIVITAI_API = os.environ.get("DICEFORGE_CIVITAI_API", "https://civitai.com/api/v1") # Another server for tests (e2e/server.js).
 KEY_FILE = os.path.join(folder_paths.get_user_directory(), "DiceForge", "civitai.json")
 SORTS = ("Highest Rated", "Most Downloaded", "Newest")
@@ -207,7 +213,7 @@ def search_item(item, index):
             "url": f"https://civitai.com/models/{item.get('id')}", "versions": versions}
 async def search(kind, query="", base="", sort="", nsfw=False, cursor=""):
     params = [("limit", "24"), ("sort", sort if sort in SORTS else SORTS[0]), ("nsfw", "true" if nsfw else "false")]
-    params += [("types", civitai_type) for civitai_type in CIVITAI_TYPES[managed_kind(kind)]]
+    params += [("types", civitai_type) for civitai_type in civitai_types(kind)]
     params += [(key, value[:200]) for key, value in (("query", query.strip()), ("baseModels", base.strip()), ("cursor", cursor)) if value]
     data = await civitai_json("/models", params)
     index = await asyncio.get_running_loop().run_in_executor(None, local_index, kind)
@@ -233,7 +239,7 @@ def write_bytes(path, data):
     with open(path, "wb") as out:
         out.write(data)
 async def start_download(kind, version_id, folder=""):
-    managed_kind(kind)
+    civitai_types(kind) # A kind Civitai has, before anything is asked.
     if isinstance(version_id, bool) or not isinstance(version_id, int) or version_id <= 0:
         raise web.HTTPBadRequest(text="Civitai: version_id must be a model version number.")
     folder = checked_relative(folder, "folder") if isinstance(folder, str) and folder.strip() else ""

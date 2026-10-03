@@ -134,7 +134,7 @@ def wildcards(tmp_path, monkeypatch):
 @pytest.fixture
 def models(tmp_path, monkeypatch):
     """Empty model folders (loras, checkpoints...); returns a function that creates a model file of a kind, with optional content."""
-    for kind in ("checkpoints", "loras", "vae", "diffusion_models"):
+    for kind in ("checkpoints", "loras", "vae", "diffusion_models", "text_encoders"):
         (tmp_path / kind).mkdir()
         monkeypatch.setitem(folder_paths.folder_names_and_paths, kind, ([str(tmp_path / kind)], folder_paths.supported_pt_extensions))
     folder_paths.filename_list_cache.clear()

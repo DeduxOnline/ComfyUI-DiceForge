@@ -120,7 +120,7 @@ def test_search_shapes_civitai_answer_and_marks_what_is_here(api, models, civita
 def test_search_without_civitai_is_a_clear_error(api, models):
     status, text = api("GET", "/diceforge/civitai/search?query=x")
     assert status == 502 and "Civitai could not be reached" in text
-    assert api("GET", "/diceforge/civitai/search?kind=vae")[0] == 400 # LoRAs, checkpoints and diffusion models only.
+    assert api("GET", "/diceforge/civitai/search?kind=embeddings")[0] == 400 # Model kinds only (not embeddings).
 
 
 def test_download_saves_the_file_its_civitai_data_and_a_preview(api, models, civitai):
@@ -232,7 +232,7 @@ def test_rename_moves_the_file_with_its_preview_and_info(api, models):
     ({"file": "a.safetensors", "to": "b"}, 409), ({"file": "a.safetensors", "to": "b.ckpt"}, 400), ({"file": "a.safetensors", "to": "../b"}, 400),
     ({"file": "a.safetensors", "to": ""}, 400), ({"file": "a.safetensors", "to": None}, 400), ({"file": "a.safetensors", "to": "c:d"}, 400),
     ({"file": "nope.safetensors", "to": "c"}, 404), ({"file": "../a.safetensors", "to": "c"}, 400), ({"file": 5, "to": "c"}, 400),
-    ({"file": "a.safetensors", "to": "c", "kind": "vae"}, 400)])
+    ({"file": "a.safetensors", "to": "c", "kind": "embeddings"}, 400)])
 def test_rename_refusals(body, status, api, models):
     models("loras", "a.safetensors", b"a")
     models("loras", "b.safetensors", b"b")
@@ -323,3 +323,21 @@ def test_model_favorites_go_with_the_file(api, models):
     for body, status in (({"kind": "loras", "file": "nope.safetensors", "favorite": True}, 404), ({"kind": "loras", "file": "ink.safetensors", "favorite": 1}, 400),
                          ({"kind": "nope", "file": "ink.safetensors", "favorite": True}, 404), ({"kind": "loras", "file": 5, "favorite": True}, 404)):
         assert api("POST", "/diceforge/model-favorite", body)[0] == status
+
+
+@pytest.mark.parametrize("kind", ["vae", "text_encoders"])
+def test_vae_and_text_encoders_are_renamed_moved_and_deleted(api, models, kind):
+    models(kind, "t5xxl.safetensors", b"encoder")
+    assert api("POST", "/diceforge/models/rename", {"kind": kind, "file": "t5xxl.safetensors", "to": "flux/t5xxl"})[1]["to"] == "flux/t5xxl.safetensors"
+    assert os.path.isfile(models.root / kind / "flux" / "t5xxl.safetensors")
+    assert api("DELETE", f"/diceforge/models/file?kind={kind}&file=flux/t5xxl.safetensors")[0] == 200
+    assert not os.path.exists(models.root / kind / "flux" / "t5xxl.safetensors")
+
+
+def test_text_encoders_are_not_searched_or_downloaded_on_civitai(api, models, civitai):
+    status, text = api("GET", "/diceforge/civitai/search?kind=text_encoders&query=t5")
+    assert status == 400 and "no model type" in text
+    assert api("POST", "/diceforge/civitai/download", {"kind": "text_encoders", "version_id": 301})[0] == 400
+    assert not [path for path, _query, _auth in civitai.requests if path.startswith("/api/")] # Refused before asking Civitai.
+    status, body = api("GET", "/diceforge/civitai/search?kind=vae&query=neon") # VAEs are: Civitai's VAE type.
+    assert status == 200 and civitai.requests[-1][1]["types"] == ["VAE"]

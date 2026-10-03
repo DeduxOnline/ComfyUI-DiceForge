@@ -32,6 +32,7 @@ const MODELS = {
   "diffusion_models/flux/flux1-schnell.safetensors": { content: "schnell diffusion model" },
   "text_encoders/clip_l.safetensors": { content: "clip l" },
   "text_encoders/t5xxl_fp16.safetensors": { content: "t5xxl" },
+  "vae/sdxl_vae.safetensors": { content: "sdxl vae" },
 };
 const WILDCARDS = {
   "color.txt": "# colors\nred\nblue\ngreen\nwhite\n",
