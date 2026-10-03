@@ -635,7 +635,7 @@ for (const vue of [true, false]) {
         widget(checkpoint, "ckpt_name").options.values = () => files; // A function, as some extensions set it.
         const models = widget(diffusion, "unet_name").options.values.slice();
         widget(diffusion, "unet_name").options.values = models.map((content) => ({ content })); // Objects.
-        delete widget(asset, "unet_name").options.values; // An Asset API widget: no list, only its value.
+        widget(asset, "unet_name").options.values = []; // As an Asset API widget: no list to read, only its value (the canvas still needs a list to draw).
       }, [checkpoint, diffusion, asset]);
       expect(await menuItems(page, checkpoint, "DiceForge.ModelBrowser")).toEqual(["🗃️ Checkpoint Browser"]);
       for (const id of [diffusion, asset]) expect(await menuItems(page, id, "DiceForge.ModelBrowser")).toEqual(["🧊 Diffusion Model Browser"]);
