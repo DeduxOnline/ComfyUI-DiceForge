@@ -219,6 +219,11 @@ def public(job):
 def safe_file_name(name):
     name = FORBIDDEN.sub("_", os.path.basename(str(name).replace("\\", "/"))).strip().strip(".") or "model.safetensors"
     return name
+def open_for_writing(path):
+    return open(path, "wb") # noqa: SIM115  (closed by run_download, which writes it chunk by chunk)
+def write_bytes(path, data):
+    with open(path, "wb") as out:
+        out.write(data)
 async def start_download(kind, version_id, folder=""):
     managed_kind(kind)
     if isinstance(version_id, bool) or not isinstance(version_id, int) or version_id <= 0:
@@ -262,11 +267,14 @@ async def run_download(job, version, file, url):
             if response.content_type.startswith("text/html"):
                 raise DownloadError("Civitai answered with a web page instead of the file: the download may need an API key or early access.")
             job["total"] = response.content_length or job["total"]
-            with open(part, "wb") as out:
+            out = await loop.run_in_executor(None, open_for_writing, part) # The file is opened, written and closed off the event loop:
+            try:                                                               # a slow disk doesn't stall ComfyUI.
                 async for chunk in response.content.iter_any(): # As it arrives, so the progress moves on a slow line too.
-                    await loop.run_in_executor(None, out.write, chunk) # Off the event loop: a slow disk doesn't stall ComfyUI.
+                    await loop.run_in_executor(None, out.write, chunk)
                     digest.update(chunk)
                     job["done"] += len(chunk)
+            finally:
+                await loop.run_in_executor(None, out.close)
         sha256 = digest.hexdigest()
         expected = str((file.get("hashes") or {}).get("SHA256") or "").lower()
         if expected and expected != sha256:
@@ -282,6 +290,7 @@ async def run_download(job, version, file, url):
         job.update(status="done", done=stat.st_size, total=stat.st_size)
     except asyncio.CancelledError:
         job["status"] = "cancelled"
+        raise # Stopped: the cleanup below runs, and the task ends as cancelled.
     except Exception as error:
         logging.warning(f"[DiceForge] Civitai download of {job['file']} failed: {error}")
         job.update(status="error", error=str(error) if isinstance(error, DownloadError) else f"Download failed: {error}")
@@ -299,8 +308,7 @@ async def save_preview(version, path):
             response.raise_for_status()
             extension = {"image/png": ".png", "image/webp": ".webp"}.get(response.content_type, ".jpg")
             data = await response.content.read(20 * 1024 * 1024)
-        with open(os.path.splitext(path)[0] + ".preview" + extension, "wb") as out:
-            out.write(data)
+        await asyncio.get_running_loop().run_in_executor(None, write_bytes, os.path.splitext(path)[0] + ".preview" + extension, data)
     except Exception as error: # The model is there; only its preview is missing (the browser shows Civitai's image instead).
         logging.warning(f"[DiceForge] Civitai preview of {os.path.basename(path)} not saved: {error}")
 def cancel_download(job_id):
