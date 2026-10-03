@@ -59,7 +59,8 @@ const STYLE = `
 .dflb button:disabled{opacity:.5;cursor:default}.dflb button.go{border-color:#4a7a4a;color:#bfe8bf}
 .dflb .main{display:flex;gap:12px;flex:1;min-height:0}.dflb .tree{width:230px;flex:none;overflow:auto;border:1px solid #4a4a4a;border-radius:6px;padding:6px}
 .dflb .tree .row{display:flex;align-items:center;gap:6px;padding:3px 6px;border-radius:4px;cursor:pointer}.dflb .tree .row:hover{background:#2c2c2c}
-.dflb .tree .row.sel{background:#2f3f55}.dflb .tree .row .name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dflb .tree button{padding:0 6px;font-size:12px}
+.dflb .tree .row.sel{background:#2f3f55}.dflb .tree .twist{width:14px;flex:none;color:#999;text-align:center}.dflb .tree .twist:hover{color:#fff}
+.dflb .tree .tools{display:flex;gap:6px;margin-bottom:6px}.dflb .tree .tools button{flex:1}.dflb .tree .row .name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dflb .tree button{padding:0 6px;font-size:12px}
 .dflb .grid{flex:1;overflow:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;align-content:start;grid-auto-rows:max-content}
 .dflb .card{background:#2a2a2a;border:1px solid #474747;border-radius:8px;overflow:hidden;display:flex;flex-direction:column}.dflb .card.sel{border-color:#6a9ad8}
 .dflb .pic{aspect-ratio:3/4;background:#1e1e1e;display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative}
@@ -235,6 +236,15 @@ async function openBrowser(node, spec, target = targetOf(node, spec)) {
     const baseOk = !base.value || (base.value === FITS ? compareBases(entry.base_model, target.base)?.level !== "bad" : entry.base_model === base.value);
     return inFolder && baseOk && (!query || query.split(/\s+/).every((word) => text.includes(word)));
   }
+  // Folders open in the tree, kept per kind between openings (and reloads) in this browser. Subfolders start closed; ▸ opens one, and the folder
+  // picked in the tree (or the one a Random loader uses) is opened to.
+  const openKey = `diceforge.browser.${kind}.open`;
+  const opened = (() => { try { return new Set(JSON.parse(localStorage.getItem(openKey)) || []); } catch { return new Set(); } })();
+  const keepOpened = () => { try { localStorage.setItem(openKey, JSON.stringify([...opened])); } catch { /* No storage: open only for this visit. */ } };
+  const openTo = (path) => {
+    const parts = path ? path.split("/") : [];
+    parts.slice(0, -1).forEach((_, index) => opened.add(parts.slice(0, index + 1).join("/")));
+  };
   function drawTree() {
     const counts = new Map([["", files.length]]);
     for (const entry of files) {
@@ -242,8 +252,22 @@ async function openBrowser(node, spec, target = targetOf(node, spec)) {
       parts.forEach((_, index) => { const path = parts.slice(0, index + 1).join("/"); counts.set(path, (counts.get(path) ?? 0) + 1); });
     }
     const folders = [...counts.keys()].sort((a, b) => a.localeCompare(b));
-    tree.replaceChildren(...folders.map((path) => {
+    const parents = new Set(folders.map((path) => path.split("/").slice(0, -1).join("/")).filter(Boolean));
+    openTo(folder);
+    if (typeof target?.folder?.value === "string") openTo(target.folder.value); // The folder the Random loader uses shows.
+    const shown = folders.filter((path) => { // Every folder above it open.
+      const parts = path.split("/");
+      return parts.slice(0, -1).every((_, index) => opened.has(parts.slice(0, index + 1).join("/")));
+    });
+    const toggle = (path) => { if (opened.has(path)) opened.delete(path); else opened.add(path); keepOpened(); drawTree(); };
+    const tools = parents.size ? [element("div", { class: "tools" },
+      element("button", { class: "open-all", title: "Open every folder", onclick: () => { parents.forEach((path) => opened.add(path)); keepOpened(); drawTree(); } }, "Expand all"),
+      element("button", { class: "close-all", title: "Close every folder", onclick: () => { opened.clear(); keepOpened(); drawTree(); } }, "Collapse all"))] : [];
+    tree.replaceChildren(...tools, ...shown.map((path) => {
       const depth = path ? path.split("/").length : 0;
+      const twist = parents.has(path)
+        ? element("span", { class: "twist", title: opened.has(path) ? "Close the folder" : "Open the folder", onclick: (event) => { event.stopPropagation(); toggle(path); } }, opened.has(path) ? "▾" : "▸")
+        : element("span", { class: "twist" });
       const useFolder = target?.folder && path && target.folder.options.values.includes(path)
         ? [element("button", { title: `Pick the ${spec.plural} of ${path} in ${spec.randomName}`, onclick: (event) => {
             event.stopPropagation();
@@ -252,8 +276,8 @@ async function openBrowser(node, spec, target = targetOf(node, spec)) {
             drawTree();
           } }, target.folder.value === path ? "In use" : "Use folder")]
         : [];
-      return element("div", { class: "row" + (path === folder ? " sel" : ""), style: `padding-left:${6 + depth * 12}px`, onclick: () => { folder = path; draw(); } },
-        element("span", { class: "name" }, path ? `📁 ${path.split("/").pop()}` : `All ${spec.plural}`), element("span", { class: "muted" }, counts.get(path)), ...useFolder);
+      return element("div", { class: "row" + (path === folder ? " sel" : ""), "data-path": path, style: `padding-left:${6 + depth * 12}px`, onclick: () => { folder = path; draw(); } },
+        ...(path ? [twist] : []), element("span", { class: "name" }, path ? `📁 ${path.split("/").pop()}` : `All ${spec.plural}`), element("span", { class: "muted" }, counts.get(path)), ...useFolder);
     }));
   }
   function draw() {

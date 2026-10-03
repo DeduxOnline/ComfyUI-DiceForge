@@ -393,7 +393,7 @@ Right-click **Load LoRA** (or another node with a LoRA list), **Random LoRA** or
 
 - a **preview**: an image saved next to the LoRA (`name.preview.png`, `name.png`, `.jpg`, `.webp`, as Civitai Helper and LoRA Manager save them) or else the first Civitai image (blurred if Civitai rates it R or higher, until clicked);
 - the **name** (yours from Model info, or the Civitai model and version), the file, its size, the **base model** and the **trigger words** (click one to copy it; your own trigger words from Model info come first);
-- a **folder tree** with the number of LoRAs in each folder, a **search** box (file, name or trigger words), a **base model** filter (SDXL, Pony, Illustrious…) and sorting by name, newest or base model.
+- a **folder tree** with the number of LoRAs in each folder (subfolders start closed: **▸** opens one, a click on the name shows that folder's LoRAs; **Expand all** / **Collapse all**; the browser remembers which folders are open, and opens the tree to the folder a Random loader uses), a **search** box (file, name or trigger words), a **base model** filter (SDXL, Pony, Illustrious…) and sorting by name, newest or base model.
 
 What a card's button does depends on where the browser was opened:
 

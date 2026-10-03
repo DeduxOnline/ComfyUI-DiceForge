@@ -265,6 +265,44 @@ for (const vue of [true, false]) {
       await page.keyboard.press("Escape");
     });
 
+    test("LoRA Browser folders open and close, and stay so", async ({ page }) => {
+      const top = `tree_${vue ? "vue" : "classic"}`;
+      for (const file of ["a/one", "a/deep/two", "b/three"]) writeFile(`models/loras/${top}/${file}.safetensors`, `${top} ${file}`);
+      try {
+        await page.evaluate(() => localStorage.removeItem("diceforge.browser.loras.open"));
+        const [loader, random] = await addNodes(page, [{ type: "LoraLoader" }, { type: "DiceForgeRandomLora", pos: [500, 40] }]);
+        await clickMenu(page, loader, "DiceForge.ModelBrowser", "LoRA Browser");
+        const row = (path) => page.locator(`.dflb .tree .row[data-path="${path}"]`);
+        await expect(row(top)).toBeVisible();
+        await expect(row(`${top}/a`)).toHaveCount(0); // Subfolders start closed.
+        await row(top).locator(".twist").click();
+        await expect(row(`${top}/a`)).toBeVisible();
+        await expect(row(`${top}/a/deep`)).toHaveCount(0);
+        await expect(page.locator(".dflb .tree .row.sel")).toContainText(`All LoRAs`); // ▸ opens without picking the folder.
+        await row(`${top}/a`).locator(".name").click(); // Picking a folder shows its LoRAs (subfolders included).
+        await expect(page.locator(".dflb .card")).toHaveCount(2);
+        await page.keyboard.press("Escape");
+        await clickMenu(page, loader, "DiceForge.ModelBrowser", "LoRA Browser");
+        await expect(row(`${top}/a`)).toBeVisible(); // Still open when the browser opens again.
+        await page.locator(".dflb .tree button.open-all").click();
+        await expect(row(`${top}/a/deep`)).toBeVisible();
+        await page.locator(".dflb .tree button.close-all").click();
+        await expect(row(`${top}/a`)).toHaveCount(0);
+        await page.keyboard.press("Escape");
+        await page.evaluate(([id, value]) => { // A Random LoRA set to a deep folder: the tree opens to it.
+          const widget = window.app.graph.getNodeById(id).widgets.find((entry) => entry.name === "folder");
+          widget.options.values.push(value);
+          widget.value = value;
+        }, [random, `${top}/a/deep`]);
+        await clickMenu(page, random, "DiceForge.ModelBrowser", "LoRA Browser");
+        await expect(row(`${top}/a/deep`).locator("button", { hasText: "In use" })).toBeVisible();
+        await page.locator(".dflb .tree button.close-all").click();
+        await page.keyboard.press("Escape");
+      } finally {
+        fs.rmSync(basePath("models", "loras", top), { recursive: true, force: true });
+      }
+    });
+
     test("LoRA Browser keeps its cards full size with many LoRAs", async ({ page }) => {
       const folder = `many_${vue ? "vue" : "classic"}`;
       for (let index = 0; index < 60; index++) writeFile(`models/loras/${folder}/lora_${String(index).padStart(2, "0")}.safetensors`, `${folder} ${index}`);
