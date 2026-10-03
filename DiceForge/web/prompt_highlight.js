@@ -31,7 +31,7 @@ const TOKENS = new RegExp([
   String.raw`(?<open>\{)`, String.raw`(?<close>\})`, String.raw`(?<bar>\|)`,
 ].join("|"), "gu");
 const COUNT = /^\s*(?:\d+(?:-\d*)?|-\d+)\$\$(?:[^{}$]*\$\$)?/; // {2$$, {1-3$$ and $$ (a choice's start only)
-const OPTION = /^\s*(?:!\s*)?(?:\d+(?:\.\d+)?::)?(?:\s*!)?/; // 3::  !  !3::  3::! (an option's start)
+const WEIGHT_START = /^\d+(?:\.\d+)?::/; // 3:: or 1.5:: (an option's weight)
 const escapeHTML = (text) => text.replace(/[&<>"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[char]);
 function globTest(pattern) {
   const source = pattern.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*").replace(/\?/g, ".");
@@ -40,12 +40,17 @@ function globTest(pattern) {
 // The marks for a prompt: [start, end, class] ranges. names: the known wildcard names, or null (not listed yet: nothing is called missing).
 export function promptMarks(text, names) {
   const marks = [], stack = [], known = names && new Set(names.map((name) => name.toLowerCase()));
-  const optionStart = (from) => { // A weight or lock right after { or |.
-    const match = OPTION.exec(text.slice(from));
-    if (!match?.[0].trim()) return;
-    const lock = match[0].indexOf("!"), weight = match[0].search(/\d/);
-    if (weight >= 0) marks.push([from + weight, from + match[0].indexOf("::") + 2, "weight"]);
-    if (lock >= 0) marks.push([from + lock, from + lock + 1, "lock"]);
+  const spacesFrom = (at) => { while (at < text.length && /\s/.test(text[at])) at++; return at; };
+  const optionStart = (from) => { // A weight or lock right after { or |: 3::  !  !3::  3::!  (spaces allowed between)
+    let at = spacesFrom(from), lock = -1;
+    if (text[at] === "!") lock = at, at = spacesFrom(at + 1);
+    const weight = WEIGHT_START.exec(text.slice(at, at + 40));
+    if (weight) {
+      marks.push([at, at + weight[0].length, "weight"]);
+      const after = spacesFrom(at + weight[0].length);
+      if (lock < 0 && text[after] === "!") lock = after;
+    }
+    if (lock >= 0) marks.push([lock, lock + 1, "lock"]);
   };
   for (const match of text.matchAll(TOKENS)) {
     const start = match.index, end = start + match[0].length, group = Object.entries(match.groups).find(([, value]) => value !== undefined)[0];
