@@ -11,7 +11,7 @@ const STYLE = `
 .dfdb{font:12px system-ui,sans-serif;color:#ccc;display:flex;flex-direction:column;gap:4px;box-sizing:border-box;padding:2px 0}
 .dfdb .head{color:#888;display:flex;gap:6px;align-items:center}.dfdb .head a{color:#9cc8ff;text-decoration:none;margin-left:auto}
 .dfdb .text{background:#222;border:1px solid #444;border-radius:5px;padding:5px 7px;white-space:pre-wrap;word-break:break-word;cursor:copy;max-height:220px;overflow:auto;user-select:text}
-.dfdb .text.copied{border-color:#6a9a6a}.dfdb .added{color:#9c9}.dfdb .empty{color:#777;font-style:italic;padding:6px}
+.dfdb .text.copied{border-color:#6a9a6a}.dfdb .added{color:#9c9}.dfdb .search{color:#888;font-size:11px}.dfdb .empty{color:#777;font-style:italic;padding:6px}
 `;
 
 app.registerExtension({
@@ -39,7 +39,8 @@ app.registerExtension({
           element("div", { class: "head" }, `Last run · post #${last.id}${RATINGS[last.rating] ? ` (${RATINGS[last.rating]})` : ""}`,
             element("a", { href: last.url, target: "_blank", rel: "noopener", title: `Found with: ${last.search || "any post"}` }, "↗ post")),
           text,
-          element("div", { class: "added" }, last.added ? `+ ${last.added}` : "Nothing to add: the post has no other tags."));
+          element("div", { class: "added" }, last.added ? `+ ${last.added}` : "Nothing to add: the post has no other tags."),
+          element("div", { class: "search" }, `Searched: ${last.search || "any post"}`)); // What Danbooru was asked, to see why this post.
       }
       fitNodeHeight(node);
     }

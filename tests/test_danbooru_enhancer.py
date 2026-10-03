@@ -88,6 +88,7 @@ def test_search_tags_are_the_two_most_telling():
     assert search_tags(["1girl", "masterpiece", "hatsune_miku"]) == ["1girl", "masterpiece"] # No lists: the first two.
     tag_list()
     assert search_tags(["1girl", "masterpiece", "smile", "hatsune_miku"]) == ["hatsune_miku", "smile"] # The character, then the rarer general tag.
+    assert search_tags(["blue_archive", "masterpiece"]) == ["blue_archive", "masterpiece"] # None known to the lists: the prompt's own, not an empty search.
     assert searches(["a", "b"]) == [["a", "b"], ["a"], ["b"]] and searches(["a"]) == [["a"]] and searches([]) == [[]]
 
 

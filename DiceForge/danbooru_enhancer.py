@@ -34,14 +34,16 @@ def prompt_text(tag):
     spaced = tag.replace("_", " ") if re.search(r"[a-z]{2}", tag, re.IGNORECASE) and len(tag) > 3 else tag
     return re.sub(r"([()])", r"\\\1", spaced)
 # The search: the two tags of the prompt that say the most (in the tag lists: characters, then series, then the rarest); without tag lists, the
-# first two. Tags Danbooru doesn't know (masterpiece, score_9) are left out when the lists are there.
+# first two. Tags Danbooru doesn't know (masterpiece, score_9) are left out when the lists are there; when the lists know none of the prompt's
+# tags (a new tag, or an incomplete list), its own first two still search: never an empty search, which would bring any post at all.
 def search_tags(tags):
     index = INDEX.load()
     if not index.tags:
         return tags[:2]
     known = {tag_key(tag): (kind, count) for tag, kind, count, _aliases in index.tags}
     rank = {4: 0, 3: 1, 1: 2, 0: 3, 5: 4} # character, copyright, artist, general, meta
-    return sorted((tag for tag in tags if tag in known), key=lambda tag: (rank.get(known[tag][0], 3), known[tag][1]))[:2]
+    found = sorted((tag for tag in tags if tag in known), key=lambda tag: (rank.get(known[tag][0], 3), known[tag][1]))
+    return found[:2] or tags[:2]
 # The searches to try: both tags, then each alone (a pair no post has together).
 def searches(tags):
     return [tags] + ([[tag] for tag in tags] if len(tags) > 1 else [])

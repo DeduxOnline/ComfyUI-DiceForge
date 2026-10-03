@@ -1075,6 +1075,7 @@ for (const vue of [true, false]) {
       await expect(panel.locator(".text")).toHaveText("hatsune miku, 1girl, smile, twintails"); // Post 101: rating:g.
       await expect(panel.locator(".head")).toContainText("Last run · post #101 (general)");
       await expect(panel.locator(".added")).toHaveText("+ 1girl, smile, twintails");
+      await expect(panel.locator(".search")).toHaveText("Searched: hatsune_miku rating:g");
       await expect(panel.locator("a")).toHaveAttribute("href", /\/posts\/101$/);
       const workflow = await page.evaluate(() => window.app.graph.serialize());
       expect(workflow.nodes.find((node) => String(node.id) === String(id)).properties.dice_forge_danbooru.id).toBe(101);
