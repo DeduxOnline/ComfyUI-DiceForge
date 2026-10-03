@@ -471,6 +471,20 @@ for (const vue of [true, false]) {
       const history = Object.values(await (await request.get("/history?max_items=1")).json())[0];
       const text = history.outputs[String(preview)].text[0];
       expect(text).toMatch(/^a (red|blue|green|white) car, [a-z ]+, [a-z ]+$/);
+      // The node shows the prompts as encoded, with the seed they came from.
+      const shown = page.locator(".dfpp").first();
+      await expect(shown.locator(".box").first()).toHaveText(`positive${text}`);
+      await expect(shown.locator(".box").nth(1)).toContainText("(empty)");
+      await expect(shown.locator(".head")).toContainText("seed 3 (random)");
+      await expect(shown).not.toHaveClass(/stale/);
+      await setWidget(page, encode, "positive", "a __color__ bike"); // Changed since the run: dimmed until the next one.
+      await expect(shown).toHaveClass(/stale/);
+      await expect(shown.locator(".changed")).toHaveText("prompt changed since");
+      // Kept with the workflow: a reload of it shows them again.
+      const workflow = await page.evaluate(() => window.app.graph.serialize());
+      expect(workflow.nodes.find((node) => String(node.id) === String(encode)).properties.dice_forge_prompts.positive).toBe(text);
+      await page.evaluate(async (data) => { window.app.graph.clear(); await window.app.loadGraphData(data); }, workflow);
+      await expect(page.locator(".dfpp").first().locator(".box").first()).toHaveText(`positive${text}`);
     });
 
     if (vue) {

@@ -604,6 +604,10 @@ In `deck` and `shuffle` modes:
 - The node runs again when a wildcard file changes, even if the prompts and the seed stay the same.
 - A `*` or `?` name (`__hair/*__`) joins the lines of every file it matches, in name order, so all seed modes (deck, shuffle, combinations…) treat them as one list. Empty files among them are skipped; a name that matches nothing stops the run with an error.
 
+### Preview of the prompts as encoded
+
+After each run the node shows, under its inputs, the **positive** and **negative** prompts as they were encoded: choices, wildcards and variables filled in, with the seed and seed mode they came from (and *combination N of M* in `combinations`). Click a prompt to copy it. The preview is kept with the workflow, so it is still there after a reload and in a workflow loaded from an image; when you change a prompt it is dimmed and marked *prompt changed since* until the next run. It also updates when the node comes from ComfyUI's cache.
+
 ### Autocomplete and the Wildcard Browser
 
 <img src="docs/images/wildcard_autocomplete.png" width="467" alt="Wildcard autocomplete in the positive prompt">

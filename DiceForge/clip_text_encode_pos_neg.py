@@ -474,6 +474,7 @@ class CLIPTextEncodePositiveNegative(io.ComfyNode):
                     advanced=True,
                 ),
             ],
+            has_intermediate_output=True, # The prompts of the last run reach the node's preview also when the node comes from the cache.
             # Outputs for the node: positive and negative conditioning, then the prompts as encoded (with choices and wildcards filled in).
             outputs=[
                 io.Conditioning.Output(display_name="positive", tooltip="Conditioning from the positive prompt."),
@@ -525,9 +526,11 @@ class CLIPTextEncodePositiveNegative(io.ComfyNode):
         # Logging the prompts when choices or wildcards changed them, for debugging and verification purposes.
         if (positive_text, negative_text) != (positive, negative):
             logging.info(f"[DiceForge] CLIP Dual Text Encode | Seed: {seed} ({seed_mode}{note}) | Positive: {positive_text} | Negative: {negative_text}")
+        # The prompts as encoded, for the node's preview in the page (web/prompt_preview.js), with the seed and mode they came from.
+        shown = {"dice_forge_prompts": [{"positive": positive_text, "negative": negative_text, "seed": seed, "seed_mode": seed_mode, "note": note.lstrip(", ")}]}
         if clip is None:
-            return io.NodeOutput(None, None, positive_text, negative_text) # No CLIP: only the text, for other text encoders.
-        return io.NodeOutput(cls.encode(clip, positive_text), cls.encode(clip, negative_text), positive_text, negative_text)
+            return io.NodeOutput(None, None, positive_text, negative_text, ui=shown) # No CLIP: only the text, for other text encoders.
+        return io.NodeOutput(cls.encode(clip, positive_text), cls.encode(clip, negative_text), positive_text, negative_text, ui=shown)
 # Extension entry point for ComfyUI V3 node registration.
 class CLIPTextEncodePositiveNegativeExtension(ComfyExtension):
     @override

@@ -40,10 +40,14 @@ test.describe("README screenshots (Nodes 2.0)", () => {
     await shot(page, [selector], "resolution_selector.png");
   });
 
-  test("CLIP Dual Text Encode and the autocomplete", async ({ page }) => {
-    const [id] = await addNodes(page, [{ type: "CLIPTextEncodePositiveNegative", pos: [400, 220], widgets: {
+  test("CLIP Dual Text Encode and the autocomplete", async ({ page, request }) => {
+    const [id, text] = await addNodes(page, [{ type: "CLIPTextEncodePositiveNegative", pos: [400, 220], widgets: {
       positive: "${g={male|female}}photo of a __outfit/${g}__ person, {2$$__characters/*/outfit__}, __color__ hair, {3::smiling|serious}",
-      negative: "blurry, lowres", seed: 42, seed_mode: "deck" } }]);
+      negative: "blurry, lowres", seed: 42, seed_mode: "deck" } }, { type: "PreviewAny", pos: [1700, 220] }]);
+    await connect(page, id, 2, text, 0);
+    await setWidget(page, id, "control_after_generate", "fixed");
+    await queueFromPage(page, request); // A run, so the node shows the prompts as encoded.
+    await expect(page.locator(".dfpp .box").first()).toContainText("photo of a");
     await showAdvanced(page, id);
     await shot(page, [id], "clip_dual_text_encode.png");
     const field = page.locator(`[data-node-id="${id}"] textarea`).first();

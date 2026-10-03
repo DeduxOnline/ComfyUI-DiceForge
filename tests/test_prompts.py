@@ -176,3 +176,12 @@ def test_remembering_modes_never_use_the_cache():
     assert Node.fingerprint_inputs(seed_mode="random")[1] is None
     first, second = Node.fingerprint_inputs(seed_mode="shuffle")[1], Node.fingerprint_inputs(seed_mode="shuffle")[1]
     assert first != second
+
+
+def test_the_node_sends_its_prompts_to_the_page_preview(wildcards):
+    from DiceForge.clip_text_encode_pos_neg import CLIPTextEncodePositiveNegative
+    wildcards("color.txt", "red\n")
+    output = CLIPTextEncodePositiveNegative.execute("a __color__ car", "{lowres|lowres}", seed=7, seed_mode="deck")
+    assert output.ui == {"dice_forge_prompts": [{"positive": "a red car", "negative": "lowres", "seed": 7, "seed_mode": "deck", "note": ""}]}
+    combinations = CLIPTextEncodePositiveNegative.execute("{a|b}", "", seed=1, seed_mode="combinations").ui["dice_forge_prompts"][0]
+    assert combinations["positive"] == "b" and combinations["note"] == "combination 2 of 2"
