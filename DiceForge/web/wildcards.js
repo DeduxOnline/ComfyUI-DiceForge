@@ -110,8 +110,9 @@ const STYLE = `
 .dfwc .top input{flex:1}.dfwc .main{display:flex;gap:12px;flex:1;min-height:0}
 .dfwc .tree{width:45%;overflow:auto;border:1px solid #4a4a4a;border-radius:6px;padding:6px}
 .dfwc .edit{flex:1;display:flex;flex-direction:column;gap:8px;min-width:0}
-.dfwc .code{flex:1;display:flex;min-height:0;border:1px solid #555;border-radius:4px;background:#262626;overflow:hidden}
-.dfwc .code .lines,.dfwc .code textarea{font:13px/20px ui-monospace,monospace;padding-top:6px;background-image:linear-gradient(to bottom,transparent 19px,#323232 19px);background-size:100% 20px;background-position:0 6px;background-attachment:local}
+.dfwc .code{--current-line:-40px;flex:1;display:flex;min-height:0;border:1px solid #555;border-radius:4px;background:#262626;overflow:hidden}
+.dfwc .code .lines,.dfwc .code textarea{font:13px/20px ui-monospace,monospace;padding-top:6px;background-image:linear-gradient(#2e3846,#2e3846),linear-gradient(to bottom,transparent 19px,#323232 19px);
+  background-size:100% 20px;background-position:0 var(--current-line),0 6px;background-repeat:no-repeat,repeat;background-attachment:local}
 .dfwc .code .lines{flex:none;box-sizing:content-box;padding:6px 8px 40px 10px;text-align:right;color:#6f6f6f;white-space:pre;overflow:hidden;user-select:none;background-color:#212121;border-right:1px solid #444}
 .dfwc .code textarea{flex:1;min-width:0;resize:none;border:none;border-radius:0;padding:6px 8px;white-space:pre;overflow:auto;background-color:#262626}
 .dfwc .row{display:flex;align-items:center;gap:6px;padding:3px 6px;border-radius:4px}.dfwc .row:hover{background:#2c2c2c}
@@ -282,6 +283,16 @@ async function openBrowser(node) {
   };
   editor.addEventListener("input", numberLines);
   editor.addEventListener("scroll", () => { lines.scrollTop = editor.scrollTop; });
+  // The line with the caret is highlighted, in the text and its number (a background row, scrolled with the text).
+  const code = element("div", { class: "code" }, lines, editor);
+  const markCurrentLine = () => {
+    let line = 0;
+    for (let at = editor.value.indexOf("\n"); at !== -1 && at < editor.selectionStart; at = editor.value.indexOf("\n", at + 1)) line++;
+    code.style.setProperty("--current-line", `${6 + 20 * line}px`);
+  };
+  const onSelection = () => { if (document.activeElement === editor) markCurrentLine(); };
+  document.addEventListener("selectionchange", onSelection);
+  for (const type of ["input", "click", "keyup", "focus"]) editor.addEventListener(type, markCurrentLine);
   const status = element("div", { class: "status" });
   const save = element("button", { class: "save" }, "Save");
   const rename = element("button", { class: "rename", disabled: true }, "Rename");
@@ -294,7 +305,7 @@ async function openBrowser(node) {
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") { event.preventDefault(); event.stopPropagation(); save.click(); }
   });
   const back = element("div", { class: "dfwc-back" });
-  const close = () => { back.remove(); document.removeEventListener("keydown", onKey, true); };
+  const close = () => { back.remove(); document.removeEventListener("keydown", onKey, true); document.removeEventListener("selectionchange", onSelection); };
   const onKey = (event) => { if (event.key === "Escape" && !document.querySelector(".dfmv-back")) { event.stopPropagation(); close(); } }; // The folder picker closes first.
   back.addEventListener("mousedown", (event) => { if (event.target === back) close(); });
   document.addEventListener("keydown", onKey, true);
@@ -311,7 +322,9 @@ async function openBrowser(node) {
     title.replaceChildren(element("b", {}, `__${name}__`), " ", element("span", { class: "muted" }, file.path));
     editor.value = saved = file.text;
     editor.scrollTop = 0;
+    editor.setSelectionRange(0, 0);
     numberLines();
+    markCurrentLine();
     editor.readOnly = !!file.readonly; // A yaml wildcard is one key of a yaml file: edited in that file.
     save.disabled = rename.disabled = move.disabled = remove.disabled = !!file.readonly;
     showDirty();
@@ -338,6 +351,7 @@ async function openBrowser(node) {
       await open(result.to);
       if (edited != null) editor.value = edited, showDirty();
       numberLines();
+      markCurrentLine();
     } else draw();
     say(`${moved ? "Moved" : "Renamed"} ${result.renamed} to ${result.to}. Prompts that use __${result.renamed}__ need the new name.`);
   }
@@ -362,6 +376,7 @@ async function openBrowser(node) {
     selected = null;
     editor.value = saved = "";
     numberLines();
+    markCurrentLine();
     editor.readOnly = false;
     rename.disabled = move.disabled = remove.disabled = true;
     showDirty();
@@ -446,7 +461,7 @@ async function openBrowser(node) {
   back.append(element("div", { class: "dfwc" },
     element("h2", {}, "Wildcards"),
     element("div", { class: "top" }, search, favoritesButton, expandAll, collapseAll, create, element("button", { onclick: close }, "Close")),
-    element("div", { class: "main" }, tree, element("div", { class: "edit" }, title, element("div", { class: "code" }, lines, editor), element("div", { class: "top" }, status, element("span", { style: "flex:1" }), remove, move, rename, save)))));
+    element("div", { class: "main" }, tree, element("div", { class: "edit" }, title, code, element("div", { class: "top" }, status, element("span", { style: "flex:1" }), remove, move, rename, save)))));
   document.body.append(back);
   await wildcardList(true);
   draw();

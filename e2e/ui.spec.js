@@ -195,6 +195,10 @@ for (const vue of [true, false]) {
       await expect.poll(numbers).toBe("1\n2"); // A line number next to each line.
       await page.locator(".dfwc .edit textarea").fill("one\ntwo\n2::three");
       await expect.poll(numbers).toBe("1\n2\n3"); // Numbered again as you type.
+      const currentLine = () => page.locator(".dfwc .code").evaluate((code) => code.style.getPropertyValue("--current-line"));
+      await expect.poll(currentLine).toBe("46px"); // The caret's line (the third, after typing) is highlighted.
+      await page.locator(".dfwc .edit textarea").press("Control+Home");
+      await expect.poll(currentLine).toBe("6px"); // And follows the caret.
       await page.locator(".dfwc button", { hasText: "Save" }).click();
       await expect(page.locator(".dfwc .status")).toContainText(`Saved ${file}.txt`);
       expect(fs.readFileSync(basePath("models", "wildcards", `${file}.txt`), "utf8")).toBe("one\ntwo\n2::three\n");
