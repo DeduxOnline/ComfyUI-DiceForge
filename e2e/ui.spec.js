@@ -837,8 +837,10 @@ for (const vue of [true, false]) {
       // ↺ opens that run's workflow, as dropping its image would: the run's two nodes, with that run's color.
       page.once("dialog", (dialog) => dialog.accept());
       await panel.locator(".cell").nth(1).locator("button.open").click();
-      await expect.poll(() => page.evaluate(() => window.app.graph.nodes.map((node) => node.comfyClass).sort().join())).toBe("DiceForgeGrid,EmptyImage");
-      expect(await page.evaluate(() => window.app.graph.nodes.find((node) => node.comfyClass === "EmptyImage").widgets.find((widget) => widget.name === "color").value)).toBe(4000000);
+      // The graph already has these two nodes: wait for the opened run's color (the graph before it had the last run's, 8000000).
+      const color = () => page.evaluate(() => window.app.graph.nodes.find((node) => node.comfyClass === "EmptyImage")?.widgets.find((widget) => widget.name === "color").value);
+      await expect.poll(color).toBe(4000000);
+      expect(await page.evaluate(() => window.app.graph.nodes.map((node) => node.comfyClass).sort().join())).toBe("DiceForgeGrid,EmptyImage");
     });
 
     test("XY Plot shows the plot under its fields and queues every cell into Dice Grid", async ({ page, request }) => {
