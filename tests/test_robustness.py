@@ -5,6 +5,7 @@
 import json
 import os
 import random
+import re
 import shutil
 import sqlite3
 import subprocess
@@ -205,7 +206,8 @@ ROUTES = [("POST", "/diceforge/wildcards/file"), ("POST", "/diceforge/lora-prese
           ("POST", "/diceforge/xy-plot"), ("POST", "/diceforge/styles"), ("GET", "/diceforge/styles"), ("DELETE", "/diceforge/styles?name=nope"),
           ("GET", "/diceforge/tags?q=hair"), ("GET", "/diceforge/tags?limit=x"), ("GET", "/diceforge/tags/lists"), ("POST", "/diceforge/tags/download"),
           ("GET", "/diceforge/tags/browse?q=x&offset=-5&limit=99999"), ("POST", "/diceforge/tags/favorite"),
-          ("GET", "/diceforge/grid?node=1"), ("GET", "/diceforge/grid/image?node=1&file=00000.png"), ("POST", "/diceforge/grid/keep"), ("POST", "/diceforge/grid/save")]
+          ("GET", "/diceforge/grid?node=1"), ("GET", "/diceforge/grid/image?node=1&file=00000.png"), ("POST", "/diceforge/grid/keep"), ("POST", "/diceforge/grid/save"),
+          ("GET", "/diceforge/civitai/search?kind=embeddings&query=%00&sort=Nope"), ("GET", "/diceforge/lora-presets"), ("GET", "/diceforge/wildcards")]
 JUNK_BODIES = ["not json", "", "[]", "5", "null", '"text"', '{"loras": 5}', '{"loras": [1, null, {"a": 1}, "x.safetensors"]}', '{"items": 5}',
                '{"items": [1, null, "x", {"kind": 5, "file": []}, {"kind": "loras", "file": "../../x"}]}', '{"kind": "loras", "file": "x", "user": [1]}',
                '{"kind": "loras", "file": "x", "user": {"name": {"a": 1}}}', '{"name": 5}', '{"name": "ok", "stack": 5}', '{"name": "ok", "stack": {"rows": "x"}}',
@@ -214,6 +216,15 @@ JUNK_BODIES = ["not json", "", "[]", "5", "null", '"text"', '{"loras": 5}', '{"l
                '{"kind": "loras", "file": "x.safetensors", "to": "../../evil"}', '{"kind": "loras", "file": "../x.safetensors", "to": "y"}', '{"key": 5}',
                '{"key": "x\\u0000y"}', '{"version_id": "1"}', '{"version_id": 1.5}', '{"version_id": -3}', '{"version_id": 1, "folder": "../../x"}',
                '{"name": "x", "steps": "5", "cfg": 5, "sampler_name": "euler", "scheduler": "normal"}', '{"name": "x", "steps": 5, "cfg": 1e308}']
+
+
+def test_every_route_of_the_sources_is_tried():
+    """A new route goes into ROUTES: every route the DiceForge sources register is tried with junk (the e2e robustness test reads them itself)."""
+    folder = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "DiceForge")
+    found = {(method.upper(), path) for name in os.listdir(folder) if name.endswith(".py")
+             for method, path in re.findall(r'@routes\.(get|post|delete)\("([^"]+)"\)', open(os.path.join(folder, name), encoding="utf-8").read())}
+    assert len(found) > 30
+    assert found - {(method, path.split("?")[0]) for method, path in ROUTES} == set()
 
 
 @pytest.mark.parametrize("method, path", ROUTES)

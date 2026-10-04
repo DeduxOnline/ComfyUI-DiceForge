@@ -7,8 +7,9 @@ import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlsplit
 import pytest
+from hypothesis import given, settings, strategies as st
 from DiceForge import danbooru_enhancer, tag_autocomplete
-from DiceForge.danbooru_enhancer import (SITES, DanbooruTagEnhancer, excluded, is_appearance, is_background, is_clothes, is_count, parse_post_ids, preview_url,
+from DiceForge.danbooru_enhancer import (GROUPS, SITES, DanbooruTagEnhancer, added_tags, excluded, is_appearance, is_background, is_clothes, is_count, parse_post_ids, preview_url,
                                          prompt_tags, prompt_text, search_tags, searches)
 
 TAGS = "1girl,0,6000000,\nhatsune_miku,4,90000,miku\nvocaloid,3,200000,\nsmile,0,4000000,\nlong_hair,0,5000000,\ntwintails,0,900000,\nsignature,0,800000,\nthighhighs,0,700000,\n"
@@ -67,6 +68,9 @@ def danbooru(monkeypatch):
             if self.server.busy > 0: # Danbooru overloaded: 503 this many times.
                 self.server.busy -= 1
                 status, body = 503, {"message": "Service Unavailable"}
+            elif self.server.garbage > 0: # A page instead of data (200), this many times.
+                self.server.garbage -= 1
+                status, body = 200, "<html><body>Down for maintenance</body></html>"
             elif url.path == "/e621/posts.json":
                 status, body = 200, {"posts": e621_found(tags)[:int(parse_qs(url.query).get("limit", ["1"])[0])]}
             elif url.path.startswith("/e621/posts/"):
@@ -82,14 +86,14 @@ def danbooru(monkeypatch):
                 status, body = 404, {"message": "That record was not found."}
             else:
                 status, body = 200, self.server.choose(posts)
-            data = json.dumps(body).encode()
+            data = body.encode() if isinstance(body, str) else json.dumps(body).encode()
             self.send_response(status)
             self.send_header("Content-Type", "application/json")
             self.send_header("Content-Length", str(len(data)))
             self.end_headers()
             self.wfile.write(data)
     server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-    server.requests, server.refuse, server.choose, server.busy = [], False, lambda posts: posts[0], 0
+    server.requests, server.refuse, server.choose, server.busy, server.garbage = [], False, lambda posts: posts[0], 0, 0
     monkeypatch.setattr(danbooru_enhancer, "RETRY_DELAYS", (0, 0)) # No waiting in the tests.
     threading.Thread(target=server.serve_forever, daemon=True).start()
     monkeypatch.setattr(danbooru_enhancer, "DANBOORU_URL", f"http://127.0.0.1:{server.server_port}")
@@ -336,6 +340,60 @@ def test_danbooru_busy_every_time_says_so(danbooru):
     with pytest.raises(ValueError, match=r"Danbooru is busy and turned the request away \(503 Service Unavailable\), 3 times in a row.*try again in a minute"):
         run(tags="hatsune miku")
     assert len(danbooru.requests) == 3 # Asked three times, no more.
+
+
+def test_an_answer_that_isnt_json_is_asked_again_then_named(danbooru):
+    danbooru.garbage = 1 # A maintenance page once, then the post.
+    assert run(tags="hatsune miku")[3] == 1
+    danbooru.garbage = 10
+    with pytest.raises(ValueError, match=r"Danbooru is busy .*an answer that isn't JSON.*3 times in a row"):
+        run(tags="hatsune miku")
+    danbooru.garbage = 10
+    with pytest.raises(ValueError, match=r"e621 is busy .*an answer that isn't JSON"):
+        run(tags="fox", source="e621")
+
+
+def test_e621_busy_names_e621(danbooru):
+    danbooru.busy = 10
+    with pytest.raises(ValueError, match=r"e621 is busy and turned the request away \(503 Service Unavailable\)"):
+        run(tags="fox", source="e621")
+
+
+# Whatever JSON a site answers with: a post is skipped or kept whole (an id above 0, texts, lists of tags), and its tags can always be added.
+json_values = st.recursive(st.none() | st.booleans() | st.integers() | st.floats(allow_nan=False) | st.text(max_size=12),
+                           lambda children: st.lists(children, max_size=4) | st.dictionaries(st.text(max_size=10), children, max_size=4), max_leaves=12)
+tag_lists = st.lists(st.text(max_size=10) | json_values, max_size=5)
+danbooru_posts = st.fixed_dictionaries({}, optional={
+    "id": json_values, "rating": json_values, "score": json_values, "preview_file_url": json_values,
+    "media_asset": json_values | st.fixed_dictionaries({"variants": st.lists(st.fixed_dictionaries({}, optional={"type": json_values, "url": json_values}), max_size=3)}),
+    **{f"tag_string_{group}": json_values for group in GROUPS}})
+e621_posts = st.fixed_dictionaries({}, optional={
+    "id": json_values, "rating": json_values, "score": json_values | st.fixed_dictionaries({"total": json_values}),
+    "preview": json_values | st.fixed_dictionaries({"url": json_values}),
+    "tags": json_values | st.dictionaries(st.sampled_from(GROUPS), tag_lists | json_values, max_size=6)})
+
+
+def check_post(post):
+    if post is None:
+        return
+    assert isinstance(post["id"], int) and not isinstance(post["id"], bool) and post["id"] > 0
+    assert all(isinstance(post[key], str) for key in ("rating", "rating_name", "preview")) and isinstance(post["safe"], bool)
+    assert all(isinstance(post[group], list) and all(isinstance(tag, str) for tag in post[group]) for group in GROUPS)
+    assert all(isinstance(tag, str) for tag in added_tags([post], list(GROUPS), set(), excluded("*censor*"), 0, [danbooru_enhancer.is_clothes]))
+
+
+@settings(max_examples=300)
+@given(danbooru_posts | json_values)
+def test_any_danbooru_json_gives_a_whole_post_or_none(data):
+    check_post(SITES["danbooru"].summary(data))
+
+
+@settings(max_examples=300)
+@given(e621_posts | json_values, st.lists(e621_posts | json_values, max_size=3) | json_values)
+def test_any_e621_json_gives_a_whole_post_or_none(data, listing):
+    check_post(SITES["e621"].summary(data))
+    for post in SITES["e621"].listed({"posts": listing}) + SITES["e621"].listed(listing):
+        check_post(post)
 
 
 def test_offline_says_so():

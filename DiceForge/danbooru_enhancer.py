@@ -133,7 +133,8 @@ def parse_post_ids(text):
 def preview_url(post):
     asset = post.get("media_asset")
     variants = asset.get("variants") if isinstance(asset, dict) else None
-    sized = {variant.get("type"): variant.get("url") for variant in variants or [] if isinstance(variant, dict)}
+    sized = {variant["type"]: variant.get("url") for variant in variants if isinstance(variant, dict) and isinstance(variant.get("type"), str)} \
+        if isinstance(variants, list) else {}
     url = sized.get("360x360") or sized.get("180x180") or post.get("preview_file_url")
     return url if isinstance(url, str) else ""
 # Busy: overloaded, limiting the requests, or its Cloudflare checking this computer. Asked again after a pause (RETRY_DELAYS seconds).
@@ -141,6 +142,12 @@ BUSY = {429, 500, 502, 503, 504}
 RETRY_DELAYS = (1, 3)
 class DanbooruBusy(Exception):
     pass
+# A post's id: a whole number above 0 (not true, a text or a fraction).
+def post_number(post):
+    number = post.get("id") if isinstance(post, dict) else None
+    return number if isinstance(number, int) and not isinstance(number, bool) and number > 0 else None
+def text_of(value):
+    return value if isinstance(value, str) else ""
 
 
 # A site to take posts from. A post is kept as: id, rating (the site's letter), rating_name, safe (not blurred), score, preview, and its tags by
@@ -175,7 +182,10 @@ class Site:
                 text = (await response.text())[:3000].lower()
                 raise DanbooruBusy(f"{response.status} {response.reason}" + (" (a Cloudflare check)" if "cloudflare" in text or "just a moment" in text else ""))
             response.raise_for_status()
-            return await response.json(content_type=None)
+            try:
+                return await response.json(content_type=None)
+            except ValueError: # A page instead of data, or a cut-off answer: asked again like a busy site.
+                raise DanbooruBusy(f"{response.status}, an answer that isn't JSON") from None
 
     def kept(self, post, rating, preview, score, tags):
         return {"id": post["id"], "rating": rating, "rating_name": self.names.get(rating, rating), "safe": rating == self.safe, "preview": preview,
@@ -194,10 +204,10 @@ class Danbooru(Site):
         return "" if len(letters) == 4 else "rating:" + ",".join(letters)
 
     def summary(self, post):
-        if not isinstance(post, dict) or not isinstance(post.get("id"), int):
+        if not post_number(post):
             return None
-        tags = {group: str(post.get(f"tag_string_{group}") or "").split() for group in GROUPS}
-        return self.kept(post, str(post.get("rating") or ""), preview_url(post), post.get("score"), tags)
+        tags = {group: text.split() if isinstance(text := post.get(f"tag_string_{group}"), str) else [] for group in GROUPS}
+        return self.kept(post, text_of(post.get("rating")), preview_url(post), post.get("score"), tags)
 
     # Random posts (count of them, different ones): Danbooru picks one a request; it may pick a post twice, and a search with fewer posts gives fewer.
     async def random_posts(self, session, query, count):
@@ -234,19 +244,22 @@ class E621(Site):
         return " ".join(f"-rating:{rating}" for rating in "sqe" if rating not in wanted)
 
     def summary(self, post):
-        if not isinstance(post, dict) or not isinstance(post.get("id"), int):
+        if not post_number(post):
             return None
         groups = post.get("tags") if isinstance(post.get("tags"), dict) else {}
-        tags = {group: [tag for tag in groups.get(group) or [] if isinstance(tag, str)] for group in GROUPS}
+        tags = {group: [tag for tag in groups[group] if isinstance(tag, str)] if isinstance(groups.get(group), list) else [] for group in GROUPS}
         preview = post.get("preview") if isinstance(post.get("preview"), dict) else {}
         score = post.get("score") if isinstance(post.get("score"), dict) else {}
-        return self.kept(post, str(post.get("rating") or ""), preview.get("url") if isinstance(preview.get("url"), str) else "", score.get("total"), tags)
+        return self.kept(post, text_of(post.get("rating")), preview.get("url") if isinstance(preview.get("url"), str) else "", score.get("total"), tags)
+
+    # The posts of a /posts.json answer.
+    def listed(self, data):
+        posts = data.get("posts") if isinstance(data, dict) else None
+        return [post for post in map(self.summary, posts if isinstance(posts, list) else []) if post]
 
     # Random posts in one request (order:random; e621 allows more tags than Danbooru).
     async def random_posts(self, session, query, count):
-        data = await self.get(session, "/posts.json", {"tags": f"{query} order:random".strip(), "limit": count}, query)
-        posts = data.get("posts") if isinstance(data, dict) else None
-        return [post for post in map(self.summary, posts if isinstance(posts, list) else []) if post]
+        return self.listed(await self.get(session, "/posts.json", {"tags": f"{query} order:random".strip(), "limit": count}, query))
 
     async def post(self, session, number):
         data = await self.get(session, f"/posts/{number}.json")

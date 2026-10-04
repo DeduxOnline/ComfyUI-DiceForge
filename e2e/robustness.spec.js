@@ -4,7 +4,7 @@
 const fs = require("fs");
 const path = require("path");
 const { test, expect, runPrompt, shown, basePath, writeFile } = require("./helpers");
-const { BASE } = require("./settings");
+const { BASE, REPO } = require("./settings");
 
 const MODES = ["random", "deck", "shuffle", "balanced", "combinations", "mutate"];
 const clip = (positive, negative = "", { seed = 0, mode = "random" } = {}) => ({
@@ -29,6 +29,12 @@ async function stillWorks(request) {
   expect(result.status).toBe("success");
   expect(["alive a", "alive b"]).toContain(shown(result, "2"));
 }
+// Every DiceForge route, read from the Python sources, so a new route is tested without being listed here: [method, path].
+const ROUTES = fs.readdirSync(path.join(REPO, "DiceForge")).filter((file) => file.endsWith(".py")).flatMap((file) =>
+  [...fs.readFileSync(path.join(REPO, "DiceForge", file), "utf8").matchAll(/@routes\.(get|post|delete)\("([^"]+)"\)/g)].map((match) => [match[1].toUpperCase(), match[2]]));
+// Query strings for GET and DELETE: none, empty and junk names, path escapes, bad kinds and numbers.
+const JUNK_QUERIES = ["", "?name=", "?name=%00x", "?name=..%2F..%2Fx", "?kind=x&file=y", "?kind=loras&file=..%2Fx", "?kind=loras&file=nope.safetensors",
+  "?node=x&file=..%2Fx", "?q=%00&limit=x&offset=-5", "?id=nope", "?query=x&sort=Nope&cursor=%00"];
 const remove = (...files) => { for (const file of files) fs.rmSync(file, { recursive: true, force: true }); };
 
 test.describe("@api robustness on the real server", () => {
@@ -36,23 +42,17 @@ test.describe("@api robustness on the real server", () => {
     const bodies = ["not json", "", "[]", "5", "null", '"text"', '{"loras": 5}', '{"loras": [1, null, {"a": 1}]}', '{"items": [1, null, {"kind": 5, "file": []}]}',
       '{"kind": "loras", "file": "x", "user": [1]}', '{"name": 5}', '{"name": "ok", "stack": 5}', '{"name": "ok", "stack": {"rows": "x"}}', '{"name": ["a"]}',
       '{"name": "' + "x".repeat(5000) + '", "text": "y"}', '{"name": "' + "x".repeat(5000) + '", "stack": {"rows": []}}', "{".repeat(10000)];
-    const posts = ["/diceforge/wildcards/file", "/diceforge/wildcards/rename", "/diceforge/models/rename", "/diceforge/civitai/download", "/diceforge/civitai/key", "/diceforge/lora-presets", "/diceforge/lora-triggers", "/diceforge/model-bases", "/diceforge/model-info"];
-    for (const route of posts) {
-      for (const body of bodies) {
-        const response = await request.post(route, { data: body, headers: { "Content-Type": "application/json" } });
-        expect(response.status(), `${route} ${body.slice(0, 40)}`).toBeLessThan(500);
-        if (response.status() >= 400) expect((await response.text()).length, `${route}: a message`).toBeGreaterThan(0);
+    expect(ROUTES.length, "routes found in the sources").toBeGreaterThan(30);
+    for (const [method, route] of ROUTES) {
+      const tries = method === "POST" ? bodies.map((body) => [route, body]) : JUNK_QUERIES.map((query) => [route + query, null]);
+      for (const [url, body] of tries) {
+        const response = method === "POST" ? await request.post(url, { data: body, headers: { "Content-Type": "application/json" } })
+          : await request.fetch(url, { method });
+        const what = `${method} ${url} ${(body ?? "").slice(0, 40)}`;
+        expect(response.status(), what).toBeLessThan(500);
+        if (response.status() >= 400) expect((await response.text()).length, `${what}: a message`).toBeGreaterThan(0);
       }
     }
-    const gets = ["/diceforge/model-info?kind=loras&file=nope", "/diceforge/model-info?kind=x&file=y", "/diceforge/model-info", "/diceforge/model-browser?kind=nope",
-      "/diceforge/model-browser", "/diceforge/model-preview?kind=loras&file=nope.safetensors", "/diceforge/model-preview", "/diceforge/wildcards/file",
-      "/diceforge/wildcards/file?name=", "/diceforge/wildcards/file?name=%00", "/diceforge/lora-presets/file?name=", "/diceforge/lora-presets/file?name=%00x"];
-    for (const route of gets) expect((await request.get(route)).status(), route).toBeLessThan(500);
-    expect((await request.delete("/diceforge/lora-presets?name=")).status()).toBeLessThan(500);
-    for (const route of ["/diceforge/wildcards/file", "/diceforge/wildcards/file?name=", "/diceforge/wildcards/file?name=%00", "/diceforge/wildcards/file?name=nope",
-      "/diceforge/models/file", "/diceforge/models/file?kind=loras&file=", "/diceforge/models/file?kind=loras&file=%00", "/diceforge/models/file?kind=vae&file=x",
-      "/diceforge/civitai/downloads", "/diceforge/civitai/downloads?id=nope"])
-      expect((await request.delete(route)).status(), route).toBeLessThan(500);
     await stillWorks(request);
   });
 
@@ -69,6 +69,9 @@ test.describe("@api robustness on the real server", () => {
           await request.get(`/diceforge/wildcards/file?name=${encoded}`),
           await request.get(`/diceforge/model-preview?kind=loras&file=${encoded}`),
           await request.get(`/diceforge/model-info?kind=loras&file=${encoded}`),
+          await request.get(`/diceforge/wildcards/picture?name=${encoded}`),
+          await request.get(`/diceforge/wildcards/picture?name=e2e_escape/POSES/${encoded}`),
+          await request.get(`/diceforge/grid/image?node=1&file=${encoded}`),
         ]) {
           expect(response.status(), name).toBeGreaterThanOrEqual(400);
           expect(await response.text(), name).not.toContain("secret\": true");

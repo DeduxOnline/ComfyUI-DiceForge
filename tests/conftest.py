@@ -112,6 +112,7 @@ def own_sampler_presets(monkeypatch, tmp_path):
     monkeypatch.setattr(tag_autocomplete, "FAVORITES_FILE", str(tmp_path / "tag_favorites.json"))
     from DiceForge import danbooru_enhancer
     monkeypatch.setattr(danbooru_enhancer, "DANBOORU_URL", "http://127.0.0.1:9")
+    monkeypatch.setattr(danbooru_enhancer, "E621_URL", "http://127.0.0.1:9") # No test reaches e621 either.
     monkeypatch.setattr(danbooru_enhancer, "INDEX", tag_autocomplete.INDEX)
 
 
