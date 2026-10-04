@@ -12,9 +12,9 @@ nodes and features, a patch for fixes. Each version is a [release on GitHub](htt
 The first release on the ComfyUI Registry: install DiceForge from ComfyUI Manager, or with `comfy node install comfyui-diceforge`.
 
 ### Nodes
-- **SDXL Resolution List (Latent)** and **Resolution Selector (Random, Latent)**: SDXL sizes and aspect ratios, fixed or random (listed groups and
+- **SDXL Resolution List** and **Resolution Selector (Random)**: SDXL sizes and aspect ratios, fixed or random (listed groups and
   Random Chaos), with rescale modes (by percentage, to width/height, to the longest side) and live previews.
-- **CLIP Dual Text Encode**: positive and negative prompts in one node, with `{a|b}` choices, weights, counts and locks, `__wildcards__` (text and
+- **CLIP Dual Text Encode (Wildcards)**: positive and negative prompts in one node, with `{a|b}` choices, weights, counts and locks, `__wildcards__` (text and
   YAML files), `${variables}`, comments, `<lora:name:weight>` tags, and the seed modes; also a text-only prompt builder for other encoders.
 - **Random Int**, **Random Float**, **Random Sampler**: numbers and sampler/scheduler pairs by the seed modes.
 - **Random LoRA**, **Random Checkpoint**, **Random Diffusion Model**, **Random VAE**, **Random Image**: files of a folder picked by the seed modes.
@@ -23,7 +23,6 @@ The first release on the ComfyUI Registry: install DiceForge from ComfyUI Manage
   their workflow.
 - **XY Plot**: an X/Y comparison of seed, steps, CFG, sampler, scheduler, LoRA, LoRA strength, denoise or variation seed/strength, every cell
   queued with one button.
-- **Hires Fix**: the second pass in one node, in the latent or with an upscale model.
 - **HiresFix (Load VAE)**: as Easy-Use's HiresFix with the VAE from a list: upscale model, rescale, preview or save, encode.
 - **Danbooru Tag Enhancer**: adds the tags of a random Danbooru post that has the prompt's tags, a new one on every run, and shows the prompt it
   made on the node; appearance tags can be left out, and an optional prompt input (quality tags) goes first without being searched.

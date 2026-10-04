@@ -21,7 +21,7 @@ class LoadDiffusionModelCLIP(io.ComfyNode):
         return io.Schema(
             node_id="LoadDiffusionModelCLIP",
             display_name="Load Diffusion Model + CLIP",
-            category="utils",
+            category="DiceForge/loaders",
             description="Loads a diffusion model (like Load Diffusion Model) and its text encoders (like Load CLIP, or DualCLIPLoader when clip_name2 is set) in one node.",
             inputs=[
                 io.Combo.Input("unet_name", options=folder_paths.get_filename_list("diffusion_models"), tooltip="The diffusion model to load, from models/diffusion_models."),

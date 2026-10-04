@@ -52,7 +52,7 @@ class LoadVAEDecodeSave(io.ComfyNode):
         return io.Schema(
             node_id="LoadVAEDecodeSave",
             display_name="Load VAE + Decode + Save",
-            category="utils",
+            category="DiceForge/image",
             inputs=[
                 io.Latent.Input("samples", tooltip="The latent to decode."),
                 io.Combo.Input(
@@ -89,7 +89,7 @@ class VAEDecodeSave(io.ComfyNode):
         return io.Schema(
             node_id="VAEDecodeSave",
             display_name="VAE Decode + Save",
-            category="utils",
+            category="DiceForge/image",
             inputs=[
                 io.Latent.Input("samples", tooltip="The latent to decode."),
                 io.Vae.Input("vae", tooltip="The VAE used for decoding, for example the VAE output of Load Checkpoint or Load VAE."),

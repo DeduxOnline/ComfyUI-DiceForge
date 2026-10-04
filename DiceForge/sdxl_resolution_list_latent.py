@@ -106,7 +106,7 @@ class SDXLResolutionListLatent(io.ComfyNode):
         size = lambda options, tooltip, default=None: io.Combo.Input("size", options=list(options), default=default or next(iter(options)), tooltip=tooltip)
         return io.Schema(
             node_id="SDXLResolutionListLatent",
-            display_name="SDXL Resolution List (Latent)",
+            display_name="SDXL Resolution List",
             category="DiceForge/latent",
             description="Pick a resolution from the SDXL list (or at random from the seed) and output an empty latent of that size.",
             has_intermediate_output=True, # The size of the last run reaches the preview also when the node comes from the cache.

@@ -26,10 +26,10 @@ Around the nodes, DiceForge adds tools to ComfyUI's right-click menus: [model br
 ## Contents
 
 - [Installation](#installation) · [Nodes](#nodes) · [Quick start](#quick-start)
-- [Prompts](#prompts): [CLIP Dual Text Encode](#clip-dual-text-encode), [wildcards](#wildcard-files), [tag autocomplete](#tag-autocomplete-danbooru-e621), [Tag Browser](#tag-browser), [prompt styles](#prompt-styles), [Danbooru Tag Enhancer](#danbooru-tag-enhancer)
-- [Image sizes](#image-sizes): [SDXL Resolution List](#sdxl-resolution-list-latent), [Resolution Selector](#resolution-selector-random-latent), [seed modes for sizes](#seed-modes-for-sizes)
+- [Prompts](#prompts): [CLIP Dual Text Encode](#clip-dual-text-encode-wildcards), [wildcards](#wildcard-files), [tag autocomplete](#tag-autocomplete-danbooru-e621), [Tag Browser](#tag-browser), [prompt styles](#prompt-styles), [Danbooru Tag Enhancer](#danbooru-tag-enhancer)
+- [Image sizes](#image-sizes): [SDXL Resolution List](#sdxl-resolution-list), [Resolution Selector](#resolution-selector-random), [seed modes for sizes](#seed-modes-for-sizes)
 - [Random nodes](#random-nodes): [Random Int and Float](#random-int-and-random-float), [random loaders](#random-lora-random-checkpoint-random-diffusion-model-and-random-vae), [Random Image](#random-image), [Random Sampler](#random-sampler)
-- [Sampling and upscaling](#sampling-and-upscaling): [KSampler presets](#ksampler-presets), [Variation Seed](#variation-seed), [Hires Fix](#hires-fix), [HiresFix (Load VAE)](#hiresfix-load-vae)
+- [Sampling and upscaling](#sampling-and-upscaling): [KSampler presets](#ksampler-presets), [Variation Seed](#variation-seed), [HiresFix (Load VAE)](#hiresfix-load-vae)
 - [Comparing results](#comparing-results): [XY Plot](#xy-plot), [Dice Grid](#dice-grid)
 - [LoRAs and models](#loras-and-models): [LoRA Stack](#lora-stack), [Model info](#model-info), [model browsers](#model-browsers)
 - [Utility nodes](#utility-nodes) · [Development](#development) ([tests](#tests), [releasing](#releasing))
@@ -55,7 +55,7 @@ The nodes and the frontend are in the `DiceForge` subfolder; the repository's ow
 
 Every version is listed in [CHANGELOG.md](CHANGELOG.md) and released on [GitHub](https://github.com/DeduxOnline/ComfyUI-DiceForge/releases) and the [ComfyUI Registry](https://registry.comfy.org); ComfyUI Manager shows when an update is out.
 
-**Requirements:** a recent ComfyUI that includes `comfy_api.latest` (the V3 node API). *Resolution Selector (Random, Latent)* also needs the resolution preview widget, which ships with the core *Resolution Selector* node. Older ComfyUI versions will not load these nodes.
+**Requirements:** a recent ComfyUI that includes `comfy_api.latest` (the V3 node API). *Resolution Selector (Random)* also needs the resolution preview widget, which ships with the core *Resolution Selector* node. Older ComfyUI versions will not load these nodes.
 
 ### Updating from ResolutionForge
 
@@ -71,11 +71,11 @@ DiceForge was called *ResolutionForge* while it was a resolution pack. To update
 | Node | Menu | Use it when |
 |---|---|---|
 | **Prompts** | | |
-| [**CLIP Dual Text Encode**](#clip-dual-text-encode) | DiceForge/conditioning | You want positive and negative prompts in one node, with wildcards, `{a\|b}` choices, variables, locked choices and `<lora:>` tags that follow the seed modes. It also outputs the filled-in text, and works without a CLIP as a text-only prompt builder for other encoders. |
+| [**CLIP Dual Text Encode (Wildcards)**](#clip-dual-text-encode-wildcards) | DiceForge/conditioning | You want positive and negative prompts in one node, with wildcards, `{a\|b}` choices, variables, locked choices and `<lora:>` tags that follow the seed modes. It also outputs the filled-in text, and works without a CLIP as a text-only prompt builder for other encoders. |
 | [**Danbooru Tag Enhancer**](#danbooru-tag-enhancer) | DiceForge/conditioning | You want a richer prompt from a few tags: it adds the tags of a random Danbooru post that has your tags, the way anime models were trained. |
 | **Image sizes** | | |
-| [**SDXL Resolution List (Latent)**](#sdxl-resolution-list-latent) | DiceForge/latent | You want the standard SDXL sizes (1024x1024, 1216x832, ...) from a fixed list, or picked at random, rescaled like Easy-Use's HiresFix. |
-| [**Resolution Selector (Random, Latent)**](#resolution-selector-random-latent) | DiceForge/latent | You want to set an aspect ratio and a megapixel target, like the core *Resolution Selector* node, or pick the ratio at random. |
+| [**SDXL Resolution List**](#sdxl-resolution-list) | DiceForge/latent | You want the standard SDXL sizes (1024x1024, 1216x832, ...) from a fixed list, or picked at random, rescaled like Easy-Use's HiresFix. |
+| [**Resolution Selector (Random)**](#resolution-selector-random) | DiceForge/latent | You want to set an aspect ratio and a megapixel target, like the core *Resolution Selector* node, or pick the ratio at random. |
 | **Random** | | |
 | [**Random Int, Random Float**](#random-int-and-random-float) | DiceForge/random | You want a random number (steps, CFG, denoise, LoRA strength) that goes through the whole range instead of clustering. |
 | [**Random Sampler**](#random-sampler) | DiceForge/sampling | You want to compare samplers and schedulers: it picks a pair for KSampler from the ones you list. |
@@ -83,16 +83,15 @@ DiceForge was called *ResolutionForge* while it was a resolution pack. To update
 | [**Random Image**](#random-image) | DiceForge/loaders | You want an input image (img2img, ControlNet pose, IP-Adapter reference) picked from a folder, like **Load Image** with the file picked for you. |
 | **LoRAs and models** | | |
 | [**LoRA Stack**](#lora-stack) | DiceForge/loaders | You want several LoRAs in one node, like rgthree's *Power Lora Loader*, with random strengths, LoRAs that take turns, base model checks and their trigger words as text. |
-| [**Load Diffusion Model + CLIP**](#utility-nodes) | utils | You want Load Diffusion Model and Load CLIP in one node, for models that come as separate files (Flux, Anima, Qwen-Image...). |
+| [**Load Diffusion Model + CLIP**](#utility-nodes) | DiceForge/loaders | You want Load Diffusion Model and Load CLIP in one node, for models that come as separate files (Flux, Anima, Qwen-Image...). |
 | **Sampling and upscaling** | | |
 | [**Variation Seed**](#variation-seed) | DiceForge/sampling | You like a picture and want it again with small differences (folds, hair, background, a hand), as A1111's variation seed. |
-| [**Hires Fix**](#hires-fix) | DiceForge/sampling | You want a bigger image with new detail in one node: the first pass's latent made bigger (in the latent, or in pixels with an upscale model) and sampled again at low denoise. |
 | [**HiresFix (Load VAE)**](#hiresfix-load-vae) | DiceForge/image | You want Easy-Use's HiresFix with the VAE picked from a list: upscale model, rescale, preview or save, and a latent for your own second KSampler pass. |
 | **Comparing results** | | |
 | [**XY Plot**](#xy-plot) | DiceForge/sampling | You want an X/Y comparison in one node: seed, steps, CFG, sampler, scheduler, LoRA, LoRA strength, denoise or variation seed/strength on each axis, every combination queued with one button. |
 | [**Dice Grid**](#dice-grid) | DiceForge/image | You want the images of a series side by side with labels (a LoRA, checkpoint or setting comparison, or an XY grid), and to keep the best ones at full size. |
 | **Decoding and saving** | | |
-| [**Load VAE + Decode + Save, VAE Decode + Save**](#utility-nodes) | utils | You want VAE Decode and Save Image (and Load VAE) in one node, with Easy-Use's *image_output* choice. |
+| [**Load VAE + Decode + Save, VAE Decode + Save**](#utility-nodes) | DiceForge/image | You want VAE Decode and Save Image (and Load VAE) in one node, with Easy-Use's *image_output* choice. |
 
 All nodes use the ComfyUI V3 node schema: in the Nodes 2.0 frontend, the secondary inputs (including `seed_mode`) sit in the node's **Advanced** section. Every node works in both node designs, Nodes 2.0 and classic.
 
@@ -114,7 +113,7 @@ The anime prompt builder *Prompt Director* lives in its own repository: [DeduxOn
 
 ## Prompts
 
-### CLIP Dual Text Encode
+### CLIP Dual Text Encode (Wildcards)
 
 <img src="docs/images/clip_dual_text_encode.png" width="448" alt="CLIP Dual Text Encode in Nodes 2.0 with wildcards, variables and choices">
 
@@ -347,9 +346,9 @@ How it picks:
 
 ## Image sizes
 
-### SDXL Resolution List (Latent)
+### SDXL Resolution List
 
-<img src="docs/images/sdxl_resolution_list.png" width="339" alt="SDXL Resolution List (Latent) in Nodes 2.0, Advanced section open, rescaled by 150%">
+<img src="docs/images/sdxl_resolution_list.png" width="339" alt="SDXL Resolution List in Nodes 2.0, Advanced section open, rescaled by 150%">
 
 Node id: `SDXLResolutionListLatent`.
 
@@ -408,9 +407,9 @@ The `size` list shows width x height; the aspect ratios are given here for refer
 - Rounding to `multiple` applies to fixed sizes too. With the default 8 every listed size stays exact; with 64, 864 becomes 896.
 - Like any `seed` input, it gets the frontend's *control after generate* option, which is *randomize* by default, so the random options give a new size on each run. Set it to *fixed* to keep the same size.
 
-### Resolution Selector (Random, Latent)
+### Resolution Selector (Random)
 
-<img src="docs/images/resolution_selector.png" width="393" alt="Resolution Selector (Random, Latent) in Nodes 2.0, 16:9 rescaled to a longest side of 1920">
+<img src="docs/images/resolution_selector.png" width="393" alt="Resolution Selector (Random) in Nodes 2.0, 16:9 rescaled to a longest side of 1920">
 
 Node id: `ResolutionSelectorRandomLatent`.
 
@@ -428,7 +427,7 @@ It works like the core ComfyUI *Resolution Selector* followed by **Empty Latent 
 | `batch` | Advanced | `1` | Number of latents in the batch (1–32). |
 | `max_aspect` | Advanced | `2.0` | Random Chaos only: the most stretched ratio allowed (1.0–4.0). 2.0 means up to 2:1 or 1:2. |
 | `seed_mode` | Advanced | `random` | How the random options change from run to run, as in SDXL Resolution List. See [Seed modes for sizes](#seed-modes-for-sizes). |
-| `rescale` | main | `by percentage` | Rescales the size calculated from `aspect_ratio` and `megapixels`, with the same modes as in [SDXL Resolution List](#sdxl-resolution-list-latent): `percent` of each side (150: 1:1 at 1 MP becomes 1536x1536), a `width` and/or `height` (0 follows the aspect ratio), or the `longer_side` (16:9 with 1920 becomes 1920x1080). Then each side is rounded to `multiple`. At 100% the size is exactly what it was without rescale, and workflows or API prompts made before it get 100%. |
+| `rescale` | main | `by percentage` | Rescales the size calculated from `aspect_ratio` and `megapixels`, with the same modes as in [SDXL Resolution List](#sdxl-resolution-list): `percent` of each side (150: 1:1 at 1 MP becomes 1536x1536), a `width` and/or `height` (0 follows the aspect ratio), or the `longer_side` (16:9 with 1920 becomes 1920x1080). Then each side is rounded to `multiple`. At 100% the size is exactly what it was without rescale, and workflows or API prompts made before it get 100%. |
 
 #### Outputs
 
@@ -610,29 +609,9 @@ Variations of a picture, as A1111's *variation seed* (subseed): the same composi
 - With several Variation Seed nodes in a row, the last one counts.
 - [XY Plot](#xy-plot) has `variation seed` and `variation strength` axes: a grid of variations of one picture (with `variation_strength` 0.1 under Advanced), or of strengths.
 
-### Hires Fix
-
-The second pass of a hires fix in one node: the latent of the first KSampler is made bigger, then sampled again at a low `denoise`, so the bigger image gets new detail instead of blur.
-
-1. Connect the first KSampler's `LATENT` to `samples`, and `model`, `positive` and `negative` as for the first KSampler.
-2. Set the size: `upscale_by` (1.5: 1024×1024 becomes 1536×1536), or `width` and `height`. To take the size from DiceForge, connect `width` and `height` of a second SDXL Resolution List or Resolution Selector with `rescale` (the same size as the first, at 150%, or to a longest side).
-3. Decode `latent` with VAE Decode (+ Save), or connect `vae` and use the `image` output.
-
-| Input | Default | Description |
-|---|---|---|
-| `upscale_by` | `1.5` | Each side times this, when `width` and `height` are 0. |
-| `width`, `height` | `0` | The size of the second pass; one of them alone keeps the aspect ratio. Rounded to multiples of 8. |
-| `upscale_method` | `bislerp` | How the latent is made bigger (`nearest-exact`, `bilinear`, `area`, `bicubic`, `bislerp`). |
-| `seed`, `steps`, `cfg`, `sampler_name`, `scheduler` | `15` steps, CFG `6` | The second pass's settings. Connect the first pass's seed for the same noise, or XY Plot's outputs. |
-| `denoise` | `0.45` | How much the second pass changes: 0.3–0.5 adds detail and keeps the picture. A latent upscale needs about 0.5 or more; with an upscale model, less is enough. |
-| `vae` | | Optional: for `upscale_model`, and for the `image` output. |
-| `upscale_model` | | Optional: an upscale model (**Load Upscale Model**: ESRGAN, 4x-UltraSharp…). The image is made bigger in pixels with it (sharper than a latent upscale), resized to the second pass's size, and encoded again. Needs `vae`. |
-
-Outputs: `latent`, `image` (only with `vae`), `width` and `height` of the second pass. The console shows the sizes and settings of each run.
-
 ### HiresFix (Load VAE)
 
-Like Easy-Use's *HiresFix*, with the VAE picked from a list instead of a `vae` input: the image of the first pass is made bigger with an upscale model, rescaled, shown or saved, and encoded into a latent for a second KSampler pass (denoise 0.3–0.5). Where [Hires Fix](#hires-fix) does the second pass itself, this node prepares the image and the latent for your own KSampler.
+Like Easy-Use's *HiresFix*, with the VAE picked from a list instead of a `vae` input: the image of the first pass is made bigger with an upscale model, rescaled, shown or saved, and encoded into a latent for a second KSampler pass (denoise 0.3–0.5). It prepares the image and the latent for your own KSampler.
 
 | Input | Default | Description |
 |---|---|---|
@@ -705,7 +684,7 @@ Under the node, the cells of the grid being made (or of the last finished one, u
 
 - Click a cell to star it (★); click again to unstar it.
 - **💾 Save N kept** saves the starred ones at full size in `output/DiceForge/kept` (`kept_00001_<row>_<label>.png`), each with the workflow and prompt of its own run in it, like **Save Image**.
-- **↺** on a cell opens the workflow of its run (its prompts and seeds included), as dropping its image on ComfyUI would: to make it again, or go on from it with Hires Fix.
+- **↺** on a cell opens the workflow of its run (its prompts and seeds included), as dropping its image on ComfyUI would: to make it again, or go on from it with HiresFix (Load VAE).
 
 - The cells wait between runs as small PNG files in `ComfyUI/user/DiceForge/grids`, not in RAM, so an unfinished grid survives a restart. Next to each is the image at full size with its run's workflow, for keeping; they go when the next grid starts.
 - The node adds a cell on every run, even if nothing else changed, so queueing the same image twice adds it twice (and, with `count` 0 and a label, finishes the grid).
@@ -843,10 +822,10 @@ The browsers are offered for every node whose list holds model files, whatever t
 
 <img src="docs/images/utility_nodes.png" width="976" alt="VAE Decode + Save, Load VAE + Decode + Save and Load Diffusion Model + CLIP in Nodes 2.0">
 
-- **Load VAE + Decode + Save** (`utils`, `DiceForge/load_vae_decode_save.py`): Load VAE, VAE Decode and Save Image in one node. It decodes the latent with the chosen VAE and saves PNG files with the workflow, like Save Image, and passes the images on. The VAE stays loaded between runs while its name stays the same. The `vae` output passes the VAE on (for VAE Encode in a hires fix or inpaint).
-- **VAE Decode + Save** (`utils`): the same without Load VAE, with the VAE from its `vae` input (the VAE of Load Checkpoint, Load VAE, Random VAE…).
+- **Load VAE + Decode + Save** (`DiceForge/image`, `DiceForge/load_vae_decode_save.py`): Load VAE, VAE Decode and Save Image in one node. It decodes the latent with the chosen VAE and saves PNG files with the workflow, like Save Image, and passes the images on. The VAE stays loaded between runs while its name stays the same. The `vae` output passes the VAE on (for VAE Encode in a hires fix or inpaint).
+- **VAE Decode + Save** (`DiceForge/image`): the same without Load VAE, with the VAE from its `vae` input (the VAE of Load Checkpoint, Load VAE, Random VAE…).
 - `image_output` decides what both do with the images, as in Easy-Use's samplers: *Hide* (only passed on), *Preview* (shown, not saved), *Save* (saved and shown, the default) or *Hide&Save* (saved, not shown).
-- **Load Diffusion Model + CLIP** (`utils`, `DiceForge/load_diffusion_model_clip.py`): Load Diffusion Model and Load CLIP in one node, for models that come as separate files (Flux, Anima, Qwen-Image...): the model from `models/diffusion_models` and one text encoder, or two like DualCLIPLoader when `clip_name2` is set. The CLIP type is checked against the number of files before anything loads.
+- **Load Diffusion Model + CLIP** (`DiceForge/loaders`, `DiceForge/load_diffusion_model_clip.py`): Load Diffusion Model and Load CLIP in one node, for models that come as separate files (Flux, Anima, Qwen-Image...): the model from `models/diffusion_models` and one text encoder, or two like DualCLIPLoader when `clip_name2` is set. The CLIP type is checked against the number of files before anything loads.
 
 ## Development
 
