@@ -26,7 +26,7 @@ The first release on the ComfyUI Registry: install DiceForge from ComfyUI Manage
   queued with one button.
 - **HiresFix (Load VAE)**: as Easy-Use's HiresFix with the VAE from a list: upscale model, rescale, preview or save, encode.
 - **Danbooru Tag Enhancer**: adds the tags of random Danbooru posts that have the prompt's tags, new ones on every run (random) or the same
-  ones again (fixed, from post_ids), with the posts' pictures on the node; several posts at once, wildcards in the tags, switches for
+  ones again (fixed, from post_ids), with the posts' pictures on the node; any rating or mix of ratings (general to explicit); several posts at once, wildcards in the tags, switches for
   appearance, clothes, background and people-count tags (1girl, 2boys, solo…), `*` patterns in exclude (`*censor*`), and an optional prompt
   input (quality tags) that goes first without being searched.
 - **Variation Seed**: variations of a picture, as A1111's variation seed, for every model with the plain KSampler.

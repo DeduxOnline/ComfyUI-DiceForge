@@ -13,8 +13,12 @@ from .tag_autocomplete import INDEX, tag_key
 # tags that the prompt lacks are added, the most used first. Random mode: new posts on every run, written into post_ids; fixed mode: those posts
 # again (as a seed's fixed). A search without an account may have two tags (rating: is free); with none found for both, each one alone.
 DANBOORU_URL = os.environ.get("DICEFORGE_DANBOORU_URL", "https://danbooru.donmai.us")
-RATING_CHOICES = ["general", "general + sensitive", "up to questionable", "any"]
-RATING_TERMS = {"general": "rating:g", "general + sensitive": "rating:g,s", "up to questionable": "rating:g,s,q", "any": ""}
+# The ratings to search: one, or several (rating:g,s is general or sensitive); any: no rating term. Danbooru's ratings, from safe on: general,
+# sensitive (suggestive), questionable (nudity), explicit.
+RATING_TERMS = {"general": "rating:g", "sensitive": "rating:s", "questionable": "rating:q", "explicit": "rating:e",
+                "general + sensitive": "rating:g,s", "sensitive + questionable": "rating:s,q", "questionable + explicit": "rating:q,e",
+                "up to questionable": "rating:g,s,q", "sensitive and up": "rating:s,q,e", "any": ""}
+RATING_CHOICES = list(RATING_TERMS)
 DEFAULT_EXCLUDE = "signature, watermark, artist_name, *username, web_address, dated, speech_bubble, comic, *_text, text_focus, *censor*"
 GROUPS = ("general", "character", "copyright", "artist", "meta")
 MAX_POSTS = 5
@@ -212,7 +216,9 @@ class DanbooruTagEnhancer(io.ComfyNode):
                 io.String.Input("tags", multiline=True, default="1girl, hatsune miku",
                                 tooltip="The tags to find posts with (or connect positive_text of CLIP Dual Text Encode). Wildcards and {a|b} choices are "
                                         "filled in (__characters__: a new character each run); weights, escapes and <lora:> tags are read through."),
-                io.Combo.Input("rating", options=RATING_CHOICES, default="general", tooltip="The posts' ratings: general only (safe), with sensitive, up to questionable, or any."),
+                io.Combo.Input("rating", options=RATING_CHOICES, default="general",
+                               tooltip="The posts' ratings, from safe on: general, sensitive (suggestive), questionable (nudity), explicit; one, two "
+                                       "next to each other, up to questionable, sensitive and up, or any."),
                 io.Combo.Input("mode", options=["random", "fixed"], default="random",
                                tooltip="random: new posts (and wildcards) on every run, written into post_ids. fixed: the posts of post_ids again, with the "
                                        "same wildcards: switch to it to keep a run you like."),

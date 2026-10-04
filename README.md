@@ -347,7 +347,7 @@ A node that makes a few tags a full prompt from a real Danbooru post: type `1gir
 How it picks:
 
 - Danbooru picks a random post (`/posts/random`) with the two most telling of your tags and your `rating` (a search without an account may have two tags; the rating is free): with the [tag lists](#tag-autocomplete-danbooru-e621) downloaded, the rarest tags Danbooru knows, characters and series first (`hatsune miku` before `1girl`), and tags it doesn't know (`masterpiece`) are left out; without the lists, or when they know none of your tags, your first two. Under the prompt the node shows what it searched (`Searched: blue_archive rating:g`). When no post has both, each tag alone.
-- `rating`: `general` posts only (the default), or also `sensitive`, `questionable`, or any.
+- `rating`, from safe on: `general` (the default), `sensitive` (suggestive), `questionable` (nudity), `explicit`. One of them, two next to each other (`general + sensitive`, `sensitive + questionable`, `questionable + explicit`), `up to questionable`, `sensitive and up` (everything but general), or `any`.
 - **`posts`** (Advanced, 1 to 5): several posts of the search at once. Their tags go together, the ones more of the posts share first: steadier than the tags of one picture.
 - From the posts, the general tags that your prompt lacks are added (characters, series and artists too, with `include_character`, `include_copyright`, `include_artist` under Advanced). Switches leave out kinds of tags, so your prompt keeps its own:
 

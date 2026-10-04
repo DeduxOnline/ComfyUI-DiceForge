@@ -124,6 +124,17 @@ def test_a_new_post_on_every_run(danbooru):
     assert danbooru.requests == ["hatsune_miku rating:g,s", "hatsune_miku rating:g"] # Asked each time.
 
 
+def test_ratings(danbooru):
+    assert run(tags="hatsune miku", rating="explicit")[3] == 3
+    assert run(tags="hatsune miku", rating="sensitive")[3] == 4
+    assert run(tags="hatsune miku", rating="questionable + explicit")[3] == 3
+    danbooru.choose = lambda posts: posts[-1]
+    assert run(tags="hatsune miku", rating="sensitive and up")[3] == 4
+    assert danbooru.requests == ["hatsune_miku rating:e", "hatsune_miku rating:s", "hatsune_miku rating:q,e", "hatsune_miku rating:s,q,e"]
+    with pytest.raises(ValueError, match="no questionable post on Danbooru has hatsune_miku"):
+        run(tags="hatsune miku", rating="questionable")
+
+
 def test_options(danbooru):
     tag_list()
     text, added, _url, number = run(max_tags=2, include_character=True, include_copyright=True, position="before", rating="any")
