@@ -124,6 +124,8 @@ Works like two core *CLIP Text Encode (Prompt)* nodes sharing one CLIP model: ea
 
 Its right-click menu has the prompt tools: **📖 Syntax guide** (every piece of the syntax below with an example; **+ Insert** puts the example where the cursor was, a click copies it), **🕘 Prompt history**, **🎲 Wildcard Browser**, **🎴 LoRA Browser** (to insert trigger words), **🏷 Tag autocomplete** (download tag lists), **🏷 Tag Browser** and **🎨 Prompt styles**.
 
+<img src="docs/images/syntax_guide.png" width="980" alt="The Syntax guide window: every piece of the prompt syntax with an example">
+
 #### Inputs
 
 | Input | Section | Description |
@@ -241,6 +243,8 @@ After each run the node shows, under its inputs, the **positive** prompt as it w
 
 **🕘 Prompt history** in the node's right-click menu opens a window with the last 20 runs' prompts, newest first, with the time, seed and mode, and **the images each run made**: the first image of every Save Image, Preview Image, VAE Decode + Save… of the workflow in that run (up to 4; click one to open it full size). A preview image is kept by ComfyUI only until it restarts; saved ones stay. A run with the same prompts and seed as the newest one is not added again (its new images join that entry). For each entry:
 
+<img src="docs/images/prompt_history.png" width="1100" alt="The Prompt history window: the last runs with their images, seeds and prompts">
+
 - **↺ Seed** puts back that run's prompts, seed and seed mode, and sets *control after generate* to *fixed*: the next run gives exactly those prompts again. In every mode a seed gives the same prompts (as long as the wildcard files are the same and, in `shuffle`, `balanced` and `mutate`, the memory file remembers the seed).
 - **Use text** puts the prompts as encoded in the fields: every choice and wildcard fixed as in that run.
 - **📌** pins it: pinned entries stay past the 20. **✕** removes it.
@@ -264,6 +268,8 @@ The history (with the images' file names) is kept in the node, with the workflow
   - **Delete** removes the open file, after a confirmation. Folders left empty by a rename or delete are removed too.
   - Wildcards from yaml files are shown read-only: edit, rename or delete them in their yaml file.
   - **🃏 Cards / 📄 Lines** in the toolbar switches between two views (remembered for the next time). **Lines** is the tree with the editor, as above. **Cards** shows a folder's wildcards as cards, like the LoRA Browser: click a folder in the tree to see its cards. Each card has its picture (or its first line when it has none), its name and text, ☆ and **+ Add** (inserts that card's `__name__`); **🎲 + Add random** inserts `__folder/*__`, a random card of the folder each run. Made for yaml card packs: a yaml file of `name: prompt` pairs with a picture for each name next to it, at the key's path (`POSES.yaml` with `POSES: {sitting: "sitting,", …}` and `POSES/sitting.jpeg`) or in a folder named like the file (`poses.yaml` and `poses/POSES/sitting.png`); png, jpg, jpeg, webp and gif. Click a card's name to open it in the lines view.
+
+    <img src="docs/images/wildcard_cards.png" width="1100" alt="The Wildcard Browser in cards view: a yaml card pack with its pictures">
 - Both work in the Nodes 2.0 and the classic node design.
 
 Example `color.txt`:
@@ -297,6 +303,8 @@ In YAML, put quotes around a line that starts with `{`, `[`, `!` or contains `: 
 - Positive and negative are filled in from the same seed, one after the other, so the same wildcard can pick different lines in each.
 
 ### Wildcards to Text
+
+<img src="docs/images/wildcards_to_text.png" width="873" alt="Wildcards to Text filling in a prompt, shown by Preview as Text">
 
 One prompt field with the same syntax as CLIP Dual Text Encode (wildcards, `{a|b}` choices, variables, comments, the seed modes), and a `text` output: the prompt filled in, for any text encoder (Flux, SD3, video models), a text input, a file name or another prompt node. The same text, seed and mode give the same text as CLIP Dual Text Encode's `positive_text`. Its field has the same tools: the `__` and tag autocomplete, syntax highlighting, and in its right-click menu the Syntax guide, Wildcard Browser and Tag Browser. `<lora:...>` tags stay in the text, for a node that reads them. Under the advanced inputs: `seed_mode` and `trim`.
 
@@ -335,6 +343,8 @@ Each also puts the usual negative for its family after your negative prompt (`lo
 - Your styles are kept in `ComfyUI/user/DiceForge/styles.csv`, in A1111's format (`name,prompt,negative_prompt`): an A1111 or Forge `styles.csv` can simply be copied there.
 
 ### Danbooru Tag Enhancer
+
+<img src="docs/images/danbooru_tag_enhancer.png" width="448" alt="Danbooru Tag Enhancer with its advanced inputs and the post of the last run">
 
 A node that makes a few tags a full prompt from a real Danbooru (or e621) post: type `1girl, hatsune miku` and get, for example, `1girl, hatsune miku, twintails, smile, thighhighs, looking at viewer, holding microphone…`, the tags of a picture that has yours, the way the anime models (Illustrious, NoobAI, Pony, Anima) learned them.
 
@@ -877,7 +887,7 @@ The `e2e` folder has end-to-end tests with [Playwright](https://playwright.dev):
 
 - **Workflows** (`api.spec.js`, no browser): workflows queued through ComfyUI's own queue, as the Run button does: every node is loaded, CLIP Dual Text Encode fills in wildcards, yaml keys, weights and variables; deck and combinations deal every option over runs; the same inputs come from ComfyUI's cache until a wildcard file changes; shuffle remembers between runs; the resolution nodes make latents of the right size; VAE Decode + Save writes PNG files with the workflow; Dice Grid saves a finished grid; Random Image loads a folder; Random Sampler's outputs are accepted by KSampler; and the server routes of the Wildcard Browser, Model info, the model browsers and LoRA Stack presets.
 - **Robustness on the real server** (`robustness.spec.js`, no browser): junk HTTP requests to every DiceForge route (always a 4xx answer, never a server error) and names that try to reach outside DiceForge's folders (`../`, absolute paths, encoded slashes: nothing read, written or deleted outside); an error in a node stops only that prompt, with a clear message, and the next prompt runs; prompts with invalid inputs are refused by ComfyUI; the seed memory file damaged or replaced while ComfyUI runs, damaged wildcard (BOM, other encodings, broken yaml), model info, preset and Dice Grid files; many prompts queued at once; every seed mode through the queue (the same seed from ComfyUI's cache with the same prompt, mutate changing one choice per new seed, combinations listing every prompt once); text in any script and emoji; a 50 000-line wildcard; Random Chaos keeping its orientation and the side `rescale` sets.
-- **Browser** (`ui.spec.js`, in both node designs, Nodes 2.0 and classic): every node can be added; the resolution preview; CLIP Dual Text Encode's preview, history, syntax highlighting, `__` and `<lora:` autocomplete, tag autocomplete, Tag Browser and prompt styles; the Wildcard Browser; Model info and **Use these settings**; every model browser (Civitai search and downloads, batch actions, favorites, moving files); LoRA Stack (adding from the browser, 🎲, groups, 🏷 trigger words, the base model marks, presets, reloading the workflow); KSampler presets; XY Plot's queue button; Dice Grid's kept cells; Random Image's and Danbooru Tag Enhancer's previews; a workflow run from the page; and node heights with advanced inputs. `ui-robustness.spec.js`, in both designs too: every DiceForge node keeps every value through saving and loading a workflow twice; damaged workflows (too few, too many or wrong values, junk LoRA Stack data) open without breaking the page; copied nodes are independent; after a failed run the page keeps working; the Wildcard Browser marks an unreadable file; the autocomplete with the mouse, in the negative prompt and after another wildcard; random series of changes to both resolution nodes, after which the preview must show exactly the size the run makes; 64 nodes at once. Any error in the page fails the test.
+- **Browser** (`ui-prompts.spec.js`, `ui-models.spec.js`, `ui-nodes.spec.js`, in both node designs, Nodes 2.0 and classic): every node can be added; the resolution preview; CLIP Dual Text Encode's preview, history, syntax highlighting, `__` and `<lora:` autocomplete, tag autocomplete, Tag Browser and prompt styles; the Wildcard Browser; Model info and **Use these settings**; every model browser (Civitai search and downloads, batch actions, favorites, moving files); LoRA Stack (adding from the browser, 🎲, groups, 🏷 trigger words, the base model marks, presets, reloading the workflow); KSampler presets; XY Plot's queue button; Dice Grid's kept cells; Random Image's and Danbooru Tag Enhancer's previews; a workflow run from the page; and node heights with advanced inputs. `ui-robustness.spec.js`, in both designs too: every DiceForge node keeps every value through saving and loading a workflow twice; damaged workflows (too few, too many or wrong values, junk LoRA Stack data) open without breaking the page; copied nodes are independent; after a failed run the page keeps working; the Wildcard Browser marks an unreadable file; the autocomplete with the mouse, in the negative prompt and after another wildcard; random series of changes to both resolution nodes, after which the preview must show exactly the size the run makes; 64 nodes at once. Any error in the page fails the test.
 
 ```sh
 cd ComfyUI-DiceForge/e2e
@@ -886,7 +896,7 @@ npx playwright install chromium
 COMFYUI_PATH=/path/to/ComfyUI npm test          # PowerShell: $env:COMFYUI_PATH="C:\ComfyUI"; npm test
 ```
 
-`e2e/server.js` makes a temporary ComfyUI base folder (`--base-directory`, in the system temp folder, deleted afterwards) with a link to this repository's `DiceForge` folder and small test files (stand-in model files, wildcards, images), starts a small stand-in for Civitai, the tag lists and Danbooru on the local machine (the tests never go online; DiceForge reads their addresses from `DICEFORGE_CIVITAI_URL`, `DICEFORGE_CIVITAI_API`, `DICEFORGE_TAGS_URL` and `DICEFORGE_DANBOORU_URL`), and runs ComfyUI on the CPU at port 8199. `COMFYUI_PYTHON` picks the Python that runs ComfyUI (by default its `venv`/`.venv`, the portable build's `python_embeded`, or `python` from the PATH), `DICEFORGE_E2E_PORT` another port (the Civitai stand-in uses the next one). `npm run test:api` runs only the tests without a browser. A run takes about 6 minutes; after a failure, `npx playwright show-report report` shows screenshots and traces.
+`e2e/server.js` makes a temporary ComfyUI base folder (`--base-directory`, in the system temp folder, deleted afterwards) with a link to this repository's `DiceForge` folder and small test files (stand-in model files, wildcards, images), starts a small stand-in for Civitai, the tag lists, Danbooru and e621 on the local machine (the tests never go online; DiceForge reads their addresses from `DICEFORGE_CIVITAI_URL`, `DICEFORGE_CIVITAI_API`, `DICEFORGE_TAGS_URL`, `DICEFORGE_DANBOORU_URL` and `DICEFORGE_E621_URL`), and runs ComfyUI on the CPU at port 8199. `COMFYUI_PYTHON` picks the Python that runs ComfyUI (by default its `venv`/`.venv`, the portable build's `python_embeded`, or `python` from the PATH), `DICEFORGE_E2E_PORT` another port (the Civitai stand-in uses the next one). `npm run test:api` runs only the tests without a browser; `npx playwright test ui-prompts.spec.js` runs one file. A run takes about 6 minutes; after a failure, `npx playwright show-report report` shows screenshots and traces.
 
 The screenshots in this README (`docs/images`) are made by `e2e/screenshots.spec.js` in the same ComfyUI with the same test files. It is skipped in a normal run; to make them again after a change to the nodes:
 
@@ -897,7 +907,7 @@ DICEFORGE_SCREENSHOTS=1 npx playwright test screenshots.spec.js
 
 #### On GitHub
 
-GitHub Actions (`.github/workflows/tests.yml`) checks the workflow files with [actionlint](https://github.com/rhysd/actionlint) and runs both suites on every push to `main` and every pull request, on Linux and the CPU, with the ComfyUI version the tests were written with (pinned in the workflow). A weekly run tests against ComfyUI's latest `master`, to see early when a ComfyUI update breaks something, and *Run workflow* on the Actions page can test any ComfyUI commit, branch or tag. When end-to-end tests fail, the run keeps the Playwright report (screenshots and traces) as the `playwright-report` artifact.
+GitHub Actions (`.github/workflows/tests.yml`) checks the workflow files with [actionlint](https://github.com/rhysd/actionlint) and runs both suites on every push to `main` and every pull request (the end-to-end tests in three jobs at once, each with its own ComfyUI: API and nodes, prompts, models), on Linux and the CPU, with the ComfyUI version the tests were written with (pinned in the workflow). A weekly run tests against ComfyUI's latest `master`, to see early when a ComfyUI update breaks something, and *Run workflow* on the Actions page can test any ComfyUI commit, branch or tag. When end-to-end tests fail, the run keeps the Playwright report (screenshots and traces) as the `playwright-report` artifact.
 
 Dependabot (`.github/dependabot.yml`) opens a weekly pull request when a GitHub Action of the workflows or an end-to-end test tool has a new version; the tests run on it like on any pull request.
 

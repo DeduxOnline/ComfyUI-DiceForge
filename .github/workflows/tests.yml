@@ -87,9 +87,20 @@ jobs:
         run: python .github/scripts/sonar_summary.py
 
   e2e:
-    name: End-to-end tests
+    # Three jobs at once, each with its own ComfyUI server (the tests of one server share its files and memory, so they run one at a time).
+    name: End-to-end tests (${{ matrix.group }})
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - group: API and nodes
+            files: api.spec.js robustness.spec.js ui-nodes.spec.js
+          - group: prompts
+            files: ui-prompts.spec.js ui-robustness.spec.js
+          - group: models
+            files: ui-models.spec.js
     steps:
       - uses: actions/checkout@v5
 
@@ -128,13 +139,13 @@ jobs:
         working-directory: e2e
         env:
           COMFYUI_PYTHON: python
-        run: npm test
+        run: npx playwright test ${{ matrix.files }}
 
       - name: Keep the Playwright report (screenshots and traces of failures)
         if: ${{ failure() }}
         uses: actions/upload-artifact@v5
         with:
-          name: playwright-report
+          name: playwright-report-${{ strategy.job-index }}
           path: |
             e2e/report/
             e2e/results/

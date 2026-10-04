@@ -2,7 +2,8 @@
 // the end-to-end server (stand-in models, wildcards, images). Not part of the test run: DICEFORGE_SCREENSHOTS=1 npx playwright test screenshots.spec.js
 const path = require("path");
 const fs = require("fs");
-const { test, expect, openComfy, addNodes, connect, setWidget, clickMenu, queueFromPage, nodeElement } = require("./helpers");
+const { test, expect, openComfy, addNodes, connect, setWidget, clickMenu, queueFromPage, nodeElement, writeFile } = require("./helpers");
+const { png } = require("./fixtures");
 
 const OUT = path.join(__dirname, "..", "docs", "images");
 test.skip(!process.env.DICEFORGE_SCREENSHOTS, "Screenshots only on request: DICEFORGE_SCREENSHOTS=1");
@@ -21,6 +22,9 @@ async function shot(page, ids, file, { extra = [], margin = 24 } = {}) {
   await page.screenshot({ path: path.join(OUT, file), clip: { x: Math.max(0, left), y: Math.max(0, top), width: right - left, height: bottom - top } });
 }
 const showAdvanced = (page, id) => page.evaluate((id) => { const node = window.app.graph.getNodeById(id); node.showAdvanced = true; node.setDirtyCanvas(true, true); }, id);
+// A soft gradient for pictures the stand-ins serve as tiny squares (Danbooru posts), so the screenshots show the layout.
+const picture = (hue) => `<svg xmlns="http://www.w3.org/2000/svg" width="270" height="360"><defs><linearGradient id="g" x2="0" y2="1">` +
+  `<stop offset="0" stop-color="hsl(${hue},45%,62%)"/><stop offset="1" stop-color="hsl(${hue + 40},40%,32%)"/></linearGradient></defs><rect width="100%" height="100%" fill="url(#g)"/></svg>`;
 const lookUp = (request, kind, file) => request.get(`/diceforge/model-info?kind=${kind}&file=${encodeURIComponent(file)}`);
 
 test.describe("README screenshots (Nodes 2.0)", () => {
@@ -177,5 +181,65 @@ test.describe("README screenshots (Nodes 2.0)", () => {
     ]);
     await expect(nodeElement(page, ids[2])).toContainText("flux1-dev.safetensors");
     await shot(page, ids, "utility_nodes.png");
+  });
+
+  test("Wildcards to Text, the Syntax guide and the prompt history", async ({ page, request }) => {
+    const [words, text] = await addNodes(page, [{ type: "DiceForgeWildcardsToText", pos: [400, 220], widgets: {
+      text: "photo of a {smiling|serious} person, __color__ hair, {2$$hat|scarf|bow} // a note", seed: 7 } }, { type: "PreviewAny", pos: [1000, 220] }]);
+    await connect(page, words, 0, text, 0);
+    await setWidget(page, words, "control_after_generate", "fixed");
+    await queueFromPage(page, request);
+    await expect(nodeElement(page, text).locator("textarea")).toHaveValue(/photo of a/);
+    await shot(page, [words, text], "wildcards_to_text.png");
+
+    const [encode, prompt, image, show] = await addNodes(page, [
+      { type: "CLIPTextEncodePositiveNegative", pos: [400, 700], widgets: { positive: "1girl, {red|blue|green} dress, __hair/style__", seed: 5, control_after_generate: "increment" } },
+      { type: "PreviewAny", pos: [1000, 700] },
+      { type: "EmptyImage", pos: [1300, 700], widgets: { width: 64, height: 64 } },
+      { type: "PreviewImage", pos: [1600, 700] },
+    ]);
+    await connect(page, encode, 2, prompt, 0); // Connected: ComfyUI runs only nodes whose outputs go somewhere.
+    await connect(page, image, 0, show, 0); // An image made in the same runs: kept with each run's prompts.
+    for (let run = 0; run < 3; run++) {
+      await setWidget(page, image, "color", [0x7a5cc0, 0xc06a5c, 0x5cc08a][run]);
+      await queueFromPage(page, request);
+    }
+    await clickMenu(page, encode, "DiceForge.PromptPreview", "Prompt history");
+    await expect(page.locator(".dfph .entry")).toHaveCount(3);
+    await page.waitForTimeout(800);
+    await page.locator(".dfph").screenshot({ path: path.join(OUT, "prompt_history.png") });
+    await page.keyboard.press("Escape");
+
+    await clickMenu(page, encode, "DiceForge.Wildcards", "Syntax guide");
+    await expect(page.locator(".dfsg h3").first()).toHaveText("Wildcards");
+    await page.waitForTimeout(500);
+    await page.locator(".dfsg").screenshot({ path: path.join(OUT, "syntax_guide.png") });
+    await page.keyboard.press("Escape");
+  });
+
+  test("Wildcard Browser cards", async ({ page }) => {
+    writeFile("models/wildcards/POSES.yaml", "POSES:\n  sitting: sitting, hands on lap,\n  standing: standing, arms crossed,\n  kneeling: kneeling,\n  lying: lying on back,\n");
+    for (const [index, pose] of ["sitting", "standing", "kneeling"].entries()) writeFile(`models/wildcards/POSES/${pose}.png`, png(120, 160, [[150, 110, 190], [190, 120, 100], [100, 160, 140]][index]));
+    const [id] = await addNodes(page, [{ type: "CLIPTextEncodePositiveNegative", pos: [400, 220], widgets: { positive: "1girl" } }]);
+    await clickMenu(page, id, "DiceForge.Wildcards", "Wildcard Browser");
+    const dialog = page.locator(".dfwc");
+    if (await dialog.locator("button.mode").textContent() === "🃏 Cards") await dialog.locator("button.mode").click();
+    await dialog.locator(".folder > .row .name", { hasText: "POSES" }).click();
+    await expect(dialog.locator(".card")).toHaveCount(4);
+    await page.waitForTimeout(800);
+    await dialog.screenshot({ path: path.join(OUT, "wildcard_cards.png") });
+    await dialog.locator("button.mode").click(); // Back to lines for the next time.
+    await page.keyboard.press("Escape");
+  });
+
+  test("Danbooru Tag Enhancer", async ({ page, request }) => {
+    let hue = 200;
+    await page.route("**/image/danbooru/**", (route) => route.fulfill({ contentType: "image/svg+xml", body: picture((hue += 70)) }));
+    const [id] = await addNodes(page, [{ type: "DiceForgeDanbooruEnhancer", pos: [400, 220], widgets: { tags: "1girl, hatsune miku", posts: 1 } }]);
+    await showAdvanced(page, id);
+    await queueFromPage(page, request);
+    await expect(page.locator(".dfdb .added")).toContainText("+ ");
+    await expect(page.locator(".dfdb a.thumb img")).toHaveJSProperty("naturalWidth", 270);
+    await shot(page, [id], "danbooru_tag_enhancer.png");
   });
 });
