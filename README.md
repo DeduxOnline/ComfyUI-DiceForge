@@ -122,7 +122,7 @@ Node id: `CLIPTextEncodePositiveNegative`.
 
 Works like two core *CLIP Text Encode (Prompt)* nodes sharing one CLIP model: each prompt is encoded exactly the same way, so the conditioning is identical to the core node's for the same text. On top of that, both prompts support wildcards and `{a|b}` choices, picked from a seed.
 
-Its right-click menu has the prompt tools: **🎲 Wildcard Browser**, **🎴 LoRA Browser** (to insert trigger words), **🏷 Tag autocomplete** (download tag lists), **🏷 Tag Browser** and **🎨 Prompt styles**.
+Its right-click menu has the prompt tools: **📖 Syntax guide** (every piece of the syntax below with an example; **+ Insert** puts the example where the cursor was, a click copies it), **🕘 Prompt history**, **🎲 Wildcard Browser**, **🎴 LoRA Browser** (to insert trigger words), **🏷 Tag autocomplete** (download tag lists), **🏷 Tag Browser** and **🎨 Prompt styles**.
 
 #### Inputs
 
@@ -237,15 +237,15 @@ The prompt fields color the syntax as you type: `__wildcards__` (red with a wavy
 
 #### Preview of the prompts as encoded
 
-After each run the node shows, under its inputs, the **positive** and **negative** prompts as they were encoded: choices, wildcards and variables filled in, with the seed and seed mode they came from (and *combination N of M* in `combinations`). Click a prompt to copy it. The preview is kept with the workflow, so it is still there after a reload and in a workflow loaded from an image; when you change a prompt it is dimmed and marked *prompt changed since* until the next run. It also updates when the node comes from ComfyUI's cache.
+After each run the node shows, under its inputs, the **positive** prompt as it was encoded (and the **negative** one when the node's advanced inputs are shown, where its field is; always in the classic canvas): choices, wildcards and variables filled in, with the seed and seed mode they came from (and *combination N of M* in `combinations`). Click a prompt to copy it. The preview is kept with the workflow, so it is still there after a reload and in a workflow loaded from an image; when you change a prompt it is dimmed and marked *prompt changed since* until the next run. It also updates when the node comes from ComfyUI's cache.
 
-**▸ History** under the preview lists the last 20 runs' prompts (newest first, with the time, seed and mode; hover one for the whole text). A run with the same prompts and seed as the newest one is not added again. For each entry:
+**🕘 Prompt history** (the node's right-click menu, or **🕘 History** under the preview) opens a window with the last 20 runs' prompts, newest first, with the time, seed and mode, and **the images each run made**: the first image of every Save Image, Preview Image, VAE Decode + Save… of the workflow in that run (up to 4; click one to open it full size). A preview image is kept by ComfyUI only until it restarts; saved ones stay. A run with the same prompts and seed as the newest one is not added again (its new images join that entry). For each entry:
 
 - **↺ Seed** puts back that run's prompts, seed and seed mode, and sets *control after generate* to *fixed*: the next run gives exactly those prompts again. In every mode a seed gives the same prompts (as long as the wildcard files are the same and, in `shuffle`, `balanced` and `mutate`, the memory file remembers the seed).
 - **Use text** puts the prompts as encoded in the fields: every choice and wildcard fixed as in that run.
 - **📌** pins it: pinned entries stay past the 20. **✕** removes it.
 
-The history is kept in the node, with the workflow.
+The history (with the images' file names) is kept in the node, with the workflow.
 
 #### Autocomplete and the Wildcard Browser
 
@@ -333,7 +333,8 @@ Each also puts the usual negative for its family after your negative prompt (`lo
 
 A node that makes a few tags a full prompt from a real Danbooru post: type `1girl, hatsune miku` and get, for example, `1girl, hatsune miku, twintails, smile, thighhighs, looking at viewer, holding microphone…`, the tags of a picture that has yours, the way the anime models (Illustrious, NoobAI, Pony, Anima) learned them.
 
-1. Type the tags in `tags`, or connect `positive_text` of a CLIP Dual Text Encode (choices and wildcards filled in); weights, `\(` escapes and `<lora:>` tags are read through.
+1. Type the tags to find a post with in `tags`, or connect `positive_text` of a CLIP Dual Text Encode (choices and wildcards filled in); weights, `\(` escapes and `<lora:>` tags are read through. Only `tags` and `rating` are on the node; the rest is under *Show advanced inputs*.
+   - The optional **`prompt`** input takes the rest of your prompt (quality and style tags: `masterpiece, best quality…`): it goes first in `text`, is never searched, and its tags are not added again. So the search uses only the tags that say what the picture is.
 2. Connect `text` to CLIP Dual Text Encode's `positive` (or another text encoder). `added_tags` has only the added ones, `post_url` the post they came from.
 3. Every run takes a new post, like Danbooru's [random post](https://danbooru.donmai.us/posts/random). The node shows the prompt it made under its inputs, with the added tags and a link to the post: click the text to copy it, and paste a prompt you like into `tags` (or a CLIP Dual Text Encode) to keep it. It runs also with nothing connected, just to see prompts.
 
@@ -341,7 +342,7 @@ How it picks:
 
 - Danbooru picks a random post (`/posts/random`) with the two most telling of your tags and your `rating` (a search without an account may have two tags; the rating is free): with the [tag lists](#tag-autocomplete-danbooru-e621) downloaded, the rarest tags Danbooru knows, characters and series first (`hatsune miku` before `1girl`), and tags it doesn't know (`masterpiece`) are left out; without the lists, or when they know none of your tags, your first two. Under the prompt the node shows what it searched (`Searched: blue_archive rating:g`). When no post has both, each tag alone.
 - `rating`: `general` posts only (the default), or also `sensitive`, `questionable`, or any.
-- From that post, its general tags that your prompt lacks are added (characters, series and artists too, if you turn them on under Advanced), the most used first, at most `max_tags` (15; 0 for all), without the `exclude` list (signature, watermark, speech bubble…), `after` or `before` your tags, written as the models learned them (spaces, escaped parentheses).
+- From that post, its general tags that your prompt lacks are added (characters, series and artists too, if you turn them on under Advanced). With **`add_appearance`** off (Advanced), the tags of how someone looks are left out (hair color and style, eyes, skin, body, ears, tail, horns…; hair ornaments and poses stay): your character keeps its own look and the post adds the pose, clothes and scene. They come the most used first, at most `max_tags` (15; 0 for all), without the `exclude` list (signature, watermark, speech bubble…), `after` or `before` your tags, written as the models learned them (spaces, escaped parentheses).
 - It needs Danbooru: offline, the node says so.
 
 ## Image sizes
@@ -763,7 +764,7 @@ Right-click a node with a model file picked in a list (**Load Checkpoint**, **Lo
 - the file, its **sha256** and size;
 - what **Civitai** knows about the file, found by its hash: the model and version name, type, base model, trigger words (click one to copy it) and a link;
 - from the model's page on Civitai: its **tags**, the counts next to them (👍 likes, ⬇ downloads, ⚡ tips, 💬 comments), the **creator** and when the newest version came out, and the **versions**, newest first. Yours is marked ●, a newer one 🆕, and each opens its page. Civitai's public API has no bookmark or generation counts, and gives the number of tips rather than the Buzz they add up to, so those numbers on the website are not shown. Model info saved before this was added gets the page once, the first time it is opened;
-- Civitai's **example images**, one at a time: **‹ ›**, the arrow keys or the dots below go through them. Hover over an image to see **how it was made**: seed, steps, CFG, sampler, schedule, size, model, and the positive and negative prompts. Click one to copy it; **civitai 🔗** opens the image's page. **⤵ Use these settings** puts the image's prompts into the prompt node that feeds the sampler (CLIP Dual Text Encode, or the CLIP Text Encode nodes on KSampler's `positive` and `negative`), its seed (with *control after generate* set to *fixed*), steps, CFG, sampler and scheduler into the samplers, and its size into Empty Latent Image, and says what it set and what it couldn't. A1111 and Forge names are translated (`DPM++ 2M Karras` → `dpmpp_2m` + `karras`, `Euler a` → `euler_ancestral`). Images Civitai rates R or higher are blurred until clicked; the next click opens the full size. Model info saved by an earlier version has no generation data yet: it is looked up again once, the first time you open it;
+- Civitai's **example images**, one at a time: **‹ ›**, the arrow keys or the dots below go through them. Hover over an image to see **how it was made**: seed, steps, CFG, sampler, schedule, size, model, and the positive and negative prompts. Click one to copy it; **civitai 🔗** opens the image's page. **⤵ Use these settings** puts the image's prompts into the prompt node that feeds the sampler (CLIP Dual Text Encode, or the CLIP Text Encode nodes on KSampler's `positive` and `negative`), its seed (with *control after generate* set to *fixed*), steps, CFG, sampler and scheduler into the samplers, and its size into Empty Latent Image, and says what it set and what it couldn't. A1111 and Forge names are translated (`DPM++ 2M Karras` → `dpmpp_2m` + `karras`, `Euler a` → `euler_ancestral`). Images Civitai rates R or higher are blurred until clicked (unless **Blur NSFW** is off); the next click opens the full size. A video waits for **▶**. Model info saved by an earlier version has no generation data yet: it is looked up again once, the first time you open it;
 - your own **name**, **trigger words**, **recommended settings** and **notes**, saved as you type.
 
 The first time, the hash is computed from the whole file, which takes a few seconds for a large checkpoint; it is kept and only computed again when the file changes. **Refresh from Civitai** asks Civitai again. Everything is stored in `ComfyUI/user/DiceForge/model_info`, one JSON file per model, so the model folders stay untouched. A merged or private model that isn't on Civitai still gets its hash and your notes.
@@ -778,7 +779,7 @@ Right-click a node with a model list and the menu offers the browser for its kin
 
 Right-click **Load LoRA** (or another node with a LoRA list), **Random LoRA** or **CLIP Dual Text Encode** and choose **🎴 LoRA Browser**. It shows your LoRAs as cards, with the same Civitai data as [Model info](#model-info):
 
-- a **preview**: an image saved next to the LoRA (`name.preview.png`, `name.png`, `.jpg`, `.webp`, as Civitai Helper and LoRA Manager save them) or else the first Civitai image (blurred if Civitai rates it R or higher, until clicked);
+- a **preview**: an image saved next to the LoRA (`name.preview.png`, `name.png`, `.jpg`, `.webp`, as Civitai Helper and LoRA Manager save them) or else the first Civitai image (blurred if Civitai rates it R or higher, until clicked; the **Blur NSFW** switch in the toolbar, also in ComfyUI's settings under *DiceForge → Browsers*, turns the blur off everywhere). A video doesn't play by itself: **▶** plays it;
 - the **name** (yours from Model info, or the Civitai model and version), the file, its size, the **base model** and the **trigger words** (click one to copy it; your own trigger words from Model info come first);
 - from the model's Civitai page: 👍 likes, ⬇ downloads, ⚡ tips and 💬 comments, **🆕 v3** when a newer version than yours is out (it links to that version), the creator and the date of the newest version, and the **tags** (a click on one shows only the LoRAs with that tag, a second click shows all again);
 - **batch actions**: Ctrl+click (⌘ on a Mac) picks cards, Shift+click picks every card between the last picked one and this one, and **☐ Select** lets plain clicks pick. The bar above the cards then works on all picked ones: **★ Star**, **☆ Unstar**, **⇄ Move…**, **🗑 Delete** (one confirmation), **Pick all shown** (the search and filters apply), **✕ Clear** (or Escape). Dragging a picked card onto a folder moves every picked one. Opened from LoRA Stack's *＋ Add LoRA*, **+ Add all** adds the picked LoRAs as rows. Each file is done in turn; any that fail are named at the end, the others are done;

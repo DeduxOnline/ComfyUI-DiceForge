@@ -26,7 +26,7 @@ The first release on the ComfyUI Registry: install DiceForge from ComfyUI Manage
 - **Hires Fix**: the second pass in one node, in the latent or with an upscale model.
 - **HiresFix (Load VAE)**: as Easy-Use's HiresFix with the VAE from a list: upscale model, rescale, preview or save, encode.
 - **Danbooru Tag Enhancer**: adds the tags of a random Danbooru post that has the prompt's tags, a new one on every run, and shows the prompt it
-  made on the node.
+  made on the node; appearance tags can be left out, and an optional prompt input (quality tags) goes first without being searched.
 - **Variation Seed**: variations of a picture, as A1111's variation seed, for every model with the plain KSampler.
 - **Load VAE + Decode + Save**, **VAE Decode + Save** (with Easy-Use's image_output choice and a vae output), **Load Diffusion Model + CLIP**.
 
@@ -38,11 +38,12 @@ The first release on the ComfyUI Registry: install DiceForge from ComfyUI Manage
 - Wildcard Browser (create, edit with line numbers and syntax highlighting, rename, move, delete, favorites, folders) and `__` autocomplete; `<lora:` autocomplete.
 - Danbooru / e621 tag autocomplete and Tag Browser, with downloadable tag lists.
 - Prompt styles (A1111's `styles.csv`) with built-in quality styles for Illustrious, NoobAI and Anima.
-- Syntax highlighting, a preview of the prompts as encoded, and a prompt history.
+- Syntax highlighting, a preview of the prompts as encoded, a prompt history window with each run's images, and a syntax guide.
 
 ### Models
 - LoRA, Checkpoint, Diffusion Model, Text Encoder and VAE Browsers: cards with Civitai previews, tags, counts and newer versions; folders,
-  search, filters, favorites, batch actions; find and download on Civitai, rename, move, delete.
+  search, filters, favorites, batch actions; find and download on Civitai (Anima among the base models), rename, move, delete; a Blur NSFW
+  switch, and videos that play with ▶.
 - Model info: what Civitai knows about a file (by its hash), example images with how they were made and **Use these settings**, your own notes.
 - KSampler presets for Anima, Illustrious and NoobAI (eps and v-pred), with Auto by the connected model, and your own.
 

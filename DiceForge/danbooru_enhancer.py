@@ -15,6 +15,16 @@ RATING_CHOICES = ["general", "general + sensitive", "up to questionable", "any"]
 RATING_TERMS = {"general": "rating:g", "general + sensitive": "rating:g,s", "up to questionable": "rating:g,s,q", "any": ""}
 DEFAULT_EXCLUDE = "signature, watermark, artist_name, twitter_username, web_address, dated, speech_bubble, comic, english_text, text_focus"
 GROUPS = ("general", "character", "copyright", "artist", "meta")
+# Appearance tags (how the character looks: hair, eyes, skin, body, ears, tails...): left out with add_appearance off, so the post adds the pose,
+# clothes and scene but your character keeps its own look. A tag is one when a word of it is one of these, or it is one of the tags below.
+APPEARANCE_WORDS = re.compile(r"(?:^|_)(?:hair|haired|eyes?|pupils|sclera|eyelashes|eyebrows|skin|skinned|ears?|tail|tails|horns?|wings?|breasts?|bangs|sidelocks|"
+                              r"ahoge|twintails|ponytail|braids?|bun|buns|drills|halo|freckles|mole|fangs?|abs|muscular|petite|curvy|plump|tall|height)(?:_|$)")
+APPEARANCE_TAGS = {"heterochromia", "flat_chest", "bob_cut", "hime_cut", "eyeliner", "makeup", "lipstick", "elf", "dark-skinned_female", "dark-skinned_male",
+                   "tan", "tanlines", "pale_skin", "colored_skin", "mature_female", "loli", "shota", "kemonomimi_mode"}
+# Not the look itself: accessories and what is done with the hair or ears (hair_ornament, hair_ribbon, hand_in_hair, adjusting_hair...).
+NOT_APPEARANCE = re.compile(r"ornament|ribbon|bow|clip|band|flower|scrunchie|pin|bobbles|tubes|tie|hand|holding|grab|adjusting|blowing|covering|pull|ring")
+def is_appearance(tag):
+    return tag in APPEARANCE_TAGS or (bool(APPEARANCE_WORDS.search(tag)) and not NOT_APPEARANCE.search(tag))
 USER_AGENT = "DiceForge/1.0" # Short: Danbooru's Cloudflare answers a longer one (with parentheses, a link or "ComfyUI") with a challenge page (403).
 
 
@@ -78,11 +88,12 @@ async def find_post(tags, rating_term):
     return None, None
 
 
-# The tags of a post to add: of the groups asked for, not in the prompt, not excluded; the most used first (by the tag lists), at most max_tags.
-def added_tags(post, groups, have, exclude, max_tags):
+# The tags of a post to add: of the groups asked for, not in the prompt, not excluded (nor appearance tags without appearance); the most used first
+# (by the tag lists), at most max_tags.
+def added_tags(post, groups, have, exclude, max_tags, appearance=True):
     index = INDEX.load()
     counts = {tag_key(tag): count for tag, _kind, count, _aliases in index.tags} if index.tags else {}
-    tags = [tag for group in groups for tag in post.get(group, []) if tag not in have and tag not in exclude]
+    tags = [tag for group in groups for tag in post.get(group, []) if tag not in have and tag not in exclude and (appearance or not is_appearance(tag))]
     tags = sorted(dict.fromkeys(tags), key=lambda tag: -counts.get(tag, 0)) if counts else list(dict.fromkeys(tags))
     return tags[:max_tags] if max_tags else tags
 
@@ -98,10 +109,14 @@ class DanbooruTagEnhancer(io.ComfyNode):
             search_aliases=["danbooru", "tag enhancer", "prompt enhancer", "booru", "tags", "enhance prompt", "random post"],
             is_output_node=True, # Runs (and shows its prompt) also with nothing connected.
             inputs=[
-                io.String.Input("tags", multiline=True, default="1girl, hatsune miku", tooltip="The prompt's tags (or connect positive_text of CLIP Dual Text Encode). Weights, escapes and <lora:> tags are read through."),
+                io.String.Input("tags", multiline=True, default="1girl, hatsune miku", tooltip="The tags to find a post with (or connect positive_text of CLIP Dual Text Encode). Weights, escapes and <lora:> tags are read through."),
                 io.Combo.Input("rating", options=RATING_CHOICES, default="general", tooltip="The posts' ratings: general only (safe), with sensitive, up to questionable, or any."),
-                io.Int.Input("max_tags", default=15, min=0, max=200, tooltip="Tags added at most (the most used first); 0: all of the post's."),
-                io.Boolean.Input("add_general", default=True, tooltip="Add the post's general tags (what is in the picture: pose, clothes, background...)."),
+                io.String.Input("prompt", optional=True, force_input=True,
+                                tooltip="Optional: the rest of the prompt (quality tags, style: masterpiece, best quality...). It goes first in text, is never searched, and its tags are not added again."),
+                io.Int.Input("max_tags", default=15, min=0, max=200, tooltip="Tags added at most (the most used first); 0: all of the post's.", advanced=True),
+                io.Boolean.Input("add_general", default=True, tooltip="Add the post's general tags (what is in the picture: pose, clothes, background...).", advanced=True),
+                io.Boolean.Input("add_appearance", default=True, advanced=True,
+                                 tooltip="Add the post's appearance tags (hair color and style, eyes, skin, body, ears, tail...). Off: your character keeps its own look; the post adds the pose, clothes and scene."),
                 io.Boolean.Input("add_character", default=False, tooltip="Add the post's characters.", advanced=True),
                 io.Boolean.Input("add_copyright", default=False, tooltip="Add the post's series.", advanced=True),
                 io.Boolean.Input("add_artist", default=False, tooltip="Add the post's artists (artist styles).", advanced=True),
@@ -123,7 +138,7 @@ class DanbooruTagEnhancer(io.ComfyNode):
 
     @classmethod
     async def execute(cls, tags, rating="general", max_tags=15, add_general=True, add_character=False, add_copyright=False, add_artist=False,
-                      exclude=DEFAULT_EXCLUDE, position="after"):
+                      exclude=DEFAULT_EXCLUDE, position="after", prompt="", add_appearance=True):
         if rating not in RATING_TERMS:
             raise ValueError(f"Danbooru Tag Enhancer: unknown rating {rating!r} (one of {', '.join(RATING_CHOICES)}).")
         have = prompt_tags(tags)
@@ -132,9 +147,11 @@ class DanbooruTagEnhancer(io.ComfyNode):
         if not post:
             raise ValueError(f"Danbooru Tag Enhancer: no {rating} post on Danbooru has {' or '.join(searched) or 'any tags'}; try other tags or another rating.")
         groups = [group for group, wanted in (("character", add_character), ("copyright", add_copyright), ("artist", add_artist), ("general", add_general)) if wanted]
-        added = [prompt_text(tag) for tag in added_tags(post, groups, set(have), set(prompt_tags(exclude)), max_tags)]
+        have_all = set(have) | set(prompt_tags(prompt)) # The prompt input's tags are not added again either.
+        added = [prompt_text(tag) for tag in added_tags(post, groups, have_all, set(prompt_tags(exclude)), max_tags, add_appearance)]
         text, extra = (tags or "").strip().rstrip(","), ", ".join(added)
         combined = ", ".join(part for part in ((extra, text) if position == "before" else (text, extra)) if part)
+        combined = ", ".join(part for part in ((prompt or "").strip().rstrip(","), combined) if part) # The prompt input first.
         url = f"{DANBOORU_URL.rstrip('/')}/posts/{post['id']}"
         logging.info(f"[DiceForge] Danbooru Tag Enhancer | {query or 'any'} | post {post['id']} | Added: {extra}")
         shown = {"text": combined, "added": extra, "url": url, "id": post["id"], "search": query, "rating": post["rating"]}

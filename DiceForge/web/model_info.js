@@ -1,6 +1,7 @@
 import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
 import { addStyleOnce, element } from "./dom.js";
+import { shouldBlur, videoPreview } from "./media.js";
 import { dateText, statsChips } from "./civitai_meta.js";
 import { applySettings, settingsOf } from "./apply_settings.js";
 
@@ -115,17 +116,16 @@ function slider(images) {
     index = (next + images.length) % images.length;
     const image = images[index];
     const large = image.full ? image.full.replace("/original=true/", "/width=1200/") : image.url; // Big enough for the slider, smaller than the original.
-    const media = image.type === "video"
-      ? element("video", { src: large, muted: "", loop: "", autoplay: "", playsinline: "" })
-      : element("img", { src: large });
+    const video = image.type === "video" ? videoPreview(large) : null; // A video waits for ▶.
+    const media = video ? video.video : element("img", { src: large });
     media.title = "Click to open the full size";
-    if ((image.nsfwLevel ?? 1) >= 4 && !revealed.has(index)) media.classList.add("blur"); // Civitai's R and up: blurred until clicked.
+    if (shouldBlur(image) && !revealed.has(index)) media.classList.add("blur"); // Civitai's R and up: blurred until clicked (Blur NSFW).
     media.addEventListener("click", () => {
       if (media.classList.contains("blur")) media.classList.remove("blur"), revealed.add(index);
       else window.open(image.full || image.url, "_blank", "noopener");
     });
     media.addEventListener("error", () => { if (media.src !== image.url) media.src = image.url; }, { once: true }); // The small copy instead.
-    stage.replaceChildren(media, metaPanel(image));
+    stage.replaceChildren(video ? video.wrapper : media, metaPanel(image));
     count.textContent = `${index + 1} / ${images.length}`;
     dots.replaceChildren(...images.map((_, dot) => element("span", { class: dot === index ? "on" : "", onclick: () => show(dot) })));
   }

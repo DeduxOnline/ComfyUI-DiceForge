@@ -359,6 +359,28 @@ for (const vue of [true, false]) {
       await expect(page.locator(".dfmi")).toHaveCount(0);
     });
 
+    test("Previews: R-rated ones blurred unless Blur NSFW is off (a switch in the browsers), videos wait for ▶", async ({ page }) => {
+      const [loader] = await addNodes(page, [{ type: "LoraLoader" }]);
+      await clickMenu(page, loader, "DiceForge.ModelBrowser", "LoRA Browser");
+      const toggle = page.locator(".dflb .dfblur-switch input");
+      await expect(toggle).toBeChecked(); // On by default.
+      const probe = () => page.evaluate(async () => { // The module the page loaded (the same instance, by its URL).
+        const url = performance.getEntriesByType("resource").map((entry) => entry.name).find((name) => name.endsWith("/media.js"));
+        const { civitaiMedia } = await import(url);
+        const picture = civitaiMedia("/nothing.png", { nsfwLevel: 5 });
+        const safe = civitaiMedia("/nothing.png", { nsfwLevel: 1 });
+        const video = civitaiMedia("/nothing.mp4", { nsfwLevel: 1, type: "video" });
+        return { blurred: picture.media.classList.contains("blur"), safe: safe.media.classList.contains("blur"), autoplay: video.media.autoplay,
+          paused: video.media.paused, play: !!video.wrapper.querySelector("button.play") };
+      });
+      expect(await probe()).toEqual({ blurred: true, safe: false, autoplay: false, paused: true, play: true });
+      await toggle.uncheck();
+      await expect.poll(() => page.evaluate(() => window.app.extensionManager.setting.get("DiceForge.BlurNSFW"))).toBe(false);
+      expect((await probe()).blurred).toBe(false); // Off: shown as they are.
+      await toggle.check();
+      await expect.poll(() => page.evaluate(() => window.app.extensionManager.setting.get("DiceForge.BlurNSFW"))).toBe(true);
+    });
+
     test("LoRA Browser picks LoRAs and looks them up on Civitai", async ({ page }) => {
       const [loader, random] = await addNodes(page, [{ type: "LoraLoader" }, { type: "DiceForgeRandomLora", pos: [500, 40] }]);
       await clickMenu(page, loader, "DiceForge.ModelBrowser", "LoRA Browser");
@@ -725,6 +747,20 @@ for (const vue of [true, false]) {
       expect(latent).toBeTruthy();
     });
 
+    test("Syntax guide: the prompt syntax by topic, searched, an example inserted into the prompt", async ({ page }) => {
+      const [id] = await addNodes(page, [{ type: "CLIPTextEncodePositiveNegative", pos: [300, 60], widgets: { positive: "1girl" } }]);
+      await clickMenu(page, id, "DiceForge.SyntaxGuide", "Syntax guide");
+      const guide = page.locator(".dfsg");
+      await expect(guide.locator("h3")).toHaveText(["Wildcards", "Choices", "Variables", "LoRAs and weights", "Comments and escapes", "Wildcard files"]);
+      await guide.locator("input").fill("lock");
+      await expect(guide.locator(".row")).toHaveCount(1);
+      await guide.locator(".row button").click();
+      await expect.poll(() => widgetValue(page, id, "positive")).toBe("1girl, {sky|!sea|forest}");
+      await expect(guide.locator(".status")).toHaveText("Inserted into the positive prompt.");
+      await page.keyboard.press("Escape");
+      await expect(guide).toHaveCount(0);
+    });
+
     test("Prompt styles: the family's quality tags in and out with a click, Auto from the connected model, your own saved and deleted", async ({ page, request }) => {
       await lookUp(request, "checkpoints", "illustrious_base.safetensors");
       const [checkpoint, encode] = await addNodes(page, [
@@ -981,6 +1017,10 @@ for (const vue of [true, false]) {
       // The node shows the prompts as encoded, with the seed they came from.
       const shown = page.locator(".dfpp").first();
       await expect(shown.locator(".box").first()).toHaveText(`positive${text}`);
+      if (vue) { // The negative shows with the advanced inputs, where its field is.
+        await expect(shown.locator(".box")).toHaveCount(1);
+        await page.evaluate((id) => { const node = window.app.graph.getNodeById(id); node.showAdvanced = true; node.setDirtyCanvas(true, true); }, encode);
+      }
       await expect(shown.locator(".box").nth(1)).toContainText("(empty)");
       await expect(shown.locator(".head")).toContainText("seed 3 (random)");
       await expect(shown).not.toHaveClass(/stale/);
@@ -994,52 +1034,63 @@ for (const vue of [true, false]) {
       await expect(page.locator(".dfpp").first().locator(".box").first()).toHaveText(`positive${text}`);
     });
 
-    test("the prompt history keeps the last runs: put back a seed, use a text, pin, remove", async ({ page, request }) => {
-      const [encode, preview] = await addNodes(page, [
+    test("the prompt history keeps the last runs with their images: put back a seed, use a text, pin, remove", async ({ page, request }) => {
+      const [encode, preview, image, show] = await addNodes(page, [
         { type: "CLIPTextEncodePositiveNegative", widgets: { positive: "a {red|blue|green|white|black|pink} car", seed: 1, control_after_generate: "increment" } },
         { type: "PreviewAny", pos: [500, 40] },
+        { type: "EmptyImage", pos: [40, 520], widgets: { width: 32, height: 32 } },
+        { type: "PreviewImage", pos: [400, 520] },
       ]);
       await connect(page, encode, 2, preview, 0);
-      for (let run = 0; run < 3; run++) await queueFromPage(page, request); // Seeds 1, 2, 3.
+      await connect(page, image, 0, show, 0); // An image made in the same runs: kept with each run's prompts.
+      for (let run = 0; run < 3; run++) {
+        await setWidget(page, image, "color", run * 1000); // Another image each run.
+        await queueFromPage(page, request); // Seeds 1, 2, 3.
+      }
       const panel = page.locator(".dfpp").first();
       const lastRun = async () => (await panel.locator(".box").first().textContent()).replace(/^positive/, "");
       const texts = (await page.evaluate((id) => window.app.graph.getNodeById(id).properties.dice_forge_history.map((item) => item.positive), encode)).reverse();
-      await panel.locator(".toggle").click();
-      await expect(panel.locator(".toggle")).toHaveText("▾ History (3)");
-      const entries = panel.locator(".entry");
+      await expect(panel.locator(".history-link")).toHaveText("🕘 History (3)");
+      await panel.locator(".history-link").click(); // A window, as from the right-click menu.
+      const dialog = page.locator(".dfph");
+      const entries = dialog.locator(".entry");
       await expect(entries.locator(".when")).toHaveText([/seed 3 \(random\)$/, /seed 2 \(random\)$/, /seed 1 \(random\)$/]); // Newest first.
       await expect(entries.locator(".text")).toHaveText([texts[2], texts[1], texts[0]]);
+      await expect(entries.first().locator(".shots img")).toHaveCount(1); // Each run's image.
+      await expect(entries.first().locator(".shots img")).toHaveJSProperty("naturalWidth", 32);
+      const files = await entries.locator(".shots img").evaluateAll((pictures) => pictures.map((picture) => new URL(picture.src).searchParams.get("filename")));
+      expect(new Set(files).size).toBe(3); // A different image for each run.
       await setWidget(page, encode, "control_after_generate", "fixed");
       await setWidget(page, encode, "seed", 3);
-      await queueFromPage(page, request); // The same as the newest: not added again.
-      await expect(panel.locator(".toggle")).toHaveText("▾ History (3)");
+      await queueFromPage(page, request); // The same as the newest: not added again, its image joins the entry.
+      await expect(entries).toHaveCount(3);
+      await expect(entries.first().locator(".shots img")).toHaveCount(1); // The same image again (same color): once.
       await entries.nth(2).locator(".reseed").click(); // Seed 1 again: its prompts, seed and mode.
       expect(await widgetValue(page, encode, "seed")).toBe(1);
       expect(await widgetValue(page, encode, "control_after_generate")).toBe("fixed");
       await queueFromPage(page, request);
       await expect(panel.locator(".head")).toContainText("seed 1 (random)");
       expect(await lastRun()).toBe(texts[0]); // The same prompts as that run.
-      await expect(panel.locator(".toggle")).toHaveText("▾ History (4)"); // That run is the newest now.
+      await expect(entries).toHaveCount(4); // That run is the newest now.
       await entries.filter({ hasText: "seed 2 (random)" }).locator(".use-text").click();
       expect(await widgetValue(page, encode, "positive")).toBe(texts[1]); // Every choice made.
       await entries.last().locator(".pin").click();
       await expect(entries.last()).toHaveClass(/pinned/);
       await entries.first().locator(".forget").click();
-      await expect(panel.locator(".toggle")).toHaveText(/History \(\d+\)/);
-      const before = await entries.count();
+      await expect(entries).toHaveCount(3);
+      await page.keyboard.press("Escape");
+      await expect(dialog).toHaveCount(0);
       await page.evaluate(([id, filler]) => { // Many unpinned runs: only the last 20 stay, a pinned one stays too.
         const node = window.app.graph.getNodeById(id);
         const pinned = node.properties.dice_forge_history.filter((item) => item.pinned);
         node.properties.dice_forge_history = [...filler, ...pinned];
-      }, [encode, Array.from({ length: 25 }, (_, index) => ({ positive: `old ${index}`, negative: "", seed: 100 + index, seed_mode: "random" }))]);
+      }, [encode, Array.from({ length: 25 }, (_, index) => ({ positive: `old ${index}`, negative: "", seed: 100 + index, seed_mode: "random", time: index + 1 }))]);
       await setWidget(page, encode, "positive", "a {big|small} boat");
       await queueFromPage(page, request);
-      await expect(panel.locator(".toggle")).toHaveText("▾ History (21)");
-      await expect(entries.filter({ has: page.locator(".pin.on") })).toHaveCount(1);
-      expect(before).toBeGreaterThan(0);
-      await setWidget(page, encode, "seed_mode", "shuffle");
-      await queueFromPage(page, request);
-      await expect(entries.first().locator(".reseed")).toBeEnabled(); // In shuffle too, a seed gives its prompts again.
+      await expect(panel.locator(".history-link")).toHaveText("🕘 History (21)");
+      await clickMenu(page, encode, "DiceForge.PromptPreview", "Prompt history");
+      await expect(dialog.locator(".pin.on")).toHaveCount(1);
+      await page.keyboard.press("Escape");
       const workflow = await page.evaluate(() => window.app.graph.serialize()); // Kept with the workflow.
       expect(workflow.nodes.find((node) => String(node.id) === String(encode)).properties.dice_forge_history).toHaveLength(21);
     });

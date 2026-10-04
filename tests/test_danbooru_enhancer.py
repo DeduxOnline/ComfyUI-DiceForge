@@ -8,7 +8,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlsplit
 import pytest
 from DiceForge import danbooru_enhancer, tag_autocomplete
-from DiceForge.danbooru_enhancer import DanbooruTagEnhancer, prompt_tags, prompt_text, search_tags, searches
+from DiceForge.danbooru_enhancer import DanbooruTagEnhancer, is_appearance, prompt_tags, prompt_text, search_tags, searches
 
 TAGS = "1girl,0,6000000,\nhatsune_miku,4,90000,miku\nvocaloid,3,200000,\nsmile,0,4000000,\nlong_hair,0,5000000,\ntwintails,0,900000,\nsignature,0,800000,\nthighhighs,0,700000,\n"
 
@@ -120,6 +120,28 @@ def test_options(danbooru):
     danbooru.choose = lambda posts: next(post for post in posts if post["id"] == 3)
     assert run(rating="any", max_tags=0)[1] == "nude"
     assert "vocaloid" in run(rating="any", add_general=False, add_copyright=True)[1]
+
+
+def test_appearance_tags():
+    for tag in ("long_hair", "blue_eyes", "twintails", "cone_hair_bun", "yellow_pupils", "dark_skin", "large_breasts", "animal_ears", "cat_tail", "ahoge",
+                "heterochromia", "hair_between_eyes", "elf"):
+        assert is_appearance(tag), tag
+    for tag in ("smile", "1girl", "shirt", "hair_ornament", "hair_ribbon", "hand_in_hair", "earrings", "blush", "thighhighs", "hairclip", "outdoors"):
+        assert not is_appearance(tag), tag
+
+
+def test_without_appearance_the_post_adds_the_rest(danbooru):
+    tag_list()
+    assert run(add_appearance=False)[1] == "smile" # Not long hair nor twintails: the character keeps its own look.
+    assert run(add_appearance=True)[1] == "long hair, smile, twintails"
+
+
+def test_the_prompt_input_goes_first_is_not_searched_nor_added_again(danbooru):
+    tag_list()
+    text, added, _url, _id = run(tags="hatsune miku", prompt="masterpiece, best quality, smile,")
+    assert danbooru.requests == ["hatsune_miku rating:g"] # Only the tags search.
+    assert added == "1girl, long hair, twintails" # smile is in the prompt input already.
+    assert text == "masterpiece, best quality, smile, hatsune miku, 1girl, long hair, twintails"
 
 
 def test_a_pair_no_post_has_is_searched_one_tag_at_a_time(danbooru):

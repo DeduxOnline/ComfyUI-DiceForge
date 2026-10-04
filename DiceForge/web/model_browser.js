@@ -5,6 +5,7 @@ import { insertIntoNode } from "./wildcards.js";
 import { openCivitaiSearch } from "./civitai.js";
 import { dragSource, dropTarget, pickFolder } from "./move_dialog.js";
 import { addStyleOnce, background, element } from "./dom.js";
+import { blurSwitch, civitaiMedia } from "./media.js";
 import { dateText, statsChips } from "./civitai_meta.js";
 
 // Model browsers (node menu): LoRA, Checkpoint, Diffusion Model, Text Encoder and VAE Browser. The model files as cards with a preview, name, base model and trigger words from Civitai
@@ -147,8 +148,10 @@ async function openBrowser(node, spec, target = targetOf(node, spec)) {
     if (picked.size) clearPicked(); // The first Escape lets go of the picked cards, the next closes the browser.
     else close();
   };
+  const blurToggle = blurSwitch(() => draw());
   function close() {
     stopLookUp?.();
+    blurToggle.dispose();
     back.remove();
     document.removeEventListener("keydown", onKey, true);
   }
@@ -286,15 +289,10 @@ async function openBrowser(node, spec, target = targetOf(node, spec)) {
     const url = entry.preview ? api.apiURL(`/diceforge/model-preview?kind=${kind}&file=${encodeURIComponent(entry.file)}&t=${entry.mtime}`) : entry.image?.url;
     if (!url) box.append(element("span", { class: "none" }, spec.icon));
     else {
-      const media = !entry.preview && entry.image?.type === "video"
-        ? element("video", { src: url, muted: "", loop: "", autoplay: "", playsinline: "" })
-        : element("img", { src: url, loading: "lazy" });
-      if (!entry.preview && (entry.image?.nsfwLevel ?? 1) >= 4) { // Civitai's R and up: blurred until clicked, as in Model info.
-        media.classList.add("blur");
-        media.addEventListener("click", () => media.classList.remove("blur"));
-      }
-      media.addEventListener("error", () => media.replaceWith(element("span", { class: "none", title: "The preview could not be loaded" }, spec.icon)));
-      box.append(media);
+      // A saved preview is yours: never blurred. Civitai's: R and up blurred (Blur NSFW), a video waits for ▶.
+      const { wrapper, media } = civitaiMedia(url, entry.preview ? null : entry.image, { video: !entry.preview && entry.image?.type === "video" });
+      media.addEventListener("error", () => wrapper.replaceWith(element("span", { class: "none", title: "The preview could not be loaded" }, spec.icon)));
+      box.append(wrapper);
     }
     if (entry.base_model) {
       const fit = target?.base ? compareBases(entry.base_model, target.base) : null;
@@ -534,7 +532,7 @@ async function openBrowser(node, spec, target = targetOf(node, spec)) {
   const hint = target?.pick ? target.hint : target?.model ? `Use puts a ${what} in ${target.model.name}.` : target?.folder ? `Use folder sets the folder ${spec.randomName} picks from.` : target?.triggers ? `+ Triggers inserts a ${what}'s trigger words where the cursor was in the prompt.` : "";
   back.append(element("div", { class: "dflb" },
     element("h2", {}, `${spec.title} Browser`),
-    element("div", { class: "top" }, search, base, tagFilter, sort, selectMode, lookAll,
+    element("div", { class: "top" }, search, base, tagFilter, sort, selectMode, lookAll, blurToggle,
       ...(spec.manage && spec.civitai !== false ? [element("button", { class: "go find", title: `Search Civitai and download ${spec.plural} into models/${kind}`, onclick: () => background(openCivitaiSearch({
         kind, title: spec.title, plural: spec.plural, icon: spec.icon, hint: spec.civitaiHint ?? "", base: target?.base, folders: [...new Set(files.map((entry) => folderOf(entry.file)).filter(Boolean))].sort((a, b) => a.localeCompare(b)),
         onChange: () => background(reload().then(() => say("The download is done: it is in the list."))),

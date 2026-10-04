@@ -1,13 +1,14 @@
 import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
 import { addStyleOnce, background, element } from "./dom.js";
+import { blurSwitch, civitaiMedia } from "./media.js";
 
 // "Find on Civitai" in the LoRA, Checkpoint and Diffusion Model Browsers (the Create of their files): search Civitai, pick a version, download it
 // into a model folder. The server
 // (model_manager.py) does the download, checks it against Civitai's sha256 and saves its Civitai data and a preview, so the browser shows it at once.
 // Downloads keep running when this dialog closes; it shows them again when opened.
 // Civitai's own base model names (a name it doesn't know is refused).
-const BASES = ["SD 1.5", "SDXL 1.0", "Pony", "Pony V7", "Illustrious", "NoobAI", "Flux.1 D", "Flux.1 S", "Flux.1 Krea", "Flux.1 Kontext", "Flux.2 D", "Chroma",
+const BASES = ["SD 1.5", "SDXL 1.0", "Pony", "Pony V7", "Illustrious", "NoobAI", "Anima", "Flux.1 D", "Flux.1 S", "Flux.1 Krea", "Flux.1 Kontext", "Flux.2 D", "Chroma",
   "HiDream", "Qwen", "SD 3.5", "ZImageTurbo", "Wan Video", "Hunyuan Video"];
 const SORTS = ["Highest Rated", "Most Downloaded", "Newest"];
 
@@ -60,9 +61,11 @@ export async function openCivitaiSearch({ kind = "loras", title = "LoRA", plural
   let items = [], next = null, searchRun = 0, polling = null, knownDone = new Set();
   const say = (text) => { status.textContent = text; };
   const onKey = (event) => { if (event.key === "Escape") { event.stopPropagation(); close(); } };
+  const blurToggle = blurSwitch(() => drawGrid());
   function close() {
     clearTimeout(polling);
     polling = null;
+    blurToggle.dispose();
     back.remove();
     document.removeEventListener("keydown", onKey, true);
   }
@@ -92,13 +95,9 @@ export async function openCivitaiSearch({ kind = "loras", title = "LoRA", plural
     const image = version?.images?.[0];
     if (!image) box.append(element("span", { class: "none" }, icon));
     else {
-      const media = image.type === "video" ? element("video", { src: image.url, muted: "", loop: "", autoplay: "", playsinline: "" }) : element("img", { src: image.url, loading: "lazy" });
-      if ((image.nsfwLevel ?? 1) >= 4) { // Civitai's R and up: blurred until clicked.
-        media.classList.add("blur");
-        media.addEventListener("click", () => media.classList.remove("blur"));
-      }
-      media.addEventListener("error", () => media.replaceWith(element("span", { class: "none" }, icon)));
-      box.append(media);
+      const { wrapper, media } = civitaiMedia(image.url, image); // R and up blurred (Blur NSFW), a video waits for ▶.
+      media.addEventListener("error", () => wrapper.replaceWith(element("span", { class: "none" }, icon)));
+      box.append(wrapper);
     }
     if (version?.base_model) box.append(element("span", { class: "base" }, version.base_model));
     return box;
@@ -192,7 +191,7 @@ export async function openCivitaiSearch({ kind = "loras", title = "LoRA", plural
   back.append(element("div", { class: "dfcv" },
     element("h2", {}, `Find ${plural} on Civitai`),
     element("div", { class: "top" }, query, baseSelect, sort, element("label", { title: `Also show ${plural} Civitai marks as NSFW` }, nsfw, "NSFW"),
-      element("button", { class: "go", onclick: () => background(search()) }, "Search"), keyButton, element("button", { onclick: close }, "Close")),
+      element("button", { class: "go", onclick: () => background(search()) }, "Search"), blurToggle, keyButton, element("button", { onclick: close }, "Close")),
     element("div", { class: "top" }, element("span", { class: "muted" }, "Save to folder:"), folder, folderList, status),
     ...(hint ? [element("div", { class: "muted hint" }, hint)] : []),
     grid, jobsBox));
