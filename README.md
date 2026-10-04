@@ -338,16 +338,28 @@ Each also puts the usual negative for its family after your negative prompt (`lo
 
 A node that makes a few tags a full prompt from a real Danbooru post: type `1girl, hatsune miku` and get, for example, `1girl, hatsune miku, twintails, smile, thighhighs, looking at viewer, holding microphone…`, the tags of a picture that has yours, the way the anime models (Illustrious, NoobAI, Pony, Anima) learned them.
 
-1. Type the tags to find a post with in `tags`, or connect `positive_text` of a CLIP Dual Text Encode (choices and wildcards filled in); weights, `\(` escapes and `<lora:>` tags are read through. Only `tags` and `rating` are on the node; the rest is under *Show advanced inputs*.
+1. Type the tags to find a post with in `tags`, or connect `positive_text` of a CLIP Dual Text Encode; weights, `\(` escapes and `<lora:>` tags are read through. [Wildcards](#wildcard-files) and `{a|b}` choices work in `tags` too: `__characters__, 1girl` searches for a new character on every run (the node shows the tags it used). `tags`, `rating`, `mode` and `post_ids` are on the node; the rest is under *Show advanced inputs*.
    - The optional **`prompt`** input takes the rest of your prompt (quality and style tags: `masterpiece, best quality…`): it goes first in `text`, is never searched, and its tags are not added again. So the search uses only the tags that say what the picture is.
-2. Connect `text` to CLIP Dual Text Encode's `positive` (or another text encoder). `added_tags` has only the added ones, `post_url` the post they came from.
-3. Every run takes a new post, like Danbooru's [random post](https://danbooru.donmai.us/posts/random). The node shows the prompt it made under its inputs, with the added tags and a link to the post: click the text to copy it, and paste a prompt you like into `tags` (or a CLIP Dual Text Encode) to keep it. It runs also with nothing connected, just to see prompts.
+2. Connect `text` to CLIP Dual Text Encode's `positive` (or another text encoder). `added_tags` has only the added ones, `post_url` the posts they came from (one link per line), `post_id` the first one's id.
+3. **`mode`** works like a seed's control: **random** takes a new post on every run, like Danbooru's [random post](https://danbooru.donmai.us/posts/random), and writes it into **`post_ids`** (and the wildcards' seed into `wildcard_seed`); switch to **fixed** to keep a run you like: the posts of `post_ids` again, with the same wildcards. You can also type post ids or paste post links into `post_ids` (`4926058, https://danbooru.donmai.us/posts/123`).
+4. Under its inputs the node shows the posts' pictures (click one to open the post; pictures that aren't general are blurred until clicked, unless *Blur NSFW* is off in the settings, DiceForge → Browsers), the added tags (click to copy) and what it searched. It runs also with nothing connected, just to see what it adds.
 
 How it picks:
 
 - Danbooru picks a random post (`/posts/random`) with the two most telling of your tags and your `rating` (a search without an account may have two tags; the rating is free): with the [tag lists](#tag-autocomplete-danbooru-e621) downloaded, the rarest tags Danbooru knows, characters and series first (`hatsune miku` before `1girl`), and tags it doesn't know (`masterpiece`) are left out; without the lists, or when they know none of your tags, your first two. Under the prompt the node shows what it searched (`Searched: blue_archive rating:g`). When no post has both, each tag alone.
 - `rating`: `general` posts only (the default), or also `sensitive`, `questionable`, or any.
-- From that post, its general tags that your prompt lacks are added (characters, series and artists too, if you turn them on under Advanced). With **`add_appearance`** off (Advanced), the tags of how someone looks are left out (hair color and style, eyes, skin, body, ears, tail, horns…; hair ornaments and poses stay): your character keeps its own look and the post adds the pose, clothes and scene. With **`add_count`** off, the post's people-count tags are left out (1girl, 2girls, 1boy, multiple_boys, solo, no_humans…): the prompt keeps its own count. They come the most used first, at most `max_tags` (15; 0 for all), without the `exclude` list (signature, watermark, speech bubble…), `after` or `before` your tags, written as the models learned them (spaces, escaped parentheses).
+- **`posts`** (Advanced, 1 to 5): several posts of the search at once. Their tags go together, the ones more of the posts share first: steadier than the tags of one picture.
+- From the posts, the general tags that your prompt lacks are added (characters, series and artists too, with `include_character`, `include_copyright`, `include_artist` under Advanced). Switches leave out kinds of tags, so your prompt keeps its own:
+
+  | Switch (Advanced, on by default) | Off leaves out |
+  |---|---|
+  | `include_appearance` | how someone looks: hair color and style, eyes, skin, body, ears, tail, horns… |
+  | `include_clothes` | clothes and accessories: shirt, skirt, uniform, thighhighs, hair ornament, glasses, also nude, barefoot… |
+  | `include_background` | the scene: simple / white background, outdoors, classroom, night, cherry blossoms, on bed… |
+  | `include_count` | people-count tags: 1girl, 2girls, 1boy, multiple_boys, solo, no_humans… |
+
+  So with appearance and clothes off, your character keeps its look and outfit and the post adds the pose and scene.
+- They come the most used first, at most `max_tags` (15; 0 for all), `after` or `before` your tags, written as the models learned them (spaces, escaped parentheses), without the **`exclude`** list. In `exclude`, `*` is any text: `*censor*` leaves out `bar_censor`, `censored` and `mosaic_censoring`, `*_text` every `english_text`, `japanese_text`… The default leaves out signatures, watermarks, usernames, speech bubbles, text and censoring.
 - It needs Danbooru: offline, the node says so. When Danbooru is busy (503, 429: overloaded, or limiting many requests for a while), the node asks again after 1 and 3 seconds, then says so: try again in a minute.
 
 ## Image sizes

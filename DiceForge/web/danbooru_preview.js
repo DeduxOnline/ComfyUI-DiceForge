@@ -1,18 +1,47 @@
 import { app } from "../../scripts/app.js";
 import { addStyleOnce, background, element } from "./dom.js";
+import { blurOn } from "./media.js";
 import { fitNodeHeight } from "./node_size.js";
 
-// Danbooru Tag Enhancer shows, under its inputs, the prompt the last run made: Danbooru picks a new post on every run, so the one you like is copied
-// from here (click the text). Also the added tags, the post (↗ opens it) and the search that found it. Kept in the node's properties, so it is still
-// there after a reload and travels with the workflow.
+// Danbooru Tag Enhancer shows, under its inputs, what the last run took: the posts (their pictures; ↗ opens one), the added tags (click to copy)
+// and the search that found them. After a random run the node's post_ids and wildcard_seed get that run's posts and seed, so switching mode to
+// fixed keeps it (as a seed's fixed). Kept in the node's properties, so it is still there after a reload and travels with the workflow.
 const NODE_TYPE = "DiceForgeDanbooruEnhancer";
 const RATINGS = { g: "general", s: "sensitive", q: "questionable", e: "explicit" };
 const STYLE = `
 .dfdb{font:12px system-ui,sans-serif;color:#ccc;display:flex;flex-direction:column;gap:4px;box-sizing:border-box;padding:2px 0}
-.dfdb .head{color:#888;display:flex;gap:6px;align-items:center}.dfdb .head a{color:#9cc8ff;text-decoration:none;margin-left:auto}
-.dfdb .text{background:#222;border:1px solid #444;border-radius:5px;padding:5px 7px;white-space:pre-wrap;word-break:break-word;cursor:copy;max-height:220px;overflow:auto;user-select:text}
-.dfdb .text.copied{border-color:#6a9a6a}.dfdb .added{color:#9c9}.dfdb .search{color:#888;font-size:11px}.dfdb .empty{color:#777;font-style:italic;padding:6px}
+.dfdb .head{color:#888}.dfdb .thumbs{display:flex;gap:4px;flex-wrap:wrap}
+.dfdb .thumb{display:block;height:120px;max-width:100%;border-radius:5px;overflow:hidden;border:1px solid #444;background:#222;color:#9cc8ff;text-decoration:none}
+.dfdb .thumb img{height:100%;max-width:100%;object-fit:cover;display:block}.dfdb .thumb img.blur{filter:blur(14px)}
+.dfdb .thumb.plain{height:auto;padding:3px 7px}
+.dfdb .added{color:#9c9;white-space:pre-wrap;word-break:break-word;cursor:copy;border:1px solid transparent;border-radius:5px;padding:2px 4px}
+.dfdb .added.copied{border-color:#6a9a6a}.dfdb .tags,.dfdb .search{color:#888;font-size:11px;word-break:break-word}.dfdb .empty{color:#777;font-style:italic;padding:6px}
 `;
+
+// A post's picture, linked to the post; blurred (until clicked) when it isn't general, unless Blur NSFW is off (DiceForge → Browsers).
+function thumb(post, onLoad) {
+  const title = `Post #${post.id}${RATINGS[post.rating] ? ` (${RATINGS[post.rating]})` : ""}: open it on Danbooru`;
+  if (!post.preview) return element("a", { class: "thumb plain", href: post.url, target: "_blank", rel: "noopener", title }, `↗ #${post.id}`);
+  const img = element("img", { src: post.preview, referrerpolicy: "no-referrer", loading: "lazy" });
+  img.addEventListener("load", onLoad);
+  const link = element("a", { class: "thumb", href: post.url, target: "_blank", rel: "noopener", title }, img);
+  if (blurOn() && post.rating !== "g") {
+    img.classList.add("blur");
+    link.addEventListener("click", (event) => {
+      if (!img.classList.contains("blur")) return;
+      event.preventDefault(); // The first click only reveals.
+      img.classList.remove("blur");
+    });
+  }
+  return link;
+}
+// A widget's new value, as typed (its callback too: the canvas and Nodes 2.0 show it).
+function setWidget(node, name, value) {
+  const widget = node.widgets?.find((item) => item.name === name);
+  if (!widget || widget.value === value) return;
+  widget.value = value;
+  widget.callback?.(value);
+}
 
 app.registerExtension({
   name: "DiceForge.DanbooruPreview",
@@ -25,22 +54,25 @@ app.registerExtension({
     function render() {
       const last = node.properties?.dice_forge_danbooru;
       shownFrom = last;
-      if (!last?.text) {
-        panel.replaceChildren(element("div", { class: "empty" }, "Run the workflow to see the prompt made from a Danbooru post here."));
+      const posts = last?.posts || (last?.id ? [{ id: last.id, url: last.url, rating: last.rating }] : []); // Also a result saved before posts.
+      if (!posts.length) {
+        panel.replaceChildren(element("div", { class: "empty" }, "Run the workflow to see the Danbooru posts it takes and the tags they add here."));
       } else {
-        const text = element("div", { class: "text", title: "Click to copy" }, last.text);
-        text.addEventListener("click", () => {
-          if (window.getSelection()?.toString()) return; // Selecting a part to copy it yourself.
-          background(navigator.clipboard?.writeText(last.text)); // A refused copy (no permission) is logged, not thrown.
-          text.classList.add("copied");
-          setTimeout(() => text.classList.remove("copied"), 600);
+        const one = posts.length === 1 ? `post #${posts[0].id}${RATINGS[posts[0].rating] ? ` (${RATINGS[posts[0].rating]})` : ""}` : `${posts.length} posts`;
+        const added = element("div", { class: "added", title: "Click to copy the added tags" }, last.added ? `+ ${last.added}` : "Nothing to add: the posts have no other tags.");
+        added.addEventListener("click", () => {
+          if (!last.added || window.getSelection()?.toString()) return; // Selecting a part to copy it yourself.
+          background(navigator.clipboard?.writeText(last.added)); // A refused copy (no permission) is logged, not thrown.
+          added.classList.add("copied");
+          setTimeout(() => added.classList.remove("copied"), 600);
         });
+        const typed = node.widgets?.find((item) => item.name === "tags")?.value;
         panel.replaceChildren(
-          element("div", { class: "head" }, `Last run · post #${last.id}${RATINGS[last.rating] ? ` (${RATINGS[last.rating]})` : ""}`,
-            element("a", { href: last.url, target: "_blank", rel: "noopener", title: `Found with: ${last.search || "any post"}` }, "↗ post")),
-          text,
-          element("div", { class: "added" }, last.added ? `+ ${last.added}` : "Nothing to add: the post has no other tags."),
-          element("div", { class: "search" }, `Searched: ${last.search || "any post"}`)); // What Danbooru was asked, to see why this post.
+          element("div", { class: "head" }, `Last run · ${one}${last.mode === "fixed" ? " · fixed" : ""}`),
+          element("div", { class: "thumbs" }, ...posts.map((post) => thumb(post, () => fitNodeHeight(node)))),
+          added,
+          ...(last.tags && last.tags !== typed?.trim() ? [element("div", { class: "tags" }, `Tags: ${last.tags}`)] : []), // Wildcards filled in.
+          element("div", { class: "search" }, last.mode === "fixed" ? `Fixed: post${posts.length > 1 ? "s" : ""} ${last.post_ids}` : `Searched: ${last.search || "any post"}`));
       }
       fitNodeHeight(node);
     }
@@ -50,6 +82,10 @@ app.registerExtension({
       if (result) {
         node.properties ??= {};
         node.properties.dice_forge_danbooru = result;
+        if (result.mode !== "fixed") { // This run's posts and wildcards: fixed mode takes them again.
+          setWidget(node, "post_ids", result.post_ids);
+          setWidget(node, "wildcard_seed", result.wildcard_seed);
+        }
         render();
       }
       return onExecuted?.apply(this, arguments);

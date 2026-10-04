@@ -28,7 +28,7 @@ function prepare() {
 }
 
 // Civitai stand-in: /by-hash/<sha256> answers like Civitai's model-versions/by-hash for the test models, /api/v1/models (search: the query filters
-// by name), /tags/danbooru.csv (a tag list), /danbooru/posts/random.json (a Danbooru post of the search), /api/v1/models/<id> (a model's page) and /api/v1/model-versions/<id> like its API, /download/<id> serves a version's file and /image/... a small image.
+// by name), /tags/danbooru.csv (a tag list), /danbooru/posts/random.json (a Danbooru post of the search) and /danbooru/posts/<id>.json, /api/v1/models/<id> (a model's page) and /api/v1/model-versions/<id> like its API, /download/<id> serves a version's file and /image/... a small image.
 function startCivitai() {
   const json = (response, status, body) => { response.writeHead(status, { "Content-Type": "application/json" }); response.end(JSON.stringify(body)); };
   const server = http.createServer((request, response) => {
@@ -58,6 +58,11 @@ function startCivitai() {
       const tags = terms.filter((term) => !term.startsWith("rating:"));
       const post = DANBOORU_POSTS.find((item) => (!ratings || ratings.includes(item.rating))
         && tags.every((tag) => `${item.tag_string_general} ${item.tag_string_character} ${item.tag_string_copyright}`.split(" ").includes(tag)));
+      return post ? json(response, 200, post) : json(response, 404, { message: "That record was not found." });
+    }
+    const postById = /^\/danbooru\/posts\/(\d+)\.json$/.exec(url.pathname);
+    if (postById) {
+      const post = DANBOORU_POSTS.find((item) => item.id === Number(postById[1]));
       return post ? json(response, 200, post) : json(response, 404, { message: "That record was not found." });
     }
     if (url.pathname === "/tags/danbooru.csv") {

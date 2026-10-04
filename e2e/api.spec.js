@@ -265,16 +265,22 @@ test.describe("@api workflows and routes", () => {
     expect(result.outputs["2"].images).toHaveLength(1); // Preview: shown on the node.
   });
 
-  test("Danbooru Tag Enhancer adds the tags of a Danbooru post (a general one) to the prompt", async ({ request }) => {
-    const prompt = () => ({ 1: { class_type: "DiceForgeDanbooruEnhancer", inputs: { tags: "hatsune miku, masterpiece", rating: "general", max_tags: 15,
-      add_general: true, add_appearance: true, add_count: true, add_character: false, add_copyright: false, add_artist: false, exclude: "", position: "after" } },
+  test("Danbooru Tag Enhancer adds the tags of a Danbooru post (a general one) to the prompt, and fixed mode takes the post of post_ids", async ({ request }) => {
+    const prompt = (mode = "random", ids = "") => ({ 1: { class_type: "DiceForgeDanbooruEnhancer", inputs: { tags: "hatsune miku, masterpiece", rating: "general",
+      mode, post_ids: ids, posts: 1, max_tags: 15, include_general: true, include_appearance: true, include_clothes: true, include_background: true,
+      include_count: true, include_character: false, include_copyright: false, include_artist: false, exclude: "", position: "after", wildcard_seed: 0 } },
       2: { class_type: "PreviewAny", inputs: { source: ["1", 0] } }, 3: { class_type: "PreviewAny", inputs: { source: ["1", 2] } } });
     const result = await runPrompt(request, prompt());
     expect(result.status, result.error).toBe("success");
     expect(shown(result, "2")).toBe("hatsune miku, masterpiece, 1girl, smile, twintails"); // Post 101: rating:g leaves the explicit one out.
     expect(shown(result, "3")).toMatch(/\/posts\/101$/);
-    expect(result.outputs["1"].dice_forge_danbooru[0]).toMatchObject({ id: 101, search: "hatsune_miku rating:g", rating: "g" }); // Shown on the node; masterpiece: no post.
+    expect(result.outputs["1"].dice_forge_danbooru[0]).toMatchObject({ post_ids: "101", search: "hatsune_miku rating:g", mode: "random", // Shown on the node.
+      posts: [{ id: 101, rating: "g", preview: expect.stringContaining("/image/danbooru/101.png") }] }); // masterpiece: no post has it.
     expect((await runPrompt(request, prompt())).status).toBe("success"); // The same inputs run again: a new post each time, never from the cache.
+    const fixed = await runPrompt(request, prompt("fixed", "102"));
+    expect(fixed.status, fixed.error).toBe("success");
+    expect(shown(fixed, "2")).toBe("hatsune miku, masterpiece, 1girl, nude"); // Your pick: no search, the rating doesn't matter.
+    expect((await runPrompt(request, prompt("fixed", ""))).error).toContain("fixed mode needs post_ids");
   });
 
   test("Wildcard Browser routes", async ({ request }) => {
