@@ -365,7 +365,7 @@ for (const vue of [true, false]) {
       const toggle = page.locator(".dflb .dfblur-switch input");
       await expect(toggle).toBeChecked(); // On by default.
       const probe = () => page.evaluate(async () => { // The module the page loaded (the same instance, by its URL).
-        const url = performance.getEntriesByType("resource").map((entry) => entry.name).find((name) => name.endsWith("/media.js"));
+        const url = (await (await fetch("/extensions")).json()).find((name) => name.endsWith("/media.js")); // As ComfyUI loaded it: the same module.
         const { civitaiMedia } = await import(url);
         const picture = civitaiMedia("/nothing.png", { nsfwLevel: 5 });
         const safe = civitaiMedia("/nothing.png", { nsfwLevel: 1 });
@@ -699,9 +699,9 @@ for (const vue of [true, false]) {
       await expect(page.locator(".dflb .tag-filter")).toHaveValue("pony");
       expect(await cardTitles(page)).toEqual(["Glow - v1 [Pony]"]);
       await page.locator(".dflb .tag-filter").selectOption("");
-      await page.locator(".dflb .top input").fill("inkmaker");
+      await page.locator(".dflb .top input:not([type=checkbox])").fill("inkmaker");
       expect(await cardTitles(page)).toEqual(["Ink - v2 [Illustrious]"]);
-      await page.locator(".dflb .top input").fill("");
+      await page.locator(".dflb .top input:not([type=checkbox])").fill("");
       await page.locator(".dflb .top select").last().selectOption("downloads");
       expect((await cardTitles(page)).slice(0, 2)).toEqual(["Ink - v2 [Illustrious]", "Glow - v1 [Pony]"]);
       await page.keyboard.press("Escape");
