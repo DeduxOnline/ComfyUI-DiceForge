@@ -14,7 +14,8 @@ The first release on the ComfyUI Registry: install DiceForge from ComfyUI Manage
 ### Nodes
 - **SDXL Resolution List** and **Resolution Selector (Random)**: SDXL sizes and aspect ratios, fixed or random (listed groups and
   Random Chaos), with rescale modes (by percentage, to width/height, to the longest side) and live previews.
-- **CLIP Dual Text Encode (Wildcards)**: positive and negative prompts in one node, with `{a|b}` choices, weights, counts and locks, `__wildcards__` (text and
+- **Wildcards to Text**: one prompt with the same syntax and seed modes, filled in, out as text.
+- **CLIP Dual Text Encode (Wildcards, LoRA)**: positive and negative prompts in one node, with `{a|b}` choices, weights, counts and locks, `__wildcards__` (text and
   YAML files), `${variables}`, comments, `<lora:name:weight>` tags, and the seed modes; also a text-only prompt builder for other encoders.
 - **Random Int**, **Random Float**, **Random Sampler**: numbers and sampler/scheduler pairs by the seed modes.
 - **Random LoRA**, **Random Checkpoint**, **Random Diffusion Model**, **Random VAE**, **Random Image**: files of a folder picked by the seed modes.

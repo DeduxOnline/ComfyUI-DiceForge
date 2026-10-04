@@ -2,7 +2,7 @@ import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
 import { background } from "./dom.js";
 import { compact } from "./civitai_meta.js";
-import { addCompletionSource, PROMPT_NODE_TYPE } from "./wildcards.js";
+import { addCompletionSource, isPromptNode } from "./wildcards.js";
 
 // Danbooru and e621 tag autocomplete in the prompt fields (tag_autocomplete.py): while a word is typed, the most used tags that start with it (or an
 // alias of them), with how often each is used. Accepting one puts it in as the models learned it: spaces for underscores (except in emoticons like
@@ -79,7 +79,7 @@ app.registerExtension({
     background(loadLists());
   },
   getNodeMenuItems(node) {
-    if (node.comfyClass !== PROMPT_NODE_TYPE) return [];
+    if (!isPromptNode(node)) return [];
     const options = lists.map((list) => ({ content: `${list.here ? "✓ Download again" : "⬇ Download"}: ${list.title}`, callback: () => background(download(list)) }));
     return [{ content: "🏷 Tag autocomplete", has_submenu: true, submenu: { options } }];
   },

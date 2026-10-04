@@ -4,7 +4,7 @@ import random
 from collections import Counter
 import pytest
 from DiceForge import clip_text_encode_pos_neg as prompts
-from DiceForge.clip_text_encode_pos_neg import CLIPTextEncodePositiveNegative as Node
+from DiceForge.clip_text_encode_pos_neg import CLIPTextEncodePositiveNegative as Node, WildcardsToText
 from DiceForge.seed_modes import DeckPicker, RandomPicker
 
 
@@ -221,3 +221,14 @@ def test_a_choice_can_pick_the_lora_and_a_missing_one_says_so(models, lora_calls
     assert Node.execute("no tags", "", seed=0, model="m").result[4] == "m" and len(lora_calls) == 20 # Passed through.
     with pytest.raises(ValueError, match="no LoRA file for <lora:nope>"):
         Node.execute("<lora:nope:1>", "", seed=0, model="m")
+
+
+def test_wildcards_to_text_fills_in_like_the_clip_node():
+    text = "a {red|green|blue|white} car, {2$$hat|scarf|bow}, ${c={big|small}}${c} dog // gone"
+    for mode in ("random", "deck", "combinations"):
+        for seed in range(4):
+            filled = WildcardsToText.execute(text, seed=seed, seed_mode=mode)
+            assert filled.result[0] == run(text, seed=seed, mode=mode)[2] # The same seed: the same text as CLIP Dual Text Encode.
+            assert filled.ui == {"text": [filled.result[0]]}
+    assert WildcardsToText.execute("  a  {x}  ,  b ", trim=True).result[0] == "a x, b"
+    assert WildcardsToText.execute("<lora:style:0.8> a {cat|cat}").result[0] == "<lora:style:0.8> a cat" # LoRA tags stay in the text.

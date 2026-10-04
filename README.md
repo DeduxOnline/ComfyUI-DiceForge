@@ -26,7 +26,7 @@ Around the nodes, DiceForge adds tools to ComfyUI's right-click menus: [model br
 ## Contents
 
 - [Installation](#installation) · [Nodes](#nodes) · [Quick start](#quick-start)
-- [Prompts](#prompts): [CLIP Dual Text Encode](#clip-dual-text-encode-wildcards), [wildcards](#wildcard-files), [tag autocomplete](#tag-autocomplete-danbooru-e621), [Tag Browser](#tag-browser), [prompt styles](#prompt-styles), [Danbooru Tag Enhancer](#danbooru-tag-enhancer)
+- [Prompts](#prompts): [CLIP Dual Text Encode](#clip-dual-text-encode-wildcards-lora), [Wildcards to Text](#wildcards-to-text), [wildcards](#wildcard-files), [tag autocomplete](#tag-autocomplete-danbooru-e621), [Tag Browser](#tag-browser), [prompt styles](#prompt-styles), [Danbooru Tag Enhancer](#danbooru-tag-enhancer)
 - [Image sizes](#image-sizes): [SDXL Resolution List](#sdxl-resolution-list), [Resolution Selector](#resolution-selector-random), [seed modes for sizes](#seed-modes-for-sizes)
 - [Random nodes](#random-nodes): [Random Int and Float](#random-int-and-random-float), [random loaders](#random-lora-random-checkpoint-random-diffusion-model-and-random-vae), [Random Image](#random-image), [Random Sampler](#random-sampler)
 - [Sampling and upscaling](#sampling-and-upscaling): [KSampler presets](#ksampler-presets), [Variation Seed](#variation-seed), [HiresFix (Load VAE)](#hiresfix-load-vae)
@@ -71,7 +71,8 @@ DiceForge was called *ResolutionForge* while it was a resolution pack. To update
 | Node | Menu | Use it when |
 |---|---|---|
 | **Prompts** | | |
-| [**CLIP Dual Text Encode (Wildcards)**](#clip-dual-text-encode-wildcards) | DiceForge/conditioning | You want positive and negative prompts in one node, with wildcards, `{a\|b}` choices, variables, locked choices and `<lora:>` tags that follow the seed modes. It also outputs the filled-in text, and works without a CLIP as a text-only prompt builder for other encoders. |
+| [**CLIP Dual Text Encode (Wildcards, LoRA)**](#clip-dual-text-encode-wildcards-lora) | DiceForge/conditioning | You want positive and negative prompts in one node, with wildcards, `{a\|b}` choices, variables, locked choices and `<lora:>` tags that follow the seed modes. It also outputs the filled-in text, and works without a CLIP as a text-only prompt builder for other encoders. |
+| [**Wildcards to Text**](#wildcards-to-text) | DiceForge/conditioning | You want only the text: one prompt with the same syntax (wildcards, choices, variables, seed modes) filled in, for any text encoder or text input. |
 | [**Danbooru Tag Enhancer**](#danbooru-tag-enhancer) | DiceForge/conditioning | You want a richer prompt from a few tags: it adds the tags of a random Danbooru post that has your tags, the way anime models were trained. |
 | **Image sizes** | | |
 | [**SDXL Resolution List**](#sdxl-resolution-list) | DiceForge/latent | You want the standard SDXL sizes (1024x1024, 1216x832, ...) from a fixed list, or picked at random, rescaled like Easy-Use's HiresFix. |
@@ -113,7 +114,7 @@ The anime prompt builder *Prompt Director* lives in its own repository: [DeduxOn
 
 ## Prompts
 
-### CLIP Dual Text Encode (Wildcards)
+### CLIP Dual Text Encode (Wildcards, LoRA)
 
 <img src="docs/images/clip_dual_text_encode.png" width="448" alt="CLIP Dual Text Encode in Nodes 2.0 with wildcards, variables and choices">
 
@@ -293,6 +294,10 @@ In YAML, put quotes around a line that starts with `{`, `[`, `!` or contains `: 
 
 - Choices and wildcards are filled in by the node, from its `seed`, not by the ComfyUI frontend. The saved workflow keeps the prompts with `__name__` and `{a|b}`, and the same seed gives the same result again.
 - Positive and negative are filled in from the same seed, one after the other, so the same wildcard can pick different lines in each.
+
+### Wildcards to Text
+
+One prompt field with the same syntax as CLIP Dual Text Encode (wildcards, `{a|b}` choices, variables, comments, the seed modes), and a `text` output: the prompt filled in, for any text encoder (Flux, SD3, video models), a text input, a file name or another prompt node. The same text, seed and mode give the same text as CLIP Dual Text Encode's `positive_text`. Its field has the same tools: the `__` and tag autocomplete, syntax highlighting, and in its right-click menu the Syntax guide, Wildcard Browser and Tag Browser. `<lora:...>` tags stay in the text, for a node that reads them. Under the advanced inputs: `seed_mode` and `trim`.
 
 ### Tag autocomplete (Danbooru, e621)
 

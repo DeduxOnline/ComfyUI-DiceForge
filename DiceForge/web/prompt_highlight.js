@@ -1,6 +1,6 @@
 import { app } from "../../scripts/app.js";
 import { addStyleOnce } from "./dom.js";
-import { knownWildcards, PROMPT_FIELDS, PROMPT_NODE_TYPE, textareaOf, wildcardList } from "./wildcards.js";
+import { fieldsOf, knownWildcards, textareaOf, wildcardList } from "./wildcards.js";
 
 // Syntax highlighting in the prompt fields of CLIP Dual Text Encode: __wildcards__ (red and wavy when no file has that name), {a|b} choices with
 // their braces colored by depth, counts (2$$), weights (3::), locks (!), ${variables}, // and /* */ comments, \ escapes, (word:1.2) weights,
@@ -169,8 +169,7 @@ function scan() {
   const fields = new Set();
   if (highlightEnabled()) {
     for (const node of app.graph?.nodes ?? []) {
-      if (node.comfyClass !== PROMPT_NODE_TYPE) continue;
-      for (const name of PROMPT_FIELDS) {
+      for (const name of fieldsOf(node) ?? []) {
         const textarea = textareaOf(node, name);
         if (textarea?.isConnected && textarea.parentElement) fields.add(textarea);
       }

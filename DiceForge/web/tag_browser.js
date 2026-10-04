@@ -3,7 +3,7 @@ import { api } from "../../scripts/api.js";
 import { addStyleOnce, background, element } from "./dom.js";
 import { compact } from "./civitai_meta.js";
 import { tagText } from "./tag_autocomplete.js";
-import { insertIntoNode, PROMPT_NODE_TYPE } from "./wildcards.js";
+import { fieldsOf, insertIntoNode, isPromptNode } from "./wildcards.js";
 
 // Tag Browser (CLIP Dual Text Encode's menu): the Danbooru / e621 tags of the downloaded lists (tag_autocomplete.py), searched by name or alias,
 // by type (characters, artists, series, general, meta) or your ★ favorites, most used first or by name. + Add puts a tag where the cursor was in
@@ -88,7 +88,7 @@ export async function openTagBrowser(node) {
       element("span", { class: "kind" }, KIND_NAMES[tag.type] ?? tag.type),
       element("span", { class: "count", title: `${tag.count.toLocaleString()} posts` }, compact(tag.count)),
       element("button", { class: "add", title: "Put it where the cursor was in the prompts", onclick: () => add(tag) }, "+ Add"),
-      element("button", { class: "neg", title: "Put it in the negative prompt", onclick: () => add(tag, "negative") }, "− Neg"),
+      ...(fieldsOf(node)?.includes("negative") ? [element("button", { class: "neg", title: "Put it in the negative prompt", onclick: () => add(tag, "negative") }, "− Neg")] : []),
       element("a", { href: `https://danbooru.donmai.us/posts?tags=${encodeURIComponent(tag.tag)}`, target: "_blank", rel: "noopener", title: "Open it on Danbooru" }, "↗"));
   }
   function draw(ready) {
@@ -117,6 +117,6 @@ export async function openTagBrowser(node) {
 app.registerExtension({
   name: "DiceForge.TagBrowser",
   getNodeMenuItems(node) {
-    return node.comfyClass === PROMPT_NODE_TYPE ? [{ content: "🏷 Tag Browser", callback: () => background(openTagBrowser(node)) }] : [];
+    return isPromptNode(node) ? [{ content: "🏷 Tag Browser", callback: () => background(openTagBrowser(node)) }] : [];
   },
 });

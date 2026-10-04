@@ -445,6 +445,46 @@ def resolve_prompts(prompts, picker):
     variables = {}
     expanded = [expand(strip_comments(text), picker, 0, variables) for text in prompts]
     return [tidy_commas(re.sub(r"\\([{}|!])", r"\1", fill_variables(text, variables))) for text in expanded]
+# The prompts with their choices, wildcards and variables filled in by the seed mode, as both prompt nodes do it (the same seed gives the same text
+# in either): returns the texts and a note for the log and preview (combination N of M). mutate remembers what it picked, unless the seed came before.
+def fill_in(prompts, seed, seed_mode):
+    note, finish = "", None
+    wildcard_index(refresh=True) # Wildcard files added or changed since the last run.
+    if seed_mode == "combinations":
+        memo = {}
+        total = math.prod(count_combinations(strip_comments(text), memo) for text in prompts)
+        picker = CombinationPicker(seed % total, memo)
+        note = f", combination {seed % total + 1} of {total}"
+    elif seed_mode == "mutate":
+        key = MEMORY.key(*prompts)
+        remembered, replay = recall("mutate", key, seed)
+        last = mutate_memory(remembered)
+        rng = random.Random(stable_seed("mutate", seed, key)) # NOSONAR: picks prompt options from the seed, not security.
+        changeable = [address for address, (_picked, options) in last.items() if options > 1]
+        state = {"rng": rng, "last": last, "now": {}, "mutate": rng.choice(changeable) if changeable else None}
+        picker = MutatePicker(state)
+        if not replay: # A seed that came before gives its prompt again without moving mutate on.
+            finish = lambda: MEMORY.set("mutate", key, [[list(address), picked, options] for address, (picked, options) in state["now"].items()])
+    elif seed_mode == "shuffle":
+        picker = ShufflePicker(seed)
+    elif seed_mode == "balanced":
+        picker = BalancedPicker(seed)
+    elif seed_mode == "deck":
+        picker = DeckPicker(random.Random(seed), seed, {})
+    else:
+        picker = RandomPicker(random.Random(seed)) # Seed behavior for reproducible choices and wildcards.
+    texts = resolve_prompts(prompts, picker)
+    if finish:
+        finish()
+    MEMORY.save()
+    return texts, note
+SEED_MODE_TOOLTIP = ("How choices and wildcards change from run to run.\n"
+    "random: every pick is independent, so the same option can come up again soon.\n"
+    "deck: the seed steps through a shuffled order of the options; with control after generate on increment, every option comes once before any repeats. Reproducible.\n"
+    "shuffle: like shuffle in a music player, the node remembers the options already used and picks from the rest with each new seed (increment or randomize); remembered in a file, so it continues after a restart. The same seed gives the same result again.\n"
+    "balanced: an option just picked gets a low chance, and options not picked for a while get a higher one, so repeats are rare but possible. Remembered in a file, so it continues after a restart. The same seed gives the same result again.\n"
+    "combinations: the seed numbers every combination of the options, so seeds 0, 1, 2... go through all of them once (the console shows how many). Reproducible.\n"
+    "mutate: keeps the last prompt and changes just one choice each run with a new seed, to explore variations of a good result. Remembered in a file, so it continues after a restart. The same seed gives the same result again.")
 # Node schema (V3 / Nodes 2.0) like CLIP Text Encode (Prompt), but with a positive prompt on top, a negative prompt below, and one conditioning output for each. Both prompts support {a|b} choices and __name__ wildcards, picked from the seed.
 class CLIPTextEncodePositiveNegative(io.ComfyNode):
     loader = nodes.LoraLoader() # The core loader, which keeps the last LoRA file in memory.
@@ -452,7 +492,7 @@ class CLIPTextEncodePositiveNegative(io.ComfyNode):
     def define_schema(cls):
         return io.Schema(
             node_id="CLIPTextEncodePositiveNegative",
-            display_name="CLIP Dual Text Encode (Wildcards)",
+            display_name="CLIP Dual Text Encode (Wildcards, LoRA)",
             category="DiceForge/conditioning",
             description="Encodes a positive and a negative prompt with the same CLIP model, outputting a conditioning and the filled-in text for each (without a CLIP, just the text, for other text encoders). Supports {a|b} choices, __name__ wildcards and ${name} variables, picked from the seed.",
             search_aliases=["text", "prompt", "positive prompt", "negative prompt", "encode text", "text encoder", "encode prompt", "wildcards", "dynamic prompts"],
@@ -491,13 +531,7 @@ class CLIPTextEncodePositiveNegative(io.ComfyNode):
                     "seed_mode",
                     options=SEED_MODES,
                     default="random",
-                    tooltip="How choices and wildcards change from run to run.\n"
-                    "random: every pick is independent, so the same option can come up again soon.\n"
-                    "deck: the seed steps through a shuffled order of the options; with control after generate on increment, every option comes once before any repeats. Reproducible.\n"
-                    "shuffle: like shuffle in a music player, the node remembers the options already used and picks from the rest with each new seed (increment or randomize); remembered in a file, so it continues after a restart. The same seed gives the same result again.\n"
-                    "balanced: an option just picked gets a low chance, and options not picked for a while get a higher one, so repeats are rare but possible. Remembered in a file, so it continues after a restart. The same seed gives the same result again.\n"
-                    "combinations: the seed numbers every combination of the options, so seeds 0, 1, 2... go through all of them once (the console shows how many). Reproducible.\n"
-                    "mutate: keeps the last prompt and changes just one choice each run with a new seed, to explore variations of a good result. Remembered in a file, so it continues after a restart. The same seed gives the same result again.",
+                    tooltip=SEED_MODE_TOOLTIP,
                     advanced=True,
                 ),
                 io.Boolean.Input(
@@ -529,38 +563,12 @@ class CLIPTextEncodePositiveNegative(io.ComfyNode):
     # Main method to fill in choices and wildcards from the seed, encode both prompts, and return the conditioning and the final prompts.
     @classmethod
     def execute(cls, positive, negative, clip=None, seed=0, seed_mode="random", trim=True, model=None):
-        note = ""
-        wildcard_index(refresh=True) # Wildcard files added or changed since the last run.
-        if seed_mode == "combinations":
-            memo = {}
-            total = math.prod(count_combinations(strip_comments(text), memo) for text in (positive, negative))
-            picker = CombinationPicker(seed % total, memo)
-            note = f", combination {seed % total + 1} of {total}"
-        elif seed_mode == "mutate":
-            key = MEMORY.key(positive, negative)
-            remembered, replay = recall("mutate", key, seed)
-            last = mutate_memory(remembered)
-            rng = random.Random(stable_seed("mutate", seed, key)) # NOSONAR: picks prompt options from the seed, not security.
-            changeable = [address for address, (_picked, options) in last.items() if options > 1]
-            state = {"rng": rng, "last": last, "now": {}, "mutate": rng.choice(changeable) if changeable else None}
-            picker = MutatePicker(state)
-        elif seed_mode == "shuffle":
-            picker = ShufflePicker(seed)
-        elif seed_mode == "balanced":
-            picker = BalancedPicker(seed)
-        elif seed_mode == "deck":
-            picker = DeckPicker(random.Random(seed), seed, {})
-        else:
-            picker = RandomPicker(random.Random(seed)) # Seed behavior for reproducible choices and wildcards.
-        positive_text, negative_text = resolve_prompts((positive, negative), picker)
+        (positive_text, negative_text), note = fill_in((positive, negative), seed, seed_mode)
         positive_text, positive_loras = lora_tags(positive_text)
         negative_text, negative_loras = lora_tags(negative_text)
         loras = lora_files(positive_loras + negative_loras)
         if trim:
             positive_text, negative_text = trim_spaces(positive_text), trim_spaces(negative_text)
-        if seed_mode == "mutate" and not replay: # A seed that came before gives its prompt again without moving mutate on.
-            MEMORY.set("mutate", key, [[list(address), picked, options] for address, (picked, options) in state["now"].items()])
-        MEMORY.save()
         # Logging the prompts when choices or wildcards changed them, for debugging and verification purposes.
         if (positive_text, negative_text) != (positive, negative):
             logging.info(f"[DiceForge] CLIP Dual Text Encode | Seed: {seed} ({seed_mode}{note}) | Positive: {positive_text} | Negative: {negative_text}")
@@ -576,10 +584,43 @@ class CLIPTextEncodePositiveNegative(io.ComfyNode):
         if clip is None:
             return io.NodeOutput(None, None, positive_text, negative_text, model, ui=shown) # No CLIP: only the text, for other text encoders.
         return io.NodeOutput(cls.encode(clip, positive_text), cls.encode(clip, negative_text), positive_text, negative_text, model, ui=shown)
+# Wildcards to Text: one prompt with the same syntax, filled in by the seed modes, out as text (no CLIP): for any text encoder or text input.
+# <lora:...> tags stay in the text, for a node that reads them.
+class WildcardsToText(io.ComfyNode):
+    @classmethod
+    def define_schema(cls):
+        return io.Schema(
+            node_id="DiceForgeWildcardsToText",
+            display_name="Wildcards to Text",
+            category="DiceForge/conditioning",
+            description="Fills in a prompt's {a|b} choices, __name__ wildcards and ${name} variables from the seed, as CLIP Dual Text Encode does, and outputs the text, for any text encoder or text input.",
+            search_aliases=["wildcards", "wildcard text", "dynamic prompts", "prompt text", "random prompt", "text"],
+            inputs=[
+                io.String.Input("text", multiline=True, tooltip="The prompt: {a|b} choices, __name__ wildcards, ${name=value} / ${name} variables (the same syntax as CLIP Dual Text Encode)."),
+                io.Int.Input("seed", default=0, min=0, max=0xFFFFFFFFFFFFFFFF, control_after_generate=True,
+                             tooltip="Seed for the choices and wildcards. The same seed always gives the same text, in every mode."),
+                io.Combo.Input("seed_mode", options=SEED_MODES, default="random", tooltip=SEED_MODE_TOOLTIP, advanced=True),
+                io.Boolean.Input("trim", default=True, tooltip="Remove extra spaces: at the start and end of lines, double spaces, spaces before , . ; : ! ? ) and after (, and extra empty lines.", advanced=True),
+            ],
+            outputs=[io.String.Output(display_name="text", tooltip="The prompt with its choices, wildcards and variables filled in.")],
+        )
+    @classmethod
+    def fingerprint_inputs(cls, **kwargs):
+        return wildcards_signature() # Runs again when a wildcard file changes.
+    @classmethod
+    def execute(cls, text, seed=0, seed_mode="random", trim=True):
+        (filled,), note = fill_in((text,), seed, seed_mode)
+        if trim:
+            filled = trim_spaces(filled)
+        if filled != text:
+            logging.info(f"[DiceForge] Wildcards to Text | Seed: {seed} ({seed_mode}{note}) | {filled}")
+        return io.NodeOutput(filled, ui={"text": [filled]})
+
+
 # Extension entry point for ComfyUI V3 node registration.
 class CLIPTextEncodePositiveNegativeExtension(ComfyExtension):
     @override
     async def get_node_list(self):
-        return [CLIPTextEncodePositiveNegative]
+        return [CLIPTextEncodePositiveNegative, WildcardsToText]
 async def comfy_entrypoint():
     return CLIPTextEncodePositiveNegativeExtension()

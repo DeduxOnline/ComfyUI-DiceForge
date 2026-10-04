@@ -4,7 +4,7 @@ const fs = require("fs");
 const { test, expect, basePath, writeFile, openComfy, addNodes, connect, widgetValue, setWidget, menuItems, clickMenu, queueFromPage, nodeElement } = require("./helpers");
 const { DOWNLOADS } = require("./fixtures");
 
-const ALL_NODES = ["SDXLResolutionListLatent", "ResolutionSelectorRandomLatent", "CLIPTextEncodePositiveNegative", "DiceForgeRandomInt", "DiceForgeRandomFloat",
+const ALL_NODES = ["SDXLResolutionListLatent", "ResolutionSelectorRandomLatent", "CLIPTextEncodePositiveNegative", "DiceForgeWildcardsToText", "DiceForgeRandomInt", "DiceForgeRandomFloat",
   "DiceForgeRandomLora", "DiceForgeRandomCheckpoint", "DiceForgeRandomDiffusionModel", "DiceForgeRandomImage", "DiceForgeGrid", "DiceForgeRandomSampler",
   "DiceForgeRandomVAE", "LoadVAEDecodeSave", "VAEDecodeSave", "LoadDiffusionModelCLIP", "DiceForgeLoraStack", "DiceForgeXYPlot", "DiceForgeVariationSeed", "DiceForgeHiresUpscale", "DiceForgeDanbooruEnhancer"];
 
@@ -745,6 +745,20 @@ for (const vue of [true, false]) {
       expect(mapped).toEqual([{ sampler_name: "dpmpp_2m", scheduler: "karras" }, { sampler_name: "dpmpp_2m", scheduler: "karras" },
         { sampler_name: "dpmpp_2m_sde", scheduler: "exponential" }, { sampler_name: "euler_ancestral", scheduler: null }, { width: 832, height: 1216, steps: 28, cfg: 5.5 }]);
       expect(latent).toBeTruthy();
+    });
+
+    test("Wildcards to Text has the prompt tools in its text field: highlighting, the menu's browsers and guide", async ({ page }) => {
+      const [id] = await addNodes(page, [{ type: "DiceForgeWildcardsToText", pos: [300, 60], widgets: { text: "a __color__ car" } }]);
+      const menu = await page.evaluate((id) => window.app.extensions.flatMap((extension) => extension.getNodeMenuItems?.(window.app.graph.getNodeById(id)) ?? [])
+        .filter(Boolean).map((item) => item.content), id);
+      expect(menu).toEqual(expect.arrayContaining(["📖 Syntax guide", "🎲 Wildcard Browser", "🏷 Tag Browser"]));
+      expect(menu).not.toContain("🎨 Prompt styles"); // Styles have a negative part: CLIP Dual Text Encode only.
+      await expect.poll(() => page.evaluate((id) => !!document.querySelector(".dfhl-input") && window.app.graph.getNodeById(id).widgets.some((widget) => widget.name === "text"), id)).toBe(true);
+      await clickMenu(page, id, "DiceForge.Wildcards", "Syntax guide");
+      await page.locator(".dfsg input").fill("lock");
+      await page.locator(".dfsg .row button").click();
+      await expect.poll(() => widgetValue(page, id, "text")).toBe("a __color__ car, {sky|!sea|forest}"); // Into its text field.
+      await page.keyboard.press("Escape");
     });
 
     test("Syntax guide: the prompt syntax by topic, searched, an example inserted into the prompt", async ({ page }) => {

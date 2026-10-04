@@ -8,6 +8,10 @@ import { addHighlightStyle, highlightEnabled, highlightWildcardFile } from "./pr
 // "+ Add" buttons that insert __name__ (or __folder/*__) where the cursor was, and an editor for the files.
 const NODE_TYPE = "CLIPTextEncodePositiveNegative";
 const FIELDS = ["positive", "negative"];
+// The nodes whose text fields get the prompt tools (autocomplete, highlighting, the browsers' + Add, the syntax guide), and their fields.
+const PROMPT_NODES = { [NODE_TYPE]: FIELDS, DiceForgeWildcardsToText: ["text"] };
+const fieldsOf = (node) => PROMPT_NODES[node?.comfyClass] ?? null;
+const isPromptNode = (node) => !!fieldsOf(node);
 
 // The wildcard list, fetched once and shared: keystrokes while it loads wait for the same request instead of each sending one (their answers could
 // come back in any order). listCache is the last list that arrived, for drawing the browser.
@@ -41,15 +45,17 @@ function fieldOf(textarea) {
   const nodeElement = textarea.closest?.("[data-node-id]");
   if (nodeElement) {
     const node = app.graph?.getNodeById(Number(nodeElement.dataset.nodeId)) ?? app.graph?.getNodeById(nodeElement.dataset.nodeId);
-    if (node?.comfyClass !== NODE_TYPE) return null;
+    const fields = fieldsOf(node);
+    if (!fields) return null;
     const labelText = textarea.closest('[data-testid="node-widget"]')?.innerText?.trim();
-    const byLabel = node.widgets?.find((widget) => FIELDS.includes(widget.name) && labelText && labelText.startsWith(widget.label || widget.name))?.name;
-    const name = byLabel ?? FIELDS[textareasOf(nodeElement.dataset.nodeId).indexOf(textarea)];
+    const byLabel = node.widgets?.find((widget) => fields.includes(widget.name) && labelText && labelText.startsWith(widget.label || widget.name))?.name;
+    const name = byLabel ?? fields[textareasOf(nodeElement.dataset.nodeId).indexOf(textarea)];
     return name ? { node, name } : null;
   }
   for (const node of app.graph?.nodes ?? []) {
-    if (node.comfyClass !== NODE_TYPE) continue;
-    const widget = node.widgets?.find((widget) => FIELDS.includes(widget.name) && (widget.inputEl === textarea || widget.element?.contains?.(textarea)));
+    const fields = fieldsOf(node);
+    if (!fields) continue;
+    const widget = node.widgets?.find((widget) => fields.includes(widget.name) && (widget.inputEl === textarea || widget.element?.contains?.(textarea)));
     if (widget) return { node, name: widget.name };
   }
   return null;
@@ -88,7 +94,7 @@ function setField(node, name, text, caret) {
 // the cursor wasn't in it.
 function insertIntoNode(node, token, field) {
   const last = lastCursor.get(node);
-  const cursor = (field && last?.name !== field ? { name: field } : last) ?? { name: "positive" };
+  const cursor = (field && last?.name !== field ? { name: field } : last) ?? { name: fieldsOf(node)?.[0] ?? "positive" };
   const current = String(node.widgets?.find((widget) => widget.name === cursor.name)?.value ?? "");
   let start = cursor.start ?? current.length, end = cursor.end ?? current.length;
   // Commas around the token when it would touch other text (no cursor yet: added at the end, after a comma).
@@ -497,7 +503,7 @@ app.registerExtension({
   name: "DiceForge.Wildcards",
   getNodeMenuItems(node) {
     // The syntax guide first: this extension registers before the other prompt tools (they all import this module), so its items come first.
-    return node.comfyClass === NODE_TYPE ? [
+    return isPromptNode(node) ? [
       { content: "📖 Syntax guide", callback: () => import("./syntax_guide.js").then((guide) => guide.openSyntaxGuide(node)).catch((error) => console.error("[DiceForge]", error)) },
       { content: "🎲 Wildcard Browser", callback: () => openBrowser(node) },
     ] : [];
@@ -506,4 +512,4 @@ app.registerExtension({
 
 // For the prompt syntax highlighting (prompt_highlight.js): the prompt fields of a node, and the wildcard names as last listed.
 const knownWildcards = () => listCache?.files?.map((file) => file.name) ?? null;
-export { insertIntoNode, setField, textareaOf, wildcardList, knownWildcards, NODE_TYPE as PROMPT_NODE_TYPE, FIELDS as PROMPT_FIELDS };
+export { insertIntoNode, setField, textareaOf, wildcardList, knownWildcards, fieldsOf, isPromptNode, NODE_TYPE as PROMPT_NODE_TYPE, FIELDS as PROMPT_FIELDS };

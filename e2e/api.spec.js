@@ -5,7 +5,7 @@ const path = require("path");
 const { test, expect, runPrompt, shown, basePath, writeFile } = require("./helpers");
 const { MODELS, DOWNLOADS } = require("./fixtures");
 
-const NODES = ["SDXLResolutionListLatent", "ResolutionSelectorRandomLatent", "CLIPTextEncodePositiveNegative", "DiceForgeRandomInt", "DiceForgeRandomFloat",
+const NODES = ["SDXLResolutionListLatent", "ResolutionSelectorRandomLatent", "CLIPTextEncodePositiveNegative", "DiceForgeWildcardsToText", "DiceForgeRandomInt", "DiceForgeRandomFloat",
   "DiceForgeRandomLora", "DiceForgeRandomCheckpoint", "DiceForgeRandomDiffusionModel", "DiceForgeRandomImage", "DiceForgeGrid", "DiceForgeRandomSampler",
   "DiceForgeRandomVAE", "LoadVAEDecodeSave", "VAEDecodeSave", "LoadDiffusionModelCLIP", "DiceForgeLoraStack", "DiceForgeXYPlot", "DiceForgeVariationSeed", "DiceForgeHiresUpscale", "DiceForgeDanbooruEnhancer"];
 const clip = (positive, negative = "", { seed = 0, mode = "random" } = {}) => ({
@@ -218,6 +218,20 @@ test.describe("@api workflows and routes", () => {
     expect(outputFiles("e2e", "xy_")).toHaveLength(1);
     const bad = await runPrompt(request, { 1: { class_type: "DiceForgeXYPlot", inputs: { ...xy(0), x_values: "4, x" } }, 2: { class_type: "PreviewAny", inputs: { source: ["1", 8] } } });
     expect(JSON.stringify(bad.rejected ?? bad.error)).toContain("not a number");
+  });
+
+  test("Wildcards to Text fills in a prompt from the seed, as CLIP Dual Text Encode does", async ({ request }) => {
+    const prompt = (seed) => ({
+      1: { class_type: "DiceForgeWildcardsToText", inputs: { text: "a __color__ car, {big|small}", seed, seed_mode: "deck", trim: true } },
+      2: { class_type: "CLIPTextEncodePositiveNegative", inputs: { positive: "a __color__ car, {big|small}", negative: "", seed, seed_mode: "deck", trim: true } },
+      3: { class_type: "PreviewAny", inputs: { source: ["1", 0] } }, 4: { class_type: "PreviewAny", inputs: { source: ["2", 2] } },
+    });
+    for (const seed of [0, 1, 2]) {
+      const result = await runPrompt(request, prompt(seed));
+      expect(result.status, result.error).toBe("success");
+      expect(shown(result, "3")).toMatch(/^a (red|blue|green|white) car, (big|small)$/);
+      expect(shown(result, "3")).toBe(shown(result, "4")); // The same text for the same seed.
+    }
   });
 
   test("Variation Seed's model goes to KSampler and its label to Dice Grid", async ({ request }) => {

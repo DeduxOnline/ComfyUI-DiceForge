@@ -5,7 +5,7 @@
 const fs = require("fs");
 const { test, expect, basePath, openComfy, addNodes, connect, widgetValue, setWidget, menuItems, clickMenu, queueFromPage, nodeElement } = require("./helpers");
 
-const ALL_NODES = ["SDXLResolutionListLatent", "ResolutionSelectorRandomLatent", "CLIPTextEncodePositiveNegative", "DiceForgeRandomInt", "DiceForgeRandomFloat",
+const ALL_NODES = ["SDXLResolutionListLatent", "ResolutionSelectorRandomLatent", "CLIPTextEncodePositiveNegative", "DiceForgeWildcardsToText", "DiceForgeRandomInt", "DiceForgeRandomFloat",
   "DiceForgeRandomLora", "DiceForgeRandomCheckpoint", "DiceForgeRandomDiffusionModel", "DiceForgeRandomImage", "DiceForgeGrid", "DiceForgeRandomSampler",
   "DiceForgeRandomVAE", "LoadVAEDecodeSave", "VAEDecodeSave", "LoadDiffusionModelCLIP", "DiceForgeLoraStack", "DiceForgeXYPlot", "DiceForgeVariationSeed", "DiceForgeHiresUpscale", "DiceForgeDanbooruEnhancer"];
 const STACK = JSON.stringify({ rows: [{ lora: "style/ink.safetensors", strength: 0.7, random: true, min: 0.4, max: 0.9, group: "A", triggers: "custom", trigger_words: ["ink style"] },
