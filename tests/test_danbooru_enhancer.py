@@ -4,6 +4,7 @@ import asyncio
 import json
 import os
 import threading
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlsplit
 import pytest
@@ -351,6 +352,26 @@ def test_an_answer_that_isnt_json_is_asked_again_then_named(danbooru):
     danbooru.garbage = 10
     with pytest.raises(ValueError, match=r"e621 is busy .*an answer that isn't JSON"):
         run(tags="fox", source="e621")
+
+
+def test_e621_is_asked_at_most_twice_a_second(danbooru, monkeypatch):
+    monkeypatch.setattr(SITES["e621"], "pause", 0.3)
+    start = time.monotonic()
+    assert run(source="e621", mode="fixed", post_ids="11, 12, 11")[3] == 11 # Two requests (11 once): a pause between them.
+    assert time.monotonic() - start >= 0.3 and danbooru.requests[-2:] == ["/e621/posts/11.json", "/e621/posts/12.json"]
+
+
+def test_each_site_searches_by_its_own_tag_list():
+    tag_list() # Danbooru's: 1girl, hatsune_miku, smile...
+    with open(os.path.join(tag_autocomplete.TAGS_FOLDER, "e621.csv"), "w", encoding="utf-8") as file:
+        file.write("solo,0,3000000,\nanthro,0,2000000,\nfox,5,600000,\nsmile,0,900000,\n")
+    e621 = SITES["e621"]
+    assert search_tags(["solo", "anthro", "fox"], e621) == ["fox", "anthro"] # The species first, then the rarer general tag.
+    assert search_tags(["1girl", "hatsune_miku", "solo"], e621) == ["solo"] # Danbooru's tags aren't e621's.
+    assert search_tags(["fox", "smile", "hatsune_miku"]) == ["hatsune_miku", "smile"] # Danbooru's search knows only Danbooru's list.
+    with open(os.path.join(tag_autocomplete.TAGS_FOLDER, "e621.csv"), "w", encoding="utf-8") as file:
+        file.write("wolf,5,500000,\n")
+    assert search_tags(["fox", "wolf"], e621) == ["wolf"] # Read again when the file changes.
 
 
 def test_e621_busy_names_e621(danbooru):

@@ -283,6 +283,26 @@ test.describe("@api workflows and routes", () => {
     expect((await runPrompt(request, prompt("fixed", ""))).error).toContain("fixed mode needs post_ids");
   });
 
+  test("Danbooru Tag Enhancer in fixed mode comes from the cache until a wildcard file changes; it fits between two CLIP Dual Text Encodes", async ({ request }) => {
+    writeFile("models/wildcards/e2e_booru.txt", "hatsune miku\n");
+    const chain = () => ({
+      1: { class_type: "CLIPTextEncodePositiveNegative", inputs: { positive: "__e2e_booru__, {masterpiece|masterpiece}", negative: "", seed: 0, seed_mode: "random", trim: true } },
+      2: { class_type: "DiceForgeDanbooruEnhancer", inputs: { tags: ["1", 2], source: "danbooru", rating: "general", mode: "fixed", post_ids: "101", posts: 1,
+        max_tags: 15, include_general: true, include_appearance: true, include_clothes: true, include_background: true, include_count: true,
+        include_character: false, include_copyright: false, include_artist: false, exclude: "", position: "after", wildcard_seed: 7 } },
+      3: { class_type: "CLIPTextEncodePositiveNegative", inputs: { positive: ["2", 0], negative: "", seed: 0, seed_mode: "random", trim: true } },
+      4: { class_type: "PreviewAny", inputs: { source: ["3", 2] } },
+    });
+    const first = await runPrompt(request, chain());
+    expect(first.status, first.error).toBe("success");
+    expect(shown(first, "4")).toBe("hatsune miku, masterpiece, 1girl, smile, twintails"); // The first node's text, the post's tags, through the second.
+    expect((await runPrompt(request, chain())).cached).toContain("2"); // Fixed: the same inputs, from the cache.
+    writeFile("models/wildcards/e2e_booru.txt", "hatsune miku, smile\n");
+    const changed = await runPrompt(request, chain());
+    expect(changed.cached).not.toContain("2");
+    expect(shown(changed, "4")).toBe("hatsune miku, smile, masterpiece, 1girl, twintails"); // smile is in the prompt now: not added again.
+  });
+
   test("Danbooru Tag Enhancer takes e621 posts with source e621 (its ratings, its species tags)", async ({ request }) => {
     const prompt = (rating, mode = "random", ids = "") => ({ 1: { class_type: "DiceForgeDanbooruEnhancer", inputs: { tags: "fox, anthro", source: "e621", rating,
       mode, post_ids: ids, posts: 2, max_tags: 15, include_general: true, include_appearance: true, include_clothes: true, include_background: true,

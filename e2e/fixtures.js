@@ -97,7 +97,10 @@ const TAGS = 'long_hair,0,5000000,"longhair"\nlong_sleeves,0,1500000,\nhatsune_m
 // Danbooru posts the stand-in answers random-post searches with (/posts/random.json) and by id (/posts/<id>.json), for the Danbooru Tag Enhancer.
 const DANBOORU_POSTS = [
   { id: 101, rating: "g", score: 50, preview_file_url: `http://127.0.0.1:${CIVITAI_PORT}/image/danbooru/101.png`, tag_string_general: "1girl smile twintails", tag_string_character: "hatsune_miku", tag_string_copyright: "vocaloid", tag_string_artist: "e2e", tag_string_meta: "highres" },
-  { id: 102, rating: "e", score: 40, tag_string_general: "1girl nude", tag_string_character: "hatsune_miku", tag_string_copyright: "vocaloid", tag_string_artist: "e2e", tag_string_meta: "" },
+  { id: 102, rating: "e", score: 40, preview_file_url: `http://127.0.0.1:${CIVITAI_PORT}/image/danbooru/102.png`, tag_string_general: "1girl nude", tag_string_character: "hatsune_miku", tag_string_copyright: "vocaloid", tag_string_artist: "e2e", tag_string_meta: "" },
+  // A post whose picture doesn't load (the node shows a link instead). Never found by a search for hatsune_miku: 101 comes first.
+  { id: 103, rating: "g", score: 30, preview_file_url: "http://127.0.0.1:9/broken.png", tag_string_general: "1girl smile", tag_string_character: "hatsune_miku",
+    tag_string_copyright: "vocaloid", tag_string_artist: "e2e", tag_string_meta: "" },
 ];
 
 // e621 posts the stand-in answers searches (/posts.json, order:random) and ids (/posts/<id>.json) with.

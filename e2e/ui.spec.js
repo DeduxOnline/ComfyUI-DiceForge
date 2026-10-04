@@ -1185,6 +1185,41 @@ for (const vue of [true, false]) {
       await expect(page.locator(".dfdb").first().locator(".added")).toHaveText("+ 1girl, smile, twintails"); // Kept with the workflow.
     });
 
+    test("Danbooru Tag Enhancer previews: pictures of fixed posts, blurred past general, a link for one that won't load; e621; an older result", async ({ page, request }) => {
+      const [id] = await addNodes(page, [{ type: "DiceForgeDanbooruEnhancer", widgets: { tags: "hatsune miku", mode: "fixed", post_ids: "https://danbooru.donmai.us/posts/101, 102 103", wildcard_seed: 5 } }]);
+      const panel = page.locator(".dfdb").first();
+      await queueFromPage(page, request);
+      await expect(panel.locator(".head")).toHaveText("Last run · 3 posts · fixed");
+      await expect(panel.locator(".search")).toHaveText("Fixed: posts 101, 102, 103");
+      await expect(panel.locator("a.thumb img")).toHaveCount(2);
+      await expect(panel.locator("a.thumb img").first()).not.toHaveClass(/blur/); // General.
+      const explicit = panel.locator("a.thumb img").nth(1);
+      await expect(explicit).toHaveClass(/blur/); // Explicit: blurred while Blur NSFW is on.
+      await expect(panel.locator("a.thumb.plain")).toHaveText("↗ #103"); // Its picture didn't load: the link to the post.
+      const tabs = page.context().pages().length;
+      await explicit.click();
+      await expect(explicit).not.toHaveClass(/blur/); // The first click only reveals...
+      expect(page.context().pages()).toHaveLength(tabs); // ...and opens nothing.
+      expect(await widgetValue(page, id, "post_ids")).toBe("https://danbooru.donmai.us/posts/101, 102 103"); // Fixed: your post_ids stay as typed,
+      expect(await widgetValue(page, id, "wildcard_seed")).toBe(5); // and the seed.
+
+      await setWidget(page, id, "mode", "random");
+      await setWidget(page, id, "source", "e621");
+      await setWidget(page, id, "tags", "fox, anthro");
+      await queueFromPage(page, request);
+      await expect(panel.locator(".head")).toHaveText("Last run · e621 post #201 (safe)");
+      await expect(panel.locator(".added")).toHaveText("+ solo, grin, canine");
+      await expect(panel.locator("a.thumb img")).not.toHaveClass(/blur/); // e621's safe isn't blurred.
+      await expect.poll(() => widgetValue(page, id, "post_ids")).toBe("201"); // Random: this run's post, for fixed mode.
+
+      await page.evaluate((nodeId) => { // A result saved by an older version (one post, no posts list).
+        window.app.graph.getNodeById(nodeId).properties.dice_forge_danbooru = { text: "x, smile", added: "smile", url: "https://danbooru.donmai.us/posts/7", id: 7, search: "x rating:s", rating: "s" };
+      }, id);
+      await expect(panel.locator(".head")).toHaveText("Last run · post #7 (sensitive)");
+      await expect(panel.locator("a.thumb.plain")).toHaveAttribute("href", /\/posts\/7$/);
+      await expect(panel.locator(".added")).toHaveText("+ smile");
+    });
+
     if (vue) {
       test("DiceForge nodes fit their inputs when advanced inputs are shown and hidden", async ({ page }) => { // NOSONAR: expect.poll(...) assertions below.
         const [id] = await addNodes(page, [{ type: "SDXLResolutionListLatent" }]);
