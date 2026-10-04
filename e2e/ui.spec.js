@@ -1053,9 +1053,10 @@ for (const vue of [true, false]) {
       const panel = page.locator(".dfpp").first();
       const lastRun = async () => (await panel.locator(".box").first().textContent()).replace(/^positive/, "");
       const texts = (await page.evaluate((id) => window.app.graph.getNodeById(id).properties.dice_forge_history.map((item) => item.positive), encode)).reverse();
-      await expect(panel.locator(".history-link")).toHaveText("🕘 History (3)");
-      await panel.locator(".history-link").click(); // A window, as from the right-click menu.
+      await expect(panel.locator(".history-link")).toHaveCount(0); // Not on the node: in its right-click menu.
+      await clickMenu(page, encode, "DiceForge.PromptPreview", "Prompt history");
       const dialog = page.locator(".dfph");
+      await expect(dialog.locator(".top .muted")).toHaveText("3 runs, newest first");
       const entries = dialog.locator(".entry");
       await expect(entries.locator(".when")).toHaveText([/seed 3 \(random\)$/, /seed 2 \(random\)$/, /seed 1 \(random\)$/]); // Newest first.
       await expect(entries.locator(".text")).toHaveText([texts[2], texts[1], texts[0]]);
@@ -1090,8 +1091,8 @@ for (const vue of [true, false]) {
       }, [encode, Array.from({ length: 25 }, (_, index) => ({ positive: `old ${index}`, negative: "", seed: 100 + index, seed_mode: "random", time: index + 1 }))]);
       await setWidget(page, encode, "positive", "a {big|small} boat");
       await queueFromPage(page, request);
-      await expect(panel.locator(".history-link")).toHaveText("🕘 History (21)");
       await clickMenu(page, encode, "DiceForge.PromptPreview", "Prompt history");
+      await expect(dialog.locator(".top .muted")).toHaveText("21 runs, newest first");
       await expect(dialog.locator(".pin.on")).toHaveCount(1);
       await page.keyboard.press("Escape");
       const workflow = await page.evaluate(() => window.app.graph.serialize()); // Kept with the workflow.

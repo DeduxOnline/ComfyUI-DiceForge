@@ -8,7 +8,7 @@ import { setField } from "./wildcards.js";
 // choices, wildcards and variables filled in, with the seed and mode they came from. Click a prompt to copy it. They are kept in the node's
 // properties, so they are still there after a reload and travel with the workflow (also the one saved in an image). When a prompt was changed since,
 // the preview is dimmed until the next run.
-// Prompt history (a window: the node's right-click menu, or 🕘 under the preview): the last runs' prompts (20, plus the pinned ones), newest first,
+// Prompt history (a window, from the node's right-click menu): the last runs' prompts (20, plus the pinned ones), newest first,
 // each with the images its run made (Save Image, Preview Image, VAE Decode + Save... in the same workflow). From an entry: ↺ Seed puts back its
 // prompts, seed and mode (with control after generate on fixed), so the next run gives the same prompts again; Use text puts the prompts as encoded
 // in the fields, every choice made; 📌 keeps it past the 20; ✕ removes it.
@@ -19,7 +19,6 @@ const STYLE = `
 .dfpp .box{background:#222;border:1px solid #444;border-radius:5px;padding:4px 6px;white-space:pre-wrap;word-break:break-word;cursor:copy;max-height:130px;overflow:auto}
 .dfpp .box b{color:#888;font-weight:400;margin-right:6px}.dfpp .box.copied{border-color:#6a9a6a}.dfpp .empty{color:#777;font-style:italic}
 .dfpp.stale .box{opacity:.55}
-.dfpp .history-link{align-self:flex-start;background:none;border:none;color:#9cc8ff;cursor:pointer;padding:0;font:inherit}
 .dfph-back{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:10000;display:flex;align-items:center;justify-content:center}
 .dfph{background:#353535;color:#ddd;border:1px solid #555;border-radius:10px;width:min(1100px,95vw);height:min(860px,92vh);display:flex;flex-direction:column;gap:8px;padding:14px 16px;font:14px system-ui,sans-serif;box-shadow:0 10px 40px #000a;box-sizing:border-box}
 .dfph h2{margin:0;font-size:20px;color:#fff}.dfph .top{display:flex;gap:8px;align-items:center}.dfph .top .muted{flex:1}.dfph .muted{color:#999;font-size:13px}
@@ -189,20 +188,16 @@ app.registerExtension({
     };
     // The negative prompt shows with the node's advanced inputs (where its field is), always in the classic canvas.
     const negativeShown = () => !vueNodes() || !!node.showAdvanced;
-    let shownFrom, shownHistory, shownNegative; // What the panel shows (undefined: not drawn yet).
+    let shownFrom, shownNegative; // What the panel shows (undefined: not drawn yet).
     function render() {
       const last = node.properties?.dice_forge_prompts;
-      const history = Array.isArray(node.properties?.dice_forge_history) ? node.properties.dice_forge_history : [];
       shownFrom = last;
-      shownHistory = node.properties?.dice_forge_history;
       shownNegative = negativeShown();
       if (!last) panel.replaceChildren(element("div", { class: "empty" }, "Run the workflow to see the prompts as encoded here."));
       else {
         const mode = [last.seed_mode, last.note].filter(Boolean).join(", ");
         panel.replaceChildren(element("div", { class: "head" }, element("span", {}, `Last run · seed ${last.seed}${mode ? ` (${mode})` : ""}`), element("span", { class: "changed" })),
-          box("positive", last.positive ?? ""), ...(shownNegative ? [box("negative", last.negative ?? "")] : []),
-          ...(history.length ? [element("button", { class: "history-link", title: "The last runs' prompts and images (also in the node's right-click menu)",
-            onclick: () => openHistory(node) }, `🕘 History (${history.length})`)] : []));
+          box("positive", last.positive ?? ""), ...(shownNegative ? [box("negative", last.negative ?? "")] : []));
       }
       markStale();
       fitNodeHeight(node); // Room for the preview: taller in the classic canvas, no gap in Nodes 2.0 (node_size.js).
@@ -234,9 +229,9 @@ app.registerExtension({
       return result;
     };
     // Drawn again when the saved prompts arrive (a loaded workflow gives the node its properties after this extension ran, in the classic canvas),
-    // when the history changes or the advanced inputs are shown or hidden; else only the "changed since" mark is checked.
+    // or when the advanced inputs are shown or hidden; else only the "changed since" mark is checked.
     const timer = setInterval(() => {
-      if (node.properties?.dice_forge_prompts !== shownFrom || node.properties?.dice_forge_history !== shownHistory || negativeShown() !== shownNegative) render();
+      if (node.properties?.dice_forge_prompts !== shownFrom || negativeShown() !== shownNegative) render();
       else markStale();
     }, 400);
     const onRemoved = node.onRemoved;
