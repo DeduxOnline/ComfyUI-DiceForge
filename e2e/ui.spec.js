@@ -1065,6 +1065,10 @@ for (const vue of [true, false]) {
         await page.evaluate((id) => { const node = window.app.graph.getNodeById(id); node.showAdvanced = true; node.setDirtyCanvas(true, true); }, encode);
       }
       await expect(shown.locator(".box").nth(1)).toContainText("(empty)");
+      if (vue) { // And hides with them again.
+        await page.evaluate((id) => { const node = window.app.graph.getNodeById(id); node.showAdvanced = false; node.setDirtyCanvas(true, true); }, encode);
+        await expect(shown.locator(".box")).toHaveCount(1);
+      }
       await expect(shown.locator(".head")).toContainText("seed 3 (random)");
       await expect(shown).not.toHaveClass(/stale/);
       await setWidget(page, encode, "positive", "a __color__ bike"); // Changed since the run: dimmed until the next one.

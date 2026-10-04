@@ -223,6 +223,19 @@ def test_a_choice_can_pick_the_lora_and_a_missing_one_says_so(models, lora_calls
         Node.execute("<lora:nope:1>", "", seed=0, model="m")
 
 
+def test_both_prompt_nodes_share_what_a_list_remembers():
+    """A list's shuffle round is kept by its options, not by the node: the same list in CLIP Dual Text Encode and Wildcards to Text (or two nodes of
+    either) deals from one round between them, and a seed that came before, in either node, gives its pick again."""
+    text = "{a|b|c|d}"
+    picks = []
+    for seed in (11, 12):
+        picks.append(run(text, seed=seed, mode="shuffle")[2])
+        picks.append(WildcardsToText.execute(text, seed=seed + 100, seed_mode="shuffle").result[0])
+    assert sorted(picks) == ["a", "b", "c", "d"] # One round between the two nodes.
+    assert WildcardsToText.execute(text, seed=11, seed_mode="shuffle").result[0] == picks[0] # Seed 11 came before, in the CLIP node.
+    assert run("{a|b|c|d|e}", seed=11, mode="shuffle")[2] in "abcde" # Another list: its own round.
+
+
 def test_wildcards_to_text_fills_in_like_the_clip_node():
     text = "a {red|green|blue|white} car, {2$$hat|scarf|bow}, ${c={big|small}}${c} dog // gone"
     for mode in ("random", "deck", "combinations"):
