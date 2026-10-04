@@ -1,6 +1,5 @@
-import { app } from "../../scripts/app.js";
 import { addStyleOnce, background, element } from "./dom.js";
-import { insertIntoNode, PROMPT_NODE_TYPE } from "./wildcards.js";
+import { insertIntoNode } from "./wildcards.js";
 
 // Syntax guide (CLIP Dual Text Encode's menu): every piece of the prompt syntax with what it does and an example. A click on an example copies it;
 // + Insert puts it where the cursor was in the node's prompts. The search box filters the rows.
@@ -96,10 +95,4 @@ export function openSyntaxGuide(node) {
   draw();
   search.focus();
 }
-
-app.registerExtension({
-  name: "DiceForge.SyntaxGuide",
-  getNodeMenuItems(node) {
-    return node.comfyClass === PROMPT_NODE_TYPE ? [{ content: "📖 Syntax guide", callback: () => openSyntaxGuide(node) }] : [];
-  },
-});
+// In the menu through wildcards.js (first among the prompt tools).

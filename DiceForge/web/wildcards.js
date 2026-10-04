@@ -496,7 +496,11 @@ async function openBrowser(node) {
 app.registerExtension({
   name: "DiceForge.Wildcards",
   getNodeMenuItems(node) {
-    return node.comfyClass === NODE_TYPE ? [{ content: "🎲 Wildcard Browser", callback: () => openBrowser(node) }] : [];
+    // The syntax guide first: this extension registers before the other prompt tools (they all import this module), so its items come first.
+    return node.comfyClass === NODE_TYPE ? [
+      { content: "📖 Syntax guide", callback: () => import("./syntax_guide.js").then((guide) => guide.openSyntaxGuide(node)).catch((error) => console.error("[DiceForge]", error)) },
+      { content: "🎲 Wildcard Browser", callback: () => openBrowser(node) },
+    ] : [];
   },
 });
 

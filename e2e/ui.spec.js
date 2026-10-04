@@ -182,7 +182,7 @@ for (const vue of [true, false]) {
     test("Wildcard Browser adds wildcards to the prompt and edits files", async ({ page }) => {
       writeFile(`models/wildcards/edit_${vue ? "vue" : "classic"}.txt`, "one\ntwo\n");
       const [id] = await addNodes(page, [{ type: "CLIPTextEncodePositiveNegative", pos: [300, 60], widgets: { positive: "1girl" } }]);
-      expect(await menuItems(page, id, "DiceForge.Wildcards")).toEqual(["🎲 Wildcard Browser"]);
+      expect(await menuItems(page, id, "DiceForge.Wildcards")).toEqual(["📖 Syntax guide", "🎲 Wildcard Browser"]);
       await clickMenu(page, id, "DiceForge.Wildcards", "Wildcard Browser");
       await expect(page.locator(".dfwc .row").first()).toBeVisible();
       await page.locator(".dfwc .tree > .row", { hasText: /^color/ }).locator("button.add").click(); // color.txt at the top, not hair/color.txt.
@@ -749,7 +749,10 @@ for (const vue of [true, false]) {
 
     test("Syntax guide: the prompt syntax by topic, searched, an example inserted into the prompt", async ({ page }) => {
       const [id] = await addNodes(page, [{ type: "CLIPTextEncodePositiveNegative", pos: [300, 60], widgets: { positive: "1girl" } }]);
-      await clickMenu(page, id, "DiceForge.SyntaxGuide", "Syntax guide");
+      const menu = await page.evaluate((id) => window.app.extensions.flatMap((extension) => extension.getNodeMenuItems?.(window.app.graph.getNodeById(id)) ?? [])
+        .filter(Boolean).map((item) => item.content), id);
+      expect(menu[0]).toBe("📖 Syntax guide"); // First in the node's menu.
+      await clickMenu(page, id, "DiceForge.Wildcards", "Syntax guide");
       const guide = page.locator(".dfsg");
       await expect(guide.locator("h3")).toHaveText(["Wildcards", "Choices", "Variables", "LoRAs and weights", "Comments and escapes", "Wildcard files"]);
       await guide.locator("input").fill("lock");
