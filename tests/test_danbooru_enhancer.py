@@ -42,7 +42,10 @@ def danbooru(monkeypatch):
             tags = parse_qs(url.query).get("tags", [""])[0]
             self.server.requests.append(tags)
             posts = found(tags)
-            if url.path != "/posts/random.json":
+            if self.server.busy > 0: # Danbooru overloaded: 503 this many times.
+                self.server.busy -= 1
+                status, body = 503, {"message": "Service Unavailable"}
+            elif url.path != "/posts/random.json":
                 status, body = 404, {"message": "Not found"}
             elif self.server.refuse or len([tag for tag in tags.split() if not tag.startswith("rating:")]) > 2:
                 status, body = 422, {"message": "You cannot search for more than 2 tags at a time."}
@@ -57,7 +60,8 @@ def danbooru(monkeypatch):
             self.end_headers()
             self.wfile.write(data)
     server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-    server.requests, server.refuse, server.choose = [], False, lambda posts: posts[0]
+    server.requests, server.refuse, server.choose, server.busy = [], False, lambda posts: posts[0], 0
+    monkeypatch.setattr(danbooru_enhancer, "RETRY_DELAYS", (0, 0)) # No waiting in the tests.
     threading.Thread(target=server.serve_forever, daemon=True).start()
     monkeypatch.setattr(danbooru_enhancer, "DANBOORU_URL", f"http://127.0.0.1:{server.server_port}")
     yield server
@@ -157,6 +161,19 @@ def test_clear_errors(danbooru):
     danbooru.refuse = True
     with pytest.raises(ValueError, match="refused the search"):
         run()
+
+
+def test_a_busy_danbooru_is_asked_again(danbooru):
+    danbooru.busy = 2 # 503 twice, then the post.
+    assert run(tags="hatsune miku")[3] == 1
+    assert len(danbooru.requests) == 3
+
+
+def test_danbooru_busy_every_time_says_so(danbooru):
+    danbooru.busy = 10
+    with pytest.raises(ValueError, match=r"Danbooru is busy and turned the request away \(503 Service Unavailable\), 3 times in a row.*try again in a minute"):
+        run(tags="hatsune miku")
+    assert len(danbooru.requests) == 3 # Asked three times, no more.
 
 
 def test_offline_says_so():

@@ -65,6 +65,11 @@ def post_summary(post):
         return None
     return {"id": post["id"], "rating": str(post.get("rating") or ""), "score": post.get("score") if isinstance(post.get("score"), int) else 0,
             **{group: str(post.get(f"tag_string_{group}") or "").split() for group in GROUPS}}
+# Danbooru busy: overloaded, limiting the requests, or its Cloudflare checking this computer. Asked again after a pause (RETRY_DELAYS seconds).
+BUSY = {429, 500, 502, 503, 504}
+RETRY_DELAYS = (1, 3)
+class DanbooruBusy(Exception):
+    pass
 # A random post of a search (Danbooru picks it), or None when no post has the tags.
 async def random_post(session, query):
     async with session.get(f"{DANBOORU_URL.rstrip('/')}/posts/random.json", params={"tags": query}) as response:
@@ -72,19 +77,30 @@ async def random_post(session, query):
             return None
         if response.status == 422:
             raise ValueError(f"Danbooru Tag Enhancer: Danbooru refused the search {query!r}: {(await response.text())[:200]}")
+        if response.status in BUSY or (response.status == 403 and "challenge" in (await response.text())[:3000].lower()):
+            text = (await response.text())[:3000].lower()
+            raise DanbooruBusy(f"{response.status} {response.reason}" + (" (a Cloudflare check)" if "cloudflare" in text or "just a moment" in text else ""))
         response.raise_for_status()
         return post_summary(await response.json(content_type=None))
-# The post: both tags with the rating, else each tag alone; returns it and the search that found it.
+# The post: both tags with the rating, else each tag alone; returns it and the search that found it. Busy: asked again after a pause, twice.
 async def find_post(tags, rating_term):
-    try:
-        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=30), headers={"User-Agent": USER_AGENT}, trust_env=True) as session:
-            for search in searches(tags):
-                query = " ".join([*search, rating_term]).strip()
-                post = await random_post(session, query)
-                if post:
-                    return post, query
-    except (aiohttp.ClientError, asyncio.TimeoutError) as error:
-        raise ValueError(f"Danbooru Tag Enhancer: Danbooru can't be reached ({error}).") from None
+    for attempt, delay in enumerate((*RETRY_DELAYS, None)):
+        try:
+            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=30), headers={"User-Agent": USER_AGENT}, trust_env=True) as session:
+                for search in searches(tags):
+                    query = " ".join([*search, rating_term]).strip()
+                    post = await random_post(session, query)
+                    if post:
+                        return post, query
+            return None, None
+        except DanbooruBusy as busy:
+            if delay is None:
+                raise ValueError(f"Danbooru Tag Enhancer: Danbooru is busy and turned the request away ({busy}), {attempt + 1} times in a row. "
+                                 "It does that for a while when it is overloaded or gets many requests: try again in a minute.") from None
+            logging.warning(f"[DiceForge] Danbooru Tag Enhancer | Danbooru is busy ({busy}): asking again in {delay} s.")
+            await asyncio.sleep(delay)
+        except (aiohttp.ClientError, asyncio.TimeoutError) as error:
+            raise ValueError(f"Danbooru Tag Enhancer: Danbooru can't be reached ({error}).") from None
     return None, None
 
 
