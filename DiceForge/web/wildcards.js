@@ -129,6 +129,16 @@ const STYLE = `
   background:transparent;color:transparent;-webkit-text-fill-color:transparent;caret-color:#eee}
 .dfwc .code textarea.src::placeholder{color:#888;-webkit-text-fill-color:#888}.dfwc .code textarea.src::selection{background:rgba(90,140,230,.4)}
 .dfwc .code.readonly .hl{color:#aaa}
+.dfwc [hidden]{display:none!important}.dfwc.cards-mode .tree{width:30%}.dfwc .cards{flex:1;display:flex;flex-direction:column;gap:8px;min-width:0;min-height:0}
+.dfwc .cards-head{display:flex;gap:8px;align-items:center;color:#ccc}.dfwc .cards-head b{color:#fff}.dfwc .cards-head .muted{flex:1}
+.dfwc .cards .grid{flex:1;overflow:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;align-content:start;grid-auto-rows:max-content;padding-right:4px}
+.dfwc .card{border:1px solid #4a4a4a;border-radius:8px;overflow:hidden;background:#2e2e2e;display:flex;flex-direction:column}
+.dfwc .card .pic{flex:none;aspect-ratio:3/4;background:#1e1e1e;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.dfwc .card .pic img{width:100%;height:100%;object-fit:cover;display:block}.dfwc .card .pic .none{color:#888;font-size:12px;padding:10px;text-align:center;word-break:break-word}
+.dfwc .card .info{padding:6px 8px;display:flex;flex-direction:column;gap:4px;flex:1}.dfwc .card .title{font-weight:600;color:#fff;word-break:break-word;cursor:pointer}
+.dfwc .card .line{color:#aaa;font-size:12px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;word-break:break-word}
+.dfwc .card .actions{display:flex;gap:6px;justify-content:space-between;align-items:center;margin-top:auto}
+.dfwc button.mode.on{border-color:#6a9ad8;background:#2f3f55}
 .dfwc .row{display:flex;align-items:center;gap:6px;padding:3px 6px;border-radius:4px}.dfwc .row:hover{background:#2c2c2c}
 .dfwc .row .name{flex:1;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dfwc .row.sel{background:#2f3f55}
 .dfwc .folder>.row .name{font-weight:600}.dfwc .folder>.row .name::before{content:"▸ ";color:#999}.dfwc .folder.open>.row .name::before{content:"▾ "}
@@ -269,6 +279,7 @@ for (const type of ["keyup", "mouseup", "focusin"]) document.addEventListener(ty
 
 // Folders open in the Wildcard Browser, kept between openings (and reloads) in this browser. Folders start closed; a search opens them all.
 const OPEN_KEY = "diceforge.wildcards.open";
+const CARDS_KEY = "diceforge.wildcards.cards";
 function openFolders() {
   try { return new Set(JSON.parse(localStorage.getItem(OPEN_KEY)) || []); } catch { return new Set(); }
 }
@@ -334,6 +345,7 @@ async function openBrowser(node) {
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") { event.preventDefault(); event.stopPropagation(); save.click(); }
   });
   const back = element("div", { class: "dfwc-back" });
+  const dialog = element("div", { class: "dfwc" }), editPane = element("div", { class: "edit" });
   const close = () => { back.remove(); document.removeEventListener("keydown", onKey, true); document.removeEventListener("selectionchange", onSelection); };
   const onKey = (event) => { if (event.key === "Escape" && !document.querySelector(".dfmv-back")) { event.stopPropagation(); close(); } }; // The folder picker closes first.
   back.addEventListener("mousedown", (event) => { if (event.target === back) close(); });
@@ -443,6 +455,49 @@ async function openBrowser(node) {
     favoritesButton.classList.toggle("on", onlyFavorites);
     draw();
   } }, "★ Favorites");
+  // Two ways to see the wildcards: 📄 Lines (the tree and the editor) and 🃏 Cards (a folder's wildcards as cards, with their pictures: a yaml card
+  // pack's POSES/sitting.jpeg next to POSES.yaml; + Add inserts one card, 🎲 a random card of the folder). The mode is remembered.
+  let cardsMode = false, cardFolder = null;
+  try { cardsMode = localStorage.getItem(CARDS_KEY) === "1"; } catch { /* No storage: lines. */ }
+  const modeButton = element("button", { class: "mode", title: "Show the wildcards as cards with their pictures (yaml card packs), or as lines with the editor" });
+  const cards = element("div", { class: "cards" });
+  const setMode = (on) => {
+    cardsMode = on;
+    try { localStorage.setItem(CARDS_KEY, on ? "1" : "0"); } catch { /* No storage: for this visit. */ }
+    draw();
+  };
+  modeButton.addEventListener("click", () => setMode(!cardsMode));
+  const pictureURL = (name) => api.apiURL(`/diceforge/wildcards/picture?name=${encodeURIComponent(name)}`);
+  function card(file) {
+    const pic = element("div", { class: "pic", title: file.preview.join("\n") });
+    if (file.picture) {
+      const img = element("img", { src: pictureURL(file.name), loading: "lazy", alt: file.name });
+      img.addEventListener("error", () => img.replaceWith(element("span", { class: "none" }, file.preview[0] ?? "")));
+      pic.append(img);
+    } else pic.append(element("span", { class: "none" }, file.preview[0] ?? "(empty)"));
+    return element("div", { class: "card", "data-name": file.name }, pic,
+      element("div", { class: "info" },
+        element("span", { class: "title", title: "Open it in the lines view", onclick: () => { setMode(false); background(open(file.name)); } }, file.name.split("/").pop()),
+        element("span", { class: "line", title: file.preview.join("\n") }, file.lines > 1 ? `${file.lines} lines: ${file.preview.join(" · ")}` : file.preview[0] ?? ""),
+        element("div", { class: "actions" },
+          element("button", { class: "fav" + (file.favorite ? " on" : ""), title: file.favorite ? "A favorite: click to remove the star" : "Add to favorites",
+            onclick: () => background(setFavorite(file.name, !file.favorite)) }, file.favorite ? "★" : "☆"),
+          element("button", { class: "add", title: `Insert __${file.name}__`, onclick: () => add(file.name) }, "+ Add"))));
+  }
+  function drawCards(shown) {
+    if (cardFolder == null) { // The first time: the folder of the first wildcard with a picture.
+      const first = shown.find((file) => file.picture);
+      cardFolder = first ? first.name.split("/").slice(0, -1).join("/") : "";
+    }
+    const inFolder = shown.filter((file) => !cardFolder || file.name.startsWith(`${cardFolder}/`));
+    const limit = 400; // A huge folder: the first ones, the search narrows it.
+    cards.replaceChildren(
+      element("div", { class: "cards-head" }, element("b", {}, `📁 ${cardFolder || "All wildcards"}`),
+        element("span", { class: "muted" }, `${inFolder.length} card${inFolder.length === 1 ? "" : "s"} · click a folder in the tree to see its cards`),
+        ...(cardFolder ? [element("button", { class: "add random", title: `Insert __${cardFolder}/*__: a random card of the folder each run`, onclick: () => add(`${cardFolder}/*`) }, "🎲 + Add random")] : [])),
+      element("div", { class: "grid" }, ...(inFolder.length ? inFolder.slice(0, limit).map(card) : [element("div", { class: "muted" }, "No wildcards here.")]),
+        ...(inFolder.length > limit ? [element("div", { class: "muted" }, `${inFolder.length - limit} more: search to narrow them.`)] : [])));
+  }
   async function setFavorite(name, favorite) {
     const response = await api.fetchApi("/diceforge/wildcards/favorite", { method: "POST", body: JSON.stringify({ name, favorite }) });
     if (!response.ok) return say(await response.text());
@@ -467,7 +522,9 @@ async function openBrowser(node) {
     }
     const drawLevel = (level) => [
       ...[...level.folders.entries()].map(([part, folder]) => {
-        const row = element("div", { class: "row" }, element("span", { class: "name", title: "Open or close the folder", onclick: () => toggle(folder.path) }, `📁 ${part}`), element("span", { class: "muted" }, "all files"),
+        const row = element("div", { class: "row" + (cardsMode && folder.path === cardFolder ? " sel" : "") },
+          element("span", { class: "name", title: cardsMode ? "Show its cards (and open or close the folder)" : "Open or close the folder",
+            onclick: () => { if (cardsMode) cardFolder = folder.path; toggle(folder.path, cardsMode ? true : undefined); } }, `📁 ${part}`), element("span", { class: "muted" }, "all files"),
           element("button", { class: "add", title: `Insert __${folder.path}/*__`, onclick: () => add(`${folder.path}/*`) }, "+ Add"));
         dropTarget(row, "wildcards", (name) => background(moveFile(name, folder.path))); // A file dropped on a folder moves into it.
         return element("div", { class: "folder" + (allOpen || opened.has(folder.path) ? " open" : ""), "data-path": folder.path }, row, element("div", { class: "kids" }, ...drawLevel(folder)));
@@ -484,15 +541,22 @@ async function openBrowser(node) {
         return row;
       }),
     ];
+    modeButton.textContent = cardsMode ? "📄 Lines" : "🃏 Cards";
+    modeButton.classList.toggle("on", cardsMode);
+    dialog.classList.toggle("cards-mode", cardsMode);
+    editPane.hidden = cardsMode;
+    cards.hidden = !cardsMode;
+    if (cardsMode) drawCards(shown);
     const items = drawLevel(root);
     tree.replaceChildren(...(items.length ? items : [element("div", { class: "muted" }, files.length ? (onlyFavorites && !query ? "No favorites yet: ☆ next to a file adds it." : "No wildcard matches the search.") : "No wildcard files yet: create one with + New file (they go to ComfyUI/models/wildcards).")]));
   }
   dropTarget(tree, "wildcards", (name) => background(moveFile(name, ""))); // Dropped on the tree, not on a folder: to the top folder.
   search.addEventListener("input", draw);
-  back.append(element("div", { class: "dfwc" },
-    element("h2", {}, "Wildcards"),
-    element("div", { class: "top" }, search, favoritesButton, expandAll, collapseAll, create, element("button", { onclick: close }, "Close")),
-    element("div", { class: "main" }, tree, element("div", { class: "edit" }, title, code, element("div", { class: "top" }, status, element("span", { style: "flex:1" }), remove, move, rename, save)))));
+  back.append(dialog);
+  dialog.append(element("h2", {}, "Wildcards"),
+    element("div", { class: "top" }, search, modeButton, favoritesButton, expandAll, collapseAll, create, element("button", { onclick: close }, "Close")),
+    element("div", { class: "main" }, tree, editPane, cards), status);
+  editPane.append(title, code, element("div", { class: "top" }, element("span", { style: "flex:1" }), remove, move, rename, save));
   document.body.append(back);
   await wildcardList(true);
   draw();

@@ -78,7 +78,7 @@ def wildcard_index(refresh=False):
                         logging.warning(f"[DiceForge] Wildcards: skipping {path}, it is not valid UTF-8 YAML: {error}")
                         continue
                     for key, lines in yaml_wildcards(data, prefix.rstrip("/")):
-                        entries.setdefault(key, {"path": path, "lines": lines})
+                        entries.setdefault(key, {"path": path, "lines": lines, "inner": key[len(prefix):]}) # inner: the key's path in its file
             index_cache.update(signature=signature, entries=entries)
     return index_cache["entries"]
 # Every wildcard name, sorted.

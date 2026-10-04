@@ -34,6 +34,29 @@ def test_list_read_and_save(api, wildcards):
         assert file.read() == "black\nwhite\n"
 
 
+def test_card_pictures_of_a_yaml_card_pack(api, wildcards):
+    # A card pack: POSES.yaml with name: prompt pairs, and POSES/<name>.jpeg next to it; or a folder named like the file.
+    wildcards("POSES.yaml", "  POSES:\n    sitting: sitting,\n    bent over:  bent over,\n    no-picture: standing,\n    ../../evil: x\n")
+    os.makedirs(os.path.join(wildcards.folder, "POSES"))
+    for name in ("sitting.jpeg", "bent over.png"):
+        with open(os.path.join(wildcards.folder, "POSES", name), "wb") as file:
+            file.write(b"picture " + name.encode())
+    wildcards("styles/pack.yml", "ink: inked lines\n")
+    os.makedirs(os.path.join(wildcards.folder, "styles", "pack"))
+    with open(os.path.join(wildcards.folder, "styles", "pack", "ink.webp"), "wb") as file:
+        file.write(b"ink picture")
+    with open(os.path.join(os.path.dirname(wildcards.folder), "evil.png"), "wb") as file: # What ../../evil reaches from POSES: outside, never served.
+        file.write(b"no")
+    files = {entry["name"]: entry for entry in api("GET", "/diceforge/wildcards")[1]["files"]}
+    assert [name for name, entry in sorted(files.items()) if entry.get("picture")] == ["POSES/bent over", "POSES/sitting", "styles/ink"]
+    assert files["POSES/sitting"]["preview"] == ["sitting,"]
+    assert api("GET", "/diceforge/wildcards/picture?name=POSES/sitting") == (200, "picture sitting.jpeg")
+    assert api("GET", "/diceforge/wildcards/picture?name=POSES/bent%20over") == (200, "picture bent over.png")
+    assert api("GET", "/diceforge/wildcards/picture?name=styles/ink") == (200, "ink picture")
+    assert api("GET", "/diceforge/wildcards/picture?name=POSES/no-picture")[0] == 404
+    assert api("GET", "/diceforge/wildcards/picture?name=../x")[0] == 400
+
+
 def test_new_files_and_folders(api, wildcards):
     status, body = api("POST", "/diceforge/wildcards/file", {"name": "new/deep/list", "text": "a\nb"})
     assert status == 200 and body["saved"] == "new/deep/list"

@@ -35,7 +35,8 @@ The first release on the ComfyUI Registry: install DiceForge from ComfyUI Manage
   picture can be made again from its seed.
 
 ### Prompts
-- Wildcard Browser (create, edit with line numbers and syntax highlighting, rename, move, delete, favorites, folders) and `__` autocomplete; `<lora:` autocomplete.
+- Wildcard Browser (create, edit with line numbers and syntax highlighting, rename, move, delete, favorites, folders), and a cards view with
+  pictures for yaml card packs and `__` autocomplete; `<lora:` autocomplete.
 - Danbooru / e621 tag autocomplete and Tag Browser, with downloadable tag lists.
 - Prompt styles (A1111's `styles.csv`) with built-in quality styles for Illustrious, NoobAI and Anima.
 - Syntax highlighting, a preview of the prompts as encoded, a prompt history window with each run's images, and a syntax guide.

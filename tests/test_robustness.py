@@ -193,7 +193,8 @@ def test_a_damaged_preset_is_skipped_in_the_list_and_refused_when_opened(api):
 # Junk requests: every route answers 4xx (with a message) or 2xx, never a server error.
 ROUTES = [("POST", "/diceforge/wildcards/file"), ("POST", "/diceforge/lora-presets"), ("POST", "/diceforge/lora-triggers"), ("POST", "/diceforge/model-bases"),
           ("POST", "/diceforge/model-info"), ("GET", "/diceforge/model-info?kind=loras&file=nope"), ("GET", "/diceforge/model-info?kind=x&file=y"),
-          ("GET", "/diceforge/model-browser?kind=nope"), ("GET", "/diceforge/model-preview?kind=loras&file=../../x"), ("GET", "/diceforge/wildcards/file?name=../x"),
+          ("GET", "/diceforge/model-browser?kind=nope"), ("GET", "/diceforge/model-preview?kind=loras&file=../../x"), ("GET", "/diceforge/wildcards/file?name=../x"), ("GET", "/diceforge/wildcards/picture?name=../x"), ("GET", "/diceforge/wildcards/picture"),
+          ("GET", "/diceforge/wildcards/picture?name=nope"),
           ("GET", "/diceforge/lora-presets/file?name=../x"), ("DELETE", "/diceforge/lora-presets?name=../x"), ("GET", "/diceforge/wildcards/file"),
           ("POST", "/diceforge/wildcards/rename"), ("DELETE", "/diceforge/wildcards/file?name=../x"), ("DELETE", "/diceforge/wildcards/file"),
           ("DELETE", "/diceforge/wildcards/file?name=nope"), ("POST", "/diceforge/models/rename"), ("DELETE", "/diceforge/models/file?kind=loras&file=../x"),

@@ -263,6 +263,7 @@ The history (with the images' file names) is kept in the node, with the workflow
   - **Rename** gives the open file a new name or moves it: `hair/color` to `palette/hair` moves it to the `palette` folder. It stays in its wildcards folder, and a name that is already taken (by a file or a yaml wildcard) is refused. Prompts that use the old `__name__` need the new one.
   - **Delete** removes the open file, after a confirmation. Folders left empty by a rename or delete are removed too.
   - Wildcards from yaml files are shown read-only: edit, rename or delete them in their yaml file.
+  - **🃏 Cards / 📄 Lines** in the toolbar switches between two views (remembered for the next time). **Lines** is the tree with the editor, as above. **Cards** shows a folder's wildcards as cards, like the LoRA Browser: click a folder in the tree to see its cards. Each card has its picture (or its first line when it has none), its name and text, ☆ and **+ Add** (inserts that card's `__name__`); **🎲 + Add random** inserts `__folder/*__`, a random card of the folder each run. Made for yaml card packs: a yaml file of `name: prompt` pairs with a picture for each name next to it, at the key's path (`POSES.yaml` with `POSES: {sitting: "sitting,", …}` and `POSES/sitting.jpeg`) or in a folder named like the file (`poses.yaml` and `poses/POSES/sitting.png`); png, jpg, jpeg, webp and gif. Click a card's name to open it in the lines view.
 - Both work in the Nodes 2.0 and the classic node design.
 
 Example `color.txt`:

@@ -2,7 +2,7 @@
 // real server. Each test builds its own graph.
 const fs = require("fs");
 const { test, expect, basePath, writeFile, openComfy, addNodes, connect, widgetValue, setWidget, menuItems, clickMenu, queueFromPage, nodeElement } = require("./helpers");
-const { DOWNLOADS } = require("./fixtures");
+const { DOWNLOADS, png } = require("./fixtures");
 
 const ALL_NODES = ["SDXLResolutionListLatent", "ResolutionSelectorRandomLatent", "CLIPTextEncodePositiveNegative", "DiceForgeWildcardsToText", "DiceForgeRandomInt", "DiceForgeRandomFloat",
   "DiceForgeRandomLora", "DiceForgeRandomCheckpoint", "DiceForgeRandomDiffusionModel", "DiceForgeRandomImage", "DiceForgeGrid", "DiceForgeRandomSampler",
@@ -758,6 +758,32 @@ for (const vue of [true, false]) {
       await page.locator(".dfsg input").fill("lock");
       await page.locator(".dfsg .row button").click();
       await expect.poll(() => widgetValue(page, id, "text")).toBe("a __color__ car, {sky|!sea|forest}"); // Into its text field.
+      await page.keyboard.press("Escape");
+    });
+
+    test("Wildcard Browser cards: a yaml card pack's keys with their pictures, + Add a card or a random one", async ({ page }) => {
+      const pack = `CARDS_${vue ? "vue" : "classic"}`; // A pack of its own: the tests share the server's files.
+      writeFile(`models/wildcards/${pack}.yaml`, `${pack}:\n  sitting: sitting,\n  standing: standing,\n  bare: no picture here,\n`);
+      writeFile(`models/wildcards/${pack}/sitting.png`, png(30, 40, [200, 80, 80]));
+      writeFile(`models/wildcards/${pack}/standing.png`, png(30, 40, [80, 80, 200]));
+      const [id] = await addNodes(page, [{ type: "CLIPTextEncodePositiveNegative", pos: [300, 60], widgets: { positive: "1girl" } }]);
+      await clickMenu(page, id, "DiceForge.Wildcards", "Wildcard Browser");
+      const dialog = page.locator(".dfwc");
+      if (await dialog.locator("button.mode").textContent() === "📄 Lines") await dialog.locator("button.mode").click(); // Start in lines.
+      await expect(dialog.locator("button.mode")).toHaveText("🃏 Cards");
+      await dialog.locator("button.mode").click();
+      await dialog.locator(".folder > .row .name", { hasText: pack }).click(); // The folder's cards.
+      await expect(dialog.locator(".cards-head b")).toHaveText(`📁 ${pack}`);
+      const cards = dialog.locator(".card");
+      await expect(cards).toHaveCount(3);
+      await expect(cards.filter({ hasText: "sitting" }).locator("img")).toHaveJSProperty("naturalWidth", 30); // Its picture, POSES/sitting.png-style.
+      await expect(cards.filter({ hasText: "bare" }).locator(".pic .none")).toHaveText("no picture here,"); // No picture: its text.
+      await expect(dialog.locator(".edit")).toBeHidden();
+      await cards.filter({ hasText: "standing" }).locator("button.add").click();
+      await dialog.locator(".cards-head button.random").click();
+      await expect.poll(() => widgetValue(page, id, "positive")).toBe(`1girl, __${pack}/standing__, __${pack}/*__`);
+      await dialog.locator("button.mode").click(); // Back to lines (remembered for the next time).
+      await expect(dialog.locator(".edit")).toBeVisible();
       await page.keyboard.press("Escape");
     });
 

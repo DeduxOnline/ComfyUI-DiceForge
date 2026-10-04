@@ -67,6 +67,22 @@ def rename_favorite(name, to):
     names = read_favorites()
     if name in names:
         write_favorites((names - {name}) | ({to} if to else set()))
+# Card pictures (the Wildcard Browser's cards mode): a yaml key's picture is next to its yaml file, at the key's path (POSES.yaml with
+# POSES: {sitting: ...} and POSES/sitting.jpeg, as card packs come), or in a folder named like the file (poses.yaml and poses/POSES/sitting.png).
+# Only a picture inside the yaml file's folder counts.
+PICTURE_ENDINGS = (".png", ".jpg", ".jpeg", ".webp", ".gif")
+def card_picture(entry):
+    if not entry or "inner" not in entry:
+        return None
+    folder = os.path.realpath(os.path.dirname(entry["path"]))
+    stem = os.path.splitext(os.path.basename(entry["path"]))[0]
+    parts = entry["inner"].split("/")
+    for base in (os.path.join(folder, *parts), os.path.join(folder, stem, *parts)):
+        for ending in PICTURE_ENDINGS:
+            path = os.path.realpath(base + ending)
+            if path.startswith(folder + os.sep) and os.path.isfile(path):
+                return path
+    return None
 def write_lines(path, text):
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8", newline="\n") as file:
@@ -86,8 +102,15 @@ def register_routes():
             except ValueError as problem: # One unreadable file doesn't hide the others: it is listed with its error.
                 options, error = [], {"error": str(problem)}
             files.append({"name": name, "lines": len(options), "preview": options[:3], "favorite": name in favorites,
-                          **({"yaml": os.path.basename(entry["path"])} if "lines" in entry else {}), **error})
+                          **({"yaml": os.path.basename(entry["path"])} if "lines" in entry else {}), **({"picture": True} if card_picture(entry) else {}), **error})
         return web.json_response({"folders": folder_paths.get_folder_paths("wildcards"), "files": files})
+    @routes.get("/diceforge/wildcards/picture")
+    async def wildcard_picture(request):
+        name = checked_name(request.rel_url.query.get("name"))
+        path = card_picture(wildcard_index().get(name) or wildcard_index(refresh=True).get(name))
+        if path is None:
+            raise web.HTTPNotFound(text=f"Wildcards: no picture for {name}.")
+        return web.FileResponse(path, headers={"Cache-Control": "max-age=300"})
     @routes.get("/diceforge/wildcards/file")
     async def read_wildcard_file(request):
         name = checked_name(request.rel_url.query.get("name"))
