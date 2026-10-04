@@ -3,11 +3,13 @@ import { addStyleOnce, background, element } from "./dom.js";
 import { blurOn } from "./media.js";
 import { fitNodeHeight } from "./node_size.js";
 
-// Danbooru Tag Enhancer shows, under its inputs, what the last run took: the posts (their pictures; ↗ opens one), the added tags (click to copy)
+// Danbooru Tag Enhancer shows, under its inputs, what the last run took: the Danbooru or e621 posts (their pictures; ↗ opens one), the added tags (click to copy)
 // and the search that found them. After a random run the node's post_ids and wildcard_seed get that run's posts and seed, so switching mode to
 // fixed keeps it (as a seed's fixed). Kept in the node's properties, so it is still there after a reload and travels with the workflow.
 const NODE_TYPE = "DiceForgeDanbooruEnhancer";
-const RATINGS = { g: "general", s: "sensitive", q: "questionable", e: "explicit" };
+const RATINGS = { g: "general", s: "sensitive", q: "questionable", e: "explicit" }; // Danbooru's, for results saved without rating_name.
+const ratingName = (post) => post.rating_name || RATINGS[post.rating] || "";
+const SITES = { e621: "e621 " }; // Named in the head (Danbooru is the default).
 const STYLE = `
 .dfdb{font:12px system-ui,sans-serif;color:#ccc;display:flex;flex-direction:column;gap:4px;box-sizing:border-box;padding:2px 0}
 .dfdb .head{color:#888}.dfdb .thumbs{display:flex;gap:4px;flex-wrap:wrap}
@@ -18,16 +20,17 @@ const STYLE = `
 .dfdb .added.copied{border-color:#6a9a6a}.dfdb .tags,.dfdb .search{color:#888;font-size:11px;word-break:break-word}.dfdb .empty{color:#777;font-style:italic;padding:6px}
 `;
 
-// A post's picture, linked to the post; blurred (until clicked) when it isn't general, unless Blur NSFW is off (DiceForge → Browsers).
+// A post's picture, linked to the post; blurred (until clicked) when it isn't safe (Danbooru's general, e621's safe), unless Blur NSFW is off
+// (DiceForge → Browsers).
 function thumb(post, onLoad) {
-  const title = `Post #${post.id}${RATINGS[post.rating] ? ` (${RATINGS[post.rating]})` : ""}: open it on Danbooru`;
+  const title = `Post #${post.id}${ratingName(post) ? ` (${ratingName(post)})` : ""}: open it`;
   const plain = () => element("a", { class: "thumb plain", href: post.url, target: "_blank", rel: "noopener", title }, `↗ #${post.id}`);
   if (!post.preview) return plain();
   const img = element("img", { src: post.preview, referrerpolicy: "no-referrer", loading: "lazy" });
   img.addEventListener("load", onLoad);
   const link = element("a", { class: "thumb", href: post.url, target: "_blank", rel: "noopener", title }, img);
   img.addEventListener("error", () => { link.replaceWith(plain()); onLoad(); }); // Danbooru's pictures out of reach: the link to the post.
-  if (blurOn() && post.rating !== "g") {
+  if (blurOn() && !(post.safe ?? post.rating === "g")) {
     img.classList.add("blur");
     link.addEventListener("click", (event) => {
       if (!img.classList.contains("blur")) return;
@@ -60,7 +63,7 @@ app.registerExtension({
       if (!posts.length) {
         panel.replaceChildren(element("div", { class: "empty" }, "Run the workflow to see the Danbooru posts it takes and the tags they add here."));
       } else {
-        const one = posts.length === 1 ? `post #${posts[0].id}${RATINGS[posts[0].rating] ? ` (${RATINGS[posts[0].rating]})` : ""}` : `${posts.length} posts`;
+        const one = `${SITES[last.site] || ""}${posts.length === 1 ? `post #${posts[0].id}${ratingName(posts[0]) ? ` (${ratingName(posts[0])})` : ""}` : `${posts.length} posts`}`;
         const added = element("div", { class: "added", title: "Click to copy the added tags" }, last.added ? `+ ${last.added}` : "Nothing to add: the posts have no other tags.");
         added.addEventListener("click", () => {
           if (!last.added || window.getSelection()?.toString()) return; // Selecting a part to copy it yourself.

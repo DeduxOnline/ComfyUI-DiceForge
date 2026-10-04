@@ -25,7 +25,7 @@ The first release on the ComfyUI Registry: install DiceForge from ComfyUI Manage
 - **XY Plot**: an X/Y comparison of seed, steps, CFG, sampler, scheduler, LoRA, LoRA strength, denoise or variation seed/strength, every cell
   queued with one button.
 - **HiresFix (Load VAE)**: as Easy-Use's HiresFix with the VAE from a list: upscale model, rescale, preview or save, encode.
-- **Danbooru Tag Enhancer**: adds the tags of random Danbooru posts that have the prompt's tags, new ones on every run (random) or the same
+- **Danbooru Tag Enhancer**: adds the tags of random Danbooru or e621 posts (a source list) that have the prompt's tags, new ones on every run (random) or the same
   ones again (fixed, from post_ids), with the posts' pictures on the node; any rating or mix of ratings (general to explicit); several posts at once, wildcards in the tags, switches for
   appearance, clothes, background and people-count tags (1girl, 2boys, solo…), `*` patterns in exclude (`*censor*`), and an optional prompt
   input (quality tags) that goes first without being searched.

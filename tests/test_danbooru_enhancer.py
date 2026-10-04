@@ -1,5 +1,5 @@
 # Danbooru Tag Enhancer (DiceForge/danbooru_enhancer.py): the prompt's tags read through weights and escapes, the search tags, Danbooru's random
-# post, the tags added, the fixed mode, wildcards, and a stand-in for Danbooru (no test goes online).
+# post, the tags added, the fixed mode, wildcards, e621, and a stand-in for Danbooru and e621 (no test goes online).
 import asyncio
 import json
 import os
@@ -8,7 +8,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlsplit
 import pytest
 from DiceForge import danbooru_enhancer, tag_autocomplete
-from DiceForge.danbooru_enhancer import (DanbooruTagEnhancer, excluded, is_appearance, is_background, is_clothes, is_count, parse_post_ids, preview_url,
+from DiceForge.danbooru_enhancer import (SITES, DanbooruTagEnhancer, excluded, is_appearance, is_background, is_clothes, is_count, parse_post_ids, preview_url,
                                          prompt_tags, prompt_text, search_tags, searches)
 
 TAGS = "1girl,0,6000000,\nhatsune_miku,4,90000,miku\nvocaloid,3,200000,\nsmile,0,4000000,\nlong_hair,0,5000000,\ntwintails,0,900000,\nsignature,0,800000,\nthighhighs,0,700000,\n"
@@ -23,6 +23,25 @@ POSTS = [post(1, "g", "1girl smile twintails long_hair signature"), post(2, "g",
          post(4, "s", "1girl smile skirt")]
 
 
+def e621_post(number, rating, general, species=("fox", "canine")):
+    return {"id": number, "rating": rating, "score": {"total": 10}, "preview": {"url": f"https://static/{number}.jpg"},
+            "tags": {"general": general.split(), "species": list(species), "character": [], "copyright": [], "artist": ["someone"], "meta": ["hi_res"]}}
+
+
+E621_POSTS = [e621_post(11, "s", "solo anthro smile red_body shirt"), e621_post(12, "e", "duo anthro nude")]
+
+
+# e621's search: tags, rating:x, -rating:x (order:random taken as asked).
+def e621_found(tags):
+    def fits(item, term):
+        if term.startswith("-rating:"):
+            return item["rating"] != term[len("-rating:"):]
+        if term.startswith("rating:"):
+            return item["rating"] == term[len("rating:"):]
+        return term == "order:random" or any(term in group for group in item["tags"].values())
+    return [item for item in E621_POSTS if all(fits(item, term) for term in tags.split())]
+
+
 def found(tags):
     wanted = [tag for tag in tags.split() if not tag.startswith("rating:")]
     ratings = next((tag[len("rating:"):].split(",") for tag in tags.split() if tag.startswith("rating:")), None)
@@ -33,7 +52,8 @@ def found(tags):
 @pytest.fixture
 def danbooru(monkeypatch):
     """The stand-in of /posts/random.json: a post of the search (server.choose picks it: the first by default), 404 when none has the tags, 422 past
-    two tags (rating: isn't counted) or when told to refuse; and of /posts/<id>.json. Requests are recorded (the search, or the path)."""
+    two tags (rating: isn't counted) or when told to refuse; and of /posts/<id>.json. Under /e621, e621's /posts.json and /posts/<id>.json.
+    Requests are recorded (the search, or the path)."""
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *args):
             pass
@@ -41,12 +61,17 @@ def danbooru(monkeypatch):
         def do_GET(self):
             url = urlsplit(self.path)
             tags = parse_qs(url.query).get("tags", [""])[0]
-            self.server.requests.append(tags if url.path == "/posts/random.json" else url.path)
+            self.server.requests.append(tags if url.path in ("/posts/random.json", "/e621/posts.json") else url.path)
             posts = found(tags)
             by_id = next((item for item in POSTS if url.path == f"/posts/{item['id']}.json"), None)
             if self.server.busy > 0: # Danbooru overloaded: 503 this many times.
                 self.server.busy -= 1
                 status, body = 503, {"message": "Service Unavailable"}
+            elif url.path == "/e621/posts.json":
+                status, body = 200, {"posts": e621_found(tags)[:int(parse_qs(url.query).get("limit", ["1"])[0])]}
+            elif url.path.startswith("/e621/posts/"):
+                item = next((item for item in E621_POSTS if url.path == f"/e621/posts/{item['id']}.json"), None)
+                status, body = (200, {"post": item}) if item else (404, {"success": False, "reason": "not found"})
             elif by_id:
                 status, body = 200, by_id
             elif url.path != "/posts/random.json":
@@ -68,6 +93,8 @@ def danbooru(monkeypatch):
     monkeypatch.setattr(danbooru_enhancer, "RETRY_DELAYS", (0, 0)) # No waiting in the tests.
     threading.Thread(target=server.serve_forever, daemon=True).start()
     monkeypatch.setattr(danbooru_enhancer, "DANBOORU_URL", f"http://127.0.0.1:{server.server_port}")
+    monkeypatch.setattr(danbooru_enhancer, "E621_URL", f"http://127.0.0.1:{server.server_port}/e621")
+    monkeypatch.setattr(SITES["e621"], "pause", 0)
     yield server
     server.shutdown()
 
@@ -111,7 +138,8 @@ def test_adds_the_tags_of_a_random_post(danbooru):
     shown = output.ui["dice_forge_danbooru"][0]
     assert {key: shown[key] for key in ("text", "tags", "added", "search", "mode", "post_ids")} == {
         "text": text, "tags": "1girl, hatsune miku, masterpiece", "added": added, "search": "hatsune_miku 1girl rating:g", "mode": "random", "post_ids": "1"}
-    assert shown["posts"] == [{"id": 1, "url": url, "rating": "g", "preview": "https://cdn/1.jpg"}] and isinstance(shown["wildcard_seed"], int)
+    assert shown["posts"] == [{"id": 1, "url": url, "rating": "g", "rating_name": "general", "safe": True, "preview": "https://cdn/1.jpg"}]
+    assert shown["site"] == "danbooru" and isinstance(shown["wildcard_seed"], int)
 
 
 def test_a_new_post_on_every_run(danbooru):
@@ -147,9 +175,9 @@ def test_options(danbooru):
 
 def test_appearance_tags():
     for tag in ("long_hair", "blue_eyes", "twintails", "cone_hair_bun", "yellow_pupils", "dark_skin", "large_breasts", "animal_ears", "cat_tail", "ahoge",
-                "heterochromia", "hair_between_eyes", "elf"):
+                "heterochromia", "hair_between_eyes", "elf", "red_body", "two_tone_fur", "anthro", "white_countershading", "muzzle"):
         assert is_appearance(tag), tag
-    for tag in ("smile", "1girl", "shirt", "hair_ornament", "hair_ribbon", "hand_in_hair", "earrings", "blush", "thighhighs", "hairclip", "outdoors"):
+    for tag in ("smile", "1girl", "shirt", "hair_ornament", "hair_ribbon", "hand_in_hair", "earrings", "blush", "thighhighs", "hairclip", "outdoors", "upper_body", "full_body"):
         assert not is_appearance(tag), tag
 
 
@@ -160,18 +188,19 @@ def test_without_appearance_the_post_adds_the_rest(danbooru):
 
 
 def test_count_tags():
-    for tag in ("1girl", "2girls", "6+girls", "multiple_girls", "1boy", "3boys", "multiple_boys", "1other", "multiple_others", "solo", "solo_focus", "no_humans"):
+    for tag in ("1girl", "2girls", "6+girls", "multiple_girls", "1boy", "3boys", "multiple_boys", "1other", "multiple_others", "solo", "solo_focus", "no_humans", "duo", "trio", "group"):
         assert is_count(tag), tag
     for tag in ("girl", "boy_on_top", "smile", "long_hair", "solo_leveling", "multiple_views"):
         assert not is_count(tag), tag
 
 
 def test_clothes_and_background_tags():
-    for tag in ("shirt", "pleated_skirt", "school_uniform", "hair_ornament", "t-shirt", "off-shoulder_dress", "glasses", "nude", "barefoot", "thighhighs"):
+    for tag in ("shirt", "pleated_skirt", "school_uniform", "hair_ornament", "t-shirt", "off-shoulder_dress", "glasses", "nude", "barefoot", "thighhighs",
+                "topwear", "fully_clothed"):
         assert is_clothes(tag), tag
     for tag in ("smile", "long_hair", "collarbone", "looking_at_viewer", "girl_on_top", "white_background"):
         assert not is_clothes(tag), tag
-    for tag in ("white_background", "simple_background", "outdoors", "classroom", "night_sky", "cherry_blossoms", "on_bed", "against_wall"):
+    for tag in ("white_background", "simple_background", "outdoors", "classroom", "night_sky", "cherry_blossoms", "on_bed", "against_wall", "outside"):
         assert is_background(tag), tag
     for tag in ("smile", "sun_hat", "upper_body", "holding", "1girl", "daydream"):
         assert not is_background(tag), tag
@@ -242,6 +271,35 @@ def test_wildcards_in_tags_are_filled_in_and_fixed_keeps_them(danbooru, wildcard
 def test_preview_url():
     assert preview_url({"media_asset": {"variants": [{"type": "180x180", "url": "a"}, {"type": "360x360", "url": "b"}]}, "preview_file_url": "c"}) == "b"
     assert preview_url({"preview_file_url": "c"}) == "c" and preview_url({}) == "" and preview_url({"media_asset": "x"}) == ""
+
+
+def test_e621(danbooru):
+    output = execute(tags="fox, smile", source="e621")
+    text, added, url, number = output.result
+    assert danbooru.requests == ["fox smile rating:s order:random"] # General: e621's safe; one request for random posts.
+    assert number == 11 and url.endswith("/e621/posts/11")
+    assert added == "solo, anthro, red body, shirt, canine" and text == "fox, smile, solo, anthro, red body, shirt, canine" # Species too.
+    shown = output.ui["dice_forge_danbooru"][0]
+    assert shown["site"] == "e621" and shown["posts"] == [{"id": 11, "url": url, "rating": "s", "rating_name": "safe", "safe": True,
+                                                            "preview": "https://static/11.jpg"}]
+    assert run(tags="fox, smile", source="e621", include_appearance=False, include_count=False)[1] == "shirt" # Not the body, anthro, the species.
+
+
+def test_e621_ratings_and_fixed_mode(danbooru):
+    e621 = SITES["e621"]
+    assert [e621.rating_term(letters) for letters in ("g", "gs", "q", "gsq", "qe", "sqe", "gsqe")] == \
+        ["rating:s", "rating:s", "rating:q", "-rating:e", "-rating:s", "", ""]
+    assert run(tags="fox", source="e621", rating="up to questionable")[3] == 11
+    assert run(tags="fox", source="e621", rating="explicit")[3] == 12
+    with pytest.raises(ValueError, match="no questionable post on e621 has fox"):
+        run(tags="fox", source="e621", rating="questionable")
+    assert danbooru.requests == ["fox -rating:e order:random", "fox rating:e order:random", "fox rating:q order:random"]
+    _text, added, _url, number = run(source="e621", mode="fixed", post_ids="https://e621.net/posts/12")
+    assert danbooru.requests[-1] == "/e621/posts/12.json" and number == 12 and added == "duo, anthro, nude, fox, canine"
+    with pytest.raises(ValueError, match="e621 has no post 99"):
+        run(source="e621", mode="fixed", post_ids="99")
+    with pytest.raises(ValueError, match="unknown source"):
+        run(source="gelbooru")
 
 
 def test_the_prompt_input_goes_first_is_not_searched_nor_added_again(danbooru):

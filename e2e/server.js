@@ -7,7 +7,14 @@ const http = require("http");
 const path = require("path");
 const { spawn } = require("child_process");
 const { REPO, PORT, CIVITAI_PORT, BASE, comfyuiPath, comfyuiPython } = require("./settings");
-const { MODELS, WILDCARDS, CIVITAI, CIVITAI_MODELS, CIVITAI_VERSIONS, CIVITAI_PAGES, DOWNLOADS, TAGS, DANBOORU_POSTS, png } = require("./fixtures");
+const { MODELS, WILDCARDS, CIVITAI, CIVITAI_MODELS, CIVITAI_VERSIONS, CIVITAI_PAGES, DOWNLOADS, TAGS, DANBOORU_POSTS, E621_POSTS, png } = require("./fixtures");
+
+// A term of an e621 search on a stand-in post: rating:x, -rating:x, order:random (any order), or a tag of the post.
+function e621Fits(post, term) {
+  if (term.startsWith("-rating:")) return post.rating !== term.slice("-rating:".length);
+  if (term.startsWith("rating:")) return post.rating === term.slice("rating:".length);
+  return term === "order:random" || Object.values(post.tags).some((group) => group.includes(term));
+}
 
 function prepare() {
   fs.rmSync(BASE, { recursive: true, force: true });
@@ -28,7 +35,7 @@ function prepare() {
 }
 
 // Civitai stand-in: /by-hash/<sha256> answers like Civitai's model-versions/by-hash for the test models, /api/v1/models (search: the query filters
-// by name), /tags/danbooru.csv (a tag list), /danbooru/posts/random.json (a Danbooru post of the search) and /danbooru/posts/<id>.json, /api/v1/models/<id> (a model's page) and /api/v1/model-versions/<id> like its API, /download/<id> serves a version's file and /image/... a small image.
+// by name), /tags/danbooru.csv (a tag list), /danbooru/posts/random.json (a Danbooru post of the search) and /danbooru/posts/<id>.json, /e621/posts.json (e621's search) and /e621/posts/<id>.json, /api/v1/models/<id> (a model's page) and /api/v1/model-versions/<id> like its API, /download/<id> serves a version's file and /image/... a small image.
 function startCivitai() {
   const json = (response, status, body) => { response.writeHead(status, { "Content-Type": "application/json" }); response.end(JSON.stringify(body)); };
   const server = http.createServer((request, response) => {
@@ -37,6 +44,16 @@ function startCivitai() {
       const query = (url.searchParams.get("query") || "").toLowerCase();
       const types = url.searchParams.getAll("types"); // LORA, LoCon, DoRA for LoRAs; Checkpoint for checkpoints and diffusion models.
       return json(response, 200, { items: CIVITAI_MODELS.filter((model) => model.name.toLowerCase().includes(query) && types.includes(model.type)), metadata: {} });
+    }
+    if (url.pathname === "/e621/posts.json") { // The posts of the search (tags, rating:x, -rating:x; order:random taken as asked), at most limit.
+      const terms = (url.searchParams.get("tags") || "").split(" ").filter(Boolean);
+      const posts = E621_POSTS.filter((item) => terms.every((term) => e621Fits(item, term)));
+      return json(response, 200, { posts: posts.slice(0, Number(url.searchParams.get("limit") || 1)) });
+    }
+    const e621Post = /^\/e621\/posts\/(\d+)\.json$/.exec(url.pathname);
+    if (e621Post) {
+      const post = E621_POSTS.find((item) => item.id === Number(e621Post[1]));
+      return post ? json(response, 200, { post }) : json(response, 404, { success: false, reason: "not found" });
     }
     const page = /^\/api\/v1\/models\/(\d+)$/.exec(url.pathname);
     if (page) return CIVITAI_PAGES[page[1]] ? json(response, 200, CIVITAI_PAGES[page[1]]) : json(response, 404, { error: "Model not found" });
@@ -98,6 +115,7 @@ const child = spawn(python, ["main.py", "--cpu", "--listen", "127.0.0.1", "--por
     DICEFORGE_CIVITAI_API: `http://127.0.0.1:${CIVITAI_PORT}/api/v1`,
     DICEFORGE_TAGS_URL: `http://127.0.0.1:${CIVITAI_PORT}/tags/{name}.csv`,
     DICEFORGE_DANBOORU_URL: `http://127.0.0.1:${CIVITAI_PORT}/danbooru`,
+    DICEFORGE_E621_URL: `http://127.0.0.1:${CIVITAI_PORT}/e621`,
     CIVITAI_API_KEY: "", DICEFORGE_CIVITAI_KEY: "", // Your own key never reaches the tests.
     NO_PROXY: ["127.0.0.1", "localhost", process.env.NO_PROXY].filter(Boolean).join(","),
     no_proxy: ["127.0.0.1", "localhost", process.env.no_proxy].filter(Boolean).join(","),

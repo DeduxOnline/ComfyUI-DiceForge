@@ -266,7 +266,7 @@ test.describe("@api workflows and routes", () => {
   });
 
   test("Danbooru Tag Enhancer adds the tags of a Danbooru post (a general one) to the prompt, and fixed mode takes the post of post_ids", async ({ request }) => {
-    const prompt = (mode = "random", ids = "") => ({ 1: { class_type: "DiceForgeDanbooruEnhancer", inputs: { tags: "hatsune miku, masterpiece", rating: "general",
+    const prompt = (mode = "random", ids = "") => ({ 1: { class_type: "DiceForgeDanbooruEnhancer", inputs: { tags: "hatsune miku, masterpiece", source: "danbooru", rating: "general",
       mode, post_ids: ids, posts: 1, max_tags: 15, include_general: true, include_appearance: true, include_clothes: true, include_background: true,
       include_count: true, include_character: false, include_copyright: false, include_artist: false, exclude: "", position: "after", wildcard_seed: 0 } },
       2: { class_type: "PreviewAny", inputs: { source: ["1", 0] } }, 3: { class_type: "PreviewAny", inputs: { source: ["1", 2] } } });
@@ -281,6 +281,25 @@ test.describe("@api workflows and routes", () => {
     expect(fixed.status, fixed.error).toBe("success");
     expect(shown(fixed, "2")).toBe("hatsune miku, masterpiece, 1girl, nude"); // Your pick: no search, the rating doesn't matter.
     expect((await runPrompt(request, prompt("fixed", ""))).error).toContain("fixed mode needs post_ids");
+  });
+
+  test("Danbooru Tag Enhancer takes e621 posts with source e621 (its ratings, its species tags)", async ({ request }) => {
+    const prompt = (rating, mode = "random", ids = "") => ({ 1: { class_type: "DiceForgeDanbooruEnhancer", inputs: { tags: "fox, anthro", source: "e621", rating,
+      mode, post_ids: ids, posts: 2, max_tags: 15, include_general: true, include_appearance: true, include_clothes: true, include_background: true,
+      include_count: true, include_character: false, include_copyright: false, include_artist: false, exclude: "", position: "after", wildcard_seed: 0 } },
+      2: { class_type: "PreviewAny", inputs: { source: ["1", 0] } }, 3: { class_type: "PreviewAny", inputs: { source: ["1", 2] } } });
+    const result = await runPrompt(request, prompt("general"));
+    expect(result.status, result.error).toBe("success");
+    expect(shown(result, "2")).toBe("fox, anthro, solo, grin, canine"); // Post 201: e621's safe; its species too.
+    expect(shown(result, "3")).toMatch(/\/e621\/posts\/201$/);
+    expect(result.outputs["1"].dice_forge_danbooru[0]).toMatchObject({ site: "e621", search: "fox anthro rating:s", post_ids: "201",
+      posts: [{ id: 201, rating: "s", rating_name: "safe", safe: true, preview: expect.stringContaining("/image/e621/201.png") }] });
+    const explicit = await runPrompt(request, prompt("questionable + explicit"));
+    expect(explicit.status, explicit.error).toBe("success");
+    expect(explicit.outputs["1"].dice_forge_danbooru[0]).toMatchObject({ search: "fox anthro -rating:s", posts: [{ id: 202, safe: false, preview: "" }] });
+    const fixed = await runPrompt(request, prompt("general", "fixed", "201"));
+    expect(fixed.status, fixed.error).toBe("success");
+    expect(shown(fixed, "2")).toBe("fox, anthro, solo, grin, canine");
   });
 
   test("Wildcard Browser routes", async ({ request }) => {

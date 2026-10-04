@@ -100,4 +100,12 @@ const DANBOORU_POSTS = [
   { id: 102, rating: "e", score: 40, tag_string_general: "1girl nude", tag_string_character: "hatsune_miku", tag_string_copyright: "vocaloid", tag_string_artist: "e2e", tag_string_meta: "" },
 ];
 
-module.exports = { MODELS, WILDCARDS, CIVITAI, CIVITAI_MODELS, CIVITAI_VERSIONS, CIVITAI_PAGES, DOWNLOADS, TAGS, DANBOORU_POSTS, png, sha256 };
+// e621 posts the stand-in answers searches (/posts.json, order:random) and ids (/posts/<id>.json) with.
+const E621_POSTS = [
+  { id: 201, rating: "s", score: { total: 10 }, preview: { url: `http://127.0.0.1:${CIVITAI_PORT}/image/e621/201.png` },
+    tags: { general: ["solo", "anthro", "grin"], species: ["fox", "canine"], character: [], copyright: [], artist: ["e2e"], meta: ["hi_res"] } },
+  { id: 202, rating: "e", score: { total: 5 }, preview: { url: null },
+    tags: { general: ["duo", "anthro", "nude"], species: ["fox"], character: [], copyright: [], artist: ["e2e"], meta: [] } },
+];
+
+module.exports = { MODELS, WILDCARDS, CIVITAI, CIVITAI_MODELS, CIVITAI_VERSIONS, CIVITAI_PAGES, DOWNLOADS, TAGS, DANBOORU_POSTS, E621_POSTS, png, sha256 };
