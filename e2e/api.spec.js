@@ -267,7 +267,7 @@ test.describe("@api workflows and routes", () => {
 
   test("Danbooru Tag Enhancer adds the tags of a Danbooru post (a general one) to the prompt", async ({ request }) => {
     const prompt = () => ({ 1: { class_type: "DiceForgeDanbooruEnhancer", inputs: { tags: "hatsune miku, masterpiece", rating: "general", max_tags: 15,
-      add_general: true, add_appearance: true, add_character: false, add_copyright: false, add_artist: false, exclude: "", position: "after" } },
+      add_general: true, add_appearance: true, add_count: true, add_character: false, add_copyright: false, add_artist: false, exclude: "", position: "after" } },
       2: { class_type: "PreviewAny", inputs: { source: ["1", 0] } }, 3: { class_type: "PreviewAny", inputs: { source: ["1", 2] } } });
     const result = await runPrompt(request, prompt());
     expect(result.status, result.error).toBe("success");

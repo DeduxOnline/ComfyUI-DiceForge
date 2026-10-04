@@ -8,7 +8,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlsplit
 import pytest
 from DiceForge import danbooru_enhancer, tag_autocomplete
-from DiceForge.danbooru_enhancer import DanbooruTagEnhancer, is_appearance, prompt_tags, prompt_text, search_tags, searches
+from DiceForge.danbooru_enhancer import DanbooruTagEnhancer, is_appearance, is_count, prompt_tags, prompt_text, search_tags, searches
 
 TAGS = "1girl,0,6000000,\nhatsune_miku,4,90000,miku\nvocaloid,3,200000,\nsmile,0,4000000,\nlong_hair,0,5000000,\ntwintails,0,900000,\nsignature,0,800000,\nthighhighs,0,700000,\n"
 
@@ -138,6 +138,19 @@ def test_without_appearance_the_post_adds_the_rest(danbooru):
     tag_list()
     assert run(add_appearance=False)[1] == "smile" # Not long hair nor twintails: the character keeps its own look.
     assert run(add_appearance=True)[1] == "long hair, smile, twintails"
+
+
+def test_count_tags():
+    for tag in ("1girl", "2girls", "6+girls", "multiple_girls", "1boy", "3boys", "multiple_boys", "1other", "multiple_others", "solo", "solo_focus", "no_humans"):
+        assert is_count(tag), tag
+    for tag in ("girl", "boy_on_top", "smile", "long_hair", "solo_leveling", "multiple_views"):
+        assert not is_count(tag), tag
+
+
+def test_without_count_the_post_keeps_the_prompts_count(danbooru):
+    tag_list()
+    assert run(tags="hatsune miku", add_count=False)[1] == "long hair, smile, twintails" # Not 1girl.
+    assert run(tags="hatsune miku", add_count=True)[1].startswith("1girl, ")
 
 
 def test_the_prompt_input_goes_first_is_not_searched_nor_added_again(danbooru):

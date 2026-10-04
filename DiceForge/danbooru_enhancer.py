@@ -25,6 +25,11 @@ APPEARANCE_TAGS = {"heterochromia", "flat_chest", "bob_cut", "hime_cut", "eyelin
 NOT_APPEARANCE = re.compile(r"ornament|ribbon|bow|clip|band|flower|scrunchie|pin|bobbles|tubes|tie|hand|holding|grab|adjusting|blowing|covering|pull|ring")
 def is_appearance(tag):
     return tag in APPEARANCE_TAGS or (bool(APPEARANCE_WORDS.search(tag)) and not NOT_APPEARANCE.search(tag))
+# People-count tags (1girl, 2boys, multiple_girls, 6+others, solo, no_humans...): left out with add_count off, so the post doesn't change how many
+# people your prompt has.
+COUNT_TAGS = re.compile(r"(?:\d\+?(?:girl|boy|other)s?|multiple_(?:girls|boys|others)|solo|solo_focus|no_humans)")
+def is_count(tag):
+    return bool(COUNT_TAGS.fullmatch(tag))
 USER_AGENT = "DiceForge/1.0" # Short: Danbooru's Cloudflare answers a longer one (with parentheses, a link or "ComfyUI") with a challenge page (403).
 
 
@@ -104,12 +109,13 @@ async def find_post(tags, rating_term):
     return None, None
 
 
-# The tags of a post to add: of the groups asked for, not in the prompt, not excluded (nor appearance tags without appearance); the most used first
+# The tags of a post to add: of the groups asked for, not in the prompt, not excluded (nor appearance or count tags with those off); the most used first
 # (by the tag lists), at most max_tags.
-def added_tags(post, groups, have, exclude, max_tags, appearance=True):
+def added_tags(post, groups, have, exclude, max_tags, appearance=True, count=True):
     index = INDEX.load()
     counts = {tag_key(tag): count for tag, _kind, count, _aliases in index.tags} if index.tags else {}
-    tags = [tag for group in groups for tag in post.get(group, []) if tag not in have and tag not in exclude and (appearance or not is_appearance(tag))]
+    tags = [tag for group in groups for tag in post.get(group, []) if tag not in have and tag not in exclude and (appearance or not is_appearance(tag))
+            and (count or not is_count(tag))]
     tags = sorted(dict.fromkeys(tags), key=lambda tag: -counts.get(tag, 0)) if counts else list(dict.fromkeys(tags))
     return tags[:max_tags] if max_tags else tags
 
@@ -133,6 +139,8 @@ class DanbooruTagEnhancer(io.ComfyNode):
                 io.Boolean.Input("add_general", default=True, tooltip="Add the post's general tags (what is in the picture: pose, clothes, background...).", advanced=True),
                 io.Boolean.Input("add_appearance", default=True, advanced=True,
                                  tooltip="Add the post's appearance tags (hair color and style, eyes, skin, body, ears, tail...). Off: your character keeps its own look; the post adds the pose, clothes and scene."),
+                io.Boolean.Input("add_count", default=True, advanced=True,
+                                 tooltip="Add the post's people-count tags (1girl, 2girls, 1boy, multiple_boys, solo, no_humans...). Off: the prompt keeps its own count."),
                 io.Boolean.Input("add_character", default=False, tooltip="Add the post's characters.", advanced=True),
                 io.Boolean.Input("add_copyright", default=False, tooltip="Add the post's series.", advanced=True),
                 io.Boolean.Input("add_artist", default=False, tooltip="Add the post's artists (artist styles).", advanced=True),
@@ -154,7 +162,7 @@ class DanbooruTagEnhancer(io.ComfyNode):
 
     @classmethod
     async def execute(cls, tags, rating="general", max_tags=15, add_general=True, add_character=False, add_copyright=False, add_artist=False,
-                      exclude=DEFAULT_EXCLUDE, position="after", prompt="", add_appearance=True):
+                      exclude=DEFAULT_EXCLUDE, position="after", prompt="", add_appearance=True, add_count=True):
         if rating not in RATING_TERMS:
             raise ValueError(f"Danbooru Tag Enhancer: unknown rating {rating!r} (one of {', '.join(RATING_CHOICES)}).")
         have = prompt_tags(tags)
@@ -164,7 +172,7 @@ class DanbooruTagEnhancer(io.ComfyNode):
             raise ValueError(f"Danbooru Tag Enhancer: no {rating} post on Danbooru has {' or '.join(searched) or 'any tags'}; try other tags or another rating.")
         groups = [group for group, wanted in (("character", add_character), ("copyright", add_copyright), ("artist", add_artist), ("general", add_general)) if wanted]
         have_all = set(have) | set(prompt_tags(prompt)) # The prompt input's tags are not added again either.
-        added = [prompt_text(tag) for tag in added_tags(post, groups, have_all, set(prompt_tags(exclude)), max_tags, add_appearance)]
+        added = [prompt_text(tag) for tag in added_tags(post, groups, have_all, set(prompt_tags(exclude)), max_tags, add_appearance, add_count)]
         text, extra = (tags or "").strip().rstrip(","), ", ".join(added)
         combined = ", ".join(part for part in ((extra, text) if position == "before" else (text, extra)) if part)
         combined = ", ".join(part for part in ((prompt or "").strip().rstrip(","), combined) if part) # The prompt input first.
