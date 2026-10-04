@@ -156,7 +156,7 @@ export function openHistory(node) {
   function draw() {
     shown = node.properties?.dice_forge_history;
     const history = Array.isArray(shown) ? shown : [];
-    list.replaceChildren(...(history.length ? history.map(entry) : [element("div", { class: "empty" }, "No runs yet: run the workflow, and its prompts and images are kept here.")]));
+    list.replaceChildren(...(history.length ? history.map((item, index) => entry(item, index)) : [element("div", { class: "empty" }, "No runs yet: run the workflow, and its prompts and images are kept here.")]));
     count.textContent = `${history.length} run${history.length === 1 ? "" : "s"}, newest first`;
   }
   const count = element("span", { class: "muted" });
