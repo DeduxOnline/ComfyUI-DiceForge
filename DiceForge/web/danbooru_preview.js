@@ -21,10 +21,12 @@ const STYLE = `
 // A post's picture, linked to the post; blurred (until clicked) when it isn't general, unless Blur NSFW is off (DiceForge → Browsers).
 function thumb(post, onLoad) {
   const title = `Post #${post.id}${RATINGS[post.rating] ? ` (${RATINGS[post.rating]})` : ""}: open it on Danbooru`;
-  if (!post.preview) return element("a", { class: "thumb plain", href: post.url, target: "_blank", rel: "noopener", title }, `↗ #${post.id}`);
+  const plain = () => element("a", { class: "thumb plain", href: post.url, target: "_blank", rel: "noopener", title }, `↗ #${post.id}`);
+  if (!post.preview) return plain();
   const img = element("img", { src: post.preview, referrerpolicy: "no-referrer", loading: "lazy" });
   img.addEventListener("load", onLoad);
   const link = element("a", { class: "thumb", href: post.url, target: "_blank", rel: "noopener", title }, img);
+  img.addEventListener("error", () => { link.replaceWith(plain()); onLoad(); }); // Danbooru's pictures out of reach: the link to the post.
   if (blurOn() && post.rating !== "g") {
     img.classList.add("blur");
     link.addEventListener("click", (event) => {
