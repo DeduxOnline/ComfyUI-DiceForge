@@ -324,7 +324,11 @@ class Safebooru(Site):
         counted = re.search(r'<posts\b[^>]*\bcount="(\d+)"', await self.get(session, "/index.php", {**search, "limit": 0}, query, raw=True) or "")
         total = min(int(counted.group(1)) if counted else 0, SAFEBOORU_DEPTH)
         found = {}
-        for place in secrets.SystemRandom().sample(range(total), min(count, total)): # Places in the search.
+        places = list(range(total))
+        for i in range(min(count, total)): # Random places in the search, none twice (the start of a shuffle).
+            j = i + secrets.randbelow(total - i)
+            places[i], places[j] = places[j], places[i]
+        for place in places[:min(count, total)]:
             for post in self.listed(await self.get(session, "/index.php", {**search, "json": "1", "limit": 1, "pid": place}, query)):
                 found.setdefault(post["id"], post)
         return list(found.values())
