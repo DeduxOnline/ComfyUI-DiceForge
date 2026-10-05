@@ -1,6 +1,7 @@
 # SonarQube Cloud results in GitHub: after the scan (tests.yml), waits until SonarQube Cloud has processed the report, then writes the Quality
 # Gate, the main measures, every open issue and every security hotspot to the run's summary page (and to the log), so they can be read on GitHub.
-# Only the Python standard library; the token is SONAR_TOKEN. It never fails the job: the Quality Gate is shown, not enforced here.
+# Only the Python standard library; the token is SONAR_TOKEN. A failed Quality Gate (ERROR) fails the job, after the summary is written; results
+# that can't be read (SonarQube Cloud down, a processing that timed out) don't.
 import json
 import os
 import sys
@@ -72,7 +73,7 @@ def file_of(component, project):
     return component.removeprefix(f"{project}:")
 
 
-def main():
+def main(result):
     task = report_task()
     project, pr = task["projectKey"], pull_request()
     # The branch analysed (main, or the pushed branch): asked by name, since SonarQube Cloud's main branch can have another name (master).
@@ -83,6 +84,7 @@ def main():
     if status != "SUCCESS":
         return lines + [f"The analysis was not processed ({status}); see the dashboard."]
     gate = api("qualitygates/project_status", projectKey=project, **where)["projectStatus"]
+    result["gate"] = gate["status"]
     lines += [f"**Quality Gate: {gate['status']}**", ""]
     failed = [condition for condition in gate.get("conditions", []) if condition["status"] == "ERROR"]
     for condition in failed:
@@ -110,8 +112,9 @@ def main():
 
 
 if __name__ == "__main__":
+    result = {"gate": None}
     try:
-        text = "\n".join(main())
+        text = "\n".join(main(result))
     except Exception as error: # noqa: BLE001  (a summary that can't be made never fails the tests)
         text = f"## SonarQube Cloud\n\nCould not read the results: {error!r}"
     print(text)
@@ -119,4 +122,6 @@ if __name__ == "__main__":
     if summary:
         with open(summary, "a", encoding="utf-8") as file:
             file.write(text + "\n")
-    sys.exit(0)
+    if result["gate"] == "ERROR":
+        print("The Quality Gate failed: see the conditions and open issues above.", file=sys.stderr)
+    sys.exit(1 if result["gate"] == "ERROR" else 0)
