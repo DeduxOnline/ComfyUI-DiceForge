@@ -98,9 +98,9 @@ jobs:
           - group: API and nodes
             files: api.spec.js robustness.spec.js ui-nodes.spec.js
           - group: prompts
-            files: ui-prompts.spec.js ui-robustness.spec.js
+            files: ui-prompts.spec.js
           - group: models
-            files: ui-models.spec.js
+            files: ui-models.spec.js ui-robustness.spec.js
     steps:
       - uses: actions/checkout@v5
 
