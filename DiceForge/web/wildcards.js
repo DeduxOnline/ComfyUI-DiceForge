@@ -236,13 +236,15 @@ addCompletionSource((before) => {
     .map((name) => ({ label: name, hint: "LoRA", insert: `<${match[1].toLowerCase()}:${name}:1>` })));
   return { start: match.index, items, skip: ">" };
 });
+// The Wildcard Browser's editor has the autocomplete too (tags, __wildcards__, <lora:): a line of a wildcard file is a prompt.
+const isEditor = (textarea) => textarea.classList?.contains("dfwc-editor");
 async function updatePopup(textarea) {
   const request = ++popupRequest;
-  if (!fieldOf(textarea)) return closePopup();
+  if (!isEditor(textarea) && !fieldOf(textarea)) return closePopup();
   const before = textarea.value.slice(0, textarea.selectionStart);
   const found = sources.map((source) => source(before)).find(Boolean);
   if (!found) return closePopup();
-  const items = await found.items;
+  const items = (await found.items).filter((item) => !(item.browse && isEditor(textarea))); // The browser is open already.
   if (request !== popupRequest) return; // Typed on (or closed) meanwhile: the newer update shows the popup, for the text as it is now.
   if (!items.length) return closePopup();
   popup.items = items;
@@ -266,6 +268,15 @@ function accept(index) {
   const textarea = popup.textarea;
   const skip = popup.skip; // Read before closePopup.
   if (!item || !textarea) return closePopup();
+  if (isEditor(textarea)) { // Put in the editor's text, as typed (its line numbers and Save • follow the input event).
+    const start = popup.start, end = textarea.selectionStart;
+    const after = skip && textarea.value.slice(end).startsWith(skip) ? skip.length : 0;
+    closePopup();
+    textarea.value = textarea.value.slice(0, start) + item.insert + textarea.value.slice(end + after);
+    textarea.setSelectionRange(start + item.insert.length, start + item.insert.length);
+    textarea.dispatchEvent(new Event("input", { bubbles: true }));
+    return textarea.focus();
+  }
   const field = fieldOf(textarea);
   closePopup();
   if (!field) return;
@@ -286,7 +297,7 @@ document.addEventListener("keydown", (event) => {
   else if (event.key === "Escape") closePopup();
   else return;
   event.preventDefault();
-  event.stopPropagation();
+  event.stopImmediatePropagation(); // Not the Wildcard Browser's own keys too (Escape closing it).
 }, true);
 document.addEventListener("focusout", (event) => { if (event.target === popup.textarea) setTimeout(closePopup, 150); rememberCursor(event); }, true);
 for (const type of ["keyup", "mouseup", "focusin"]) document.addEventListener(type, rememberCursor, true);
@@ -309,7 +320,7 @@ async function openBrowser(node) {
   const search = element("input", { placeholder: "Search wildcards…" });
   const tree = element("div", { class: "tree" });
   const title = element("div", { class: "muted" }, "Select a file to see and edit its lines, one option per line (# starts a comment).");
-  const editor = element("textarea", { class: "src", placeholder: "One option per line", wrap: "off", spellcheck: "false" });
+  const editor = element("textarea", { class: "src dfwc-editor", placeholder: "One option per line", wrap: "off", spellcheck: "false" });
   // The text is drawn, with its syntax colored as in the prompt fields, by a layer behind the editor, whose own text is transparent (it keeps
   // the caret, selection and editing). The layer also draws the lines under the rows and the caret's line.
   const highlight = element("div", { class: "dfhl hl", "aria-hidden": "true" });

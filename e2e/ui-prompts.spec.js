@@ -254,6 +254,34 @@ for (const vue of [true, false]) {
       await page.keyboard.press("Escape");
     });
 
+    test("Wildcard Browser's editor has the autocomplete: wildcards and LoRAs while typing, Escape closes only the list", async ({ page }) => {
+      const file = `complete_${vue ? "vue" : "classic"}`; // A file of its own: the tests share the server's files.
+      writeFile(`models/wildcards/${file}.txt`, "one\n");
+      const [id] = await addNodes(page, [{ type: "CLIPTextEncodePositiveNegative", pos: [300, 60] }]);
+      await clickMenu(page, id, "DiceForge.Wildcards", "Wildcard Browser");
+      const dialog = page.locator(".dfwc");
+      if (await dialog.locator("button.mode").textContent() === "📄 Lines") await dialog.locator("button.mode").click(); // Lines: the editor.
+      await dialog.locator(".row", { hasText: file }).locator(".name").click();
+      const editor = dialog.locator(".edit textarea");
+      await expect(editor).toHaveValue("one");
+      await editor.press("Control+End");
+      await page.keyboard.type("\ntwo __hair/st");
+      await expect(page.locator(".dfwc-pop div").first()).toContainText("__hair/style__");
+      await expect(page.locator(".dfwc-pop")).not.toContainText("Browse wildcards"); // The browser is open already.
+      await page.keyboard.press("Enter");
+      await expect(editor).toHaveValue("one\ntwo __hair/style__");
+      await expect(dialog.locator("button.save")).toHaveText("Save •"); // An unsaved change, as when typed.
+      await page.keyboard.type(", <lora:in");
+      await expect(page.locator(".dfwc-pop div").first()).toContainText("style/ink");
+      await page.keyboard.press("Escape"); // Closes the list, not the browser.
+      await expect(page.locator(".dfwc-pop")).toHaveCount(0);
+      await expect(dialog).toBeVisible();
+      await page.keyboard.type("k");
+      await page.keyboard.press("Tab");
+      await expect(editor).toHaveValue("one\ntwo __hair/style__, <lora:style/ink:1>");
+      await page.keyboard.press("Escape");
+    });
+
     test("Wildcard Browser creates, renames and deletes files", async ({ page }) => {
       const tag = vue ? "vue" : "classic", wildcards = (...parts) => basePath("models", "wildcards", ...parts);
       const [id] = await addNodes(page, [{ type: "CLIPTextEncodePositiveNegative", pos: [300, 60] }]);
