@@ -98,9 +98,9 @@ jobs:
           - group: API and nodes
             files: api.spec.js robustness.spec.js ui-nodes.spec.js
           - group: prompts
-            files: ui-prompts.spec.js
+            files: ui-prompts.spec.js ui-robustness.spec.js --grep-invert "classic robustness" # ui-robustness: Nodes 2.0 here, classic with models.
           - group: models
-            files: ui-models.spec.js ui-robustness.spec.js
+            files: ui-models.spec.js ui-robustness.spec.js --grep-invert "Nodes 2.0 robustness"
     steps:
       - uses: actions/checkout@v5
 
