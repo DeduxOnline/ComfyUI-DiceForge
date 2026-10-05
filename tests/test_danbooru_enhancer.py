@@ -329,7 +329,7 @@ def test_e621_ratings_and_fixed_mode(danbooru):
     with pytest.raises(ValueError, match="e621 has no post 99"):
         run(source="e621", mode="fixed", post_ids="99")
     with pytest.raises(ValueError, match="unknown source"):
-        run(source="gelbooru")
+        run(source="nope")
 
 
 def test_the_prompt_input_goes_first_is_not_searched_nor_added_again(danbooru):

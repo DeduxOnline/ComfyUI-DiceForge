@@ -296,7 +296,7 @@ for (const vue of [true, false]) {
       await expect(dialog.locator(".status")).toHaveText(`Imported 3 files from ${pack}.zip; 1 not wildcards or pictures, left out.`);
       expect(fs.existsSync(basePath("models", "wildcards", pack, "sitting.png"))).toBe(true);
       await dialog.locator("input").first().fill("zebra"); // In no name: found by a line.
-      const found = dialog.locator(".row", { hasText: "lines" });
+      const found = dialog.locator(`.row[data-name="${pack}/lines"]`); // Its own pack's (the other design's pack has the line too).
       await expect(found.locator(".found")).toHaveText("“3::quiet zebra pose”");
       await found.locator(".name").click();
       await expect(dialog.locator(".edit textarea")).toHaveValue("# a comment\n3::quiet zebra pose\nloud pose");
