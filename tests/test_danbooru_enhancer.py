@@ -178,7 +178,8 @@ def test_adds_the_tags_of_a_random_post(danbooru):
 def test_a_new_post_on_every_run(danbooru):
     first = DanbooruTagEnhancer.fingerprint_inputs(tags="x", mode="random")
     assert DanbooruTagEnhancer.fingerprint_inputs(tags="x", mode="random") != first # Never from the cache.
-    assert DanbooruTagEnhancer.fingerprint_inputs(tags="x", mode="fixed") == DanbooruTagEnhancer.fingerprint_inputs(tags="x", mode="fixed") # Cached.
+    fixed = [DanbooruTagEnhancer.fingerprint_inputs(tags="x", mode="fixed") for _ in range(2)]
+    assert fixed[0] == fixed[1] # Fixed: the same each time, so from the cache.
     danbooru.choose = lambda posts: posts[-1]
     assert run(tags="hatsune miku", rating="general + sensitive")[3] == 4
     assert run(tags="hatsune miku", rating="general")[3] == 2

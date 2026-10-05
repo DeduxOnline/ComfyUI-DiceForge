@@ -3,8 +3,8 @@ import html
 import json
 import logging
 import os
-import random
 import re
+import secrets
 import time
 import aiohttp
 from typing_extensions import override
@@ -324,7 +324,7 @@ class Safebooru(Site):
         counted = re.search(r'<posts\b[^>]*\bcount="(\d+)"', await self.get(session, "/index.php", {**search, "limit": 0}, query, raw=True) or "")
         total = min(int(counted.group(1)) if counted else 0, SAFEBOORU_DEPTH)
         found = {}
-        for place in random.sample(range(total), min(count, total)): # NOSONAR: picks posts, not security.
+        for place in secrets.SystemRandom().sample(range(total), min(count, total)): # Places in the search.
             for post in self.listed(await self.get(session, "/index.php", {**search, "json": "1", "limit": 1, "pid": place}, query)):
                 found.setdefault(post["id"], post)
         return list(found.values())
@@ -459,7 +459,7 @@ class DanbooruTagEnhancer(io.ComfyNode):
         if rating not in RATINGS:
             raise ValueError(f"Danbooru Tag Enhancer: unknown rating {rating!r} (one of {', '.join(RATING_CHOICES)}).")
         fixed = mode == "fixed"
-        seed = wildcard_seed if fixed else random.randrange(0x100000000) # NOSONAR: picks wildcard lines, not security.
+        seed = wildcard_seed if fixed else secrets.randbelow(0x100000000) # A new wildcard seed each random run.
         loop = asyncio.get_running_loop()
         (tags,), _note = await loop.run_in_executor(None, fill_in, (tags or "",), seed, "random") # Wildcards, choices, comments.
         have = prompt_tags(tags)
