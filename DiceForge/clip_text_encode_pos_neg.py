@@ -548,7 +548,7 @@ class CLIPTextEncodePositiveNegative(io.ComfyNode):
                 io.Conditioning.Output(display_name="negative", tooltip="Conditioning from the negative prompt."),
                 io.String.Output(display_name="positive_text", tooltip="The positive prompt as encoded: choices, wildcards and variables filled in. Connect it to another text encoder (Flux, SD3...) or a Save Image file name."),
                 io.String.Output(display_name="negative_text", tooltip="The negative prompt as encoded: choices, wildcards and variables filled in."),
-                io.Model.Output(display_name="model", tooltip="The model with the prompts' <lora:...> LoRAs (connect it to KSampler instead of the loader's model)."),
+                io.Model.Output(display_name="model"), # The model with the prompts' <lora:...> LoRAs (connect it to KSampler instead of the loader's model).
             ],
         )
     # Method to run the node again when a wildcard file changes, even if the inputs are the same.
