@@ -87,7 +87,7 @@ jobs:
         run: python .github/scripts/sonar_summary.py
 
   e2e:
-    # Three jobs at once, each with its own ComfyUI server (the tests of one server share its files and memory, so they run one at a time).
+    # Four jobs at once, each with its own ComfyUI server (the tests of one server share its files and memory, so they run one at a time).
     name: End-to-end tests (${{ matrix.group }})
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -96,11 +96,13 @@ jobs:
       matrix:
         include:
           - group: API and nodes
-            files: api.spec.js robustness.spec.js ui-nodes.spec.js
+            files: api.spec.js ui-nodes.spec.js
           - group: prompts
-            files: ui-prompts.spec.js ui-robustness.spec.js --grep-invert "classic robustness" # ui-robustness: Nodes 2.0 here, classic with models.
+            files: ui-prompts.spec.js
           - group: models
-            files: ui-models.spec.js ui-robustness.spec.js --grep-invert "Nodes 2.0 robustness"
+            files: ui-models.spec.js
+          - group: robustness
+            files: robustness.spec.js ui-robustness.spec.js
     steps:
       - uses: actions/checkout@v5
 
