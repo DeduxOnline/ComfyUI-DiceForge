@@ -200,6 +200,41 @@ for (const vue of [true, false]) {
       await page.keyboard.press("Escape");
     });
 
+    test("Wildcard Browser converts a folder of txt files to yaml and back, and gives a yaml card its picture", async ({ page }) => {
+      const pack = `CONV_${vue ? "vue" : "classic"}`; // A folder of its own: the tests share the server's files.
+      const file = (...parts) => basePath("models", "wildcards", ...parts);
+      writeFile(`models/wildcards/${pack}/sitting.txt`, "sitting\n");
+      writeFile(`models/wildcards/${pack}/standing.txt`, "standing\nstanding, arms crossed\n");
+      const [id] = await addNodes(page, [{ type: "CLIPTextEncodePositiveNegative", pos: [300, 60], widgets: { positive: "1girl" } }]);
+      page.on("dialog", (confirmation) => confirmation.accept());
+      await clickMenu(page, id, "DiceForge.Wildcards", "Wildcard Browser");
+      const dialog = page.locator(".dfwc");
+      if (await dialog.locator("button.mode").textContent() === "📄 Lines") await dialog.locator("button.mode").click(); // Start in lines.
+      const folder = dialog.locator(`.folder[data-path="${pack}"] > .row`);
+      await folder.locator("button.convert", { hasText: "→ yaml" }).click();
+      await expect(dialog.locator(".status")).toContainText("Converted 2 wildcards into");
+      expect(fs.existsSync(file(`${pack}.yaml`))).toBe(true);
+      expect(fs.existsSync(file(pack, "sitting.txt"))).toBe(false);
+      await expect(folder.locator("button.convert")).toHaveText("→ txt"); // The same names, now from the yaml file.
+      await dialog.locator("button.mode").click(); // Cards: a picture for a card.
+      await folder.locator(".name").click();
+      const sitting = dialog.locator(".card", { hasText: "sitting" });
+      const chooser = page.waitForEvent("filechooser");
+      await sitting.locator("button.picture").click();
+      await (await chooser).setFiles({ name: "sitting.png", mimeType: "image/png", buffer: png(20, 30, [200, 50, 50]) });
+      await expect(sitting.locator("img")).toHaveJSProperty("naturalWidth", 20);
+      expect(fs.existsSync(file(pack, "sitting.png"))).toBe(true); // Next to the yaml file, where card packs keep them.
+      await sitting.locator("button.no-picture").click();
+      await expect(sitting.locator("img")).toHaveCount(0);
+      expect(fs.existsSync(file(pack, "sitting.png"))).toBe(false);
+      await dialog.locator("button.mode").click(); // Back to lines, and back to txt files.
+      await folder.locator("button.convert", { hasText: "→ txt" }).click();
+      await expect(dialog.locator(".status")).toContainText(`${pack}.yaml into 2 txt files`);
+      expect(fs.readFileSync(file(pack, "standing.txt"), "utf8")).toBe("standing\nstanding, arms crossed\n");
+      expect(fs.existsSync(file(`${pack}.yaml`))).toBe(false);
+      await page.keyboard.press("Escape");
+    });
+
     test("Wildcard Browser creates, renames and deletes files", async ({ page }) => {
       const tag = vue ? "vue" : "classic", wildcards = (...parts) => basePath("models", "wildcards", ...parts);
       const [id] = await addNodes(page, [{ type: "CLIPTextEncodePositiveNegative", pos: [300, 60] }]);

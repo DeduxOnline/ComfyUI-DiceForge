@@ -3,11 +3,14 @@ import json
 import os
 import re
 import folder_paths
+import yaml
 from aiohttp import web
-from .clip_text_encode_pos_neg import entry_lines, find_wildcard, read_text_lines, wildcard_index
+from .clip_text_encode_pos_neg import TextLoader, entry_lines, find_wildcard, read_text_lines, wildcard_index, yaml_wildcards
+from .http_read import read_up_to
 from .model_info import json_body
 # Server side of the Wildcard Browser and the __ autocomplete (web/wildcards.js): the list of wildcards, and creating, reading, saving, renaming and
-# deleting a wildcard file. Wildcards from yaml files are listed and shown too, but read-only: they are edited in their yaml file.
+# deleting a wildcard file, converting txt files to a yaml file and back, and the cards' pictures. Wildcards from yaml files are listed and
+# shown too, but read-only: they are edited in their yaml file (or converted to txt files).
 PART = r"[\w\-.]+(?: [\w\-.]+)*" # Single spaces inside a name, as __hair color__ reads them (clip_text_encode_pos_neg.WILDCARD_PATTERN).
 NAME = re.compile(rf"{PART}(/{PART})*")
 def checked_name(name):
@@ -83,6 +86,91 @@ def card_picture(entry):
             if path.startswith(folder + os.sep) and os.path.isfile(path):
                 return path
     return None
+# A card's picture, sent from the browser: PNG, JPEG, WebP or GIF (by its first bytes, not its name), saved where card_picture finds it first
+# (POSES/sitting.png next to POSES.yaml), in place of the picture it had. Only a yaml wildcard has a card picture.
+PICTURE_BYTES = 20 * 1024 * 1024
+def picture_ending(data):
+    if data.startswith(b"\x89PNG\r\n\x1a\n"):
+        return ".png"
+    if data.startswith(b"\xff\xd8\xff"):
+        return ".jpg"
+    if data[:6] in (b"GIF87a", b"GIF89a"):
+        return ".gif"
+    return ".webp" if data[:4] == b"RIFF" and data[8:12] == b"WEBP" else None
+def picture_base(entry):
+    if not entry or "inner" not in entry:
+        return None
+    folder = os.path.realpath(os.path.dirname(entry["path"]))
+    base = os.path.realpath(os.path.join(folder, *entry["inner"].split("/")))
+    return base if base.startswith(folder + os.sep) else None
+def save_picture(base, data, ending):
+    for other in PICTURE_ENDINGS:
+        if os.path.isfile(base + other):
+            os.remove(base + other)
+    os.makedirs(os.path.dirname(base), exist_ok=True)
+    with open(base + ending, "wb") as file:
+        file.write(data)
+    return base + ending
+# A folder or file of txt wildcards to one yaml file and back, with the same wildcard names: hair/ (hair/color.txt, hair/style.txt) becomes
+# hair.yaml ({hair: {color: [...], style: [...]}}) next to the folder, and a yaml file becomes one txt file per key. Card pictures stay where they
+# are (hair/color.png serves both). Nothing is overwritten: a name or file already taken stops the conversion before anything changes.
+def yaml_target(name, root):
+    parts = name.split("/")
+    for ending in (".yaml", ".yml"):
+        if os.path.exists(os.path.join(root, *parts[:-1], parts[-1] + ending)):
+            raise web.HTTPConflict(text=f"Wildcards: {name}{ending} already exists.")
+    return os.path.join(root, *parts[:-1], parts[-1] + ".yaml")
+def to_yaml(name):
+    index = wildcard_index(refresh=True)
+    files = {key: entry["path"] for key, entry in index.items() if "lines" not in entry and (key == name or key.startswith(name + "/"))}
+    if not files:
+        raise web.HTTPNotFound(text=f"Wildcards: no txt wildcard {name} (or in the folder {name}).")
+    root = root_of(files[min(files)])
+    files = {key: path for key, path in files.items() if root_of(path) == root} # One wildcards folder: the yaml file goes there.
+    target, depth, data = yaml_target(name, root), name.count("/"), {}
+    for key, path in sorted(files.items()):
+        level, parts = data, key.split("/")[depth:]
+        for part in parts[:-1]:
+            level = level.setdefault(part, {})
+            if not isinstance(level, dict):
+                raise web.HTTPConflict(text=f"Wildcards: {'/'.join(key.split('/')[:depth] + parts[:parts.index(part) + 1])} is both a file and a folder.")
+        if isinstance(level.get(parts[-1]), dict):
+            raise web.HTTPConflict(text=f"Wildcards: {key} is both a file and a folder.")
+        try:
+            level[parts[-1]] = [line.strip() for line in read_text_lines(path) if line.strip()]
+        except ValueError as error:
+            raise web.HTTPBadRequest(text=f"Wildcards: {error}") from None
+    with open(target, "w", encoding="utf-8", newline="\n") as file:
+        yaml.safe_dump(data, file, allow_unicode=True, sort_keys=False, default_flow_style=False, width=4096)
+    for path in files.values():
+        delete_file(path)
+    return target, sorted(files)
+def to_txt(name):
+    index = wildcard_index(refresh=True)
+    paths = sorted({entry["path"] for key, entry in index.items() if "lines" in entry and (key == name or key.startswith(name + "/"))})
+    if not paths:
+        raise web.HTTPNotFound(text=f"Wildcards: no yaml wildcard {name} (or in the folder {name}).")
+    plan = []
+    for path in paths:
+        root = root_of(path)
+        prefix = os.path.relpath(os.path.dirname(path), root).replace(os.sep, "/")
+        try:
+            with open(path, encoding="utf-8-sig") as file:
+                data = yaml.load(file, Loader=TextLoader)
+        except (OSError, UnicodeDecodeError, yaml.YAMLError) as error:
+            raise web.HTTPBadRequest(text=f"Wildcards: can't read {path}: {error}") from None
+        for key, lines in yaml_wildcards(data, "" if prefix == "." else prefix):
+            target = new_path(checked_name(key), root)
+            if os.path.exists(target) or find_wildcard(key):
+                raise web.HTTPConflict(text=f"Wildcards: {key}.txt already exists: rename it first.")
+            plan.append((key, target, lines))
+    if len({target for _, target, _ in plan}) < len(plan):
+        raise web.HTTPConflict(text="Wildcards: two yaml keys would make the same txt file.")
+    for _, target, lines in plan:
+        write_lines(target, "\n".join(lines))
+    for path in paths:
+        os.remove(path)
+    return paths, [key for key, _, _ in plan]
 def write_lines(path, text):
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8", newline="\n") as file:
@@ -111,6 +199,52 @@ def register_routes():
         if path is None:
             raise web.HTTPNotFound(text=f"Wildcards: no picture for {name}.")
         return web.FileResponse(path, headers={"Cache-Control": "max-age=300"})
+    @routes.post("/diceforge/wildcards/picture")
+    async def set_wildcard_picture(request):
+        name = checked_name(request.rel_url.query.get("name"))
+        base = picture_base(wildcard_index(refresh=True).get(name))
+        if base is None:
+            raise web.HTTPBadRequest(text=f"Wildcards: {name} is not a yaml card: pictures are for the wildcards of a yaml file.")
+        data = await read_up_to(request, PICTURE_BYTES) # The whole body (content.read(n) gives only what has come so far).
+        if len(data) > PICTURE_BYTES:
+            raise web.HTTPRequestEntityTooLarge(max_size=PICTURE_BYTES, actual_size=len(data), text="Wildcards: the picture is over 20 MB.")
+        ending = picture_ending(data)
+        if ending is None:
+            raise web.HTTPBadRequest(text="Wildcards: send a PNG, JPEG, WebP or GIF picture.")
+        try:
+            path = await asyncio.get_running_loop().run_in_executor(None, save_picture, base, data, ending)
+        except OSError as error:
+            raise web.HTTPBadRequest(text=f"Wildcards: can't save the picture: {error.strerror or error}.") from None
+        return web.json_response({"name": name, "picture": path})
+    @routes.delete("/diceforge/wildcards/picture")
+    async def remove_wildcard_picture(request):
+        name = checked_name(request.rel_url.query.get("name"))
+        path = card_picture(wildcard_index(refresh=True).get(name))
+        if path is None:
+            raise web.HTTPNotFound(text=f"Wildcards: no picture for {name}.")
+        try:
+            os.remove(path)
+        except OSError as error:
+            raise web.HTTPBadRequest(text=f"Wildcards: can't remove the picture: {error.strerror or error}.") from None
+        return web.json_response({"name": name, "removed": path})
+    # Convert a txt wildcard or folder to one yaml file ("to": "yaml"), or the yaml file(s) of a wildcard or folder to txt files ("to": "txt").
+    @routes.post("/diceforge/wildcards/convert")
+    async def convert_wildcards(request):
+        body = await json_body(request)
+        name, to = checked_name(body.get("name")), body.get("to")
+        if to not in ("yaml", "txt"):
+            raise web.HTTPBadRequest(text='Wildcards: "to" must be "yaml" or "txt".')
+        try:
+            if to == "yaml":
+                path, names = await asyncio.get_running_loop().run_in_executor(None, to_yaml, name)
+                result = {"converted": name, "to": "yaml", "path": path, "names": names}
+            else:
+                paths, names = await asyncio.get_running_loop().run_in_executor(None, to_txt, name)
+                result = {"converted": name, "to": "txt", "removed": paths, "names": names}
+        except OSError as error:
+            raise web.HTTPBadRequest(text=f"Wildcards: can't convert {name}: {error.strerror or error}.") from None
+        wildcard_index(refresh=True)
+        return web.json_response(result)
     @routes.get("/diceforge/wildcards/file")
     async def read_wildcard_file(request):
         name = checked_name(request.rel_url.query.get("name"))

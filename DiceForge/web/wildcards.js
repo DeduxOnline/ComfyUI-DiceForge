@@ -145,6 +145,8 @@ const STYLE = `
 .dfwc .kids{margin-left:16px}.dfwc button.fav{border:none;background:none;padding:0 4px;font-size:15px;color:#888}.dfwc button.fav.on{color:#ffd24a}
 .dfwc button.only-favorites.on{border-color:#b8962e;color:#ffd24a}.dfwc .row.drop,.dfwc .tree.drop{background:#35584a;outline:1px dashed #8fd0a8}.dfwc .folder:not(.open)>.kids{display:none}.dfwc .muted{color:#999;font-size:12px}
 .dfwc button{background:#222;color:#eee;border:1px solid #666;border-radius:6px;padding:5px 12px;cursor:pointer;font:inherit}.dfwc button:hover{background:#2c2c2c}
+.dfwc button.convert{padding:1px 7px;font-size:12px;border-color:#5a6f9a;color:#bcd0f5}.dfwc .edit button.convert{padding:5px 12px;font-size:inherit}
+.dfwc .card .actions button.picture,.dfwc .card .actions button.no-picture{padding:1px 6px;font-size:12px}.dfwc .card.drop{outline:2px dashed #8fd0a8}
 .dfwc button:disabled{opacity:.5;cursor:default}.dfwc button.delete:not(:disabled){border-color:#8a4a4a;color:#f0b0b0}.dfwc textarea[readonly]{color:#aaa}.dfwc button.add{padding:1px 8px;font-size:12px;border-color:#4a7a4a;color:#bfe8bf}.dfwc .status{color:#9c9;min-height:18px;font-size:13px}
 `;
 const addStyle = () => addStyleOnce("dfwc-style", STYLE);
@@ -338,7 +340,8 @@ async function openBrowser(node) {
   const rename = element("button", { class: "rename", disabled: true }, "Rename");
   const move = element("button", { class: "move", disabled: true, title: "Move the file to another folder (or drag it onto a folder in the tree)" }, "⇄ Move");
   const remove = element("button", { class: "delete", disabled: true }, "Delete");
-  let selected = null, saved = "";
+  const convertButton = element("button", { class: "convert", disabled: true }, "→ yaml");
+  let selected = null, saved = "", selectedYaml = false;
   const showDirty = () => { save.textContent = selected && !editor.readOnly && editor.value !== saved ? "Save •" : "Save"; };
   editor.addEventListener("input", showDirty);
   editor.addEventListener("keydown", (event) => {
@@ -369,6 +372,10 @@ async function openBrowser(node) {
     editor.readOnly = !!file.readonly; // A yaml wildcard is one key of a yaml file: edited in that file.
     code.classList.toggle("readonly", editor.readOnly);
     save.disabled = rename.disabled = move.disabled = remove.disabled = !!file.readonly;
+    selectedYaml = !!file.readonly;
+    convertButton.disabled = false;
+    convertButton.textContent = selectedYaml ? "→ txt" : "→ yaml";
+    convertButton.title = selectedYaml ? "Turn its yaml file into txt files, one per key (the names stay the same)" : `Turn ${name}.txt into ${name.split("/").pop()}.yaml (the name stays the same)`;
     showDirty();
     say(file.readonly ? "From a yaml file: read-only here, edit the yaml file to change it." : "");
     draw();
@@ -421,13 +428,29 @@ async function openBrowser(node) {
     markCurrentLine();
     editor.readOnly = false;
     code.classList.remove("readonly");
-    rename.disabled = move.disabled = remove.disabled = true;
+    rename.disabled = move.disabled = remove.disabled = convertButton.disabled = true;
     showDirty();
     title.replaceChildren("Select a file to see and edit its lines, one option per line (# starts a comment).");
     await wildcardList(true);
     draw();
     say(`Deleted ${name}.txt.`);
   });
+  // txt ⇄ yaml: a txt file or a folder of them becomes one yaml file (hair/ -> hair.yaml), a yaml file becomes one txt file per key. The
+  // wildcard names stay the same, so prompts keep working; card pictures stay where they are.
+  async function convert(name, to) {
+    if (selected && editor.value !== saved && (selected === name || selected.startsWith(`${name}/`))) return say("Save (or undo) your changes first.");
+    const what = to === "yaml" ? `the txt wildcards ${name} into ${name.split("/").pop()}.yaml` : `the yaml file of ${name} into txt files, one per key`;
+    if (!confirm(`Convert ${what}? The wildcard names stay the same.`)) return;
+    const response = await api.fetchApi("/diceforge/wildcards/convert", { method: "POST", body: JSON.stringify({ name, to }) });
+    if (!response.ok) return say(await response.text());
+    const result = await response.json();
+    await wildcardList(true);
+    if (selected && result.names.includes(selected)) await open(selected);
+    else draw();
+    say(to === "yaml" ? `Converted ${result.names.length} wildcard${result.names.length === 1 ? "" : "s"} into ${result.path}.`
+      : `Converted ${result.removed.join(", ")} into ${result.names.length} txt file${result.names.length === 1 ? "" : "s"}.`);
+  }
+  convertButton.addEventListener("click", () => { if (selected) background(convert(selected, selectedYaml ? "txt" : "yaml")); });
   const create = element("button", { onclick: async () => {
     const name = prompt("New wildcard file name (folders with /, for example hair/color):", search.value.trim());
     if (!name) return;
@@ -467,7 +490,31 @@ async function openBrowser(node) {
     draw();
   };
   modeButton.addEventListener("click", () => setMode(!cardsMode));
-  const pictureURL = (name) => api.apiURL(`/diceforge/wildcards/picture?name=${encodeURIComponent(name)}`);
+  let pictureVersion = Date.now(); // Changes with a new picture: the browser doesn't show the old one from its cache.
+  const pictureURL = (name) => api.apiURL(`/diceforge/wildcards/picture?name=${encodeURIComponent(name)}&v=${pictureVersion}`);
+  // A card's example picture (yaml cards): 🖼 picks a file, or drop a picture on the card; ✕ removes it. Saved next to the yaml file.
+  async function setPicture(name, file) {
+    if (!file) return;
+    const response = await api.fetchApi(`/diceforge/wildcards/picture?name=${encodeURIComponent(name)}`, { method: "POST", body: file });
+    if (!response.ok) return say(await response.text());
+    pictureVersion = Date.now();
+    await wildcardList(true);
+    say(`New picture for __${name}__.`);
+    draw();
+  }
+  async function removePicture(name) {
+    if (!confirm(`Remove the picture of __${name}__?`)) return;
+    const response = await api.fetchApi(`/diceforge/wildcards/picture?name=${encodeURIComponent(name)}`, { method: "DELETE" });
+    if (!response.ok) return say(await response.text());
+    await wildcardList(true);
+    say(`Removed the picture of __${name}__.`);
+    draw();
+  }
+  const pickPicture = (name) => {
+    const input = element("input", { type: "file", accept: "image/png,image/jpeg,image/webp,image/gif" });
+    input.addEventListener("change", () => background(setPicture(name, input.files?.[0])));
+    input.click();
+  };
   function card(file) {
     const pic = element("div", { class: "pic", title: file.preview.join("\n") });
     if (file.picture) {
@@ -475,14 +522,30 @@ async function openBrowser(node) {
       img.addEventListener("error", () => img.replaceWith(element("span", { class: "none" }, file.preview[0] ?? "")));
       pic.append(img);
     } else pic.append(element("span", { class: "none" }, file.preview[0] ?? "(empty)"));
-    return element("div", { class: "card", "data-name": file.name }, pic,
+    const pictureButtons = file.yaml ? [
+      element("button", { class: "picture", title: "Choose an example picture for this card (or drop one on the card)", onclick: () => pickPicture(file.name) }, "🖼"),
+      ...(file.picture ? [element("button", { class: "no-picture", title: "Remove the picture", onclick: () => background(removePicture(file.name)) }, "✕")] : []),
+    ] : [];
+    const box = element("div", { class: "card", "data-name": file.name }, pic,
       element("div", { class: "info" },
         element("span", { class: "title", title: "Open it in the lines view", onclick: () => { setMode(false); background(open(file.name)); } }, file.name.split("/").pop()),
         element("span", { class: "line", title: file.preview.join("\n") }, file.lines > 1 ? `${file.lines} lines: ${file.preview.join(" · ")}` : file.preview[0] ?? ""),
         element("div", { class: "actions" },
           element("button", { class: "fav" + (file.favorite ? " on" : ""), title: file.favorite ? "A favorite: click to remove the star" : "Add to favorites",
             onclick: () => background(setFavorite(file.name, !file.favorite)) }, file.favorite ? "★" : "☆"),
+          ...pictureButtons,
           element("button", { class: "add", title: `Insert __${file.name}__`, onclick: () => add(file.name) }, "+ Add"))));
+    if (file.yaml) { // A picture file dropped on the card becomes its picture.
+      box.addEventListener("dragover", (event) => { if (event.dataTransfer?.types?.includes("Files")) { event.preventDefault(); box.classList.add("drop"); } });
+      box.addEventListener("dragleave", () => box.classList.remove("drop"));
+      box.addEventListener("drop", (event) => {
+        if (!event.dataTransfer?.files?.length) return;
+        event.preventDefault();
+        box.classList.remove("drop");
+        background(setPicture(file.name, event.dataTransfer.files[0]));
+      });
+    }
+    return box;
   }
   function drawCards(shown) {
     if (cardFolder == null) { // The first time: the folder of the first wildcard with a picture.
@@ -505,6 +568,14 @@ async function openBrowser(node) {
     say(favorite ? `__${name}__ is a favorite.` : `__${name}__ is no longer a favorite.`);
     draw();
   }
+  // A folder's convert buttons: → yaml when it has txt wildcards, → txt when it has yaml ones.
+  function convertButtons(path) {
+    const inside = (listCache?.files ?? []).filter((file) => file.name.startsWith(`${path}/`));
+    return [
+      ...(inside.some((file) => !file.yaml) ? [element("button", { class: "convert", title: `Turn the folder's txt files into ${path.split("/").pop()}.yaml (the names stay the same)`, onclick: () => background(convert(path, "yaml")) }, "→ yaml")] : []),
+      ...(inside.some((file) => file.yaml) ? [element("button", { class: "convert", title: "Turn the folder's yaml file into txt files, one per key (the names stay the same)", onclick: () => background(convert(path, "txt")) }, "→ txt")] : []),
+    ];
+  }
   function draw() {
     const { files } = listCache ?? { files: [] };
     const query = search.value.trim().toLowerCase();
@@ -525,6 +596,7 @@ async function openBrowser(node) {
         const row = element("div", { class: "row" + (cardsMode && folder.path === cardFolder ? " sel" : "") },
           element("span", { class: "name", title: cardsMode ? "Show its cards (and open or close the folder)" : "Open or close the folder",
             onclick: () => { if (cardsMode) cardFolder = folder.path; toggle(folder.path, cardsMode ? true : undefined); } }, `📁 ${part}`), element("span", { class: "muted" }, "all files"),
+          ...convertButtons(folder.path),
           element("button", { class: "add", title: `Insert __${folder.path}/*__`, onclick: () => add(`${folder.path}/*`) }, "+ Add"));
         dropTarget(row, "wildcards", (name) => background(moveFile(name, folder.path))); // A file dropped on a folder moves into it.
         return element("div", { class: "folder" + (allOpen || opened.has(folder.path) ? " open" : ""), "data-path": folder.path }, row, element("div", { class: "kids" }, ...drawLevel(folder)));
@@ -556,7 +628,7 @@ async function openBrowser(node) {
   dialog.append(element("h2", {}, "Wildcards"),
     element("div", { class: "top" }, search, modeButton, favoritesButton, expandAll, collapseAll, create, element("button", { onclick: close }, "Close")),
     element("div", { class: "main" }, tree, editPane, cards), status);
-  editPane.append(title, code, element("div", { class: "top" }, element("span", { style: "flex:1" }), remove, move, rename, save));
+  editPane.append(title, code, element("div", { class: "top" }, element("span", { style: "flex:1" }), convertButton, remove, move, rename, save));
   document.body.append(back);
   await wildcardList(true);
   draw();

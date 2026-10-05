@@ -3,6 +3,7 @@
 import os
 import folder_paths
 import pytest
+import yaml
 from aiohttp import web
 from DiceForge.wildcards_api import checked_name
 
@@ -192,3 +193,71 @@ def test_a_damaged_favorites_file_means_none(api, wildcards):
             file.write(junk)
         status, body = api("GET", "/diceforge/wildcards")
         assert status == 200 and body["files"][0]["favorite"] == (junk.endswith("]"))
+
+
+def test_a_folder_of_txt_files_to_yaml_and_back(api, wildcards):
+    wildcards("POSES/sitting.txt", "# a comment\nsitting\n\nsitting, legs crossed\n")
+    wildcards("POSES/standing.txt", "standing\n")
+    wildcards("POSES/deep/kneel.txt", "kneeling\n")
+    with open(os.path.join(wildcards.folder, "POSES", "sitting.png"), "wb") as file:
+        file.write(b"\x89PNG\r\n\x1a\nsitting")
+    status, body = api("POST", "/diceforge/wildcards/convert", {"name": "POSES", "to": "yaml"})
+    assert status == 200 and body["names"] == ["POSES/deep/kneel", "POSES/sitting", "POSES/standing"]
+    with open(os.path.join(wildcards.folder, "POSES.yaml"), encoding="utf-8") as file:
+        assert yaml.safe_load(file) == {"POSES": {"deep": {"kneel": ["kneeling"]}, "sitting": ["# a comment", "sitting", "sitting, legs crossed"],
+                                                  "standing": ["standing"]}}
+    assert not os.path.exists(os.path.join(wildcards.folder, "POSES", "sitting.txt")) # Moved into the yaml file, not copied: a txt would hide its key.
+    files = {entry["name"]: entry for entry in api("GET", "/diceforge/wildcards")[1]["files"]}
+    assert set(files) == {"POSES/deep/kneel", "POSES/sitting", "POSES/standing"} and files["POSES/sitting"]["yaml"] == "POSES.yaml"
+    assert files["POSES/sitting"]["lines"] == 2 and files["POSES/sitting"]["picture"] is True # The same names; the picture is now its card's.
+    status, body = api("POST", "/diceforge/wildcards/convert", {"name": "POSES/sitting", "to": "txt"}) # Any of its names: the whole yaml file.
+    assert status == 200 and body["names"] == ["POSES/deep/kneel", "POSES/sitting", "POSES/standing"]
+    assert not os.path.exists(os.path.join(wildcards.folder, "POSES.yaml"))
+    with open(os.path.join(wildcards.folder, "POSES", "sitting.txt"), encoding="utf-8") as file:
+        assert file.read() == "# a comment\nsitting\nsitting, legs crossed\n"
+    assert os.path.isfile(os.path.join(wildcards.folder, "POSES", "deep", "kneel.txt")) and os.path.isfile(os.path.join(wildcards.folder, "POSES", "sitting.png"))
+
+
+def test_one_txt_file_to_yaml_and_what_is_refused(api, wildcards):
+    wildcards("styles/color.txt", "red\nyes\n{blue|green}\n")
+    status, body = api("POST", "/diceforge/wildcards/convert", {"name": "styles/color", "to": "yaml"})
+    assert status == 200 and body["path"].endswith(os.path.join("styles", "color.yaml"))
+    assert api("GET", "/diceforge/wildcards/file?name=styles/color")[1]["text"] == "red\nyes\n{blue|green}" # Read back as written.
+    wildcards("styles/color2.txt", "x\n")
+    wildcards("styles/color2.yml", "color2: [y]\n")
+    assert api("POST", "/diceforge/wildcards/convert", {"name": "styles/color2", "to": "yaml"})[0] == 409 # A yaml file of that name is there.
+    wildcards("a.txt", "x\n")
+    wildcards("a/b.txt", "y\n")
+    status, text = api("POST", "/diceforge/wildcards/convert", {"name": "a", "to": "yaml"})
+    assert status == 409 and "both a file and a folder" in text and os.path.isfile(os.path.join(wildcards.folder, "a.txt"))
+    wildcards("pack.yaml", "hair: {color: [red], style: [bob]}\n")
+    wildcards("hair/color.txt", "black\n") # Hides the yaml key hair/color, and is in the way of its txt file.
+    status, text = api("POST", "/diceforge/wildcards/convert", {"name": "hair", "to": "txt"})
+    assert status == 409 and "hair/color.txt already exists" in text
+    assert os.path.isfile(os.path.join(wildcards.folder, "pack.yaml")) and not os.path.exists(os.path.join(wildcards.folder, "hair", "style.txt")) # Nothing changed.
+    assert api("POST", "/diceforge/wildcards/convert", {"name": "hair", "to": "json"})[0] == 400
+    assert api("POST", "/diceforge/wildcards/convert", {"name": "nope", "to": "yaml"})[0] == 404
+    assert api("POST", "/diceforge/wildcards/convert", {"name": "nope", "to": "txt"})[0] == 404
+    assert api("POST", "/diceforge/wildcards/convert", {"name": "../x", "to": "txt"})[0] == 400
+
+
+PNG = b"\x89PNG\r\n\x1a\n" + b"png"
+JPEG = b"\xff\xd8\xff\xe0" + b"jpeg"
+
+
+def test_a_yaml_card_gets_a_picture_replaced_and_removed(api, wildcards):
+    wildcards("POSES.yaml", "POSES:\n  sitting: sitting,\n")
+    wildcards("color.txt", "red\n")
+    status, body = api("POST", "/diceforge/wildcards/picture?name=POSES/sitting", data=PNG)
+    assert status == 200 and body["picture"].endswith(os.path.join("POSES", "sitting.png"))
+    assert api("GET", "/diceforge/wildcards/picture?name=POSES/sitting") == (200, PNG)
+    assert api("POST", "/diceforge/wildcards/picture?name=POSES/sitting", data=JPEG)[0] == 200 # Another picture: in place of the first.
+    assert sorted(os.listdir(os.path.join(wildcards.folder, "POSES"))) == ["sitting.jpg"]
+    assert api("GET", "/diceforge/wildcards/picture?name=POSES/sitting") == (200, JPEG)
+    status, text = api("POST", "/diceforge/wildcards/picture?name=POSES/sitting", data=b"<html>not a picture")
+    assert status == 400 and "PNG, JPEG, WebP or GIF" in text
+    assert api("POST", "/diceforge/wildcards/picture?name=color", data=PNG)[0] == 400 # A txt wildcard: no card picture.
+    assert api("POST", "/diceforge/wildcards/picture?name=../x", data=PNG)[0] == 400
+    assert api("DELETE", "/diceforge/wildcards/picture?name=POSES/sitting")[0] == 200
+    assert api("GET", "/diceforge/wildcards/picture?name=POSES/sitting")[0] == 404
+    assert api("DELETE", "/diceforge/wildcards/picture?name=POSES/sitting")[0] == 404
