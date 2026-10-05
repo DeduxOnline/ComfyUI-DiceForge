@@ -209,7 +209,9 @@ ROUTES = [("POST", "/diceforge/wildcards/file"), ("POST", "/diceforge/lora-prese
           ("GET", "/diceforge/grid?node=1"), ("GET", "/diceforge/grid/image?node=1&file=00000.png"), ("POST", "/diceforge/grid/keep"), ("POST", "/diceforge/grid/save"),
           ("GET", "/diceforge/civitai/search?kind=embeddings&query=%00&sort=Nope"), ("GET", "/diceforge/lora-presets"), ("GET", "/diceforge/wildcards"),
           ("POST", "/diceforge/wildcards/picture?name=nope"), ("POST", "/diceforge/wildcards/picture"), ("DELETE", "/diceforge/wildcards/picture?name=../x"),
-          ("DELETE", "/diceforge/wildcards/picture"), ("POST", "/diceforge/wildcards/convert")]
+          ("DELETE", "/diceforge/wildcards/picture"), ("POST", "/diceforge/wildcards/convert"),
+          ("POST", "/diceforge/wildcards/import"), ("POST", "/diceforge/wildcards/import?folder=../x"), ("GET", "/diceforge/wildcards/search?q=re"),
+          ("GET", "/diceforge/wildcards/search")]
 JUNK_BODIES = ["not json", "", "[]", "5", "null", '"text"', '{"loras": 5}', '{"loras": [1, null, {"a": 1}, "x.safetensors"]}', '{"items": 5}',
                '{"items": [1, null, "x", {"kind": 5, "file": []}, {"kind": "loras", "file": "../../x"}]}', '{"kind": "loras", "file": "x", "user": [1]}',
                '{"kind": "loras", "file": "x", "user": {"name": {"a": 1}}}', '{"name": 5}', '{"name": "ok", "stack": 5}', '{"name": "ok", "stack": {"rows": "x"}}',

@@ -25,7 +25,7 @@ The first release on the ComfyUI Registry: install DiceForge from ComfyUI Manage
 - **XY Plot**: an X/Y comparison of seed, steps, CFG, sampler, scheduler, LoRA, LoRA strength, denoise or variation seed/strength, every cell
   queued with one button.
 - **HiresFix (Load VAE)**: as Easy-Use's HiresFix with the VAE from a list: upscale model, rescale, preview or save, encode.
-- **Danbooru Tag Enhancer**: adds the tags of random Danbooru or e621 posts (a source list) that have the prompt's tags, new ones on every run (random) or the same
+- **Danbooru Tag Enhancer**: adds the tags of random Danbooru, e621 or Gelbooru posts (a source list) that have the prompt's tags, new ones on every run (random) or the same
   ones again (fixed, from post_ids), with the posts' pictures on the node; any rating or mix of ratings (general to explicit); several posts at once, wildcards in the tags, switches for
   appearance, clothes, background and people-count tags (1girl, 2boys, solo…), `*` patterns in exclude (`*censor*`), and an optional prompt
   input (quality tags) that goes first without being searched.
@@ -38,7 +38,7 @@ The first release on the ComfyUI Registry: install DiceForge from ComfyUI Manage
 
 ### Prompts
 - Wildcard Browser (create, edit with line numbers and syntax highlighting, rename, move, delete, favorites, folders), and a cards view with
-  pictures for yaml card packs (🖼 adds a card's example picture), txt ⇄ yaml conversion of a file or folder with the same names, the autocomplete in its editor too, and `__` autocomplete; `<lora:` autocomplete.
+  pictures for yaml card packs (🖼 adds a card's example picture), txt ⇄ yaml conversion of a file or folder with the same names, the autocomplete in its editor too, + on a line to put it in the prompt, search by lines, zip import of card packs, and `__` autocomplete; `<lora:` autocomplete.
 - Danbooru / e621 tag autocomplete and Tag Browser, with downloadable tag lists.
 - Prompt styles (A1111's `styles.csv`) with built-in quality styles for Illustrious, NoobAI and Anima.
 - Syntax highlighting, a preview of the prompts as encoded, a prompt history window with each run's images, and a syntax guide.

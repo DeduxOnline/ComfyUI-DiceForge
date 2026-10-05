@@ -3,7 +3,7 @@
 // classic), against the real server. Each test builds its own graph.
 const fs = require("fs");
 const { test, expect, basePath, writeFile, openComfy, addNodes, connect, widgetValue, setWidget, menuItems, clickMenu, queueFromPage } = require("./helpers");
-const { png } = require("./fixtures");
+const { png, zip } = require("./fixtures");
 const { promptField, lookUp } = require("./ui-shared");
 
 for (const vue of [true, false]) {
@@ -279,6 +279,38 @@ for (const vue of [true, false]) {
       await page.keyboard.type("k");
       await page.keyboard.press("Tab");
       await expect(editor).toHaveValue("one\ntwo __hair/style__, <lora:style/ink:1>");
+      await page.keyboard.press("Escape");
+    });
+
+    test("Wildcard Browser imports a zip card pack, finds wildcards by their lines, and + puts a line in the prompt", async ({ page }) => {
+      const pack = `ZIP_${vue ? "vue" : "classic"}`; // A pack of its own: the tests share the server's files.
+      const [id] = await addNodes(page, [{ type: "CLIPTextEncodePositiveNegative", pos: [300, 60], widgets: { positive: "1girl" } }]);
+      await clickMenu(page, id, "DiceForge.Wildcards", "Wildcard Browser");
+      const dialog = page.locator(".dfwc");
+      if (await dialog.locator("button.mode").textContent() === "📄 Lines") await dialog.locator("button.mode").click(); // Lines: the editor.
+      const chooser = page.waitForEvent("filechooser");
+      await dialog.locator("button.import").click();
+      await (await chooser).setFiles({ name: `${pack}.zip`, mimeType: "application/zip", buffer: zip({
+        [`${pack}.yaml`]: `${pack}:\n  sitting: sitting, hands on lap\n  standing: standing\n`, [`${pack}/sitting.png`]: png(20, 30, [90, 60, 160]),
+        [`${pack}/notes.pdf`]: "%PDF", [`${pack}/lines.txt`]: "# a comment\n3::quiet zebra pose\nloud pose\n" }) });
+      await expect(dialog.locator(".status")).toHaveText(`Imported 3 files from ${pack}.zip; 1 not wildcards or pictures, left out.`);
+      expect(fs.existsSync(basePath("models", "wildcards", pack, "sitting.png"))).toBe(true);
+      await dialog.locator("input").first().fill("zebra"); // In no name: found by a line.
+      const found = dialog.locator(".row", { hasText: "lines" });
+      await expect(found.locator(".found")).toHaveText("“3::quiet zebra pose”");
+      await found.locator(".name").click();
+      await expect(dialog.locator(".edit textarea")).toHaveValue("# a comment\n3::quiet zebra pose\nloud pose");
+      const code = dialog.locator(".code");
+      const box = await code.boundingBox();
+      await page.mouse.move(box.x + 60, box.y + 6 + 20 * 1 + 10); // Over the second line.
+      await code.locator("button.line-add").click();
+      await expect.poll(() => widgetValue(page, id, "positive")).toBe("1girl, quiet zebra pose"); // Without its weight.
+      await page.mouse.move(box.x + 60, box.y + 6 + 10); // The comment line: nothing to add.
+      await expect(code.locator("button.line-add")).toBeHidden();
+      const again = page.waitForEvent("filechooser"); // The same zip again: what is there is kept.
+      await dialog.locator("button.import").click();
+      await (await again).setFiles({ name: `${pack}.zip`, mimeType: "application/zip", buffer: zip({ [`${pack}.yaml`]: "changed: [x]\n" }) });
+      await expect(dialog.locator(".status")).toHaveText(`Imported 0 files from ${pack}.zip; 1 already there, kept as they were.`);
       await page.keyboard.press("Escape");
     });
 

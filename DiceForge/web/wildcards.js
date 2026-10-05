@@ -117,11 +117,11 @@ const STYLE = `
 .dfwc .top input{flex:1}.dfwc .main{display:flex;gap:12px;flex:1;min-height:0}
 .dfwc .tree{width:45%;overflow:auto;border:1px solid #4a4a4a;border-radius:6px;padding:6px}
 .dfwc .edit{flex:1;display:flex;flex-direction:column;gap:8px;min-width:0}
-.dfwc .code{--current-line:-40px;flex:1;display:flex;min-height:0;border:1px solid #555;border-radius:4px;background:#262626;overflow:hidden}
+.dfwc .code{--current-line:-40px;position:relative;flex:1;display:flex;min-height:0;border:1px solid #555;border-radius:4px;background:#262626;overflow:hidden}
 .dfwc .code .lines,.dfwc .code .hl,.dfwc .code textarea{font:13px/20px ui-monospace,monospace;letter-spacing:normal}
 .dfwc .code .lines,.dfwc .code .hl{background-image:linear-gradient(#2e3846,#2e3846),linear-gradient(to bottom,transparent 19px,#323232 19px);
   background-size:100% 20px;background-position:0 var(--current-line),0 6px;background-repeat:no-repeat,repeat;background-attachment:local}
-.dfwc .code .lines{flex:none;box-sizing:content-box;padding:6px 8px 40px 10px;text-align:right;color:#6f6f6f;white-space:pre;overflow:hidden;user-select:none;background-color:#212121;border-right:1px solid #444}
+.dfwc .code .lines{flex:none;box-sizing:content-box;padding:6px 8px 40px 24px;text-align:right;color:#6f6f6f;white-space:pre;overflow:hidden;user-select:none;background-color:#212121;border-right:1px solid #444}
 .dfwc .code .text{flex:1;min-width:0;position:relative;display:flex}
 .dfwc .code .hl{position:absolute;inset:0;margin:0;padding:6px 48px 46px 8px;white-space:pre;overflow:hidden;color:#eee;background-color:#262626;pointer-events:none;z-index:0}
 .dfwc .code .hl span{font-weight:inherit}
@@ -129,6 +129,8 @@ const STYLE = `
   background:transparent;color:transparent;-webkit-text-fill-color:transparent;caret-color:#eee}
 .dfwc .code textarea.src::placeholder{color:#888;-webkit-text-fill-color:#888}.dfwc .code textarea.src::selection{background:rgba(90,140,230,.4)}
 .dfwc .code.readonly .hl{color:#aaa}
+.dfwc .code button.line-add{position:absolute;left:3px;z-index:2;width:18px;height:18px;padding:0;border-radius:4px;font:13px/16px system-ui,sans-serif;border-color:#4a7a4a;color:#bfe8bf;background:#253325}
+.dfwc .row .found{color:#9cc8ff;font-style:italic;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:45%}.dfwc.drop-zip{outline:3px dashed #8fd0a8}
 .dfwc [hidden]{display:none!important}.dfwc.cards-mode .tree{width:30%}.dfwc .cards{flex:1;display:flex;flex-direction:column;gap:8px;min-width:0;min-height:0}
 .dfwc .cards-head{display:flex;gap:8px;align-items:center;color:#ccc}.dfwc .cards-head b{color:#fff}.dfwc .cards-head .muted{flex:1}
 .dfwc .cards .grid{flex:1;overflow:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;align-content:start;grid-auto-rows:max-content;padding-right:4px}
@@ -317,7 +319,7 @@ function keepOpenFolders(folders) {
 async function openBrowser(node) {
   addStyle();
   addHighlightStyle();
-  const search = element("input", { placeholder: "Search wildcards…" });
+  const search = element("input", { placeholder: "Search wildcards (names and lines)…" });
   const tree = element("div", { class: "tree" });
   const title = element("div", { class: "muted" }, "Select a file to see and edit its lines, one option per line (# starts a comment).");
   const editor = element("textarea", { class: "src dfwc-editor", placeholder: "One option per line", wrap: "off", spellcheck: "false" });
@@ -358,6 +360,26 @@ async function openBrowser(node) {
   const onSelection = () => { if (document.activeElement === editor) markCurrentLine(); };
   document.addEventListener("selectionchange", onSelection);
   for (const type of ["input", "click", "keyup", "focus"]) editor.addEventListener(type, markCurrentLine);
+  // + next to a line's number puts that line in the prompt (without its 3:: weight), where the cursor was in the node's fields.
+  const lineAdd = element("button", { class: "line-add", hidden: true, title: "Add this line to the prompt" }, "+");
+  code.append(lineAdd);
+  const lineText = (index) => (editor.value.split("\n")[index] ?? "").trim().replace(/^\d+(?:\.\d+)?::/, "").trim();
+  code.addEventListener("mousemove", (event) => {
+    if (event.target === lineAdd) return;
+    const index = Math.floor((event.clientY - code.getBoundingClientRect().top - 6 + editor.scrollTop) / 20);
+    const text = lineText(index);
+    lineAdd.hidden = !text || text.startsWith("#");
+    lineAdd.dataset.line = String(index);
+    lineAdd.style.top = `${6 + 20 * index - editor.scrollTop + 1}px`;
+  });
+  code.addEventListener("mouseleave", () => { lineAdd.hidden = true; });
+  editor.addEventListener("scroll", () => { lineAdd.hidden = true; });
+  lineAdd.addEventListener("click", () => {
+    const text = lineText(Number(lineAdd.dataset.line));
+    if (!text) return;
+    const field = insertIntoNode(node, text);
+    say(`Added line ${Number(lineAdd.dataset.line) + 1} to ${field}.`);
+  });
   const status = element("div", { class: "status" });
   const save = element("button", { class: "save" }, "Save");
   const rename = element("button", { class: "rename", disabled: true }, "Rename");
@@ -474,6 +496,24 @@ async function openBrowser(node) {
       : `Converted ${result.removed.join(", ")} into ${result.names.length} txt file${result.names.length === 1 ? "" : "s"}.`);
   }
   convertButton.addEventListener("click", () => { if (selected) background(convert(selected, selectedYaml ? "txt" : "yaml")); });
+  // ⇪ Import zip: a card pack or any zip of wildcards into the wildcards folder, with its paths (files already there are kept). A zip dropped on
+  // the browser does the same.
+  async function importZip(file) {
+    if (!file) return;
+    say(`Importing ${file.name}…`);
+    const response = await api.fetchApi("/diceforge/wildcards/import", { method: "POST", body: file });
+    if (!response.ok) return say(await response.text());
+    const result = await response.json();
+    await wildcardList(true);
+    draw();
+    say(`Imported ${result.imported.length} file${result.imported.length === 1 ? "" : "s"} from ${file.name}` +
+      (result.skipped.length ? `; ${result.skipped.length} already there, kept as they were` : "") + (result.left_out.length ? `; ${result.left_out.length} not wildcards or pictures, left out` : "") + ".");
+  }
+  const importButton = element("button", { class: "import", title: "Import a zip of wildcards (a card pack: yaml files and their pictures); or drop the zip on this window", onclick: () => {
+    const input = element("input", { type: "file", accept: ".zip,application/zip" });
+    input.addEventListener("change", () => background(importZip(input.files?.[0])));
+    input.click();
+  } }, "⇪ Import zip");
   const create = element("button", { onclick: async () => {
     const name = prompt("New wildcard file name (folders with /, for example hair/color):", search.value.trim());
     if (!name) return;
@@ -599,10 +639,27 @@ async function openBrowser(node) {
       ...(inside.some((file) => file.yaml) ? [element("button", { class: "convert", title: "Turn the folder's yaml file into txt files, one per key (the names stay the same)", onclick: () => background(convert(path, "txt")) }, "→ txt")] : []),
     ];
   }
+  // The search finds names, and lines too: the wildcards with a line that has the text (from the server, a moment after typing).
+  let lineMatches = new Map(), lineQuery = "", searchTimer = null;
+  function searchLines() {
+    clearTimeout(searchTimer);
+    const query = search.value.trim().toLowerCase();
+    if (query.length < 2) { lineMatches = new Map(); lineQuery = ""; return; }
+    searchTimer = setTimeout(async () => {
+      try {
+        const response = await api.fetchApi(`/diceforge/wildcards/search?q=${encodeURIComponent(query)}`);
+        if (!response.ok || search.value.trim().toLowerCase() !== query) return;
+        lineMatches = new Map((await response.json()).found.map((found) => [found.name, found.line]));
+        lineQuery = query;
+        draw();
+      } catch { /* No answer: names only. */ }
+    }, 250);
+  }
   function draw() {
     const { files } = listCache ?? { files: [] };
     const query = search.value.trim().toLowerCase();
-    const shown = files.filter((file) => (!query || file.name.toLowerCase().includes(query)) && (!onlyFavorites || file.favorite));
+    const byLine = (file) => lineQuery === query && lineMatches.has(file.name);
+    const shown = files.filter((file) => (!query || file.name.toLowerCase().includes(query) || byLine(file)) && (!onlyFavorites || file.favorite));
     const allOpen = query || onlyFavorites; // A search or the favorites show their matches in open folders.
     const root = { folders: new Map(), files: [] };
     for (const file of shown) {
@@ -627,6 +684,7 @@ async function openBrowser(node) {
       ...level.files.map((file) => {
         const row = element("div", { class: "row" + (file.name === selected ? " sel" : ""), "data-name": file.name, title: file.error || file.preview.join("\n") },
           element("span", { class: "name", onclick: () => open(file.name) }, file.name.split("/").pop()),
+          ...(query && !file.name.toLowerCase().includes(query) && byLine(file) ? [element("span", { class: "found", title: lineMatches.get(file.name) }, `“${lineMatches.get(file.name)}”`)] : []),
           element("span", { class: "muted", title: file.error || (file.yaml ? `From ${file.yaml}` : "") },
             file.error ? "⚠ can't be read" : `${file.yaml ? "yaml · " : ""}${file.lines} ${file.lines === 1 ? "line" : "lines"}`),
           element("button", { class: "fav" + (file.favorite ? " on" : ""), title: file.favorite ? "A favorite: click to remove the star" : "Add to favorites",
@@ -646,10 +704,24 @@ async function openBrowser(node) {
     tree.replaceChildren(...(items.length ? items : [element("div", { class: "muted" }, files.length ? (onlyFavorites && !query ? "No favorites yet: ☆ next to a file adds it." : "No wildcard matches the search.") : "No wildcard files yet: create one with + New file (they go to ComfyUI/models/wildcards).")]));
   }
   dropTarget(tree, "wildcards", (name) => background(moveFile(name, ""))); // Dropped on the tree, not on a folder: to the top folder.
-  search.addEventListener("input", draw);
+  search.addEventListener("input", () => { draw(); searchLines(); });
+  dialog.addEventListener("dragover", (event) => {
+    if (!event.dataTransfer?.types?.includes("Files") || event.target.closest?.(".card")) return; // A picture on a card is the card's.
+    event.preventDefault();
+    dialog.classList.add("drop-zip");
+  });
+  dialog.addEventListener("dragleave", (event) => { if (event.target === dialog) dialog.classList.remove("drop-zip"); });
+  dialog.addEventListener("drop", (event) => {
+    dialog.classList.remove("drop-zip");
+    const file = event.dataTransfer?.files?.[0];
+    if (!file || event.target.closest?.(".card")) return;
+    event.preventDefault();
+    if (file.name.toLowerCase().endsWith(".zip")) background(importZip(file));
+    else say("Drop a .zip of wildcards here (or a picture on a yaml card).");
+  });
   back.append(dialog);
   dialog.append(element("h2", {}, "Wildcards"),
-    element("div", { class: "top" }, search, modeButton, favoritesButton, expandAll, collapseAll, create, element("button", { onclick: close }, "Close")),
+    element("div", { class: "top" }, search, modeButton, favoritesButton, expandAll, collapseAll, importButton, create, element("button", { onclick: close }, "Close")),
     element("div", { class: "main" }, tree, editPane, cards), status);
   editPane.append(title, code, element("div", { class: "top" }, element("span", { style: "flex:1" }), convertButton, remove, move, rename, save));
   document.body.append(back);

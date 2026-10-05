@@ -111,4 +111,32 @@ const E621_POSTS = [
     tags: { general: ["duo", "anthro", "nude"], species: ["fox"], character: [], copyright: [], artist: ["e2e"], meta: [] } },
 ];
 
-module.exports = { MODELS, WILDCARDS, CIVITAI, CIVITAI_MODELS, CIVITAI_VERSIONS, CIVITAI_PAGES, DOWNLOADS, TAGS, DANBOORU_POSTS, E621_POSTS, png, sha256 };
+// Gelbooru posts the stand-in answers its API with (index.php?page=dapi: tags and sort:random, or an id); it asks for the key the server gets.
+const GELBOORU_POSTS = [
+  { id: 301, rating: "general", score: 7, preview_url: `http://127.0.0.1:${CIVITAI_PORT}/image/gelbooru/301.png`, tags: "1girl hatsune_miku smile twintails" },
+];
+
+// A zip of the given files (name: text or Buffer), stored without compression: enough for the tests' card packs.
+function zip(files) {
+  const zlib = require("zlib");
+  const locals = [], centrals = [];
+  let offset = 0;
+  for (const [name, content] of Object.entries(files)) {
+    const data = Buffer.isBuffer(content) ? content : Buffer.from(content), path = Buffer.from(name), crc = zlib.crc32(data);
+    const local = Buffer.alloc(30);
+    local.writeUInt32LE(0x04034b50, 0); local.writeUInt16LE(20, 4); local.writeUInt32LE(crc, 14); local.writeUInt32LE(data.length, 18);
+    local.writeUInt32LE(data.length, 22); local.writeUInt16LE(path.length, 26);
+    const central = Buffer.alloc(46);
+    central.writeUInt32LE(0x02014b50, 0); central.writeUInt16LE(20, 4); central.writeUInt16LE(20, 6); central.writeUInt32LE(crc, 16);
+    central.writeUInt32LE(data.length, 20); central.writeUInt32LE(data.length, 24); central.writeUInt16LE(path.length, 28); central.writeUInt32LE(offset, 42);
+    locals.push(local, path, data);
+    centrals.push(central, path);
+    offset += 30 + path.length + data.length;
+  }
+  const directory = Buffer.concat(centrals), end = Buffer.alloc(22);
+  end.writeUInt32LE(0x06054b50, 0); end.writeUInt16LE(Object.keys(files).length, 8); end.writeUInt16LE(Object.keys(files).length, 10);
+  end.writeUInt32LE(directory.length, 12); end.writeUInt32LE(offset, 16);
+  return Buffer.concat([...locals, directory, end]);
+}
+
+module.exports = { MODELS, WILDCARDS, CIVITAI, CIVITAI_MODELS, CIVITAI_VERSIONS, CIVITAI_PAGES, DOWNLOADS, TAGS, DANBOORU_POSTS, E621_POSTS, GELBOORU_POSTS, png, sha256, zip };

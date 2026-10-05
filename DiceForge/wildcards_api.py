@@ -1,7 +1,9 @@
 import asyncio
+import io
 import json
 import os
 import re
+import zipfile
 import folder_paths
 import yaml
 from aiohttp import web
@@ -171,6 +173,51 @@ def to_txt(name):
     for path in paths:
         os.remove(path)
     return paths, [key for key, _, _ in plan]
+# Import a zip of wildcards (a card pack: POSES.yaml and POSES/sitting.png...): its txt, yaml and picture files go into the first wildcards
+# folder (or a folder in it), with their paths. Files already there are skipped, never overwritten; other files and paths that would leave
+# the folder are left out. Limits keep a zip bomb out.
+ZIP_BYTES, ZIP_FILES, ZIP_UNPACKED = 512 * 1024 * 1024, 5000, 1024 * 1024 * 1024
+IMPORTED = (".txt", ".yaml", ".yml") + PICTURE_ENDINGS
+def import_zip(data, folder=""):
+    root = os.path.abspath(folder_paths.get_folder_paths("wildcards")[0])
+    base = os.path.abspath(os.path.join(root, *folder.split("/"))) if folder else root
+    try:
+        archive = zipfile.ZipFile(io.BytesIO(data))
+        members = [member for member in archive.infolist() if not member.is_dir()]
+    except (zipfile.BadZipFile, ValueError, OSError):
+        raise web.HTTPBadRequest(text="Wildcards: that is not a zip file.") from None
+    if len(members) > ZIP_FILES or sum(member.file_size for member in members) > ZIP_UNPACKED:
+        raise web.HTTPBadRequest(text=f"Wildcards: the zip is too big (at most {ZIP_FILES} files and 1 GB unpacked).")
+    imported, skipped, left_out = [], [], []
+    for member in members:
+        parts = [part for part in member.filename.replace("\\", "/").split("/") if part not in ("", ".")]
+        if not parts or ".." in parts or parts[0] == "__MACOSX" or any(part.startswith(".") for part in parts) or not parts[-1].lower().endswith(IMPORTED):
+            left_out.append(member.filename)
+            continue
+        target = os.path.abspath(os.path.join(base, *parts))
+        if not target.startswith(root + os.sep):
+            left_out.append(member.filename)
+        elif os.path.exists(target):
+            skipped.append("/".join(parts))
+        else:
+            os.makedirs(os.path.dirname(target), exist_ok=True)
+            with archive.open(member) as source, open(target, "wb") as file:
+                file.write(source.read(ZIP_UNPACKED))
+            imported.append("/".join(parts))
+    return imported, skipped, left_out
+# Search the wildcards' lines (not only their names): each wildcard with a line that has the text, and its first such line.
+def search_lines(text, limit=200):
+    found = []
+    for name, entry in sorted(wildcard_index(refresh=True).items(), key=lambda item: item[0].lower()):
+        try:
+            line = next((line for line in entry_lines(entry) if text in line.lower()), None)
+        except ValueError: # An unreadable file: not found in it.
+            continue
+        if line is not None:
+            found.append({"name": name, "line": line})
+            if len(found) >= limit:
+                break
+    return found
 def write_lines(path, text):
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8", newline="\n") as file:
@@ -305,6 +352,25 @@ def register_routes():
         wildcard_index(refresh=True)
         rename_favorite(name, None)
         return web.json_response({"deleted": name, "path": path})
+    @routes.post("/diceforge/wildcards/import")
+    async def import_wildcards(request):
+        folder = request.rel_url.query.get("folder", "").strip()
+        folder = checked_name(folder) if folder else ""
+        data = await read_up_to(request, ZIP_BYTES)
+        if len(data) > ZIP_BYTES:
+            raise web.HTTPRequestEntityTooLarge(max_size=ZIP_BYTES, actual_size=len(data), text="Wildcards: the zip is over 512 MB.")
+        try:
+            imported, skipped, left_out = await asyncio.get_running_loop().run_in_executor(None, import_zip, data, folder)
+        except OSError as error:
+            raise web.HTTPBadRequest(text=f"Wildcards: can't import the zip: {error.strerror or error}.") from None
+        wildcard_index(refresh=True)
+        return web.json_response({"imported": imported, "skipped": skipped, "left_out": left_out})
+    @routes.get("/diceforge/wildcards/search")
+    async def search_wildcard_lines(request):
+        text = request.rel_url.query.get("q", "").strip().lower()
+        if len(text) < 2:
+            raise web.HTTPBadRequest(text="Wildcards: search for at least 2 characters.")
+        return web.json_response({"found": await asyncio.get_running_loop().run_in_executor(None, search_lines, text)})
     @routes.post("/diceforge/wildcards/favorite")
     async def favorite_wildcard(request):
         body = await json_body(request)

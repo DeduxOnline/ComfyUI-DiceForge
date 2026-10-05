@@ -44,6 +44,21 @@ def e621_found(tags):
     return [item for item in E621_POSTS if all(fits(item, term) for term in tags.split())]
 
 
+GELBOORU_POSTS = [{"id": 21, "rating": "general", "score": 7, "preview_url": "https://img/21.jpg", "tags": "1girl hatsune_miku vocaloid smile jack-o&#039;-lantern"},
+                  {"id": 22, "rating": "explicit", "score": 3, "preview_url": "https://img/22.jpg", "tags": "1girl hatsune_miku nude"}]
+
+
+# Gelbooru's search: tags, rating:x, -rating:x, sort:random taken as asked.
+def gelbooru_found(tags):
+    def fits(item, term):
+        if term.startswith("-rating:"):
+            return item["rating"] != term[len("-rating:"):]
+        if term.startswith("rating:"):
+            return item["rating"] == term[len("rating:"):]
+        return term == "sort:random" or term in item["tags"].split()
+    return [item for item in GELBOORU_POSTS if all(fits(item, term) for term in tags.split())]
+
+
 def found(tags):
     wanted = [tag for tag in tags.split() if not tag.startswith("rating:")]
     ratings = next((tag[len("rating:"):].split(",") for tag in tags.split() if tag.startswith("rating:")), None)
@@ -63,7 +78,9 @@ def danbooru(monkeypatch):
         def do_GET(self):
             url = urlsplit(self.path)
             tags = parse_qs(url.query).get("tags", [""])[0]
-            self.server.requests.append(tags if url.path in ("/posts/random.json", "/e621/posts.json") else url.path)
+            query = parse_qs(url.query)
+            self.server.requests.append(tags if url.path in ("/posts/random.json", "/e621/posts.json") else
+                                        f"gelbooru {query.get('id', [tags])[0]} {query.get('api_key', ['-'])[0]}" if url.path == "/gelbooru/index.php" else url.path)
             posts = found(tags)
             by_id = next((item for item in POSTS if url.path == f"/posts/{item['id']}.json"), None)
             if self.server.busy > 0: # Danbooru overloaded: 503 this many times.
@@ -72,6 +89,12 @@ def danbooru(monkeypatch):
             elif self.server.garbage > 0: # A page instead of data (200), this many times.
                 self.server.garbage -= 1
                 status, body = 200, "<html><body>Down for maintenance</body></html>"
+            elif url.path == "/gelbooru/index.php" and "api_key" not in query:
+                status, body = 401, {"message": "Unauthorized"}
+            elif url.path == "/gelbooru/index.php":
+                posts = [item for item in GELBOORU_POSTS if str(item["id"]) == query["id"][0]] if "id" in query else gelbooru_found(tags)
+                posts = posts[:int(query.get("limit", ["100"])[0])]
+                status, body = 200, {"@attributes": {"count": len(posts)}, **({"post": posts} if posts else {})}
             elif url.path == "/e621/posts.json":
                 status, body = 200, {"posts": e621_found(tags)[:int(parse_qs(url.query).get("limit", ["1"])[0])]}
             elif url.path.startswith("/e621/posts/"):
@@ -99,6 +122,8 @@ def danbooru(monkeypatch):
     threading.Thread(target=server.serve_forever, daemon=True).start()
     monkeypatch.setattr(danbooru_enhancer, "DANBOORU_URL", f"http://127.0.0.1:{server.server_port}")
     monkeypatch.setattr(danbooru_enhancer, "E621_URL", f"http://127.0.0.1:{server.server_port}/e621")
+    monkeypatch.setattr(danbooru_enhancer, "GELBOORU_URL", f"http://127.0.0.1:{server.server_port}/gelbooru")
+    monkeypatch.setattr(SITES["gelbooru"], "pause", 0)
     monkeypatch.setattr(SITES["e621"], "pause", 0)
     yield server
     server.shutdown()
@@ -374,6 +399,30 @@ def test_each_site_searches_by_its_own_tag_list():
     assert search_tags(["fox", "wolf"], e621) == ["wolf"] # Read again when the file changes.
 
 
+def test_gelbooru(danbooru, monkeypatch):
+    monkeypatch.delenv("GELBOORU_API_KEY", raising=False)
+    with pytest.raises(ValueError, match="Gelbooru asks for an API key: set GELBOORU_API_KEY and GELBOORU_USER_ID"):
+        run(tags="hatsune miku", source="gelbooru")
+    monkeypatch.setenv("GELBOORU_API_KEY", "key")
+    monkeypatch.setenv("GELBOORU_USER_ID", "7")
+    tag_list() # Danbooru's list tells the groups: hatsune_miku is a character, vocaloid a series.
+    output = execute(tags="hatsune miku", source="gelbooru")
+    text, added, url, number = output.result
+    assert danbooru.requests[-1] == "gelbooru hatsune_miku rating:general sort:random key" # Its rating words; the key goes along.
+    assert number == 21 and url.endswith("/gelbooru/index.php?page=post&s=view&id=21")
+    assert added == "1girl, smile, jack-o'-lantern" # Not the character or the series (off by default); an HTML entity read back.
+    assert "vocaloid" in run(tags="hatsune miku", source="gelbooru", include_copyright=True)[1]
+    assert output.ui["dice_forge_danbooru"][0]["posts"][0] == {"id": 21, "url": url, "rating": "g", "rating_name": "general", "safe": True, "preview": "https://img/21.jpg"}
+    assert run(tags="hatsune miku", source="gelbooru", rating="questionable + explicit")[3] == 22
+    assert danbooru.requests[-1] == "gelbooru hatsune_miku -rating:general -rating:sensitive sort:random key"
+    assert run(source="gelbooru", mode="fixed", post_ids="22")[3] == 22 and danbooru.requests[-1] == "gelbooru 22 key"
+    with pytest.raises(ValueError, match="Gelbooru has no post 99"):
+        run(source="gelbooru", mode="fixed", post_ids="99")
+    gelbooru = SITES["gelbooru"]
+    assert [gelbooru.rating_term(letters) for letters in ("g", "gs", "gsqe")] == ["rating:general", "-rating:questionable -rating:explicit", ""]
+    assert gelbooru.listed({"post": GELBOORU_POSTS[0]})[0]["id"] == 21 and gelbooru.listed({"@attributes": {}}) == [] and gelbooru.listed([1]) == []
+
+
 def test_e621_busy_names_e621(danbooru):
     danbooru.busy = 10
     with pytest.raises(ValueError, match=r"e621 is busy and turned the request away \(503 Service Unavailable\)"):
@@ -392,6 +441,18 @@ e621_posts = st.fixed_dictionaries({}, optional={
     "id": json_values, "rating": json_values, "score": json_values | st.fixed_dictionaries({"total": json_values}),
     "preview": json_values | st.fixed_dictionaries({"url": json_values}),
     "tags": json_values | st.dictionaries(st.sampled_from(GROUPS), tag_lists | json_values, max_size=6)})
+
+
+gelbooru_posts = st.fixed_dictionaries({}, optional={"id": json_values, "rating": json_values, "score": json_values, "preview_url": json_values,
+                                                    "tags": json_values | st.text(max_size=40)})
+
+
+@settings(max_examples=300)
+@given(gelbooru_posts | json_values, st.lists(gelbooru_posts | json_values, max_size=3) | gelbooru_posts | json_values)
+def test_any_gelbooru_json_gives_a_whole_post_or_none(data, listing):
+    check_post(SITES["gelbooru"].summary(data))
+    for post in SITES["gelbooru"].listed({"post": listing}) + SITES["gelbooru"].listed(listing):
+        check_post(post)
 
 
 def check_post(post):

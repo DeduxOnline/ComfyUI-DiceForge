@@ -1,4 +1,5 @@
 import asyncio
+import html
 import logging
 import os
 import random
@@ -16,6 +17,7 @@ from .tag_autocomplete import INDEX, parse_tags, tag_key
 # (as a seed's fixed). A Danbooru search without an account may have two tags (rating: is free); with none found for both, each one alone.
 DANBOORU_URL = os.environ.get("DICEFORGE_DANBOORU_URL", "https://danbooru.donmai.us")
 E621_URL = os.environ.get("DICEFORGE_E621_URL", "https://e621.net")
+GELBOORU_URL = os.environ.get("DICEFORGE_GELBOORU_URL", "https://gelbooru.com")
 # The ratings to search, as Danbooru's letters, from safe on: general, sensitive (suggestive), questionable (nudity), explicit. One, or several.
 RATINGS = {"general": "g", "sensitive": "s", "questionable": "q", "explicit": "e", "general + sensitive": "gs", "sensitive + questionable": "sq",
            "questionable + explicit": "qe", "up to questionable": "gsq", "sensitive and up": "sqe", "any": "gsqe"}
@@ -154,6 +156,7 @@ def text_of(value):
 # group (GROUPS; species only on e621).
 class Site:
     name = key = safe = ""
+    unauthorized = "the site refused the request (401)."
     pause = 0.0 # Seconds between requests (e621 asks for at most two a second).
     ranks = {} # Tag kinds of the site's tag list by how much they say: the search takes the lowest first; 0 is general.
     names = {}
@@ -176,6 +179,8 @@ class Site:
         async with session.get(f"{self.base().rstrip('/')}{path}", params=params) as response:
             if response.status == 404:
                 return None
+            if response.status == 401:
+                raise ValueError(f"Danbooru Tag Enhancer: {self.unauthorized}")
             if response.status == 422:
                 raise ValueError(f"Danbooru Tag Enhancer: {self.name} refused the search {query!r}: {(await response.text())[:200]}")
             if response.status in BUSY or (response.status == 403 and "challenge" in (await response.text())[:3000].lower()):
@@ -266,7 +271,60 @@ class E621(Site):
         return self.summary(data.get("post") if isinstance(data, dict) else None)
 
 
-SITES = {"danbooru": Danbooru(), "e621": E621()}
+# Gelbooru (anime, Danbooru's tags): it asks for an API key, from the environment where ComfyUI starts. Its posts have all their tags in one
+# list: the Danbooru tag list (when downloaded) tells characters, series, artists and meta apart.
+KIND_GROUPS = {4: "character", 3: "copyright", 1: "artist", 5: "meta"}
+class Gelbooru(Site):
+    name, key, safe = "Gelbooru", "gelbooru", "g"
+    pause = 0.5
+    ranks, names = Danbooru.ranks, Danbooru.names
+    letters = {"general": "g", "sensitive": "s", "questionable": "q", "explicit": "e", "safe": "g"}
+    unauthorized = ("Gelbooru asks for an API key: set GELBOORU_API_KEY and GELBOORU_USER_ID where ComfyUI starts (Gelbooru → My Account → "
+                    "Options → API Access Credentials), then restart ComfyUI.")
+
+    def base(self):
+        return GELBOORU_URL
+
+    def link(self, number):
+        return f"{self.base().rstrip('/')}/index.php?page=post&s=view&id={number}"
+
+    def auth(self):
+        key, user = os.environ.get("GELBOORU_API_KEY", "").strip(), os.environ.get("GELBOORU_USER_ID", "").strip()
+        return {"api_key": key, "user_id": user} if key and user else {}
+
+    def rating_term(self, letters): # One rating, or the ones left out.
+        words = {letter: word for word, letter in self.letters.items() if word != "safe"}
+        if len(letters) == 4:
+            return ""
+        if len(letters) == 1:
+            return f"rating:{words[letters]}"
+        return " ".join(f"-rating:{words[letter]}" for letter in "gsqe" if letter not in letters)
+
+    def summary(self, post):
+        if not post_number(post):
+            return None
+        known = site_tags("danbooru")
+        tags = {group: [] for group in GROUPS}
+        for tag in html.unescape(text_of(post.get("tags"))).split():
+            tags[KIND_GROUPS.get(known.get(tag, (0, 0))[0], "general")].append(tag)
+        return self.kept(post, self.letters.get(text_of(post.get("rating")), ""), text_of(post.get("preview_url")), post.get("score"), tags)
+
+    # The posts of an answer: {"post": [...]} (one post may come alone, none leaves "post" out).
+    def listed(self, data):
+        posts = data.get("post") if isinstance(data, dict) else None
+        posts = [posts] if isinstance(posts, dict) else posts if isinstance(posts, list) else []
+        return [post for post in map(self.summary, posts) if post]
+
+    async def random_posts(self, session, query, count):
+        params = {"page": "dapi", "s": "post", "q": "index", "json": "1", "limit": count, "tags": f"{query} sort:random".strip(), **self.auth()}
+        return self.listed(await self.get(session, "/index.php", params, query))
+
+    async def post(self, session, number):
+        found = self.listed(await self.get(session, "/index.php", {"page": "dapi", "s": "post", "q": "index", "json": "1", "id": number, **self.auth()}))
+        return found[0] if found else None
+
+
+SITES = {"danbooru": Danbooru(), "e621": E621(), "gelbooru": Gelbooru()}
 
 
 # Work with the site (work(session)); busy: asked again after a pause, twice.
@@ -337,7 +395,8 @@ class DanbooruTagEnhancer(io.ComfyNode):
                                 tooltip="The tags to find posts with (or connect positive_text of CLIP Dual Text Encode). Wildcards and {a|b} choices are "
                                         "filled in (__characters__: a new character each run); weights, escapes and <lora:> tags are read through."),
                 io.Combo.Input("source", options=list(SITES), default="danbooru",
-                               tooltip="Where the posts come from: Danbooru (anime: Illustrious, NoobAI, Anima, Pony) or e621 (furry: NoobAI, Pony). "
+                               tooltip="Where the posts come from: Danbooru (anime: Illustrious, NoobAI, Anima, Pony), e621 (furry: NoobAI, Pony) or Gelbooru (anime, "
+                                       "Danbooru's tags; needs GELBOORU_API_KEY and GELBOORU_USER_ID). "
                                        "Each has its own tags: the tag list of the site (Tag autocomplete) helps the search."),
                 io.Combo.Input("rating", options=RATING_CHOICES, default="general",
                                tooltip="The posts' ratings, from safe on: general, sensitive (suggestive), questionable (nudity), explicit; one, two "

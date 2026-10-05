@@ -9,7 +9,7 @@ import { fitNodeHeight } from "./node_size.js";
 const NODE_TYPE = "DiceForgeDanbooruEnhancer";
 const RATINGS = { g: "general", s: "sensitive", q: "questionable", e: "explicit" }; // Danbooru's, for results saved without rating_name.
 const ratingName = (post) => post.rating_name || RATINGS[post.rating] || "";
-const SITES = { e621: "e621 " }; // Named in the head (Danbooru is the default).
+const SITES = { e621: "e621 ", gelbooru: "Gelbooru " }; // Named in the head (Danbooru is the default).
 const STYLE = `
 .dfdb{font:12px system-ui,sans-serif;color:#ccc;display:flex;flex-direction:column;gap:4px;box-sizing:border-box;padding:2px 0}
 .dfdb .head{color:#888}.dfdb .thumbs{display:flex;gap:4px;flex-wrap:wrap}

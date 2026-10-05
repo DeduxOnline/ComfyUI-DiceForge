@@ -1,6 +1,8 @@
 # Server routes of the Wildcard Browser and the __ autocomplete (DiceForge/wildcards_api.py): listing, creating, reading, saving, renaming and deleting
 # wildcard files.
+import io
 import os
+import zipfile
 import folder_paths
 import pytest
 import yaml
@@ -261,3 +263,39 @@ def test_a_yaml_card_gets_a_picture_replaced_and_removed(api, wildcards):
     assert api("DELETE", "/diceforge/wildcards/picture?name=POSES/sitting")[0] == 200
     assert api("GET", "/diceforge/wildcards/picture?name=POSES/sitting")[0] == 404
     assert api("DELETE", "/diceforge/wildcards/picture?name=POSES/sitting")[0] == 404
+
+
+def zip_of(files):
+    data = io.BytesIO()
+    with zipfile.ZipFile(data, "w") as archive:
+        for name, content in files.items():
+            archive.writestr(name, content)
+    return data.getvalue()
+
+
+def test_a_zip_card_pack_is_imported_with_its_paths(api, wildcards):
+    wildcards("color.txt", "red\n")
+    data = zip_of({"POSES.yaml": "POSES:\n  sitting: sitting,\n", "POSES/sitting.png": PNG, "POSES/notes.pdf": b"%PDF", "../evil.txt": "x",
+                   "__MACOSX/POSES/._sitting.png": b"x", ".hidden/a.txt": "x", "color.txt": "black\n", "more\\style.txt": "bob\n"})
+    status, body = api("POST", "/diceforge/wildcards/import", data=data)
+    assert status == 200 and sorted(body["imported"]) == ["POSES.yaml", "POSES/sitting.png", "more/style.txt"]
+    assert body["skipped"] == ["color.txt"] and len(body["left_out"]) == 4 # A pdf, a path out, a Mac's leftovers, a hidden folder.
+    with open(os.path.join(wildcards.folder, "color.txt"), encoding="utf-8") as file:
+        assert file.read() == "red\n" # Kept as it was.
+    assert not os.path.exists(os.path.join(os.path.dirname(wildcards.folder), "evil.txt"))
+    files = {entry["name"]: entry for entry in api("GET", "/diceforge/wildcards")[1]["files"]}
+    assert files["POSES/sitting"]["picture"] is True and "more/style" in files
+    status, body = api("POST", "/diceforge/wildcards/import?folder=packs/new", data=zip_of({"hair.txt": "long\n"}))
+    assert status == 200 and body["imported"] == ["hair.txt"] and os.path.isfile(os.path.join(wildcards.folder, "packs", "new", "hair.txt"))
+    assert api("POST", "/diceforge/wildcards/import", data=b"not a zip")[0] == 400
+    assert api("POST", "/diceforge/wildcards/import?folder=../x", data=data)[0] == 400
+
+
+def test_search_finds_wildcards_by_their_lines(api, wildcards):
+    wildcards("color.txt", "# red in a comment\ncrimson red\nblue\n")
+    wildcards("pack.yaml", "outfit: [Red dress, suit]\n")
+    wildcards("hair.txt", "bob\n")
+    status, body = api("GET", "/diceforge/wildcards/search?q=RED")
+    assert status == 200 and body["found"] == [{"name": "color", "line": "crimson red"}, {"name": "outfit", "line": "Red dress"}] # Not in comments.
+    assert api("GET", "/diceforge/wildcards/search?q=zzz")[1]["found"] == []
+    assert api("GET", "/diceforge/wildcards/search?q=r")[0] == 400

@@ -56,7 +56,9 @@ async function openComfy(page, { vue = true } = {}) {
     await page.reload();
     await ready();
   }
-  await page.waitForTimeout(1000);
+  // Ready when DiceForge's extensions are registered and the page has drawn twice (instead of a fixed second for every test).
+  await page.waitForFunction(() => window.app.extensions?.some((extension) => extension.name === "DiceForge.Wildcards"), null, { timeout: 60_000 });
+  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
   await page.keyboard.press("Escape");
   await page.evaluate(() => {
     window.app.graph.clear();

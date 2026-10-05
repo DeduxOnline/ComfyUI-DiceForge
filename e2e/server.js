@@ -7,13 +7,20 @@ const http = require("http");
 const path = require("path");
 const { spawn } = require("child_process");
 const { REPO, PORT, CIVITAI_PORT, BASE, comfyuiPath, comfyuiPython } = require("./settings");
-const { MODELS, WILDCARDS, CIVITAI, CIVITAI_MODELS, CIVITAI_VERSIONS, CIVITAI_PAGES, DOWNLOADS, TAGS, DANBOORU_POSTS, E621_POSTS, png } = require("./fixtures");
+const { MODELS, WILDCARDS, CIVITAI, CIVITAI_MODELS, CIVITAI_VERSIONS, CIVITAI_PAGES, DOWNLOADS, TAGS, DANBOORU_POSTS, E621_POSTS, GELBOORU_POSTS, png } = require("./fixtures");
 
 // A term of an e621 search on a stand-in post: rating:x, -rating:x, order:random (any order), or a tag of the post.
 function e621Fits(post, term) {
   if (term.startsWith("-rating:")) return post.rating !== term.slice("-rating:".length);
   if (term.startsWith("rating:")) return post.rating === term.slice("rating:".length);
   return term === "order:random" || Object.values(post.tags).some((group) => group.includes(term));
+}
+
+// A term of a Gelbooru search on a stand-in post: rating:x, -rating:x, or a tag of the post.
+function gelbooruFits(post, term) {
+  if (term.startsWith("-rating:")) return post.rating !== term.slice("-rating:".length);
+  if (term.startsWith("rating:")) return post.rating === term.slice("rating:".length);
+  return post.tags.split(" ").includes(term);
 }
 
 function prepare() {
@@ -35,7 +42,7 @@ function prepare() {
 }
 
 // Civitai stand-in: /by-hash/<sha256> answers like Civitai's model-versions/by-hash for the test models, /api/v1/models (search: the query filters
-// by name), /tags/danbooru.csv (a tag list), /danbooru/posts/random.json (a Danbooru post of the search) and /danbooru/posts/<id>.json, /e621/posts.json (e621's search) and /e621/posts/<id>.json, /api/v1/models/<id> (a model's page) and /api/v1/model-versions/<id> like its API, /download/<id> serves a version's file and /image/... a small image.
+// by name), /tags/danbooru.csv (a tag list), /danbooru/posts/random.json (a Danbooru post of the search) and /danbooru/posts/<id>.json, /e621/posts.json (e621's search) and /e621/posts/<id>.json, /gelbooru/index.php (Gelbooru's API, with the key), /api/v1/models/<id> (a model's page) and /api/v1/model-versions/<id> like its API, /download/<id> serves a version's file and /image/... a small image.
 function startCivitai() {
   const json = (response, status, body) => { response.writeHead(status, { "Content-Type": "application/json" }); response.end(JSON.stringify(body)); };
   const server = http.createServer((request, response) => {
@@ -44,6 +51,12 @@ function startCivitai() {
       const query = (url.searchParams.get("query") || "").toLowerCase();
       const types = url.searchParams.getAll("types"); // LORA, LoCon, DoRA for LoRAs; Checkpoint for checkpoints and diffusion models.
       return json(response, 200, { items: CIVITAI_MODELS.filter((model) => model.name.toLowerCase().includes(query) && types.includes(model.type)), metadata: {} });
+    }
+    if (url.pathname === "/gelbooru/index.php") { // The key the server was given, then posts by id or by tags (sort:random as asked).
+      if (url.searchParams.get("api_key") !== "e2e-key") return json(response, 401, { message: "Unauthorized" });
+      const id = url.searchParams.get("id"), terms = (url.searchParams.get("tags") || "").split(" ").filter((term) => term && term !== "sort:random");
+      const posts = GELBOORU_POSTS.filter((item) => (id ? String(item.id) === id : terms.every((term) => gelbooruFits(item, term))));
+      return json(response, 200, { "@attributes": { count: posts.length }, ...(posts.length ? { post: posts } : {}) });
     }
     if (url.pathname === "/e621/posts.json") { // The posts of the search (tags, rating:x, -rating:x; order:random taken as asked), at most limit.
       const terms = (url.searchParams.get("tags") || "").split(" ").filter(Boolean);
@@ -116,6 +129,8 @@ const child = spawn(python, ["main.py", "--cpu", "--listen", "127.0.0.1", "--por
     DICEFORGE_TAGS_URL: `http://127.0.0.1:${CIVITAI_PORT}/tags/{name}.csv`,
     DICEFORGE_DANBOORU_URL: `http://127.0.0.1:${CIVITAI_PORT}/danbooru`,
     DICEFORGE_E621_URL: `http://127.0.0.1:${CIVITAI_PORT}/e621`,
+    DICEFORGE_GELBOORU_URL: `http://127.0.0.1:${CIVITAI_PORT}/gelbooru`,
+    GELBOORU_API_KEY: "e2e-key", GELBOORU_USER_ID: "1", // The stand-in's key, not anyone's.
     CIVITAI_API_KEY: "", DICEFORGE_CIVITAI_KEY: "", // Your own key never reaches the tests.
     NO_PROXY: ["127.0.0.1", "localhost", process.env.NO_PROXY].filter(Boolean).join(","),
     no_proxy: ["127.0.0.1", "localhost", process.env.no_proxy].filter(Boolean).join(","),
