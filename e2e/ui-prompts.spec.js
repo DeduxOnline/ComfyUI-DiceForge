@@ -34,6 +34,25 @@ for (const vue of [true, false]) {
       await expect.poll(() => widgetValue(page, id, "positive")).toBe("__цвет__, <lora:style/ink:1>");
     });
 
+    test("the autocomplete opens under the caret, also on a zoomed canvas and on a later line", async ({ page }) => {
+      const [id] = await addNodes(page, [{ type: "CLIPTextEncodePositiveNegative", pos: [100, 60], widgets: {
+        positive: "masterpiece, best quality, 1girl, __color__ hair, multiple views, dynamic pose, from above, standing, looking at viewer, long hair" } }]);
+      await page.evaluate(() => { window.app.canvas.ds.scale = 1.5; window.app.canvas.setDirty(true, true); });
+      await page.waitForTimeout(500);
+      const positive = await promptField(page, id, "positive");
+      await positive.click();
+      await page.keyboard.press("Control+End");
+      await page.keyboard.type(", __co");
+      const popupBox = await page.locator(".dfwc-pop").boundingBox();
+      const box = await positive.evaluate((field) => { // The field's box on the screen: the caret is on its last line, after some text.
+        const rect = field.getBoundingClientRect();
+        return { right: rect.right, bottom: rect.bottom, top: rect.top, left: rect.left };
+      });
+      expect(popupBox.y).toBeGreaterThan(box.top + 20); // Under a later line, not the first.
+      expect(popupBox.y).toBeLessThan(box.bottom + 40); // Right under the text, not far below the field.
+      expect(popupBox.x).toBeGreaterThan(box.left + 100); // At the caret, not at the start of the line.
+    });
+
     test("autocomplete follows the text as typed while the wildcard list loads slowly", async ({ page }) => {
       let requests = 0;
       await page.route("**/diceforge/wildcards", async (route) => {

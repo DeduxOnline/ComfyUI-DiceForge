@@ -161,18 +161,28 @@ export function addCompletionSource(source, first = false) {
   if (first) sources.unshift(source);
   else sources.push(source);
 }
+// Where the caret is on the screen: a hidden copy of the field, laid out like it (each side's padding and border: the shorthands read empty in
+// some browsers, and a copy without them wraps the lines elsewhere), measured to the caret, then scaled like the field is (Nodes 2.0 zooms the
+// nodes with a CSS transform, so the field's own sizes differ from its size on the screen).
+const MIRRORED = ["fontFamily", "fontSize", "fontWeight", "fontStyle", "fontVariant", "lineHeight", "letterSpacing", "wordSpacing", "textTransform", "textIndent",
+  "tabSize", "boxSizing", "paddingTop", "paddingRight", "paddingBottom", "paddingLeft", "borderTopWidth", "borderRightWidth", "borderBottomWidth", "borderLeftWidth",
+  "borderTopStyle", "borderRightStyle", "borderBottomStyle", "borderLeftStyle", "whiteSpace", "wordBreak", "overflowWrap"];
 function caretPoint(textarea) {
   const style = getComputedStyle(textarea);
   const mirror = document.createElement("div");
-  for (const property of ["fontFamily", "fontSize", "fontWeight", "lineHeight", "letterSpacing", "padding", "border", "boxSizing", "whiteSpace", "wordWrap", "tabSize"]) mirror.style[property] = style[property];
-  Object.assign(mirror.style, { position: "absolute", visibility: "hidden", whiteSpace: "pre-wrap", wordWrap: "break-word", width: `${textarea.clientWidth}px` });
+  for (const property of MIRRORED) mirror.style[property] = style[property];
+  const wraps = style.whiteSpace !== "pre" && textarea.getAttribute("wrap") !== "off";
+  Object.assign(mirror.style, { position: "absolute", visibility: "hidden", left: "-9999px", top: "0", overflow: "hidden", width: `${textarea.offsetWidth}px`,
+    whiteSpace: wraps ? "pre-wrap" : "pre", overflowWrap: wraps ? "break-word" : "normal" });
   mirror.textContent = textarea.value.slice(0, textarea.selectionStart);
   const marker = document.createElement("span");
-  marker.textContent = "​";
+  marker.textContent = "\u200b";
   mirror.append(marker);
   document.body.append(mirror);
   const rect = textarea.getBoundingClientRect();
-  const point = { x: rect.left + marker.offsetLeft - textarea.scrollLeft, y: rect.top + marker.offsetTop - textarea.scrollTop + marker.offsetHeight + 2 };
+  const scaleX = textarea.offsetWidth ? rect.width / textarea.offsetWidth : 1, scaleY = textarea.offsetHeight ? rect.height / textarea.offsetHeight : 1;
+  const point = { x: rect.left + (marker.offsetLeft - textarea.scrollLeft) * scaleX, y: rect.top + (marker.offsetTop - textarea.scrollTop + marker.offsetHeight) * scaleY + 2,
+    lineHeight: marker.offsetHeight * scaleY };
   mirror.remove();
   return point;
 }
@@ -245,9 +255,11 @@ async function updatePopup(textarea) {
     popup.element = element("div", { class: "dfwc-pop" });
     document.body.append(popup.element);
   }
-  const point = caretPoint(textarea);
-  Object.assign(popup.element.style, { left: `${Math.min(point.x, innerWidth - 260)}px`, top: `${Math.min(point.y, innerHeight - 120)}px` });
   renderPopup();
+  // Under the caret's line; above it when there is no room below (near the bottom of the window).
+  const point = caretPoint(textarea), height = popup.element.offsetHeight, line = point.lineHeight;
+  const top = point.y + height > innerHeight - 4 && point.y - line - height - 4 >= 0 ? point.y - line - height - 4 : Math.min(point.y, innerHeight - height - 4);
+  Object.assign(popup.element.style, { left: `${Math.max(0, Math.min(point.x, innerWidth - popup.element.offsetWidth - 4))}px`, top: `${Math.max(0, top)}px` });
 }
 function accept(index) {
   const item = popup.items[index];
