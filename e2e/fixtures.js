@@ -111,9 +111,9 @@ const E621_POSTS = [
     tags: { general: ["duo", "anthro", "nude"], species: ["fox"], character: [], copyright: [], artist: ["e2e"], meta: [] } },
 ];
 
-// Gelbooru posts the stand-in answers its API with (index.php?page=dapi: tags and sort:random, or an id); it asks for the key the server gets.
-const GELBOORU_POSTS = [
-  { id: 301, rating: "general", score: 7, preview_url: `http://127.0.0.1:${CIVITAI_PORT}/image/gelbooru/301.png`, tags: "1girl hatsune_miku smile twintails" },
+// Safebooru posts the stand-in answers its API with (index.php?page=dapi: the count of a search in XML, a post at a place, or by id).
+const SAFEBOORU_POSTS = [
+  { id: 301, rating: "safe", score: 7, directory: "301", image: "picture.png", hash: "picture", tags: "1girl hatsune_miku smile twintails" },
 ];
 
 // A zip of the given files (name: text or Buffer), stored without compression: enough for the tests' card packs.
@@ -139,4 +139,4 @@ function zip(files) {
   return Buffer.concat([...locals, directory, end]);
 }
 
-module.exports = { MODELS, WILDCARDS, CIVITAI, CIVITAI_MODELS, CIVITAI_VERSIONS, CIVITAI_PAGES, DOWNLOADS, TAGS, DANBOORU_POSTS, E621_POSTS, GELBOORU_POSTS, png, sha256, zip };
+module.exports = { MODELS, WILDCARDS, CIVITAI, CIVITAI_MODELS, CIVITAI_VERSIONS, CIVITAI_PAGES, DOWNLOADS, TAGS, DANBOORU_POSTS, E621_POSTS, SAFEBOORU_POSTS, png, sha256, zip };

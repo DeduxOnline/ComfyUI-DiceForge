@@ -303,16 +303,17 @@ test.describe("@api workflows and routes", () => {
     expect(shown(changed, "4")).toBe("hatsune miku, smile, masterpiece, 1girl, twintails"); // smile is in the prompt now: not added again.
   });
 
-  test("Danbooru Tag Enhancer takes Gelbooru posts with source gelbooru, with the key from the environment", async ({ request }) => {
-    const prompt = { 1: { class_type: "DiceForgeDanbooruEnhancer", inputs: { tags: "hatsune miku", source: "gelbooru", rating: "general", mode: "random", post_ids: "",
+  test("Danbooru Tag Enhancer takes Safebooru posts with source safebooru", async ({ request }) => {
+    const prompt = { 1: { class_type: "DiceForgeDanbooruEnhancer", inputs: { tags: "hatsune miku", source: "safebooru", rating: "general", mode: "random", post_ids: "",
       posts: 1, max_tags: 15, include_general: true, include_appearance: true, include_clothes: true, include_background: true, include_count: true,
       include_character: false, include_copyright: false, include_artist: false, exclude: "", position: "after", wildcard_seed: 0 } },
       2: { class_type: "PreviewAny", inputs: { source: ["1", 0] } }, 3: { class_type: "PreviewAny", inputs: { source: ["1", 2] } } };
     const result = await runPrompt(request, prompt);
     expect(result.status, result.error).toBe("success");
     expect(shown(result, "2")).toMatch(/^hatsune miku, (1girl, smile, twintails|smile, 1girl, twintails|1girl, twintails, smile)$/); // Its general tags.
-    expect(shown(result, "3")).toMatch(/\/gelbooru\/index\.php\?page=post&s=view&id=301$/);
-    expect(result.outputs["1"].dice_forge_danbooru[0]).toMatchObject({ site: "gelbooru", search: "hatsune_miku rating:general", posts: [{ id: 301, rating: "g", safe: true }] });
+    expect(shown(result, "3")).toMatch(/\/safebooru\/index\.php\?page=post&s=view&id=301$/);
+    expect(result.outputs["1"].dice_forge_danbooru[0]).toMatchObject({ site: "safebooru", search: "hatsune_miku rating:safe",
+      posts: [{ id: 301, rating: "g", safe: true, preview: expect.stringContaining("/safebooru/thumbnails/301/thumbnail_picture.jpg") }] });
   });
 
   test("Danbooru Tag Enhancer takes e621 posts with source e621 (its ratings, its species tags)", async ({ request }) => {

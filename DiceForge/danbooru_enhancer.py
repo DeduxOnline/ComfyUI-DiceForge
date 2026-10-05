@@ -1,5 +1,6 @@
 import asyncio
 import html
+import json
 import logging
 import os
 import random
@@ -17,7 +18,7 @@ from .tag_autocomplete import INDEX, parse_tags, tag_key
 # (as a seed's fixed). A Danbooru search without an account may have two tags (rating: is free); with none found for both, each one alone.
 DANBOORU_URL = os.environ.get("DICEFORGE_DANBOORU_URL", "https://danbooru.donmai.us")
 E621_URL = os.environ.get("DICEFORGE_E621_URL", "https://e621.net")
-GELBOORU_URL = os.environ.get("DICEFORGE_GELBOORU_URL", "https://gelbooru.com")
+SAFEBOORU_URL = os.environ.get("DICEFORGE_SAFEBOORU_URL", "https://safebooru.org")
 # The ratings to search, as Danbooru's letters, from safe on: general, sensitive (suggestive), questionable (nudity), explicit. One, or several.
 RATINGS = {"general": "g", "sensitive": "s", "questionable": "q", "explicit": "e", "general + sensitive": "gs", "sensitive + questionable": "sq",
            "questionable + explicit": "qe", "up to questionable": "gsq", "sensitive and up": "sqe", "any": "gsqe"}
@@ -171,7 +172,7 @@ class Site:
         return f"{self.base().rstrip('/')}/posts/{number}"
 
     # The site's JSON for a path, None for 404.
-    async def get(self, session, path, params=None, query=None):
+    async def get(self, session, path, params=None, query=None, raw=False):
         wait = self.last + self.pause - time.monotonic()
         if wait > 0:
             await asyncio.sleep(wait)
@@ -187,8 +188,13 @@ class Site:
                 text = (await response.text())[:3000].lower()
                 raise DanbooruBusy(f"{response.status} {response.reason}" + (" (a Cloudflare check)" if "cloudflare" in text or "just a moment" in text else ""))
             response.raise_for_status()
+            text = await response.text()
+            if raw:
+                return text
+            if not text.strip(): # Nothing found (Safebooru answers an empty search so).
+                return None
             try:
-                return await response.json(content_type=None)
+                return json.loads(text)
             except ValueError: # A page instead of data, or a cut-off answer: asked again like a busy site.
                 raise DanbooruBusy(f"{response.status}, an answer that isn't JSON") from None
 
@@ -271,34 +277,30 @@ class E621(Site):
         return self.summary(data.get("post") if isinstance(data, dict) else None)
 
 
-# Gelbooru (anime, Danbooru's tags): it asks for an API key, from the environment where ComfyUI starts. Its posts have all their tags in one
-# list: the Danbooru tag list (when downloaded) tells characters, series, artists and meta apart.
+# Safebooru (safe anime pictures, Danbooru's tags, no account needed). Its API (Gelbooru 0.2) has no random order: the node asks how many posts
+# the search has (the XML answer's count), then takes posts at random places of it. Its posts have all their tags in one list: the Danbooru tag
+# list (when downloaded) tells characters, series, artists and meta apart.
 KIND_GROUPS = {4: "character", 3: "copyright", 1: "artist", 5: "meta"}
-class Gelbooru(Site):
-    name, key, safe = "Gelbooru", "gelbooru", "g"
+SAFEBOORU_DEPTH = 20000 # Posts its API reaches into a search (the rest of a big search is never picked).
+class Safebooru(Site):
+    name, key, safe = "Safebooru", "safebooru", "g"
     pause = 0.5
-    ranks, names = Danbooru.ranks, Danbooru.names
-    letters = {"general": "g", "sensitive": "s", "questionable": "q", "explicit": "e", "safe": "g"}
-    unauthorized = ("Gelbooru asks for an API key: set GELBOORU_API_KEY and GELBOORU_USER_ID where ComfyUI starts (Gelbooru → My Account → "
-                    "Options → API Access Credentials), then restart ComfyUI.")
+    ranks, names = Danbooru.ranks, {"g": "safe", "s": "safe", "q": "questionable", "e": "explicit"}
+    letters = {"safe": "g", "general": "g", "sensitive": "s", "questionable": "q", "explicit": "e"}
 
     def base(self):
-        return GELBOORU_URL
+        return SAFEBOORU_URL
 
     def link(self, number):
         return f"{self.base().rstrip('/')}/index.php?page=post&s=view&id={number}"
 
-    def auth(self):
-        key, user = os.environ.get("GELBOORU_API_KEY", "").strip(), os.environ.get("GELBOORU_USER_ID", "").strip()
-        return {"api_key": key, "user_id": user} if key and user else {}
-
-    def rating_term(self, letters): # One rating, or the ones left out.
-        words = {letter: word for word, letter in self.letters.items() if word != "safe"}
-        if len(letters) == 4:
+    def rating_term(self, letters): # Its ratings: safe (general and sensitive), questionable, explicit; one, or the ones left out.
+        wanted = {"safe" if letter in "gs" else {"q": "questionable", "e": "explicit"}[letter] for letter in letters}
+        if len(wanted) == 3:
             return ""
-        if len(letters) == 1:
-            return f"rating:{words[letters]}"
-        return " ".join(f"-rating:{words[letter]}" for letter in "gsqe" if letter not in letters)
+        if len(wanted) == 1:
+            return f"rating:{wanted.pop()}"
+        return " ".join(f"-rating:{word}" for word in ("safe", "questionable", "explicit") if word not in wanted)
 
     def summary(self, post):
         if not post_number(post):
@@ -307,24 +309,32 @@ class Gelbooru(Site):
         tags = {group: [] for group in GROUPS}
         for tag in html.unescape(text_of(post.get("tags"))).split():
             tags[KIND_GROUPS.get(known.get(tag, (0, 0))[0], "general")].append(tag)
-        return self.kept(post, self.letters.get(text_of(post.get("rating")), ""), text_of(post.get("preview_url")), post.get("score"), tags)
+        directory, picture = text_of(post.get("directory")), text_of(post.get("image")) or text_of(post.get("hash"))
+        preview = f"{self.base().rstrip('/')}/thumbnails/{directory}/thumbnail_{os.path.splitext(picture)[0]}.jpg" if directory and picture else ""
+        return self.kept(post, self.letters.get(text_of(post.get("rating")), ""), preview, post.get("score"), tags)
 
-    # The posts of an answer: {"post": [...]} (one post may come alone, none leaves "post" out).
+    # The posts of an answer: a list of posts (or one post, or {"post": [...]}).
     def listed(self, data):
-        posts = data.get("post") if isinstance(data, dict) else None
+        posts = data.get("post", data) if isinstance(data, dict) and "post" in data else data
         posts = [posts] if isinstance(posts, dict) else posts if isinstance(posts, list) else []
         return [post for post in map(self.summary, posts) if post]
 
     async def random_posts(self, session, query, count):
-        params = {"page": "dapi", "s": "post", "q": "index", "json": "1", "limit": count, "tags": f"{query} sort:random".strip(), **self.auth()}
-        return self.listed(await self.get(session, "/index.php", params, query))
+        search = {"page": "dapi", "s": "post", "q": "index", "tags": query}
+        counted = re.search(r'<posts\b[^>]*\bcount="(\d+)"', await self.get(session, "/index.php", {**search, "limit": 0}, query, raw=True) or "")
+        total = min(int(counted.group(1)) if counted else 0, SAFEBOORU_DEPTH)
+        found = {}
+        for place in random.sample(range(total), min(count, total)): # NOSONAR: picks posts, not security.
+            for post in self.listed(await self.get(session, "/index.php", {**search, "json": "1", "limit": 1, "pid": place}, query)):
+                found.setdefault(post["id"], post)
+        return list(found.values())
 
     async def post(self, session, number):
-        found = self.listed(await self.get(session, "/index.php", {"page": "dapi", "s": "post", "q": "index", "json": "1", "id": number, **self.auth()}))
+        found = self.listed(await self.get(session, "/index.php", {"page": "dapi", "s": "post", "q": "index", "json": "1", "id": number}))
         return found[0] if found else None
 
 
-SITES = {"danbooru": Danbooru(), "e621": E621(), "gelbooru": Gelbooru()}
+SITES = {"danbooru": Danbooru(), "e621": E621(), "safebooru": Safebooru()}
 
 
 # Work with the site (work(session)); busy: asked again after a pause, twice.
@@ -395,8 +405,8 @@ class DanbooruTagEnhancer(io.ComfyNode):
                                 tooltip="The tags to find posts with (or connect positive_text of CLIP Dual Text Encode). Wildcards and {a|b} choices are "
                                         "filled in (__characters__: a new character each run); weights, escapes and <lora:> tags are read through."),
                 io.Combo.Input("source", options=list(SITES), default="danbooru",
-                               tooltip="Where the posts come from: Danbooru (anime: Illustrious, NoobAI, Anima, Pony), e621 (furry: NoobAI, Pony) or Gelbooru (anime, "
-                                       "Danbooru's tags; needs GELBOORU_API_KEY and GELBOORU_USER_ID). "
+                               tooltip="Where the posts come from: Danbooru (anime: Illustrious, NoobAI, Anima, Pony), e621 (furry: NoobAI, Pony) or Safebooru (safe "
+                                       "anime pictures, Danbooru's tags). "
                                        "Each has its own tags: the tag list of the site (Tag autocomplete) helps the search."),
                 io.Combo.Input("rating", options=RATING_CHOICES, default="general",
                                tooltip="The posts' ratings, from safe on: general, sensitive (suggestive), questionable (nudity), explicit; one, two "
