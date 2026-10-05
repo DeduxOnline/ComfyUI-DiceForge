@@ -17,8 +17,8 @@ jobs:
     name: Check the version
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
       - name: The tag, pyproject.toml, DiceForge.__version__ and CHANGELOG.md agree
@@ -39,8 +39,8 @@ jobs:
     env:
       REGISTRY_ACCESS_TOKEN: ${{ secrets.REGISTRY_ACCESS_TOKEN }} # Here, not on the step: a step's condition can't see secrets.
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
       - name: Release on GitHub, with the changelog's notes
