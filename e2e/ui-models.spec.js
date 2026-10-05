@@ -411,8 +411,8 @@ for (const vue of [true, false]) {
         { type: "KSampler", pos: [840, 40], widgets: { sampler_name: "euler", scheduler: "simple" } },
         { type: "EmptyLatentImage", pos: [420, 480] },
       ]);
-      await connect(page, encode, 0, sampler, "positive");
-      await connect(page, encode, 1, sampler, "negative");
+      await connect(page, encode, 1, sampler, "positive");
+      await connect(page, encode, 2, sampler, "negative");
       await clickMenu(page, lora, "DiceForge.ModelInfo", "Model info");
       const stage = page.locator(".dfmi .stage");
       await stage.hover();

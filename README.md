@@ -142,11 +142,13 @@ Its right-click menu has the prompt tools: **📖 Syntax guide** (every piece of
 
 | Output | Description |
 |---|---|
+| `model` | The model with the prompts' `<lora:...>` LoRAs. Connect it to KSampler instead of the loader's model. |
 | `positive` | Conditioning from the positive prompt. |
 | `negative` | Conditioning from the negative prompt. |
 | `positive_text` | The positive prompt as encoded, with choices, wildcards and variables filled in. |
 | `negative_text` | The negative prompt as encoded, with choices, wildcards and variables filled in. |
-| `model` | The model with the prompts' `<lora:...>` LoRAs. Connect it to KSampler instead of the loader's model. |
+
+`model` used to be the last output: a workflow saved before keeps its connections, they follow their outputs to the new places when it opens.
 
 The text outputs carry the prompt that was actually used, for example to show it with a preview node, put it in a file name, or feed a text encoder for other models (Flux, SD3, video models): leave `clip` unconnected and the node only fills in the prompts, with every seed mode.
 

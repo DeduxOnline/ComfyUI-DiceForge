@@ -48,7 +48,7 @@ test.describe("README screenshots (Nodes 2.0)", () => {
     const [id, text] = await addNodes(page, [{ type: "CLIPTextEncodePositiveNegative", pos: [400, 220], widgets: {
       positive: "${g={male|female}}photo of a __outfit/${g}__ person, {2$$__characters/*/outfit__}, __color__ hair, {3::smiling|serious}",
       negative: "blurry, lowres", seed: 42, seed_mode: "deck" } }, { type: "PreviewAny", pos: [1700, 220] }]);
-    await connect(page, id, 2, text, 0);
+    await connect(page, id, 3, text, 0);
     await setWidget(page, id, "control_after_generate", "fixed");
     await queueFromPage(page, request); // A run, so the node shows the prompts as encoded.
     await expect(page.locator(".dfpp .box").first()).toContainText("photo of a");
@@ -198,7 +198,7 @@ test.describe("README screenshots (Nodes 2.0)", () => {
       { type: "EmptyImage", pos: [1300, 700], widgets: { width: 64, height: 64 } },
       { type: "PreviewImage", pos: [1600, 700] },
     ]);
-    await connect(page, encode, 2, prompt, 0); // Connected: ComfyUI runs only nodes whose outputs go somewhere.
+    await connect(page, encode, 3, prompt, 0); // Connected: ComfyUI runs only nodes whose outputs go somewhere.
     await connect(page, image, 0, show, 0); // An image made in the same runs: kept with each run's prompts.
     for (let run = 0; run < 3; run++) {
       await setWidget(page, image, "color", [0x7a5cc0, 0xc06a5c, 0x5cc08a][run]);

@@ -80,7 +80,7 @@ def test_unset_variable_is_a_clear_error():
 
 def test_locked_option_always_comes_in_every_mode():
     for mode in ("random", "deck", "shuffle", "balanced", "combinations", "mutate"):
-        assert {run("{sky|!sea|forest}", seed=seed, mode=mode)[2] for seed in range(6)} == {"sea"}, mode
+        assert {run("{sky|!sea|forest}", seed=seed, mode=mode)[3] for seed in range(6)} == {"sea"}, mode
 
 
 def test_escaped_braces_and_bars_stay_literal():
@@ -88,7 +88,7 @@ def test_escaped_braces_and_bars_stay_literal():
 
 
 def test_comments_are_removed():
-    assert run("cat /* hidden */, dog // the rest\nbird")[2] == "cat, dog\nbird"
+    assert run("cat /* hidden */, dog // the rest\nbird")[3] == "cat, dog\nbird"
 
 
 @pytest.mark.parametrize("text, expected", [
@@ -113,12 +113,12 @@ def test_trim_spaces(text, expected):
 
 
 def test_node_trim_input():
-    assert run("( a ) , b", trim=True)[2] == "(a), b"
-    assert run("( a ) , b", trim=False)[2] == "( a ), b"
+    assert run("( a ) , b", trim=True)[3] == "(a), b"
+    assert run("( a ) , b", trim=False)[3] == "( a ), b"
 
 
 def test_node_without_clip_outputs_only_text():
-    positive, negative, positive_text, negative_text, model = run("{a|b}", "bad", seed=1)
+    model, positive, negative, positive_text, negative_text = run("{a|b}", "bad", seed=1)
     assert positive is None and negative is None and model is None
     assert positive_text in ("a", "b") and negative_text == "bad"
 
@@ -139,18 +139,18 @@ def test_count_combinations(text, total):
 
 def test_combinations_mode_goes_through_every_combination_then_starts_over():
     text = "{a|b} {c|d|e}"
-    results = [run(text, seed=seed, mode="combinations")[2] for seed in range(12)]
+    results = [run(text, seed=seed, mode="combinations")[3] for seed in range(12)]
     assert len(set(results[:6])) == 6
     assert results[6:] == results[:6]
 
 
 def test_combinations_cover_multi_picks():
-    results = {run("{2$$a|b|c|d}", seed=seed, mode="combinations")[2] for seed in range(6)}
+    results = {run("{2$$a|b|c|d}", seed=seed, mode="combinations")[3] for seed in range(6)}
     assert len(results) == 6 and all(len(result.split(", ")) == 2 for result in results)
 
 
 def test_deck_mode_deals_every_option_before_repeating():
-    assert sorted(run("{a|b|c|d}", seed=seed, mode="deck")[2] for seed in range(4)) == ["a", "b", "c", "d"]
+    assert sorted(run("{a|b|c|d}", seed=seed, mode="deck")[3] for seed in range(4)) == ["a", "b", "c", "d"]
 
 
 def test_deck_same_list_twice_in_a_prompt_gives_different_options():
@@ -160,14 +160,14 @@ def test_deck_same_list_twice_in_a_prompt_gives_different_options():
 
 
 def test_shuffle_mode_goes_through_every_option():
-    assert sorted(run("{a|b|c|d|e}", seed=seed, mode="shuffle")[2] for seed in range(5)) == list("abcde")
+    assert sorted(run("{a|b|c|d|e}", seed=seed, mode="shuffle")[3] for seed in range(5)) == list("abcde")
 
 
 def test_mutate_changes_exactly_one_choice_per_run():
     text = "{a1|a2|a3|a4} {b1|b2|b3|b4} {c1|c2|c3|c4}"
-    previous = run(text, mode="mutate")[2].split(" ")
+    previous = run(text, mode="mutate")[3].split(" ")
     for seed in range(1, 11):
-        current = run(text, seed=seed, mode="mutate")[2].split(" ")
+        current = run(text, seed=seed, mode="mutate")[3].split(" ")
         assert sum(a != b for a, b in zip(previous, current)) == 1, (previous, current)
         previous = current
 
@@ -175,10 +175,10 @@ def test_mutate_changes_exactly_one_choice_per_run():
 @pytest.mark.parametrize("mode", ["shuffle", "balanced", "mutate"])
 def test_remembering_modes_give_a_seed_its_prompt_again(mode):
     text = "{a|b|c|d|e} {x|y|z}"
-    first = [run(text, seed=seed, mode=mode)[2] for seed in range(5)]
-    assert [run(text, seed=seed, mode=mode)[2] for seed in (3, 0, 4)] == [first[3], first[0], first[4]] # Older seeds again: their prompts.
-    fifth = run(text, seed=5, mode=mode)[2]
-    assert run(text, seed=5, mode=mode)[2] == fifth
+    first = [run(text, seed=seed, mode=mode)[3] for seed in range(5)]
+    assert [run(text, seed=seed, mode=mode)[3] for seed in (3, 0, 4)] == [first[3], first[0], first[4]] # Older seeds again: their prompts.
+    fifth = run(text, seed=5, mode=mode)[3]
+    assert run(text, seed=5, mode=mode)[3] == fifth
     if mode == "shuffle": # Replaying didn't move the shuffle on: the next new seeds still finish the round.
         assert sorted(prompt.split(" ")[0] for prompt in first) == list("abcde")
 
@@ -208,17 +208,17 @@ def test_lora_tags_go_on_the_model_and_leave_the_text(models, lora_calls):
     for name in ("style/ink.safetensors", "detail.safetensors"):
         models("loras", name)
     result = Node.execute("1girl, <lora:ink:0.8>, smile <LORA:detail.safetensors>", "lowres, <lyco:style/ink:0.5:0.25>", seed=0, model="model").result
-    assert result[2] == "1girl, smile" and result[3] == "lowres"
+    assert result[3] == "1girl, smile" and result[4] == "lowres"
     assert lora_calls == [("style/ink.safetensors", 0.8, 0), ("detail.safetensors", 1.0, 0), ("style/ink.safetensors", 0.5, 0)] # No CLIP: the model only.
-    assert result[4] == "model+style/ink.safetensors+detail.safetensors+style/ink.safetensors"
+    assert result[0] == "model+style/ink.safetensors+detail.safetensors+style/ink.safetensors"
 
 
 def test_a_choice_can_pick_the_lora_and_a_missing_one_says_so(models, lora_calls):
     for name in ("a.safetensors", "b.safetensors"):
         models("loras", name)
-    picked = {Node.execute("cat {<lora:a:1>|<lora:b:1>}", "", seed=seed, model="m").result[4] for seed in range(20)}
+    picked = {Node.execute("cat {<lora:a:1>|<lora:b:1>}", "", seed=seed, model="m").result[0] for seed in range(20)}
     assert picked == {"m+a.safetensors", "m+b.safetensors"}
-    assert Node.execute("no tags", "", seed=0, model="m").result[4] == "m" and len(lora_calls) == 20 # Passed through.
+    assert Node.execute("no tags", "", seed=0, model="m").result[0] == "m" and len(lora_calls) == 20 # Passed through.
     with pytest.raises(ValueError, match="no LoRA file for <lora:nope>"):
         Node.execute("<lora:nope:1>", "", seed=0, model="m")
 
@@ -229,11 +229,11 @@ def test_both_prompt_nodes_share_what_a_list_remembers():
     text = "{a|b|c|d}"
     picks = []
     for seed in (11, 12):
-        picks.append(run(text, seed=seed, mode="shuffle")[2])
+        picks.append(run(text, seed=seed, mode="shuffle")[3])
         picks.append(WildcardsToText.execute(text, seed=seed + 100, seed_mode="shuffle").result[0])
     assert sorted(picks) == ["a", "b", "c", "d"] # One round between the two nodes.
     assert WildcardsToText.execute(text, seed=11, seed_mode="shuffle").result[0] == picks[0] # Seed 11 came before, in the CLIP node.
-    assert run("{a|b|c|d|e}", seed=11, mode="shuffle")[2] in "abcde" # Another list: its own round.
+    assert run("{a|b|c|d|e}", seed=11, mode="shuffle")[3] in "abcde" # Another list: its own round.
 
 
 def test_wildcards_to_text_fills_in_like_the_clip_node():
@@ -241,7 +241,7 @@ def test_wildcards_to_text_fills_in_like_the_clip_node():
     for mode in ("random", "deck", "combinations"):
         for seed in range(4):
             filled = WildcardsToText.execute(text, seed=seed, seed_mode=mode)
-            assert filled.result[0] == run(text, seed=seed, mode=mode)[2] # The same seed: the same text as CLIP Dual Text Encode.
+            assert filled.result[0] == run(text, seed=seed, mode=mode)[3] # The same seed: the same text as CLIP Dual Text Encode.
             assert filled.ui == {"text": [filled.result[0]]}
     assert WildcardsToText.execute("  a  {x}  ,  b ", trim=True).result[0] == "a x, b"
     assert WildcardsToText.execute("<lora:style:0.8> a {cat|cat}").result[0] == "<lora:style:0.8> a cat" # LoRA tags stay in the text.

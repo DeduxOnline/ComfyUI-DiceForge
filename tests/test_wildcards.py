@@ -140,13 +140,13 @@ def test_counting_combinations_with_wildcards(wildcards):
 
 def test_combinations_mode_goes_through_every_wildcard_line(wildcards):
     wildcards("color.txt", "red\nblue\ngreen\n")
-    got = [Node.execute("__color__ {cat|dog}", "", clip=None, seed=seed, seed_mode="combinations").result[2] for seed in range(6)]
+    got = [Node.execute("__color__ {cat|dog}", "", clip=None, seed=seed, seed_mode="combinations").result[3] for seed in range(6)]
     assert len(set(got)) == 6
 
 
 def test_deck_mode_deals_every_wildcard_line(wildcards):
     wildcards("color.txt", "red\nblue\ngreen\nwhite\n")
-    got = [Node.execute("__color__", "", clip=None, seed=seed, seed_mode="deck").result[2] for seed in range(4)]
+    got = [Node.execute("__color__", "", clip=None, seed=seed, seed_mode="deck").result[3] for seed in range(4)]
     assert sorted(got) == ["blue", "green", "red", "white"]
 
 

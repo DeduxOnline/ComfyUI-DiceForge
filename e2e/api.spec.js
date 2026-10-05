@@ -10,8 +10,8 @@ const NODES = ["SDXLResolutionListLatent", "ResolutionSelectorRandomLatent", "CL
   "DiceForgeRandomVAE", "LoadVAEDecodeSave", "VAEDecodeSave", "LoadDiffusionModelCLIP", "DiceForgeLoraStack", "DiceForgeXYPlot", "DiceForgeVariationSeed", "DiceForgeHiresUpscale", "DiceForgeDanbooruEnhancer"];
 const clip = (positive, negative = "", { seed = 0, mode = "random" } = {}) => ({
   1: { class_type: "CLIPTextEncodePositiveNegative", inputs: { positive, negative, seed, seed_mode: mode, trim: true } },
-  2: { class_type: "PreviewAny", inputs: { source: ["1", 2] } },
-  3: { class_type: "PreviewAny", inputs: { source: ["1", 3] } },
+  2: { class_type: "PreviewAny", inputs: { source: ["1", 3] } },
+  3: { class_type: "PreviewAny", inputs: { source: ["1", 4] } },
 });
 const randomInt = (inputs) => ({
   1: { class_type: "DiceForgeRandomInt", inputs: { min: 1, max: 5, step: 1, seed: 0, seed_mode: "random", ...inputs } },
@@ -224,7 +224,7 @@ test.describe("@api workflows and routes", () => {
     const prompt = (seed) => ({
       1: { class_type: "DiceForgeWildcardsToText", inputs: { text: "a __color__ car, {big|small}", seed, seed_mode: "deck", trim: true } },
       2: { class_type: "CLIPTextEncodePositiveNegative", inputs: { positive: "a __color__ car, {big|small}", negative: "", seed, seed_mode: "deck", trim: true } },
-      3: { class_type: "PreviewAny", inputs: { source: ["1", 0] } }, 4: { class_type: "PreviewAny", inputs: { source: ["2", 2] } },
+      3: { class_type: "PreviewAny", inputs: { source: ["1", 0] } }, 4: { class_type: "PreviewAny", inputs: { source: ["2", 3] } },
     });
     for (const seed of [0, 1, 2]) {
       const result = await runPrompt(request, prompt(seed));
@@ -287,11 +287,11 @@ test.describe("@api workflows and routes", () => {
     writeFile("models/wildcards/e2e_booru.txt", "hatsune miku\n");
     const chain = () => ({
       1: { class_type: "CLIPTextEncodePositiveNegative", inputs: { positive: "__e2e_booru__, {masterpiece|masterpiece}", negative: "", seed: 0, seed_mode: "random", trim: true } },
-      2: { class_type: "DiceForgeDanbooruEnhancer", inputs: { tags: ["1", 2], source: "danbooru", rating: "general", mode: "fixed", post_ids: "101", posts: 1,
+      2: { class_type: "DiceForgeDanbooruEnhancer", inputs: { tags: ["1", 3], source: "danbooru", rating: "general", mode: "fixed", post_ids: "101", posts: 1,
         max_tags: 15, include_general: true, include_appearance: true, include_clothes: true, include_background: true, include_count: true,
         include_character: false, include_copyright: false, include_artist: false, exclude: "", position: "after", wildcard_seed: 7 } },
       3: { class_type: "CLIPTextEncodePositiveNegative", inputs: { positive: ["2", 0], negative: "", seed: 0, seed_mode: "random", trim: true } },
-      4: { class_type: "PreviewAny", inputs: { source: ["3", 2] } },
+      4: { class_type: "PreviewAny", inputs: { source: ["3", 3] } },
     });
     const first = await runPrompt(request, chain());
     expect(first.status, first.error).toBe("success");

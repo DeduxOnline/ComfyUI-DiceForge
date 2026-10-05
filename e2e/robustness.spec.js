@@ -9,8 +9,8 @@ const { BASE, REPO } = require("./settings");
 const MODES = ["random", "deck", "shuffle", "balanced", "combinations", "mutate"];
 const clip = (positive, negative = "", { seed = 0, mode = "random" } = {}) => ({
   1: { class_type: "CLIPTextEncodePositiveNegative", inputs: { positive, negative, seed, seed_mode: mode, trim: true } },
-  2: { class_type: "PreviewAny", inputs: { source: ["1", 2] } },
-  3: { class_type: "PreviewAny", inputs: { source: ["1", 3] } },
+  2: { class_type: "PreviewAny", inputs: { source: ["1", 3] } },
+  3: { class_type: "PreviewAny", inputs: { source: ["1", 4] } },
 });
 const sdxl = (inputs) => ({
   1: { class_type: "SDXLResolutionListLatent", inputs: { resolution: "Standard", "resolution.size": "1024 x 1024", seed: 0, rescale: "by percentage", "rescale.percent": 100, multiple: 8, batch: 1, seed_mode: "random", ...inputs } },

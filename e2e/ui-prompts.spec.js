@@ -492,12 +492,32 @@ for (const vue of [true, false]) {
       }
     });
 
+    test("a workflow saved when model was the last output keeps its connections: they follow their outputs", async ({ page, request }) => {
+      const [encode, preview] = await addNodes(page, [
+        { type: "CLIPTextEncodePositiveNegative", widgets: { positive: "an old {saved|saved} workflow" } }, { type: "PreviewAny", pos: [600, 40] }]);
+      await connect(page, encode, 3, preview, 0);
+      const saved = await page.evaluate((id) => { // As saved before: positive, negative, positive_text, negative_text, model; the link from slot 2.
+        const data = window.app.graph.serialize();
+        const node = data.nodes.find((item) => String(item.id) === String(id));
+        const order = ["positive", "negative", "positive_text", "negative_text", "model"];
+        node.outputs = order.map((name) => node.outputs.find((output) => output.name === name));
+        for (const link of data.links) if (String(link[1]) === String(id)) link[2] = order.indexOf("positive_text");
+        return data;
+      }, encode);
+      await page.evaluate(async (data) => { window.app.graph.clear(); await window.app.loadGraphData(data); }, saved);
+      expect(await page.evaluate((id) => window.app.graph.getNodeById(id).outputs.map((output) => output.name), encode))
+        .toEqual(["model", "positive", "negative", "positive_text", "negative_text"]);
+      await queueFromPage(page, request);
+      const history = Object.values(await (await request.get("/history?max_items=1")).json())[0];
+      expect(history.outputs[String(preview)].text[0]).toBe("an old saved workflow"); // Still from positive_text, now slot 3.
+    });
+
     test("a workflow queued from the page fills in the prompt", async ({ page, request }) => {
       const [encode, preview] = await addNodes(page, [
         { type: "CLIPTextEncodePositiveNegative", widgets: { positive: "a __color__ car, {2$$__characters/*/outfit__}", seed: 3 } },
         { type: "PreviewAny", pos: [500, 40] },
       ]);
-      await connect(page, encode, 2, preview, 0);
+      await connect(page, encode, 3, preview, 0);
       await queueFromPage(page, request);
       const history = Object.values(await (await request.get("/history?max_items=1")).json())[0];
       const text = history.outputs[String(preview)].text[0];
@@ -533,7 +553,7 @@ for (const vue of [true, false]) {
         { type: "EmptyImage", pos: [40, 520], widgets: { width: 32, height: 32 } },
         { type: "PreviewImage", pos: [400, 520] },
       ]);
-      await connect(page, encode, 2, preview, 0);
+      await connect(page, encode, 3, preview, 0);
       await connect(page, image, 0, show, 0); // An image made in the same runs: kept with each run's prompts.
       for (let run = 0; run < 3; run++) {
         await setWidget(page, image, "color", run * 1000); // Another image each run.

@@ -115,7 +115,7 @@ for (const vue of [true, false]) {
         { type: "CLIPTextEncodePositiveNegative", widgets: { positive: "a __no_such_wildcard__ car" } },
         { type: "PreviewAny", pos: [500, 40] },
       ]);
-      await connect(page, encode, 2, preview, 0);
+      await connect(page, encode, 3, preview, 0);
       await queueFromPage(page, request);
       const failed = Object.values(await (await request.get("/history?max_items=1")).json())[0];
       expect(JSON.stringify(failed.status.messages)).toContain("Wildcard __no_such_wildcard__ not found");

@@ -19,7 +19,7 @@ words = st.text(alphabet="abcdefgh", min_size=1, max_size=5)
 
 
 def run(positive, negative="", seed=0, mode="random", trim=True):
-    return Node.execute(positive, negative, clip=None, seed=seed, seed_mode=mode, trim=trim).result[2:4]
+    return Node.execute(positive, negative, clip=None, seed=seed, seed_mode=mode, trim=trim).result[3:5]
 
 
 def resolve(text, seed=0):

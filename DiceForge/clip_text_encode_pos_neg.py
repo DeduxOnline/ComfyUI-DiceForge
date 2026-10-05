@@ -542,13 +542,14 @@ class CLIPTextEncodePositiveNegative(io.ComfyNode):
                 ),
             ],
             has_intermediate_output=True, # The prompts of the last run reach the node's preview also when the node comes from the cache.
-            # Outputs for the node: positive and negative conditioning, then the prompts as encoded (with choices and wildcards filled in).
+            # Outputs for the node: the model with the prompts' LoRAs first, then positive and negative conditioning, then the prompts as encoded
+            # (with choices and wildcards filled in). Workflows saved with the model last are reordered when loaded (web/prompt_preview.js).
             outputs=[
+                io.Model.Output(display_name="model"), # The model with the prompts' <lora:...> LoRAs (connect it to KSampler instead of the loader's model).
                 io.Conditioning.Output(display_name="positive", tooltip="Conditioning from the positive prompt."),
                 io.Conditioning.Output(display_name="negative", tooltip="Conditioning from the negative prompt."),
                 io.String.Output(display_name="positive_text", tooltip="The positive prompt as encoded: choices, wildcards and variables filled in. Connect it to another text encoder (Flux, SD3...) or a Save Image file name."),
                 io.String.Output(display_name="negative_text", tooltip="The negative prompt as encoded: choices, wildcards and variables filled in."),
-                io.Model.Output(display_name="model"), # The model with the prompts' <lora:...> LoRAs (connect it to KSampler instead of the loader's model).
             ],
         )
     # Method to run the node again when a wildcard file changes, even if the inputs are the same.
@@ -582,8 +583,8 @@ class CLIPTextEncodePositiveNegative(io.ComfyNode):
             logging.info(f"[DiceForge] CLIP Dual Text Encode | LoRAs from the prompts: {applied}{'' if model is not None else ' (CLIP only: the model input is not connected)'}")
         shown = {"dice_forge_prompts": [{"positive": positive_text, "negative": negative_text, "seed": seed, "seed_mode": seed_mode, "note": note.lstrip(", ")}]}
         if clip is None:
-            return io.NodeOutput(None, None, positive_text, negative_text, model, ui=shown) # No CLIP: only the text, for other text encoders.
-        return io.NodeOutput(cls.encode(clip, positive_text), cls.encode(clip, negative_text), positive_text, negative_text, model, ui=shown)
+            return io.NodeOutput(model, None, None, positive_text, negative_text, ui=shown) # No CLIP: only the text, for other text encoders.
+        return io.NodeOutput(model, cls.encode(clip, positive_text), cls.encode(clip, negative_text), positive_text, negative_text, ui=shown)
 # Wildcards to Text: one prompt with the same syntax, filled in by the seed modes, out as text (no CLIP): for any text encoder or text input.
 # <lora:...> tags stay in the text, for a node that reads them.
 class WildcardsToText(io.ComfyNode):
