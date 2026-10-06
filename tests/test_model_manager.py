@@ -262,7 +262,7 @@ def test_delete_removes_the_file_its_companions_and_info(api, models):
     models("loras", "keep.safetensors", b"k")
     write_info("loras", "old/x.safetensors", {"user": {"notes": "n"}})
     status, body = api("DELETE", "/diceforge/models/file?kind=loras&file=old/x.safetensors")
-    assert status == 200 and body == {"deleted": "old/x.safetensors", "files": ["x.safetensors", "x.preview.jpg", "x.metadata.json"]}
+    assert status == 200 and body["deleted"] == "old/x.safetensors" and body["files"] == ["x.safetensors", "x.preview.jpg", "x.metadata.json"]
     assert os.listdir(models.root / "loras") == ["keep.safetensors"] and not os.path.exists(path)
     assert not os.path.exists(info_file("loras", "old/x.safetensors"))
     assert api("DELETE", "/diceforge/models/file?kind=loras&file=old/x.safetensors")[0] == 404
@@ -341,3 +341,35 @@ def test_text_encoders_are_not_searched_or_downloaded_on_civitai(api, models, ci
     assert not [path for path, _query, _auth in civitai.requests if path.startswith("/api/")] # Refused before asking Civitai.
     status, body = api("GET", "/diceforge/civitai/search?kind=vae&query=neon") # VAEs are: Civitai's VAE type.
     assert status == 200 and civitai.requests[-1][1]["types"] == ["VAE"]
+
+
+def test_a_delete_is_undone_with_the_files_and_the_info(api, models):
+    models("loras", "old/x.safetensors", b"x")
+    models("loras", "old/x.preview.jpg", b"p")
+    write_info("loras", "old/x.safetensors", {"user": {"notes": "mine"}})
+    undo = api("DELETE", "/diceforge/models/file?kind=loras&file=old/x.safetensors")[1]["undo"]
+    assert os.listdir(models.root / "loras") == [] and os.path.isdir(models.root / ".diceforge_trash" / undo) # Next to the model folder.
+    status, body = api("POST", "/diceforge/models/restore", {"kind": "loras", "id": undo})
+    assert status == 200 and body == {"restored": "old/x.safetensors"}
+    assert sorted(os.listdir(models.root / "loras" / "old")) == ["x.preview.jpg", "x.safetensors"]
+    assert read_info("loras", "old/x.safetensors")["user"]["notes"] == "mine"
+    assert api("POST", "/diceforge/models/restore", {"kind": "loras", "id": undo})[0] == 404 # Once.
+    undo = api("DELETE", "/diceforge/models/file?kind=loras&file=old/x.safetensors")[1]["undo"]
+    assert api("POST", "/diceforge/models/restore", {"kind": "vae", "id": undo})[0] == 400 # Another kind's model.
+    models("loras", "old/x.safetensors", b"new")
+    assert api("POST", "/diceforge/models/restore", {"kind": "loras", "id": undo})[0] == 409 # Taken again: not overwritten.
+    for body in ({"kind": "loras", "id": "../x"}, {"kind": "loras", "id": 5}, {"kind": "loras"}, {"kind": "nope", "id": undo}):
+        assert api("POST", "/diceforge/models/restore", body)[0] == 400
+
+
+def test_the_model_trash_keeps_the_last_deletes_and_empties_at_start(api, models, monkeypatch):
+    monkeypatch.setattr(model_manager, "TRASH_KEPT", 2)
+    undo = []
+    for name in ("a", "b", "c"):
+        models("loras", f"{name}.safetensors", b"x")
+        undo.append(api("DELETE", f"/diceforge/models/file?kind=loras&file={name}.safetensors")[1]["undo"])
+    assert sorted(os.listdir(models.root / ".diceforge_trash")) == sorted(undo[1:]) # The oldest is gone for good.
+    model_manager.empty_all_trash()
+    assert os.listdir(models.root / ".diceforge_trash") == []
+    assert api("POST", "/diceforge/models/restore", {"kind": "loras", "id": undo[2]})[0] == 404
+

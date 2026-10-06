@@ -2,6 +2,7 @@
 # wildcard files.
 import io
 import os
+import re
 import zipfile
 import folder_paths
 import pytest
@@ -359,3 +360,19 @@ def test_the_trash_keeps_the_last_deletes(api, wildcards, monkeypatch):
     assert len(os.listdir(wildcards_api.TRASH_FOLDER)) == 2
     assert api("POST", "/diceforge/wildcards/restore", {"id": undo[0]})[0] == 404 # The oldest is gone.
     assert api("POST", "/diceforge/wildcards/restore", {"id": undo[2]})[0] == 200
+
+
+def test_preview_picks_fill_a_wildcard_or_a_folder_in_as_runs_would(api, wildcards):
+    wildcards("hair/color.txt", "red\nblue\n0::never\n")
+    wildcards("hair/style.txt", "{long|short} __hair/color__ hair\n")
+    status, body = api("GET", "/diceforge/wildcards/preview?name=hair/color&count=20")
+    assert status == 200 and body["token"] == "hair/color" and len(body["picks"]) == 20 and set(body["picks"]) <= {"red", "blue"} # Weight 0: never.
+    picks = api("GET", "/diceforge/wildcards/preview?name=hair/style")[1]["picks"]
+    assert len(picks) == 5 and all(re.fullmatch(r"(long|short) (red|blue) hair", pick) for pick in picks) # Choices and nested wildcards.
+    status, body = api("GET", "/diceforge/wildcards/preview?name=hair&folder=1&count=10")
+    assert status == 200 and body["token"] == "hair/*" and all(pick in ("red", "blue") or pick.endswith(" hair") for pick in body["picks"])
+    assert api("GET", "/diceforge/wildcards/preview?name=nope")[0] == 404
+    assert api("GET", "/diceforge/wildcards/preview?name=hair")[0] == 404 # A folder, not a wildcard.
+    for query in ("name=../x", "name=hair/color&count=0", "name=hair/color&count=21", "name=hair/color&count=x", ""):
+        assert api("GET", f"/diceforge/wildcards/preview?{query}")[0] == 400
+

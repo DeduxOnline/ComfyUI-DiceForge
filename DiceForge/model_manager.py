@@ -4,6 +4,7 @@ import json
 import logging
 import os
 import re
+import shutil
 import time
 import uuid
 from urllib.parse import urlsplit
@@ -118,19 +119,94 @@ def rename_model(kind, name, to):
     remove_empty_folders(os.path.dirname(path), root)
     drop_list_cache(kind)
     return {"renamed": name, "to": new_name}
-# Delete: the model file, its previews and info files, and its Model info entry; folders left empty go too.
+# Deleted models wait in a trash folder next to their model folder (models/.diceforge_trash for models/loras: on the same drive, so moving a
+# model there takes no time and no space), so a delete can be undone. The last TRASH_KEPT are kept, and none after ComfyUI restarts: a delete
+# frees the space by then. A model folder whose parent can't take the trash (another drive, read-only) deletes at once, without undo.
+TRASH_NAME = ".diceforge_trash"
+TRASH_KEPT = 10
+TRASH_ID = re.compile(r"\d{19}-[0-9a-f]{8}")
+last_trashed = [0] # Ids in the order of the deletes, also two within a clock tick: the oldest go first.
+def trash_folder(root):
+    return os.path.join(os.path.dirname(os.path.abspath(root)), TRASH_NAME)
+def new_trash(root):
+    trash = trash_folder(root)
+    try:
+        os.makedirs(trash, exist_ok=True)
+        if os.stat(trash).st_dev != os.stat(root).st_dev: # Another drive: moving a model there would copy gigabytes.
+            return None
+        last_trashed[0] = max(time.time_ns(), last_trashed[0] + 1)
+        folder = os.path.join(trash, f"{last_trashed[0]:019d}-{uuid.uuid4().hex[:8]}")
+        os.makedirs(folder)
+        return folder
+    except OSError:
+        return None
+def empty_trash(trash, kept=0):
+    try:
+        entries = sorted(name for name in os.listdir(trash) if TRASH_ID.fullmatch(name))
+    except OSError:
+        return
+    for name in entries[:len(entries) - kept] if kept else entries:
+        shutil.rmtree(os.path.join(trash, name), ignore_errors=True)
+# When ComfyUI starts: the deletes of the last session are final.
+def empty_all_trash():
+    for kind in MANAGED_KINDS:
+        try:
+            roots = folder_paths.get_folder_paths(kind)
+        except Exception: # A kind this ComfyUI doesn't have.
+            continue
+        for root in roots:
+            empty_trash(trash_folder(root))
+# Delete: the model file, its previews and info files, and its Model info entry, into the trash (see above); folders left empty go too.
 def delete_model(kind, name):
     path, root = existing(kind, name)
     removed = [path] + [companion for _ending, companion in companions(path)]
-    for file in removed:
-        os.remove(file)
-    try:
-        os.remove(info_file(kind, name))
-    except OSError:
-        pass
+    info = info_file(kind, name)
+    folder = new_trash(root)
+    if folder is None:
+        for file in removed:
+            os.remove(file)
+        try:
+            os.remove(info)
+        except OSError:
+            pass
+    else:
+        with open(os.path.join(folder, "meta.json"), "w", encoding="utf-8") as file:
+            json.dump({"kind": kind, "name": name, "files": [os.path.basename(file) for file in removed], "info": os.path.isfile(info)}, file)
+        for file in removed:
+            os.replace(file, os.path.join(folder, os.path.basename(file))) # The same drive: only a new name.
+        if os.path.isfile(info):
+            shutil.move(info, os.path.join(folder, "model_info.json"))
+        empty_trash(os.path.dirname(folder), TRASH_KEPT)
     remove_empty_folders(os.path.dirname(path), root)
     drop_list_cache(kind)
-    return {"deleted": name, "files": [os.path.basename(file) for file in removed]}
+    return {"deleted": name, "files": [os.path.basename(file) for file in removed], **({"undo": os.path.basename(folder)} if folder else {})}
+# Undo a delete: the model and its files back where they were, from the trash of one of the kind's model folders.
+def restore_model(kind, trash_id):
+    kind = managed_kind(kind)
+    if not isinstance(trash_id, str) or not TRASH_ID.fullmatch(trash_id):
+        raise web.HTTPBadRequest(text="Models: that is not a deleted model's id.")
+    root, folder = next(((os.path.abspath(root), os.path.join(trash_folder(root), trash_id)) for root in folder_paths.get_folder_paths(kind)
+                         if os.path.isdir(os.path.join(trash_folder(root), trash_id))), (None, None))
+    try:
+        with open(os.path.join(folder, "meta.json"), encoding="utf-8") as file:
+            meta = json.load(file)
+        name, files = checked_relative(meta["name"], "file name"), [str(file) for file in meta["files"]]
+    except (TypeError, OSError, ValueError, KeyError):
+        raise web.HTTPNotFound(text="Models: nothing to undo: the deleted model is no longer kept (a restart of ComfyUI empties the trash).") from None
+    if meta.get("kind") != kind or any(os.path.basename(file) != file or file in ("", ".", "..") for file in files):
+        raise web.HTTPBadRequest(text="Models: that deleted model can't be brought back here.")
+    target = inside(root, *name.split("/"))
+    if os.path.exists(target) or folder_paths.get_full_path(kind, name):
+        raise web.HTTPConflict(text=f"Models: there is a {name} again: rename it to bring the deleted one back.")
+    os.makedirs(os.path.dirname(target), exist_ok=True)
+    for file in files:
+        os.replace(os.path.join(folder, file), os.path.join(os.path.dirname(target), file))
+    if meta.get("info") and os.path.isfile(os.path.join(folder, "model_info.json")):
+        os.makedirs(os.path.dirname(info_file(kind, name)), exist_ok=True)
+        shutil.move(os.path.join(folder, "model_info.json"), info_file(kind, name))
+    shutil.rmtree(folder, ignore_errors=True)
+    drop_list_cache(kind)
+    return {"restored": name}
 
 
 # The Civitai API key: CIVITAI_API_KEY (or DICEFORGE_CIVITAI_KEY) from the environment, else the one saved from the browser in the ComfyUI user folder.
@@ -403,4 +479,12 @@ def register_routes():
             return web.json_response(await asyncio.get_running_loop().run_in_executor(None, delete_model, query.get("kind", ""), query.get("file")))
         except OSError as error:
             raise web.HTTPBadRequest(text=f"Models: can't delete: {error.strerror or error}.") from None
+    @routes.post("/diceforge/models/restore")
+    async def models_restore(request):
+        body = await json_body(request)
+        try:
+            return web.json_response(await asyncio.get_running_loop().run_in_executor(None, restore_model, body.get("kind", ""), body.get("id")))
+        except OSError as error:
+            raise web.HTTPBadRequest(text=f"Models: can't bring the model back: {error.strerror or error}.") from None
 register_routes()
+empty_all_trash()

@@ -105,7 +105,7 @@ const STYLE = `
 .dflb .ctags span:hover{background:#4a4a4a;color:#fff}.dflb .ctags span.on{background:#2f3f55;color:#cfe2ff}.dflb .stats{display:flex;flex-wrap:wrap;gap:4px;align-items:center}
 .dflb .stats .stat{background:#232323;border:1px solid #444;border-radius:4px;padding:0 5px;font-size:12px;font-weight:600;color:#ddd}
 .dflb .stats a.newer{background:#2c4a2c;border:1px solid #4a7a4a;color:#bfe8bf;border-radius:4px;padding:0 5px;font-size:12px;text-decoration:none}
-.dflb .buttons{display:flex;gap:5px;flex-wrap:wrap;margin-top:auto}.dflb .buttons button{padding:3px 8px;font-size:12px}.dflb .status{color:#9c9;font-size:13px;min-height:18px}
+.dflb .buttons{display:flex;gap:5px;flex-wrap:wrap;margin-top:auto}.dflb .buttons button{padding:3px 8px;font-size:12px}.dflb .status{color:#9c9;font-size:13px;min-height:18px}.dflb .status button.undo{margin-left:10px;padding:0 8px;font-size:12px}
 `;
 const addStyle = () => addStyleOnce("dflb-style", STYLE);
 const pathParts = (file) => file.split(/[\\/]/);
@@ -160,7 +160,10 @@ async function openBrowser(node, spec, target = targetOf(node, spec)) {
   }
   back.addEventListener("mousedown", (event) => { if (event.target === back) close(); });
   document.addEventListener("keydown", onKey, true);
-  const say = (text) => { status.textContent = text; };
+  // A message; after a rename, a move or a delete, with ↶ Undo (until the next message).
+  const say = (text, undo) => {
+    status.replaceChildren(text, ...(undo ? [element("button", { class: "undo", title: "Undo it", onclick: () => background(undo()) }, "↶ Undo")] : []));
+  };
 
   // Picked cards, for the batch bar: picked files, the last one clicked (for Shift ranges), the cards drawn (file -> element) in their order.
   const picked = new Set();
@@ -243,11 +246,26 @@ async function openBrowser(node, spec, target = targetOf(node, spec)) {
     report(`Moved to ${destination || "the top folder"}:`, result);
   }
   async function batchDelete() {
-    if (!confirm(`Delete ${picked.size} ${picked.size === 1 ? what : spec.plural}, with their previews and info? This can't be undone.`)) return;
-    const result = await eachPicked("Deleting", (file) => call(`/diceforge/models/file?kind=${kind}&file=${encodeURIComponent(file)}`, { method: "DELETE" }));
+    if (!confirm(`Delete ${picked.size} ${picked.size === 1 ? what : spec.plural}, with their previews and info? (↶ Undo brings them back until ComfyUI restarts.)`)) return;
+    const undo = [];
+    const result = await eachPicked("Deleting", async (file) => {
+      const deleted = await call(`/diceforge/models/file?kind=${kind}&file=${encodeURIComponent(file)}`, { method: "DELETE" });
+      if (deleted.undo) undo.push(deleted.undo);
+    });
     picked.clear();
     await reload();
     report("Deleted", result);
+    if (undo.length) say(status.textContent, () => restore(undo));
+  }
+  // Undo deletes: the models come back where they were, with their previews and info (from the trash next to the model folder).
+  async function restore(ids) {
+    const failed = [];
+    for (const id of ids) {
+      try { await call("/diceforge/models/restore", { method: "POST", body: JSON.stringify({ kind, id }) }); } catch (error) { failed.push(error.message); }
+    }
+    await reload();
+    const back = ids.length - failed.length;
+    say(`Brought back ${back} ${back === 1 ? what : spec.plural}.${failed.length ? ` Not done: ${failed.join("; ")}` : ""}`);
   }
   async function batchAdd() {
     const list = [...picked];
@@ -385,7 +403,7 @@ async function openBrowser(node, spec, target = targetOf(node, spec)) {
     if (target?.model?.value === file) setWidget(node, target.model, result.to);
     if (selectedFile === file) selectedFile = result.to;
     await reload();
-    say(`${moved ? "Moved" : "Renamed"} ${file} to ${result.to}. Workflows that use the old name need the new one.`);
+    say(`${moved ? "Moved" : "Renamed"} ${file} to ${result.to}. Workflows that use the old name need the new one.`, () => renameTo(result.to, file, moved));
   }
   async function renameFile(entry) {
     const to = prompt(`New name for ${entry.file} (the extension stays; folders with /):`, entry.file.replace(/\.[^./\\]+$/, ""))?.trim();
@@ -403,11 +421,12 @@ async function openBrowser(node, spec, target = targetOf(node, spec)) {
     await renameTo(entry.file, `${destination ? `${destination}/` : ""}${pathParts(entry.file).pop()}`, true);
   }
   async function deleteFile(entry) {
-    if (!confirm(`Delete ${entry.file}, its preview and its info? This can't be undone.`)) return;
+    if (!confirm(`Delete ${entry.file}, its preview and its info? (↶ Undo brings it back until ComfyUI restarts.)`)) return;
     const response = await api.fetchApi(`/diceforge/models/file?kind=${kind}&file=${encodeURIComponent(entry.file)}`, { method: "DELETE" });
     if (!response.ok) return say(await response.text());
+    const { undo } = await response.json();
     await reload();
-    say(`Deleted ${entry.file}.`);
+    say(`Deleted ${entry.file}.`, undo ? () => restore([undo]) : null);
   }
   async function setFavorite(entry, favorite) {
     const response = await api.fetchApi("/diceforge/model-favorite", { method: "POST", body: JSON.stringify({ kind, file: entry.file, favorite }) });

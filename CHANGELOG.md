@@ -13,6 +13,9 @@ nodes and features, a patch for fixes. Each version is a [release on GitHub](htt
 - The windows can be resized by their bottom-right corner and keep their size (a double-click on the title: the default size).
 - Wildcard Browser: ⇩ Export zip (every wildcard, or ⇩ zip on a folder, with a card pack's yaml file); ↶ Undo of the last rename, move or
   delete (deleted files wait in a trash folder, the last 50).
+- Wildcard Browser: a right-click menu (or ⋯) on files and folders with every action, so the rows keep only ☆ and + Add; 🎲 Preview picks
+  shows what runs would put in for a wildcard or a folder.
+- Model browsers: ↶ Undo of a rename, move or delete (deleted models wait in models/.diceforge_trash until ComfyUI restarts, the last 10).
 - Tag Browser: a basket of picked tags, put into the prompt (or the negative one) all at once.
 
 ### Changed

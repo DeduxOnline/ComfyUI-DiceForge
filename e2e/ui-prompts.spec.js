@@ -264,11 +264,18 @@ for (const vue of [true, false]) {
       const dialog = page.locator(".dfwc");
       if (await dialog.locator("button.mode").textContent() === "📄 Lines") await dialog.locator("button.mode").click(); // Start in lines.
       const folder = dialog.locator(`.folder[data-path="${pack}"] > .row`);
-      await folder.locator("button.convert", { hasText: "→ yaml" }).click();
+      const menu = page.locator(".dfwc-menu");
+      await folder.click({ button: "right" }); // Right-click: the folder's menu.
+      await expect(menu.locator("button")).toContainText(["＋ Add", "🎲 Preview picks", "the folder", "＋ New file here…", "⇩ Export zip", "→ yaml"]);
+      await menu.locator("button", { hasText: "→ yaml" }).click();
       await expect(dialog.locator(".status")).toContainText("Converted 2 wildcards into");
       expect(fs.existsSync(file(`${pack}.yaml`))).toBe(true);
       expect(fs.existsSync(file(pack, "sitting.txt"))).toBe(false);
-      await expect(folder.locator("button.convert")).toHaveText("→ txt"); // The same names, now from the yaml file.
+      await folder.locator("button.more").click(); // ⋯ opens the same menu.
+      await expect(menu.locator("button", { hasText: /^→/ })).toHaveText(["→ txt"]); // The same names, now from the yaml file.
+      await page.keyboard.press("Escape"); // Closes the menu only.
+      await expect(menu).toHaveCount(0);
+      await expect(dialog).toHaveCount(1);
       await dialog.locator("button.mode").click(); // Cards: a picture for a card.
       await folder.locator(".name").click();
       const sitting = dialog.locator(".card", { hasText: "sitting" });
@@ -281,7 +288,8 @@ for (const vue of [true, false]) {
       await expect(sitting.locator("img")).toHaveCount(0);
       expect(fs.existsSync(file(pack, "sitting.png"))).toBe(false);
       await dialog.locator("button.mode").click(); // Back to lines, and back to txt files.
-      await folder.locator("button.convert", { hasText: "→ txt" }).click();
+      await folder.click({ button: "right" });
+      await menu.locator("button", { hasText: "→ txt" }).click();
       await expect(dialog.locator(".status")).toContainText(`${pack}.yaml into 2 txt files`);
       expect(fs.readFileSync(file(pack, "standing.txt"), "utf8")).toBe("standing\nstanding, arms crossed\n");
       expect(fs.existsSync(file(`${pack}.yaml`))).toBe(false);
@@ -341,12 +349,22 @@ for (const vue of [true, false]) {
       await expect.poll(() => widgetValue(page, id, "positive")).toBe("1girl, quiet zebra pose"); // Without its weight.
       await page.mouse.move(box.x + 60, box.y + 6 + 10); // The comment line: nothing to add.
       await expect(code.locator("button.line-add")).toBeHidden();
+      await found.click({ button: "right" }); // 🎲 Preview picks: what runs would put in for it.
+      await page.locator(".dfwc-menu button", { hasText: "🎲 Preview picks" }).click();
+      const picks = dialog.locator(".picks .pick .text");
+      await expect(picks).toHaveCount(5);
+      for (const text of await picks.allTextContents()) expect(["quiet zebra pose", "loud pose"]).toContain(text); // Weights and all, not the comment.
+      await dialog.locator(".picks .pick").first().locator("button.add").click();
+      await expect.poll(() => widgetValue(page, id, "positive")).toMatch(/^1girl, quiet zebra pose, (quiet zebra|loud) pose$/);
+      await dialog.locator(".picks button.close-picks").click();
+      await expect(dialog.locator(".picks")).toBeHidden();
       const again = page.waitForEvent("filechooser"); // The same zip again: what is there is kept.
       await dialog.locator("button.import").click();
       await (await again).setFiles({ name: `${pack}.zip`, mimeType: "application/zip", buffer: zip({ [`${pack}.yaml`]: "changed: [x]\n" }) });
       await expect(dialog.locator(".status")).toHaveText(`Imported 0 files from ${pack}.zip; 1 already there, kept as they were.`);
       const download = page.waitForEvent("download"); // ⇩ zip on the folder: the pack again, its yaml file too.
-      await dialog.locator(`.folder[data-path="${pack}"] > .row button.export`).click();
+      await dialog.locator(`.folder[data-path="${pack}"] > .row`).click({ button: "right" });
+      await page.locator(".dfwc-menu button", { hasText: "⇩ Export zip" }).click();
       const file = await download;
       expect(file.suggestedFilename()).toBe(`wildcards-${pack}.zip`);
       const listed = fs.readFileSync(await file.path()).toString("latin1"); // A zip lists its file names as they are.
@@ -566,7 +584,7 @@ for (const vue of [true, false]) {
         await expect(browser.locator(".basket .count")).toHaveText("2 picked");
         await expect(browser.locator(".basket .tags")).toHaveText("fox tail, long sleeves");
         await browser.locator(".basket button.neg").click();
-        await expect.poll(() => widgetValue(page, id, "negative")).toBe("long sleeves, fox tail, long sleeves");
+        await expect.poll(() => widgetValue(page, id, "negative")).toBe("long sleeves, hatsune miku, fox tail, long sleeves"); // + Add above followed the cursor there.
         await expect(browser.locator(".status")).toHaveText("Added 2 tags to the negative prompt.");
         await expect(browser.locator(".basket")).toBeHidden();
         await page.keyboard.press("Escape");

@@ -11,7 +11,7 @@ from urllib.parse import quote
 import folder_paths
 import yaml
 from aiohttp import web
-from .clip_text_encode_pos_neg import TextLoader, entry_lines, find_wildcard, read_text_lines, wildcard_index, yaml_wildcards
+from .clip_text_encode_pos_neg import TextLoader, entry_lines, fill_in, find_wildcard, read_text_lines, wildcard_index, yaml_wildcards
 from .http_read import read_up_to
 from .model_info import json_body
 # Server side of the Wildcard Browser and the __ autocomplete (web/wildcards.js): the list of wildcards, and creating, reading, saving, renaming and
@@ -276,6 +276,22 @@ def restore_file(trash_id):
     shutil.move(os.path.join(folder, "file.txt"), path)
     shutil.rmtree(folder, ignore_errors=True)
     return name, path, meta.get("favorite") is True
+# 🎲 Preview picks: what runs would put in for a wildcard (or a folder's __folder/*__), as many times, each with a new random seed: the same filling
+# in as the prompt nodes (weights, choices, nested wildcards).
+PREVIEW_MOST = 20
+def preview_picks(name, folder, count):
+    index = wildcard_index(refresh=True)
+    if not (any(key.startswith(f"{name}/") for key in index) if folder else name in index):
+        raise web.HTTPNotFound(text=f"Wildcards: no {'folder' if folder else 'wildcard'} {name}.")
+    token = f"{name}/*" if folder else name
+    picks = []
+    for _ in range(count):
+        try:
+            (text,), _note = fill_in((f"__{token}__",), secrets.randbelow(0x100000000), "random")
+        except (ValueError, RecursionError) as error: # A file that can't be read, a wildcard that uses itself...
+            raise web.HTTPBadRequest(text=f"Wildcards: {error}") from None
+        picks.append(text)
+    return {"token": token, "picks": picks}
 # Search the wildcards' lines (not only their names): each wildcard with a line that has the text, and its first such line.
 def search_lines(text, limit=200):
     found = []
@@ -438,6 +454,18 @@ def register_routes():
             except OSError: # Back without its star.
                 pass
         return web.json_response({"restored": name, "path": path})
+    @routes.get("/diceforge/wildcards/preview")
+    async def preview_wildcard(request):
+        query = request.rel_url.query
+        name = checked_name(query.get("name"))
+        try:
+            count = int(query.get("count", "5"))
+        except ValueError:
+            raise web.HTTPBadRequest(text="Wildcards: count must be a number.") from None
+        if not 1 <= count <= PREVIEW_MOST:
+            raise web.HTTPBadRequest(text=f"Wildcards: count must be 1 to {PREVIEW_MOST}.")
+        folder = query.get("folder") in ("1", "true")
+        return web.json_response(await asyncio.get_running_loop().run_in_executor(None, preview_picks, name, folder, count))
     @routes.get("/diceforge/wildcards/export")
     async def export_wildcards(request):
         folder = request.rel_url.query.get("folder", "").strip()

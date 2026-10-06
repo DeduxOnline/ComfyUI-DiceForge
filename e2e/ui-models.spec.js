@@ -285,6 +285,12 @@ for (const vue of [true, false]) {
       await expect(page.locator(".dflb .card", { hasText: "Neon - v1" })).toContainText(`${folder}_moved/neon.safetensors`); // Its Civitai data moved too.
       await page.locator(".dflb .card", { hasText: "Neon - v1" }).locator("button.delete").click();
       await expect(page.locator(".dflb .status")).toContainText(`Deleted ${folder}_moved/neon.safetensors`);
+      await page.locator(".dflb .status button.undo").click(); // ↶ Undo: back, with its preview and Civitai data.
+      await expect(page.locator(".dflb .status")).toContainText("Brought back 1 LoRA.");
+      expect(fs.readdirSync(loras(`${folder}_moved`)).sort()).toEqual(["neon.preview.png", "neon.safetensors"]);
+      await expect(page.locator(".dflb .card", { hasText: "Neon - v1" })).toBeVisible();
+      await page.locator(".dflb .card", { hasText: "Neon - v1" }).locator("button.delete").click();
+      await expect(page.locator(".dflb .status")).toContainText(`Deleted ${folder}_moved/neon.safetensors`);
       await expect(page.locator(".dflb .card", { hasText: "Neon" })).toHaveCount(0);
       expect(fs.existsSync(loras(`${folder}_moved`))).toBe(false);
       await page.keyboard.press("Escape");
