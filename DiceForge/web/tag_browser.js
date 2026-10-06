@@ -7,10 +7,12 @@ import { fieldsOf, insertIntoNode, isPromptNode } from "./wildcards.js";
 
 // Tag Browser (CLIP Dual Text Encode's menu): the Danbooru / e621 tags of the downloaded lists (tag_autocomplete.py), searched by name or alias,
 // by type (characters, artists, series, general, meta) or your ★ favorites, most used first or by name. + Add puts a tag where the cursor was in
-// the prompts (as the autocomplete writes it: spaces, escaped parentheses), − Neg at the end of the negative prompt; ↗ opens its wiki page on Danbooru (what
-// the tag means, how it's used).
-// A tag's wiki page on Danbooru (its name as the address, like Danbooru's own links: ? and / escaped).
-const wikiUrl = (tag) => `https://danbooru.donmai.us/wiki_pages/${encodeURIComponent(tag)}`;
+// the prompts (as the autocomplete writes it: spaces, escaped parentheses), − Neg at the end of the negative prompt; ↗ opens its wiki page on Danbooru, or
+// e621 for a tag of an e621 list (what the tag means, how it's used).
+// A tag's wiki page on its site: e621 for the tags of an e621 list, else Danbooru (the name as the address: ? and / escaped).
+const WIKIS = { e621: ["e621", (tag) => `https://e621.net/wiki_pages/show_or_new?title=${encodeURIComponent(tag)}`],
+  danbooru: ["Danbooru", (tag) => `https://danbooru.donmai.us/wiki_pages/${encodeURIComponent(tag)}`] };
+const wikiOf = (tag) => WIKIS[tag.site] || WIKIS.danbooru;
 const STYLE = `
 .dftb-back{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:10000;display:flex;align-items:center;justify-content:center}
 .dftb{background:#353535;color:#ddd;border:1px solid #555;border-radius:10px;width:min(980px,95vw);height:min(820px,90vh);display:flex;flex-direction:column;gap:8px;padding:14px 16px;font:14px system-ui,sans-serif;box-shadow:0 10px 40px #000a;box-sizing:border-box}
@@ -92,7 +94,7 @@ export async function openTagBrowser(node) {
       element("span", { class: "count", title: `${tag.count.toLocaleString()} posts` }, compact(tag.count)),
       element("button", { class: "add", title: "Put it where the cursor was in the prompts", onclick: () => add(tag) }, "+ Add"),
       ...(fieldsOf(node)?.includes("negative") ? [element("button", { class: "neg", title: "Put it in the negative prompt", onclick: () => add(tag, "negative") }, "− Neg")] : []),
-      element("a", { class: "wiki", href: wikiUrl(tag.tag), target: "_blank", rel: "noopener", title: "Open its wiki page on Danbooru" }, "↗"));
+      element("a", { class: "wiki", href: wikiOf(tag)[1](tag.tag), target: "_blank", rel: "noopener", title: `Open its wiki page on ${wikiOf(tag)[0]}` }, "↗"));
   }
   function draw(ready) {
     types.replaceChildren(...TYPES.map(([value, label]) => element("button", { class: value === kind ? "on" : "", onclick: () => { kind = value; background(load()); } }, label)));

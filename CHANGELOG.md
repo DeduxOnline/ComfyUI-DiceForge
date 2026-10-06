@@ -8,7 +8,7 @@ nodes and features, a patch for fixes. Each version is a [release on GitHub](htt
 ## [Unreleased]
 
 ### Changed
-- Tag Browser: ↗ opens the tag's wiki page on Danbooru instead of its posts.
+- Tag Browser: ↗ opens the tag's wiki page instead of its posts: on e621 for the tags of an e621 list, on Danbooru otherwise.
 
 ## [1.0.0] - 2026-10-03
 

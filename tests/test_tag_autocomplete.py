@@ -41,6 +41,14 @@ def test_lists_are_merged_and_read_again_when_changed():
     assert index.load().search("fur") == [] and index.search("feath")[0]["tag"] == "feathers"
 
 
+def test_browse_gives_each_tag_its_site_for_the_wiki_link():
+    write_list("danbooru.csv", DANBOORU)
+    write_list("e621.csv", "long_hair,0,10,\nfur,0,700000,\n")
+    index = TagIndex().load()
+    sites = {tag["tag"]: tag["site"] for tag in index.browse(limit=100)["tags"]}
+    assert sites["fur"] == "e621" and sites["long_hair"] == "danbooru" and sites["1girl"] == "danbooru" # In both: the list it came from.
+
+
 def test_routes(api):
     status, body = api("GET", "/diceforge/tags?q=lo")
     assert status == 200 and body == {"tags": [], "ready": False}

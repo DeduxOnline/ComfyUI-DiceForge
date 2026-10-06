@@ -331,7 +331,7 @@ Right-click CLIP Dual Text Encode and choose **🏷 Tag Browser** to look throug
 
 - **Search** by name or alias (spaces or underscores), most used first (or by name); tags that start with what you typed come first.
 - **Types**: General, 👤 Characters, ©️ Series, 🎨 Artists, ⚙️ Meta, and your **★ Favorites** (☆ next to a tag stars it; kept in `ComfyUI/user/DiceForge/tag_favorites.json`).
-- **+ Add** puts the tag where the cursor was last in the node's prompts (as the autocomplete writes it: spaces, escaped parentheses), **− Neg** at the end of the negative prompt, **↗** opens the tag's wiki page on Danbooru (what it means, how it's used).
+- **+ Add** puts the tag where the cursor was last in the node's prompts (as the autocomplete writes it: spaces, escaped parentheses), **− Neg** at the end of the negative prompt, **↗** opens the tag's wiki page (what it means, how it's used): on e621 for a tag of an e621 list, on Danbooru otherwise.
 - 100 tags at a time; **Show more** loads the next ones.
 
 ### Prompt styles

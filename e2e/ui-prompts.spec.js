@@ -488,6 +488,11 @@ for (const vue of [true, false]) {
         await expect(browser.locator(".status")).toContainText("Added hatsune miku to the");
         await page.keyboard.press("Escape");
         await expect(browser).toHaveCount(0);
+        writeFile("user/DiceForge/tags/e621.csv", "fox_tail,0,9000,\n"); // An e621 tag: ↗ opens e621's wiki.
+        await clickMenu(page, id, "DiceForge.TagBrowser", "Tag Browser");
+        await browser.locator(".top input").fill("fox");
+        await expect(browser.locator(".row a.wiki")).toHaveAttribute("href", "https://e621.net/wiki_pages/show_or_new?title=fox_tail");
+        await page.keyboard.press("Escape");
       } finally {
         fs.rmSync(basePath("user", "DiceForge", "tags"), { recursive: true, force: true }); // No tag suggestions in the other tests.
         fs.rmSync(basePath("user", "DiceForge", "tag_favorites.json"), { force: true });

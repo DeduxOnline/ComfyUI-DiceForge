@@ -16,7 +16,7 @@ from .model_info import json_body
 # Tag autocomplete for the prompt fields (web/tag_autocomplete.js): Danbooru and e621 tags, the way anime models (Illustrious, NoobAI, Anima) were
 # trained on them, with how often each is used and its aliases. The lists are CSV files in the format of a1111-sd-webui-tagcomplete
 # (tag,type,count,"alias,alias"), kept in the ComfyUI user folder: downloaded from that project with one click, or put there by hand. Every list
-# there is used; a tag in two lists counts once, with its higher count.
+# there is used; a tag in two lists counts once, with its higher count (and is that list's tag: its site, for the Tag Browser's wiki link).
 TAGS_FOLDER = os.path.join(folder_paths.get_user_directory(), "DiceForge", "tags")
 TAGS_URL = os.environ.get("DICEFORGE_TAGS_URL", "https://raw.githubusercontent.com/DominikDoom/a1111-sd-webui-tagcomplete/main/tags/{name}.csv")
 LISTS = {"danbooru": "Danbooru (anime: Illustrious, NoobAI, Anima, Pony)", "e621": "e621 (furry: NoobAI, Pony)"}
@@ -25,6 +25,11 @@ TYPES = {0: "general", 1: "artist", 3: "copyright", 4: "character", 5: "meta"}
 TYPE_NUMBERS = {name: number for number, name in TYPES.items()}
 FAVORITES_FILE = os.path.join(folder_paths.get_user_directory(), "DiceForge", "tag_favorites.json")
 SORTS = ("count", "name")
+
+
+# The site of a tag list, by its file name: e621's lists (e621.csv, e621_sfw.csv), else Danbooru's.
+def list_site(name):
+    return "e621" if name.lower().startswith("e621") else "danbooru"
 
 
 def tag_key(text):
@@ -48,7 +53,7 @@ def parse_tags(text):
 # The tags of every list in the folder, read again when a file changes: names and aliases sorted, for prefix search by bisection.
 class TagIndex:
     def __init__(self):
-        self.lock, self.signature, self.tags, self.names, self.aliases, self.by_count = threading.Lock(), None, [], [], [], []
+        self.lock, self.signature, self.tags, self.sites, self.names, self.aliases, self.by_count = threading.Lock(), None, [], [], [], [], []
 
     def files(self):
         try:
@@ -72,9 +77,10 @@ class TagIndex:
                     continue
                 for tag, kind, count, aliases in tags:
                     known = merged.get(tag_key(tag))
-                    if known is None or count > known[2]:
-                        merged[tag_key(tag)] = (tag, kind, count, sorted(set(aliases) | set(known[3] if known else [])))
-            self.tags = list(merged.values())
+                    if known is None or count > known[0][2]:
+                        merged[tag_key(tag)] = ((tag, kind, count, sorted(set(aliases) | set(known[0][3] if known else []))), list_site(name))
+            self.tags = [tag for tag, _site in merged.values()]
+            self.sites = [site for _tag, site in merged.values()]
             self.names = sorted((tag_key(tag[0]), index) for index, tag in enumerate(self.tags))
             self.aliases = sorted((tag_key(alias), index, alias) for index, tag in enumerate(self.tags) for alias in tag[3])
             self.by_count = sorted(range(len(self.tags)), key=lambda index: (-self.tags[index][2], self.tags[index][0].lower()))
@@ -103,7 +109,8 @@ class TagIndex:
                 for index in best]
     def entry(self, index, favorites=frozenset()):
         tag, kind, count, aliases = self.tags[index]
-        return {"tag": tag, "type": TYPES.get(kind, "general"), "count": count, "aliases": aliases[:8], "favorite": tag in favorites}
+        return {"tag": tag, "type": TYPES.get(kind, "general"), "count": count, "aliases": aliases[:8], "favorite": tag in favorites,
+                "site": self.sites[index] if index < len(self.sites) else "danbooru"}
 
     # The Tag Browser's page of tags: those whose name or an alias contains what is typed (all without), of one type or the favorites, most used
     # first or by name; offset and limit page through them.
