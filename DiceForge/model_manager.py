@@ -140,12 +140,13 @@ def new_trash(root):
         return folder
     except OSError:
         return None
-# A kept delete's folder in a trash folder, found among its entries (a path made only of names the trash holds, never of the id as sent).
+# A kept delete's folder in a trash folder: never outside it, whatever the id.
 def kept_delete(trash, trash_id):
-    try:
-        return next((os.path.join(trash, name) for name in os.listdir(trash) if TRASH_ID.fullmatch(name) and name == trash_id), None)
-    except OSError:
+    trash = os.path.realpath(trash)
+    folder = os.path.realpath(os.path.join(trash, trash_id))
+    if not folder.startswith(trash + os.sep) or not os.path.isdir(folder):
         return None
+    return folder
 def empty_trash(trash, kept=0):
     try:
         entries = sorted(name for name in os.listdir(trash) if TRASH_ID.fullmatch(name))
