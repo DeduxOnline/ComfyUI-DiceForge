@@ -116,7 +116,7 @@ const STYLE = `
 .dfwc h2{margin:0 0 10px;font-size:20px;color:#fff}.dfwc .top{display:flex;gap:8px;margin-bottom:10px}
 .dfwc input,.dfwc textarea{background:#262626;color:#eee;border:1px solid #555;border-radius:4px;padding:6px 8px;font:inherit;box-sizing:border-box}
 .dfwc .top input{flex:1}.dfwc .main{display:flex;gap:12px;flex:1;min-height:0}
-.dfwc .tree{width:45%;overflow:auto;border:1px solid #4a4a4a;border-radius:6px;padding:6px}
+.dfwc .tree{width:calc((100% - 12px) / 3);flex:none;box-sizing:border-box;overflow:auto;border:1px solid #4a4a4a;border-radius:6px;padding:6px}
 .dfwc .edit{flex:1;display:flex;flex-direction:column;gap:8px;min-width:0}
 .dfwc .code{--current-line:-40px;position:relative;flex:1;display:flex;min-height:0;border:1px solid #555;border-radius:4px;background:#262626;overflow:hidden}
 .dfwc .code .lines,.dfwc .code .hl,.dfwc .code textarea{font:13px/20px ui-monospace,monospace;letter-spacing:normal}
@@ -132,7 +132,7 @@ const STYLE = `
 .dfwc .code.readonly .hl{color:#aaa}
 .dfwc .code button.line-add{position:absolute;left:3px;z-index:2;width:18px;height:18px;padding:0;border-radius:4px;font:13px/16px system-ui,sans-serif;border-color:#4a7a4a;color:#bfe8bf;background:#253325}
 .dfwc .row .found{color:#9cc8ff;font-style:italic;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:45%}.dfwc.drop-zip{outline:3px dashed #8fd0a8}
-.dfwc [hidden]{display:none!important}.dfwc.cards-mode .tree{width:30%}.dfwc .cards{flex:1;display:flex;flex-direction:column;gap:8px;min-width:0;min-height:0}
+.dfwc [hidden]{display:none!important}.dfwc .cards{flex:1;display:flex;flex-direction:column;gap:8px;min-width:0;min-height:0}
 .dfwc .cards-head{display:flex;gap:8px;align-items:center;color:#ccc}.dfwc .cards-head b{color:#fff}.dfwc .cards-head .muted{flex:1}
 .dfwc .cards .grid{flex:1;overflow:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;align-content:start;grid-auto-rows:max-content;padding-right:4px}
 .dfwc .card{border:1px solid #4a4a4a;border-radius:8px;overflow:hidden;background:#2e2e2e;display:flex;flex-direction:column}

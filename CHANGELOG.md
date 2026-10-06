@@ -16,6 +16,7 @@ nodes and features, a patch for fixes. Each version is a [release on GitHub](htt
 - Tag Browser: a basket of picked tags, put into the prompt (or the negative one) all at once.
 
 ### Changed
+- Wildcard Browser: the tree takes a third of the window, the editor (or the cards) two thirds.
 - Tag Browser: ↗ opens the tag's wiki page instead of its posts: on e621 for the tags of an e621 list, on Danbooru otherwise.
 
 ## [1.0.0] - 2026-10-03

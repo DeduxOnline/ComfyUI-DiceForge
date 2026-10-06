@@ -144,6 +144,8 @@ for (const vue of [true, false]) {
       const hair = page.locator('.dfwc .folder[data-path="hair"]');
       const style = hair.locator(".row", { hasText: "style" });
       await expect(hair).not.toHaveClass(/open/); // Folders start closed.
+      const [treeWidth, mainWidth] = await page.evaluate(() => [".dfwc .tree", ".dfwc .main"].map((selector) => document.querySelector(selector).offsetWidth));
+      expect(Math.abs(treeWidth * 3 + 12 - mainWidth)).toBeLessThan(4); // The tree a third, the editor two thirds (12px between them).
       await expect(style).toBeHidden();
       await hair.locator("> .row .name").click();
       await expect(style).toBeVisible();
