@@ -474,6 +474,7 @@ for (const vue of [true, false]) {
         await expect(browser.locator(".row .name b")).toHaveText(["1girl", "long_hair", "smile", "long_sleeves", "hatsune_miku"]); // Most used first.
         await browser.locator(".top input").fill("long");
         await expect(browser.locator(".row .name b")).toHaveText(["long_hair", "long_sleeves"]);
+        await expect(browser.locator(".row", { hasText: "long_sleeves" }).locator("a.wiki")).toHaveAttribute("href", "https://danbooru.donmai.us/wiki_pages/long_sleeves"); // ↗: the wiki.
         await browser.locator(".row", { hasText: "long_sleeves" }).locator("button.neg").click();
         await expect.poll(() => widgetValue(page, id, "negative")).toBe("long sleeves");
         await browser.locator(".top input").fill("");
