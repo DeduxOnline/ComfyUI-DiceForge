@@ -171,7 +171,7 @@ for (const vue of [true, false]) {
         await clickMenu(page, id, "DiceForge.Wildcards", "Wildcard Browser");
         await page.locator(".dfwc button.open-all").click();
         await page.locator(`.dfwc .row[data-name="${top}/from/x"] .name`).click();
-        await expect(page.locator(".dfwc .edit textarea")).toHaveValue("one\ntwo\n"); // Opened (else the file, loading, replaces the typing).
+        await expect(page.locator(".dfwc .edit textarea")).toHaveValue("one\ntwo"); // Opened (else the file, loading, replaces the typing).
         await page.locator(".dfwc .edit textarea").fill("one\ntwo\nthree"); // Unsaved: stays in the editor through the move.
         await page.locator(".dfwc button.move").click();
         await page.locator(`.dfmv .item[data-folder="${top}/to"]`).click();
