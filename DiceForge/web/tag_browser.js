@@ -28,7 +28,7 @@ const STYLE = `
 .dftb .row button{padding:1px 8px;font-size:12px}.dftb .row button.add{border-color:#4a7a4a;color:#bfe8bf}.dftb .row button.neg{border-color:#7a4a4a;color:#f0c0c0}
 .dftb .row button.fav{border:none;background:none;font-size:16px;color:#888;padding:0 2px}.dftb .row button.fav.on{color:#ffd24a}
 .dftb .row a{color:#9cc8ff;text-decoration:none;font-size:13px}.dftb .status{color:#9c9;font-size:13px;min-height:18px}.dftb .more{margin:8px auto;display:block}
-.dftb .empty{color:#999;padding:16px}
+.dftb .empty{color:#999;padding:16px}.dftb [hidden]{display:none!important}
 .dftb .row button.pick{border:none;background:none;font-size:16px;color:#888;padding:0 2px}.dftb .row button.pick.on{color:#8fc0ff}.dftb .row.picked{background:#2a3444}
 .dftb .basket{display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:#2a3444;border:1px solid #4a6a9a;border-radius:6px;padding:5px 8px}
 .dftb .basket .tags{flex:1;min-width:0;color:#cfe0ff;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

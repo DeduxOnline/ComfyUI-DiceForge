@@ -261,12 +261,12 @@ def trash_file(path, name, favorite):
 def restore_file(trash_id):
     if not isinstance(trash_id, str) or not TRASH_ID.fullmatch(trash_id):
         raise web.HTTPBadRequest(text="Wildcards: that is not a deleted file's id.")
-    folder = os.path.join(TRASH_FOLDER, trash_id)
-    try:
+    try: # The delete's folder, found among the trash's own entries (not a path made of the id as sent).
+        folder = next(os.path.join(TRASH_FOLDER, name) for name in os.listdir(TRASH_FOLDER) if TRASH_ID.fullmatch(name) and name == trash_id)
         with open(os.path.join(folder, "meta.json"), encoding="utf-8") as file:
             meta = json.load(file)
         name, path = checked_name(meta.get("name")), os.path.abspath(str(meta.get("path", "")))
-    except (OSError, ValueError, AttributeError):
+    except (OSError, ValueError, AttributeError, StopIteration):
         raise web.HTTPNotFound(text="Wildcards: nothing to undo: the deleted file is no longer kept.") from None
     if not any(path.startswith(root + os.sep) for root in map(os.path.abspath, folder_paths.get_folder_paths("wildcards"))):
         raise web.HTTPBadRequest(text="Wildcards: the deleted file was in a folder that is no longer a wildcards folder.")

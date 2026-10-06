@@ -140,6 +140,12 @@ def new_trash(root):
         return folder
     except OSError:
         return None
+# A kept delete's folder in a trash folder, found among its entries (a path made only of names the trash holds, never of the id as sent).
+def kept_delete(trash, trash_id):
+    try:
+        return next((os.path.join(trash, name) for name in os.listdir(trash) if TRASH_ID.fullmatch(name) and name == trash_id), None)
+    except OSError:
+        return None
 def empty_trash(trash, kept=0):
     try:
         entries = sorted(name for name in os.listdir(trash) if TRASH_ID.fullmatch(name))
@@ -185,8 +191,8 @@ def restore_model(kind, trash_id):
     kind = managed_kind(kind)
     if not isinstance(trash_id, str) or not TRASH_ID.fullmatch(trash_id):
         raise web.HTTPBadRequest(text="Models: that is not a deleted model's id.")
-    root, folder = next(((os.path.abspath(root), os.path.join(trash_folder(root), trash_id)) for root in folder_paths.get_folder_paths(kind)
-                         if os.path.isdir(os.path.join(trash_folder(root), trash_id))), (None, None))
+    root, folder = next(((os.path.abspath(root), kept) for root in folder_paths.get_folder_paths(kind)
+                         for kept in [kept_delete(trash_folder(root), trash_id)] if kept), (None, None))
     try:
         with open(os.path.join(folder, "meta.json"), encoding="utf-8") as file:
             meta = json.load(file)
