@@ -131,6 +131,7 @@ def wildcards(tmp_path, monkeypatch):
     monkeypatch.setitem(folder_paths.folder_names_and_paths, "wildcards", ([str(folder)], set()))
     from DiceForge import wildcards_api
     monkeypatch.setattr(wildcards_api, "FAVORITES_FILE", str(tmp_path / "wildcard_favorites.json")) # Each test starts with no favorites.
+    monkeypatch.setattr(wildcards_api, "TRASH_FOLDER", str(tmp_path / "wildcards_trash")) # And an empty trash.
     prompts.index_cache.update(signature=None, entries={})
 
     def add(name, text):

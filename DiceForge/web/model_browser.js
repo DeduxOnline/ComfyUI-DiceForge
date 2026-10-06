@@ -7,7 +7,7 @@ import { dragSource, dropTarget, pickFolder } from "./move_dialog.js";
 import { addStyleOnce, background, element } from "./dom.js";
 import { blurSwitch, civitaiMedia } from "./media.js";
 import { dateText, statsChips } from "./civitai_meta.js";
-import { recall, remember, scrollBack } from "./window_memory.js";
+import { keepSize, recall, remember, scrollBack } from "./window_memory.js";
 
 // Model browsers (node menu): LoRA, Checkpoint, Diffusion Model, Text Encoder and VAE Browser. The model files as cards with a preview, name, base model and trigger words from Civitai
 // (looked up by the file's hash, as in Model info), a folder tree, search and filters. What a card's button does depends on the node it was opened
@@ -152,6 +152,7 @@ async function openBrowser(node, spec, target = targetOf(node, spec)) {
   const blurToggle = blurSwitch(() => draw());
   function close() {
     remember(`browser.${kind}`, { search: search.value, sort: sort.value, tag: tagFilter.value, scroll: grid.scrollTop }); // Opens where it was closed.
+    stopSize();
     stopLookUp?.();
     blurToggle.dispose();
     back.remove();
@@ -532,8 +533,11 @@ async function openBrowser(node, spec, target = targetOf(node, spec)) {
   });
   for (const input of [search, base, tagFilter, sort]) input.addEventListener(input === search ? "input" : "change", draw);
   const hint = target?.pick ? target.hint : target?.model ? `Use puts a ${what} in ${target.model.name}.` : target?.folder ? `Use folder sets the folder ${spec.randomName} picks from.` : target?.triggers ? `+ Triggers inserts a ${what}'s trigger words where the cursor was in the prompt.` : "";
-  back.append(element("div", { class: "dflb" },
-    element("h2", {}, `${spec.title} Browser`),
+  const heading = element("h2", {}, `${spec.title} Browser`), dialog = element("div", { class: "dflb" });
+  const stopSize = keepSize(dialog, `browser.${kind}`, heading);
+  back.append(dialog);
+  dialog.append(
+    heading,
     element("div", { class: "top" }, search, base, tagFilter, sort, selectMode, lookAll, blurToggle,
       ...(spec.manage && spec.civitai !== false ? [element("button", { class: "go find", title: `Search Civitai and download ${spec.plural} into models/${kind}`, onclick: () => background(openCivitaiSearch({
         kind, title: spec.title, plural: spec.plural, icon: spec.icon, hint: spec.civitaiHint ?? "", base: target?.base, folders: [...new Set(files.map((entry) => folderOf(entry.file)).filter(Boolean))].sort((a, b) => a.localeCompare(b)),
@@ -541,7 +545,7 @@ async function openBrowser(node, spec, target = targetOf(node, spec)) {
       })) }, "＋ Find on Civitai")] : []),
       element("button", { onclick: close }, "Close")),
     element("div", { class: "top" }, element("span", { class: "muted" }, hint), status),
-    element("div", { class: "main" }, tree, element("div", { class: "cards" }, batch, grid))));
+    element("div", { class: "main" }, tree, element("div", { class: "cards" }, batch, grid)));
   const last = recall(`browser.${kind}`);
   search.value = typeof last.search === "string" ? last.search : "";
   if ([...sort.options].some((option) => option.value === last.sort)) sort.value = last.sort;

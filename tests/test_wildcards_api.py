@@ -299,3 +299,63 @@ def test_search_finds_wildcards_by_their_lines(api, wildcards):
     assert status == 200 and body["found"] == [{"name": "color", "line": "crimson red"}, {"name": "outfit", "line": "Red dress"}] # Not in comments.
     assert api("GET", "/diceforge/wildcards/search?q=zzz")[1]["found"] == []
     assert api("GET", "/diceforge/wildcards/search?q=r")[0] == 400
+
+
+def zip_bytes(body):
+    return body if isinstance(body, bytes) else body.encode("utf-8") # A zip that happens to read as text comes back as text.
+
+
+def test_a_folder_or_all_wildcards_export_as_a_zip_that_imports_back(api, wildcards):
+    wildcards("color.txt", "red\n")
+    wildcards("anima/style.txt", "flat\n")
+    wildcards("anima/POSES.yaml", "POSES:\n  sitting: sitting,\n")
+    os.makedirs(os.path.join(wildcards.folder, "anima", "POSES"))
+    with open(os.path.join(wildcards.folder, "anima", "POSES", "sitting.png"), "wb") as file:
+        file.write(PNG)
+    wildcards("anima/notes.pdf", "not a wildcard")
+    wildcards("anima/.hidden/x.txt", "x\n")
+    status, body = api("GET", "/diceforge/wildcards/export?folder=anima")
+    assert status == 200
+    names = sorted(zipfile.ZipFile(io.BytesIO(zip_bytes(body))).namelist())
+    assert names == ["anima/POSES.yaml", "anima/POSES/sitting.png", "anima/style.txt"] # With the folder's name; no pdf, no hidden folder.
+    status, body = api("GET", "/diceforge/wildcards/export?folder=anima/POSES")
+    assert sorted(zipfile.ZipFile(io.BytesIO(zip_bytes(body))).namelist()) == ["anima/POSES.yaml", "anima/POSES/sitting.png"] # The pack's yaml too.
+    status, body = api("GET", "/diceforge/wildcards/export")
+    assert status == 200 and "color.txt" in zipfile.ZipFile(io.BytesIO(zip_bytes(body))).namelist()
+    assert api("GET", "/diceforge/wildcards/export?folder=nope")[0] == 404
+    assert api("GET", "/diceforge/wildcards/export?folder=../x")[0] == 400
+    exported = zip_bytes(api("GET", "/diceforge/wildcards/export?folder=anima")[1])
+    status, body = api("POST", "/diceforge/wildcards/import?folder=copy", data=exported)
+    assert status == 200 and sorted(body["imported"]) == ["anima/POSES.yaml", "anima/POSES/sitting.png", "anima/style.txt"]
+    assert os.path.isfile(os.path.join(wildcards.folder, "copy", "anima", "POSES", "sitting.png"))
+
+
+def test_a_delete_is_undone_with_its_star(api, wildcards):
+    wildcards("hair/style/long.txt", "l\n")
+    assert api("POST", "/diceforge/wildcards/favorite", {"name": "hair/style/long", "favorite": True})[0] == 200
+    status, body = api("DELETE", "/diceforge/wildcards/file?name=hair/style/long")
+    assert status == 200 and body["undo"] and os.listdir(wildcards.folder) == [] # In the trash, its folders gone.
+    status, body = api("POST", "/diceforge/wildcards/restore", {"id": body["undo"]})
+    assert status == 200 and body["restored"] == "hair/style/long"
+    with open(os.path.join(wildcards.folder, "hair", "style", "long.txt"), encoding="utf-8") as file:
+        assert file.read() == "l\n"
+    files = {entry["name"]: entry for entry in api("GET", "/diceforge/wildcards")[1]["files"]}
+    assert files["hair/style/long"]["favorite"] is True
+    undo = api("DELETE", "/diceforge/wildcards/file?name=hair/style/long")[1]["undo"]
+    wildcards("hair/style/long.txt", "a new one\n")
+    assert api("POST", "/diceforge/wildcards/restore", {"id": undo})[0] == 409 # The name is taken again: not overwritten.
+    assert api("POST", "/diceforge/wildcards/restore", {"id": "1234567890123456789-deadbeef"})[0] == 404
+    for junk in ("../x", 5, None, "1234567890123456789-deadbeef/../x"):
+        assert api("POST", "/diceforge/wildcards/restore", {"id": junk})[0] == 400
+
+
+def test_the_trash_keeps_the_last_deletes(api, wildcards, monkeypatch):
+    from DiceForge import wildcards_api
+    monkeypatch.setattr(wildcards_api, "TRASH_KEPT", 2)
+    undo = []
+    for name in ("a", "b", "c"):
+        wildcards(f"{name}.txt", f"{name}\n")
+        undo.append(api("DELETE", f"/diceforge/wildcards/file?name={name}")[1]["undo"])
+    assert len(os.listdir(wildcards_api.TRASH_FOLDER)) == 2
+    assert api("POST", "/diceforge/wildcards/restore", {"id": undo[0]})[0] == 404 # The oldest is gone.
+    assert api("POST", "/diceforge/wildcards/restore", {"id": undo[2]})[0] == 200

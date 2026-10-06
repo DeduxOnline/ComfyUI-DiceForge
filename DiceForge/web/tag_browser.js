@@ -4,7 +4,7 @@ import { addStyleOnce, background, element } from "./dom.js";
 import { compact } from "./civitai_meta.js";
 import { tagText } from "./tag_autocomplete.js";
 import { fieldsOf, insertIntoNode, isPromptNode } from "./wildcards.js";
-import { recall, remember, scrollBack } from "./window_memory.js";
+import { keepSize, recall, remember, scrollBack } from "./window_memory.js";
 
 // Tag Browser (CLIP Dual Text Encode's menu): the Danbooru / e621 tags of the downloaded lists (tag_autocomplete.py), searched by name or alias,
 // by type (characters, artists, series, general, meta) or your ★ favorites, most used first or by name. + Add puts a tag where the cursor was in
@@ -29,6 +29,10 @@ const STYLE = `
 .dftb .row button.fav{border:none;background:none;font-size:16px;color:#888;padding:0 2px}.dftb .row button.fav.on{color:#ffd24a}
 .dftb .row a{color:#9cc8ff;text-decoration:none;font-size:13px}.dftb .status{color:#9c9;font-size:13px;min-height:18px}.dftb .more{margin:8px auto;display:block}
 .dftb .empty{color:#999;padding:16px}
+.dftb .row button.pick{border:none;background:none;font-size:16px;color:#888;padding:0 2px}.dftb .row button.pick.on{color:#8fc0ff}.dftb .row.picked{background:#2a3444}
+.dftb .basket{display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:#2a3444;border:1px solid #4a6a9a;border-radius:6px;padding:5px 8px}
+.dftb .basket .tags{flex:1;min-width:0;color:#cfe0ff;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dftb .basket button.add{border-color:#4a7a4a;color:#bfe8bf}.dftb .basket button.neg{border-color:#7a4a4a;color:#f0c0c0}
 `;
 const TYPES = [["", "All"], ["general", "General"], ["character", "👤 Characters"], ["copyright", "©️ Series"], ["artist", "🎨 Artists"], ["meta", "⚙️ Meta"], ["favorites", "★ Favorites"]];
 const KIND_NAMES = { general: "general", character: "👤 character", copyright: "©️ series", artist: "🎨 artist", meta: "⚙️ meta" };
@@ -51,10 +55,35 @@ export async function openTagBrowser(node) {
   const list = element("div", { class: "list" });
   const status = element("div", { class: "status" });
   const say = (text) => { status.textContent = text; };
+  // The basket: tags picked (☐ on a row) while searching and switching types, then put into a prompt all at once.
+  const picked = new Map(), basket = element("div", { class: "basket", hidden: "" });
+  function drawBasket() {
+    basket.hidden = !picked.size;
+    const texts = [...picked.keys()].map(tagText);
+    basket.replaceChildren(element("b", { class: "count" }, `${picked.size} picked`), element("span", { class: "tags", title: texts.join(", ") }, texts.join(", ")),
+      element("button", { class: "add", title: "Put them all where the cursor was in the prompts", onclick: () => addPicked() }, "+ Add all"),
+      ...(fieldsOf(node)?.includes("negative") ? [element("button", { class: "neg", title: "Put them all in the negative prompt", onclick: () => addPicked("negative") }, "− Neg all")] : []),
+      element("button", { class: "clear", title: "Empty the basket", onclick: () => { picked.clear(); drawBasket(); draw(true); } }, "Clear"));
+  }
+  function addPicked(field) {
+    const texts = [...picked.keys()].map(tagText);
+    const where = insertIntoNode(node, texts.join(", "), field);
+    picked.clear();
+    drawBasket();
+    draw(true);
+    say(`Added ${texts.length} tag${texts.length === 1 ? "" : "s"} to the ${where} prompt.`);
+  }
+  function togglePick(tag) {
+    if (picked.has(tag.tag)) picked.delete(tag.tag);
+    else picked.set(tag.tag, tag);
+    drawBasket();
+    draw(true);
+  }
   const back = element("div", { class: "dftb-back" });
   const onKey = (event) => { if (event.key === "Escape") { event.stopPropagation(); close(); } };
   function close() {
     remember("tags", { search: search.value, kind, sort: sort.value, scroll: list.scrollTop });
+    stopSize();
     back.remove();
     document.removeEventListener("keydown", onKey, true);
   }
@@ -90,7 +119,10 @@ export async function openTagBrowser(node) {
     say(`Added ${tagText(tag.tag)} to the ${where} prompt.`);
   }
   function row(tag) {
-    return element("div", { class: "row" },
+    const on = picked.has(tag.tag);
+    return element("div", { class: "row" + (on ? " picked" : "") },
+      element("button", { class: "pick" + (on ? " on" : ""), title: on ? "In the basket: click to take it out" : "Pick it for the basket (several tags at once)",
+        onclick: () => togglePick(tag) }, on ? "☑" : "☐"),
       element("button", { class: "fav" + (tag.favorite ? " on" : ""), title: tag.favorite ? "A favorite: click to remove the star" : "Add to favorites",
         onclick: () => background(setFavorite(tag, !tag.favorite)) }, tag.favorite ? "★" : "☆"),
       element("span", { class: "name", title: tag.aliases.length ? `Also: ${tag.aliases.join(", ")}` : "" }, element("b", {}, tag.tag),
@@ -115,10 +147,13 @@ export async function openTagBrowser(node) {
   let typing = null;
   search.addEventListener("input", () => { clearTimeout(typing); typing = setTimeout(() => background(load()), 150); });
   sort.addEventListener("change", () => background(load()));
-  back.append(element("div", { class: "dftb" },
-    element("h2", {}, "Tag Browser"),
+  const heading = element("h2", {}, "Tag Browser"), dialog = element("div", { class: "dftb" });
+  const stopSize = keepSize(dialog, "tags", heading);
+  back.append(dialog);
+  dialog.append(
+    heading,
     element("div", { class: "top" }, search, sort, element("button", { onclick: close }, "Close")),
-    types, list, status));
+    types, basket, list, status);
   document.body.append(back);
   search.focus();
   search.setSelectionRange(search.value.length, search.value.length);

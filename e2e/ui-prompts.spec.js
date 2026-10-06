@@ -343,6 +343,13 @@ for (const vue of [true, false]) {
       await dialog.locator("button.import").click();
       await (await again).setFiles({ name: `${pack}.zip`, mimeType: "application/zip", buffer: zip({ [`${pack}.yaml`]: "changed: [x]\n" }) });
       await expect(dialog.locator(".status")).toHaveText(`Imported 0 files from ${pack}.zip; 1 already there, kept as they were.`);
+      const download = page.waitForEvent("download"); // ⇩ zip on the folder: the pack again, its yaml file too.
+      await dialog.locator(`.folder[data-path="${pack}"] > .row button.export`).click();
+      const file = await download;
+      expect(file.suggestedFilename()).toBe(`wildcards-${pack}.zip`);
+      const listed = fs.readFileSync(await file.path()).toString("latin1"); // A zip lists its file names as they are.
+      for (const name of [`${pack}.yaml`, `${pack}/sitting.png`, `${pack}/lines.txt`]) expect(listed).toContain(name);
+      expect(listed).not.toContain("notes.pdf");
       await page.keyboard.press("Escape");
     });
 
@@ -368,7 +375,17 @@ for (const vue of [true, false]) {
       await expect(status).toContainText(`Renamed crud_${tag}/new to crud_${tag}_done/renamed`);
       await expect(page.locator(".dfwc .row.sel")).toContainText("renamed");
       await expect(editor).toHaveValue("alpha\nbeta");
+      await status.locator("button.undo").click(); // ↶ Undo: the old name back, and again the new one.
+      await expect(status).toContainText(`Renamed crud_${tag}_done/renamed to crud_${tag}/new`);
+      await status.locator("button.undo").click();
+      await expect(status).toContainText(`Renamed crud_${tag}/new to crud_${tag}_done/renamed`);
       expect(fs.existsSync(wildcards(`crud_${tag}`))).toBe(false);
+      await page.locator(".dfwc button.delete").click();
+      await expect(status).toContainText(`Deleted crud_${tag}_done/renamed.txt`);
+      await status.locator("button.undo").click(); // ↶ Undo the delete: back, and open.
+      await expect(status).toContainText(`crud_${tag}_done/renamed is back.`);
+      await expect(editor).toHaveValue("alpha\nbeta");
+      expect(fs.readFileSync(wildcards(`crud_${tag}_done`, "renamed.txt"), "utf8")).toBe("alpha\nbeta\n");
       await page.locator(".dfwc button.delete").click();
       await expect(status).toContainText(`Deleted crud_${tag}_done/renamed.txt`);
       expect(fs.existsSync(wildcards(`crud_${tag}_done`))).toBe(false);
@@ -438,6 +455,14 @@ for (const vue of [true, false]) {
       await clickMenu(page, id, "DiceForge.Wildcards", "Syntax guide");
       await expect(guide.locator("input")).toHaveValue("lock"); // Opens where it was closed.
       await expect(guide.locator(".row")).toHaveCount(1);
+      const size = () => guide.evaluate((element) => [element.offsetWidth, element.offsetHeight]);
+      await guide.evaluate((element) => { element.style.width = "640px"; element.style.height = "480px"; }); // As dragging its corner leaves it.
+      await expect.poll(() => page.evaluate(() => localStorage.getItem("diceforge.window.size.syntax"))).toBe('{"width":640,"height":480}');
+      await page.keyboard.press("Escape");
+      await clickMenu(page, id, "DiceForge.Wildcards", "Syntax guide");
+      expect(await size()).toEqual([640, 480]); // The same size again.
+      await guide.locator("h2").dblclick(); // Its default size.
+      expect((await size())[0]).toBeGreaterThan(640);
       await page.keyboard.press("Escape");
     });
 
@@ -529,7 +554,19 @@ for (const vue of [true, false]) {
         await expect(browser.locator(".row .name b")).toHaveText(["hatsune_miku"]);
         await browser.locator(".types button", { hasText: "All" }).click();
         await browser.locator(".top input").fill("fox");
+        await expect(browser.locator(".row .name b")).toHaveText(["fox_tail"]);
         await expect(browser.locator(".row a.wiki")).toHaveAttribute("href", "https://e621.net/wiki_pages/show_or_new?title=fox_tail");
+        // The basket: tags picked across searches, put in all at once.
+        await browser.locator(".row button.pick").click();
+        await browser.locator(".top input").fill("long");
+        await expect(browser.locator(".row .name b")).toHaveText(["long_hair", "long_sleeves"]);
+        await browser.locator(".row", { hasText: "long_sleeves" }).locator("button.pick").click();
+        await expect(browser.locator(".basket .count")).toHaveText("2 picked");
+        await expect(browser.locator(".basket .tags")).toHaveText("fox tail, long sleeves");
+        await browser.locator(".basket button.neg").click();
+        await expect.poll(() => widgetValue(page, id, "negative")).toBe("long sleeves, fox tail, long sleeves");
+        await expect(browser.locator(".status")).toHaveText("Added 2 tags to the negative prompt.");
+        await expect(browser.locator(".basket")).toBeHidden();
         await page.keyboard.press("Escape");
       } finally {
         fs.rmSync(basePath("user", "DiceForge", "tags"), { recursive: true, force: true }); // No tag suggestions in the other tests.

@@ -21,3 +21,29 @@ export function scrollBack(element, top) {
   element.scrollTop = top;
   requestAnimationFrame(() => { element.scrollTop = top; });
 }
+
+// A window's size: dragged by its bottom-right corner, kept for the next time (per window, in this browser); a double-click on its title puts
+// the default size back. Never larger than the screen.
+export function keepSize(dialog, name, title) {
+  const key = `size.${name}`;
+  Object.assign(dialog.style, { resize: "both", overflow: "hidden", maxWidth: "98vw", maxHeight: "96vh", minWidth: "420px", minHeight: "320px" });
+  const size = recall(key);
+  if (size.width > 0 && size.height > 0) Object.assign(dialog.style, { width: `${size.width}px`, height: `${size.height}px` });
+  let ready = false; // The first report is the size it opened with, not a drag.
+  const observer = new ResizeObserver(() => {
+    if (!ready) {
+      ready = true;
+      return;
+    }
+    if (dialog.isConnected && dialog.style.width.endsWith("px")) remember(key, { width: dialog.offsetWidth, height: dialog.offsetHeight });
+  });
+  observer.observe(dialog);
+  if (title) {
+    title.title = "Drag the bottom-right corner to resize the window; double-click here for its default size";
+    title.addEventListener("dblclick", () => {
+      dialog.style.width = dialog.style.height = "";
+      remember(key, {});
+    });
+  }
+  return () => observer.disconnect();
+}

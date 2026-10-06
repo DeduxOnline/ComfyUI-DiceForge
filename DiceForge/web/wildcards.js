@@ -3,7 +3,7 @@ import { api } from "../../scripts/api.js";
 import { addStyleOnce, background, element } from "./dom.js";
 import { dragSource, dropTarget, pickFolder } from "./move_dialog.js";
 import { addHighlightStyle, highlightEnabled, highlightWildcardFile } from "./prompt_highlight.js";
-import { recall, remember, scrollBack } from "./window_memory.js";
+import { keepSize, recall, remember, scrollBack } from "./window_memory.js";
 
 // Wildcards in CLIP Dual Text Encode: autocomplete after "__" in the prompt fields, and the Wildcard Browser (node menu) with a folder tree,
 // "+ Add" buttons that insert __name__ (or __folder/*__) where the cursor was, and an editor for the files.
@@ -148,9 +148,9 @@ const STYLE = `
 .dfwc .kids{margin-left:16px}.dfwc button.fav{border:none;background:none;padding:0 4px;font-size:15px;color:#888}.dfwc button.fav.on{color:#ffd24a}
 .dfwc button.only-favorites.on{border-color:#b8962e;color:#ffd24a}.dfwc .row.drop,.dfwc .tree.drop{background:#35584a;outline:1px dashed #8fd0a8}.dfwc .folder:not(.open)>.kids{display:none}.dfwc .muted{color:#999;font-size:12px}
 .dfwc button{background:#222;color:#eee;border:1px solid #666;border-radius:6px;padding:5px 12px;cursor:pointer;font:inherit}.dfwc button:hover{background:#2c2c2c}
-.dfwc button.convert{padding:1px 7px;font-size:12px;border-color:#5a6f9a;color:#bcd0f5}.dfwc .edit button.convert{padding:5px 12px;font-size:inherit}
+.dfwc button.convert{padding:1px 7px;font-size:12px;border-color:#5a6f9a;color:#bcd0f5}.dfwc .row button.export{padding:1px 7px;font-size:12px}.dfwc .edit button.convert{padding:5px 12px;font-size:inherit}
 .dfwc .card .actions button.picture,.dfwc .card .actions button.no-picture{padding:1px 6px;font-size:12px}.dfwc .card.drop{outline:2px dashed #8fd0a8}
-.dfwc button:disabled{opacity:.5;cursor:default}.dfwc button.delete:not(:disabled){border-color:#8a4a4a;color:#f0b0b0}.dfwc textarea[readonly]{color:#aaa}.dfwc button.add{padding:1px 8px;font-size:12px;border-color:#4a7a4a;color:#bfe8bf}.dfwc .status{color:#9c9;min-height:18px;font-size:13px}
+.dfwc button:disabled{opacity:.5;cursor:default}.dfwc button.delete:not(:disabled){border-color:#8a4a4a;color:#f0b0b0}.dfwc textarea[readonly]{color:#aaa}.dfwc button.add{padding:1px 8px;font-size:12px;border-color:#4a7a4a;color:#bfe8bf}.dfwc .status{color:#9c9;min-height:18px;font-size:13px}.dfwc .status button.undo{margin-left:10px;padding:0 8px;font-size:12px}
 `;
 const addStyle = () => addStyleOnce("dfwc-style", STYLE);
 
@@ -400,6 +400,7 @@ async function openBrowser(node) {
     const dirty = selected && !editor.readOnly && editor.value !== saved;
     remember("wildcards", { search: search.value, favorites: onlyFavorites, cardFolder, selected, caret: editor.selectionStart, tree: tree.scrollTop,
       editor: editor.scrollTop, cards: cards.querySelector(".grid")?.scrollTop ?? 0, ...(dirty ? { draft: editor.value, saved } : {}) });
+    stopSize();
     back.remove();
     document.removeEventListener("keydown", onKey, true);
     document.removeEventListener("selectionchange", onSelection);
@@ -407,7 +408,10 @@ async function openBrowser(node) {
   const onKey = (event) => { if (event.key === "Escape" && !document.querySelector(".dfmv-back")) { event.stopPropagation(); close(); } }; // The folder picker closes first.
   back.addEventListener("mousedown", (event) => { if (event.target === back) close(); });
   document.addEventListener("keydown", onKey, true);
-  const say = (text) => { status.textContent = text; };
+  // A message; after a rename, a move or a delete, with ↶ Undo (until the next message).
+  const say = (text, undo) => {
+    status.replaceChildren(text, ...(undo ? [element("button", { class: "undo", title: "Undo it", onclick: () => background(undo()) }, "↶ Undo")] : []));
+  };
   const add = (token) => { const field = insertIntoNode(node, `__${token}__`); say(`Added __${token}__ to ${field}.`); };
   async function open(name) {
     const response = await api.fetchApi(`/diceforge/wildcards/file?name=${encodeURIComponent(name)}`);
@@ -456,7 +460,8 @@ async function openBrowser(node) {
       numberLines();
       markCurrentLine();
     } else draw();
-    say(`${moved ? "Moved" : "Renamed"} ${result.renamed} to ${result.to}. Prompts that use __${result.renamed}__ need the new name.`);
+    say(`${moved ? "Moved" : "Renamed"} ${result.renamed} to ${result.to}. Prompts that use __${result.renamed}__ need the new name.`,
+      () => renameTo(result.to, result.renamed, moved)); // Undo: back to its old name and folder.
   }
   rename.addEventListener("click", async () => {
     if (!selected) return;
@@ -472,7 +477,7 @@ async function openBrowser(node) {
   }
   move.addEventListener("click", () => { if (selected) background(moveFile(selected)); });
   remove.addEventListener("click", async () => {
-    if (!selected || !confirm(`Delete the wildcard file ${selected}.txt? This can't be undone.`)) return;
+    if (!selected || !confirm(`Delete the wildcard file ${selected}.txt? (↶ Undo brings it back.)`)) return;
     const response = await api.fetchApi(`/diceforge/wildcards/file?name=${encodeURIComponent(selected)}`, { method: "DELETE" });
     if (!response.ok) return say(await response.text());
     const name = selected;
@@ -485,10 +490,29 @@ async function openBrowser(node) {
     rename.disabled = move.disabled = remove.disabled = convertButton.disabled = true;
     showDirty();
     title.replaceChildren("Select a file to see and edit its lines, one option per line (# starts a comment).");
+    const { undo } = await response.json();
     await wildcardList(true);
     draw();
-    say(`Deleted ${name}.txt.`);
+    say(`Deleted ${name}.txt.`, () => restore(undo));
   });
+  // Undo a delete: the file comes back where it was (from the server's trash), with its star, and opens.
+  async function restore(id) {
+    const response = await api.fetchApi("/diceforge/wildcards/restore", { method: "POST", body: JSON.stringify({ id }) });
+    if (!response.ok) return say(await response.text());
+    const result = await response.json();
+    await wildcardList(true);
+    await open(result.restored);
+    say(`${result.restored} is back.`);
+  }
+  // Export a folder (or every wildcard) as a zip, which Import zip takes back: to share a card pack or keep a copy.
+  function exportZip(folder = "") {
+    const link = element("a", { href: api.apiURL(`/diceforge/wildcards/export${folder ? `?folder=${encodeURIComponent(folder)}` : ""}`), download: "" });
+    document.body.append(link);
+    link.click();
+    link.remove();
+    say(`Downloading ${folder ? `the folder ${folder}` : "every wildcard"} as a zip.`);
+  }
+  const exportButton = element("button", { class: "export", title: "Download every wildcard as a zip (⇩ zip on a folder downloads that folder)", onclick: () => exportZip() }, "⇩ Export zip");
   // txt ⇄ yaml: a txt file or a folder of them becomes one yaml file (hair/ -> hair.yaml), a yaml file becomes one txt file per key. The
   // wildcard names stay the same, so prompts keep working; card pictures stay where they are.
   async function convert(name, to) {
@@ -686,6 +710,7 @@ async function openBrowser(node) {
           element("span", { class: "name", title: cardsMode ? "Show its cards (and open or close the folder)" : "Open or close the folder",
             onclick: () => { if (cardsMode) cardFolder = folder.path; toggle(folder.path, cardsMode ? true : undefined); } }, `📁 ${part}`), element("span", { class: "muted" }, "all files"),
           ...convertButtons(folder.path),
+          element("button", { class: "export", title: `Download the folder ${folder.path} as a zip`, onclick: () => exportZip(folder.path) }, "⇩ zip"),
           element("button", { class: "add", title: `Insert __${folder.path}/*__`, onclick: () => add(`${folder.path}/*`) }, "+ Add"));
         dropTarget(row, "wildcards", (name) => background(moveFile(name, folder.path))); // A file dropped on a folder moves into it.
         return element("div", { class: "folder" + (allOpen || opened.has(folder.path) ? " open" : ""), "data-path": folder.path }, row, element("div", { class: "kids" }, ...drawLevel(folder)));
@@ -729,8 +754,10 @@ async function openBrowser(node) {
     else say("Drop a .zip of wildcards here (or a picture on a yaml card).");
   });
   back.append(dialog);
-  dialog.append(element("h2", {}, "Wildcards"),
-    element("div", { class: "top" }, search, modeButton, favoritesButton, expandAll, collapseAll, importButton, create, element("button", { onclick: close }, "Close")),
+  const heading = element("h2", {}, "Wildcards");
+  const stopSize = keepSize(dialog, "wildcards", heading);
+  dialog.append(heading,
+    element("div", { class: "top" }, search, modeButton, favoritesButton, expandAll, collapseAll, importButton, exportButton, create, element("button", { onclick: close }, "Close")),
     element("div", { class: "main" }, tree, editPane, cards), status);
   editPane.append(title, code, element("div", { class: "top" }, element("span", { style: "flex:1" }), convertButton, remove, move, rename, save));
   const last = recall("wildcards");

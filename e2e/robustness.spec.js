@@ -70,6 +70,7 @@ test.describe("@api robustness on the real server", () => {
           await request.get(`/diceforge/model-preview?kind=loras&file=${encoded}`),
           await request.get(`/diceforge/model-info?kind=loras&file=${encoded}`),
           await request.get(`/diceforge/wildcards/picture?name=${encoded}`),
+          await request.get(`/diceforge/wildcards/export?folder=${encoded}`),
           await request.get(`/diceforge/wildcards/picture?name=e2e_escape/POSES/${encoded}`),
           await request.get(`/diceforge/grid/image?node=1&file=${encoded}`),
         ]) {

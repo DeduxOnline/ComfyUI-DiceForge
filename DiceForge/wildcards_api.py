@@ -3,7 +3,11 @@ import io
 import json
 import os
 import re
+import secrets
+import shutil
+import time
 import zipfile
+from urllib.parse import quote
 import folder_paths
 import yaml
 from aiohttp import web
@@ -12,7 +16,8 @@ from .http_read import read_up_to
 from .model_info import json_body
 # Server side of the Wildcard Browser and the __ autocomplete (web/wildcards.js): the list of wildcards, and creating, reading, saving, renaming and
 # deleting a wildcard file, converting txt files to a yaml file and back, and the cards' pictures. Wildcards from yaml files are listed and
-# shown too, but read-only: they are edited in their yaml file (or converted to txt files).
+# shown too, but read-only: they are edited in their yaml file (or converted to txt files). A deleted file goes to a trash folder first, so the
+# Wildcard Browser can undo the delete; a folder (or all of them) can be exported as a zip.
 PART = r"[\w\-.]+(?: [\w\-.]+)*" # Single spaces inside a name, as __hair color__ reads them (clip_text_encode_pos_neg.WILDCARD_PATTERN).
 NAME = re.compile(rf"{PART}(/{PART})*")
 def checked_name(name):
@@ -205,6 +210,72 @@ def import_zip(data, folder=""):
                 file.write(source.read(ZIP_UNPACKED))
             imported.append("/".join(parts))
     return imported, skipped, left_out
+# Export a folder of wildcards (all of them without one) as a zip that Import zip takes back: its txt, yaml and picture files, with their paths
+# from the wildcards folder (the folder's own name included), and a yaml card pack's yaml file next to the folder (POSES.yaml with POSES/). A file
+# in two wildcards folders goes once, from the first, as wildcards are read.
+def export_zip(folder=""):
+    buffer, added, total, found = io.BytesIO(), set(), 0, False
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
+        def add(path, root):
+            nonlocal total
+            entry = os.path.relpath(path, root).replace(os.sep, "/")
+            name = os.path.basename(path)
+            if name.startswith(".") or not name.lower().endswith(IMPORTED) or entry in added or not os.path.isfile(path):
+                return
+            total += os.path.getsize(path)
+            if total > ZIP_UNPACKED or len(added) >= ZIP_FILES:
+                raise web.HTTPBadRequest(text=f"Wildcards: too much to export at once (at most {ZIP_FILES} files and 1 GB): export a smaller folder.")
+            archive.write(path, entry)
+            added.add(entry)
+        for root in map(os.path.abspath, folder_paths.get_folder_paths("wildcards")):
+            base = os.path.join(root, *folder.split("/")) if folder else root
+            packs = [base + ending for ending in (".yaml", ".yml") if folder and os.path.isfile(base + ending)]
+            found = found or bool(packs) or os.path.isdir(base)
+            for pack in packs:
+                add(pack, root)
+            for current, folders, files in os.walk(base): # Links to folders are not followed: nothing outside the wildcards folder.
+                folders[:] = sorted(name for name in folders if not name.startswith("."))
+                for name in sorted(files):
+                    add(os.path.join(current, name), root)
+    if folder and not found:
+        raise web.HTTPNotFound(text=f"Wildcards: no folder {folder}.")
+    return buffer.getvalue()
+# Deleted files wait in a trash folder (the last 50), so a delete can be undone: the file goes back where it was, with its star.
+TRASH_FOLDER = os.path.join(folder_paths.get_user_directory(), "DiceForge", "wildcards_trash")
+TRASH_KEPT = 50
+TRASH_ID = re.compile(r"\d{19}-[0-9a-f]{8}")
+last_trashed = [0] # Ids in the order of the deletes, also two within a clock tick: the oldest go first.
+def trash_file(path, name, favorite):
+    last_trashed[0] = max(time.time_ns(), last_trashed[0] + 1)
+    trash_id = f"{last_trashed[0]:019d}-{secrets.token_hex(4)}"
+    folder = os.path.join(TRASH_FOLDER, trash_id)
+    os.makedirs(folder)
+    with open(os.path.join(folder, "meta.json"), "w", encoding="utf-8") as file:
+        json.dump({"name": name, "path": os.path.abspath(path), "favorite": favorite}, file)
+    root = root_of(path)
+    shutil.move(path, os.path.join(folder, "file.txt")) # Moved, not copied: on another drive too.
+    remove_empty_folders(os.path.dirname(os.path.abspath(path)), root)
+    for old in sorted(os.listdir(TRASH_FOLDER))[:-TRASH_KEPT]:
+        shutil.rmtree(os.path.join(TRASH_FOLDER, old), ignore_errors=True)
+    return trash_id
+def restore_file(trash_id):
+    if not isinstance(trash_id, str) or not TRASH_ID.fullmatch(trash_id):
+        raise web.HTTPBadRequest(text="Wildcards: that is not a deleted file's id.")
+    folder = os.path.join(TRASH_FOLDER, trash_id)
+    try:
+        with open(os.path.join(folder, "meta.json"), encoding="utf-8") as file:
+            meta = json.load(file)
+        name, path = checked_name(meta.get("name")), os.path.abspath(str(meta.get("path", "")))
+    except (OSError, ValueError, AttributeError):
+        raise web.HTTPNotFound(text="Wildcards: nothing to undo: the deleted file is no longer kept.") from None
+    if not any(path.startswith(root + os.sep) for root in map(os.path.abspath, folder_paths.get_folder_paths("wildcards"))):
+        raise web.HTTPBadRequest(text="Wildcards: the deleted file was in a folder that is no longer a wildcards folder.")
+    if wildcard_index(refresh=True).get(name) is not None or os.path.exists(path):
+        raise web.HTTPConflict(text=f"Wildcards: there is a wildcard {name} again: rename it to bring the deleted one back.")
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    shutil.move(os.path.join(folder, "file.txt"), path)
+    shutil.rmtree(folder, ignore_errors=True)
+    return name, path, meta.get("favorite") is True
 # Search the wildcards' lines (not only their names): each wildcard with a line that has the text, and its first such line.
 def search_lines(text, limit=200):
     found = []
@@ -346,12 +417,34 @@ def register_routes():
         name = checked_name(request.rel_url.query.get("name"))
         path = existing_file(name)
         try:
-            await asyncio.get_running_loop().run_in_executor(None, delete_file, path)
+            trash_id = await asyncio.get_running_loop().run_in_executor(None, trash_file, path, name, name in read_favorites())
         except OSError as error:
             raise web.HTTPBadRequest(text=f"Wildcards: can't delete {name}: {error.strerror or error}.") from None
         wildcard_index(refresh=True)
         rename_favorite(name, None)
-        return web.json_response({"deleted": name, "path": path})
+        return web.json_response({"deleted": name, "path": path, "undo": trash_id})
+    # Undo a delete: {"id": the delete's "undo"}.
+    @routes.post("/diceforge/wildcards/restore")
+    async def restore_wildcard_file(request):
+        body = await json_body(request)
+        try:
+            name, path, favorite = await asyncio.get_running_loop().run_in_executor(None, restore_file, body.get("id"))
+        except OSError as error:
+            raise web.HTTPBadRequest(text=f"Wildcards: can't bring the file back: {error.strerror or error}.") from None
+        wildcard_index(refresh=True)
+        if favorite:
+            try:
+                write_favorites(read_favorites() | {name})
+            except OSError: # Back without its star.
+                pass
+        return web.json_response({"restored": name, "path": path})
+    @routes.get("/diceforge/wildcards/export")
+    async def export_wildcards(request):
+        folder = request.rel_url.query.get("folder", "").strip()
+        folder = checked_name(folder) if folder else ""
+        data = await asyncio.get_running_loop().run_in_executor(None, export_zip, folder)
+        filename = f"wildcards-{folder.replace('/', '-')}.zip" if folder else "wildcards.zip"
+        return web.Response(body=data, content_type="application/zip", headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(filename)}"})
     @routes.post("/diceforge/wildcards/import")
     async def import_wildcards(request):
         folder = request.rel_url.query.get("folder", "").strip()

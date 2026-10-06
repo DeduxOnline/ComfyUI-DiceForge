@@ -10,6 +10,10 @@ nodes and features, a patch for fixes. Each version is a [release on GitHub](htt
 ### Added
 - The windows open where they were closed: Wildcard Browser (search, ★ Favorites, the open file with its unsaved changes, scrolling), Tag Browser
   (search, type, order), syntax guide (search), model browsers (search, tag filter, order).
+- The windows can be resized by their bottom-right corner and keep their size (a double-click on the title: the default size).
+- Wildcard Browser: ⇩ Export zip (every wildcard, or ⇩ zip on a folder, with a card pack's yaml file); ↶ Undo of the last rename, move or
+  delete (deleted files wait in a trash folder, the last 50).
+- Tag Browser: a basket of picked tags, put into the prompt (or the negative one) all at once.
 
 ### Changed
 - Tag Browser: ↗ opens the tag's wiki page instead of its posts: on e621 for the tags of an e621 list, on Danbooru otherwise.
