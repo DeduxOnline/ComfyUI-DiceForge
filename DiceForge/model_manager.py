@@ -43,7 +43,7 @@ class DownloadError(Exception):
 def managed_kind(kind):
     if kind not in MANAGED_KINDS:
         raise web.HTTPBadRequest(text=f"Models: {kind!r} can't be managed here (only {', '.join(MANAGED_KINDS)}).")
-    return kind
+    return MANAGED_KINDS[MANAGED_KINDS.index(kind)] # The list's own string, not the one sent: paths are made only of known names.
 # A relative file or folder name inside a model folder: / for subfolders, no .. and nothing Windows can't name a file.
 def checked_relative(name, what="name"):
     name = (name if isinstance(name, str) else "").strip().replace("\\", "/")
