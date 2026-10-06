@@ -3,6 +3,7 @@ import { api } from "../../scripts/api.js";
 import { addStyleOnce, background, element } from "./dom.js";
 import { dragSource, dropTarget, pickFolder } from "./move_dialog.js";
 import { addHighlightStyle, highlightEnabled, highlightWildcardFile } from "./prompt_highlight.js";
+import { recall, remember, scrollBack } from "./window_memory.js";
 
 // Wildcards in CLIP Dual Text Encode: autocomplete after "__" in the prompt fields, and the Wildcard Browser (node menu) with a folder tree,
 // "+ Add" buttons that insert __name__ (or __folder/*__) where the cursor was, and an editor for the files.
@@ -394,7 +395,15 @@ async function openBrowser(node) {
   });
   const back = element("div", { class: "dfwc-back" });
   const dialog = element("div", { class: "dfwc" }), editPane = element("div", { class: "edit" });
-  const close = () => { back.remove(); document.removeEventListener("keydown", onKey, true); document.removeEventListener("selectionchange", onSelection); };
+  const close = () => {
+    // Opens again where it was: the search, ★ Favorites, the open file (its unsaved changes too, if the file stays the same), the scrolling.
+    const dirty = selected && !editor.readOnly && editor.value !== saved;
+    remember("wildcards", { search: search.value, favorites: onlyFavorites, cardFolder, selected, caret: editor.selectionStart, tree: tree.scrollTop,
+      editor: editor.scrollTop, cards: cards.querySelector(".grid")?.scrollTop ?? 0, ...(dirty ? { draft: editor.value, saved } : {}) });
+    back.remove();
+    document.removeEventListener("keydown", onKey, true);
+    document.removeEventListener("selectionchange", onSelection);
+  };
   const onKey = (event) => { if (event.key === "Escape" && !document.querySelector(".dfmv-back")) { event.stopPropagation(); close(); } }; // The folder picker closes first.
   back.addEventListener("mousedown", (event) => { if (event.target === back) close(); });
   document.addEventListener("keydown", onKey, true);
@@ -724,10 +733,33 @@ async function openBrowser(node) {
     element("div", { class: "top" }, search, modeButton, favoritesButton, expandAll, collapseAll, importButton, create, element("button", { onclick: close }, "Close")),
     element("div", { class: "main" }, tree, editPane, cards), status);
   editPane.append(title, code, element("div", { class: "top" }, element("span", { style: "flex:1" }), convertButton, remove, move, rename, save));
+  const last = recall("wildcards");
+  search.value = typeof last.search === "string" ? last.search : "";
+  onlyFavorites = last.favorites === true;
+  favoritesButton.classList.toggle("on", onlyFavorites);
+  if (typeof last.cardFolder === "string") cardFolder = last.cardFolder;
   document.body.append(back);
   await wildcardList(true);
   draw();
+  searchLines();
   search.focus();
+  search.setSelectionRange(search.value.length, search.value.length);
+  if (typeof last.selected === "string" && listCache?.files?.some((file) => file.name === last.selected)) {
+    await open(last.selected);
+    if (typeof last.draft === "string" && !editor.readOnly && editor.value === last.saved) { // Changed on disk since: the file as it is now.
+      editor.value = last.draft;
+      showDirty();
+      numberLines();
+      say("Your unsaved changes from last time are back: Save keeps them.");
+    }
+    const caret = Math.min(Number(last.caret) || 0, editor.value.length);
+    editor.setSelectionRange(caret, caret);
+    markCurrentLine();
+    scrollBack(editor, last.editor);
+  }
+  scrollBack(tree, last.tree);
+  const grid = cards.querySelector(".grid");
+  if (grid) scrollBack(grid, last.cards);
 }
 
 app.registerExtension({

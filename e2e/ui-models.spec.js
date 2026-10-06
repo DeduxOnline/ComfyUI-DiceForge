@@ -392,6 +392,9 @@ for (const vue of [true, false]) {
       await page.locator(".dflb .top select").last().selectOption("downloads");
       expect((await cardTitles(page)).slice(0, 2)).toEqual(["Ink - v2 [Illustrious]", "Glow - v1 [Pony]"]);
       await page.keyboard.press("Escape");
+      await clickMenu(page, loader, "DiceForge.ModelBrowser", "LoRA Browser");
+      await expect(page.locator(".dflb .top select").last()).toHaveValue("downloads"); // Opens where it was closed.
+      await page.keyboard.press("Escape");
       // Model info: the tags and counts by the title, the versions (yours marked, the newer one new).
       await addNodes(page, [{ type: "LoraLoader", pos: [500, 40], widgets: { lora_name: "style/ink.safetensors" } }]);
       const id = await page.evaluate(() => window.app.graph.nodes.at(-1).id);

@@ -194,6 +194,37 @@ for (const vue of [true, false]) {
       }
     });
 
+    test("Wildcard Browser opens where it was closed: the search, the open file with its unsaved changes", async ({ page }) => {
+      const top = `wmem_${vue ? "vue" : "classic"}`;
+      writeFile(`models/wildcards/${top}/notes.txt`, "alpha\nbeta\n");
+      try {
+        const [id] = await addNodes(page, [{ type: "CLIPTextEncodePositiveNegative", pos: [300, 60] }]);
+        await clickMenu(page, id, "DiceForge.Wildcards", "Wildcard Browser");
+        await page.locator(".dfwc .top input").first().fill(top);
+        await page.locator(`.dfwc .row[data-name="${top}/notes"] .name`).click();
+        await expect(page.locator(".dfwc .edit textarea")).toHaveValue("alpha\nbeta");
+        await page.locator(".dfwc .edit textarea").fill("alpha\nbeta\ngamma");
+        await page.locator(".dfwc .top button", { hasText: "Close" }).click();
+        await expect(page.locator(".dfwc")).toHaveCount(0);
+        await clickMenu(page, id, "DiceForge.Wildcards", "Wildcard Browser");
+        await expect(page.locator(".dfwc .top input").first()).toHaveValue(top);
+        await expect(page.locator(`.dfwc .row.sel[data-name="${top}/notes"]`)).toBeVisible();
+        await expect(page.locator(".dfwc .edit textarea")).toHaveValue("alpha\nbeta\ngamma"); // Not saved, still there.
+        await expect(page.locator(".dfwc button.save")).toHaveText("Save •");
+        expect(fs.readFileSync(basePath("models", "wildcards", top, "notes.txt"), "utf8")).toBe("alpha\nbeta\n");
+        await page.locator(".dfwc button.save").click();
+        await expect(page.locator(".dfwc .status")).toContainText(`Saved ${top}/notes.txt`);
+        await page.locator(".dfwc .top button", { hasText: "Close" }).click();
+        writeFile(`models/wildcards/${top}/notes.txt`, "changed on disk\n");
+        await clickMenu(page, id, "DiceForge.Wildcards", "Wildcard Browser");
+        await expect(page.locator(".dfwc .edit textarea")).toHaveValue("changed on disk"); // Saved: the file as it is now.
+        await expect(page.locator(".dfwc button.save")).toHaveText("Save");
+        await page.locator(".dfwc .top button", { hasText: "Close" }).click();
+      } finally {
+        fs.rmSync(basePath("models", "wildcards", top), { recursive: true, force: true });
+      }
+    });
+
     test("Wildcard Browser favorites: ☆ stars a file, ★ Favorites shows only them, the autocomplete puts them first", async ({ page }) => {
       const [id] = await addNodes(page, [{ type: "CLIPTextEncodePositiveNegative", pos: [300, 60] }]);
       await clickMenu(page, id, "DiceForge.Wildcards", "Wildcard Browser");
@@ -404,6 +435,10 @@ for (const vue of [true, false]) {
       await expect(guide.locator(".status")).toHaveText("Inserted into the positive prompt.");
       await page.keyboard.press("Escape");
       await expect(guide).toHaveCount(0);
+      await clickMenu(page, id, "DiceForge.Wildcards", "Syntax guide");
+      await expect(guide.locator("input")).toHaveValue("lock"); // Opens where it was closed.
+      await expect(guide.locator(".row")).toHaveCount(1);
+      await page.keyboard.press("Escape");
     });
 
     test("Prompt styles: the family's quality tags in and out with a click, Auto from the connected model, your own saved and deleted", async ({ page, request }) => {
@@ -490,6 +525,9 @@ for (const vue of [true, false]) {
         await expect(browser).toHaveCount(0);
         writeFile("user/DiceForge/tags/e621.csv", "fox_tail,0,9000,\n"); // An e621 tag: ↗ opens e621's wiki.
         await clickMenu(page, id, "DiceForge.TagBrowser", "Tag Browser");
+        await expect(browser.locator(".types button.on")).toHaveText("★ Favorites"); // Opens where it was closed.
+        await expect(browser.locator(".row .name b")).toHaveText(["hatsune_miku"]);
+        await browser.locator(".types button", { hasText: "All" }).click();
         await browser.locator(".top input").fill("fox");
         await expect(browser.locator(".row a.wiki")).toHaveAttribute("href", "https://e621.net/wiki_pages/show_or_new?title=fox_tail");
         await page.keyboard.press("Escape");

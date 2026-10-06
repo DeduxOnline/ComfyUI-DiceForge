@@ -1,5 +1,6 @@
 import { addStyleOnce, background, element } from "./dom.js";
 import { insertIntoNode } from "./wildcards.js";
+import { recall, remember, scrollBack } from "./window_memory.js";
 
 // Syntax guide (CLIP Dual Text Encode's menu): every piece of the prompt syntax with what it does and an example. A click on an example copies it;
 // + Insert puts it where the cursor was in the node's prompts. The search box filters the rows.
@@ -63,6 +64,7 @@ export function openSyntaxGuide(node) {
   const back = element("div", { class: "dfsg-back" });
   const onKey = (event) => { if (event.key === "Escape") { event.stopPropagation(); close(); } };
   function close() {
+    remember("syntax", { search: search.value, scroll: body.scrollTop }); // Opens where it was closed.
     back.remove();
     document.removeEventListener("keydown", onKey, true);
   }
@@ -91,8 +93,12 @@ export function openSyntaxGuide(node) {
   search.addEventListener("input", draw);
   back.append(element("div", { class: "dfsg" }, element("h2", {}, "Prompt syntax"),
     element("div", { class: "top" }, search, element("button", { onclick: close }, "Close")), body, status));
+  const last = recall("syntax");
+  search.value = typeof last.search === "string" ? last.search : "";
   document.body.append(back);
   draw();
   search.focus();
+  search.setSelectionRange(search.value.length, search.value.length);
+  scrollBack(body, last.scroll);
 }
 // In the menu through wildcards.js (first among the prompt tools).

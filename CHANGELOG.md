@@ -7,6 +7,10 @@ nodes and features, a patch for fixes. Each version is a [release on GitHub](htt
 
 ## [Unreleased]
 
+### Added
+- The windows open where they were closed: Wildcard Browser (search, ★ Favorites, the open file with its unsaved changes, scrolling), Tag Browser
+  (search, type, order), syntax guide (search), model browsers (search, tag filter, order).
+
 ### Changed
 - Tag Browser: ↗ opens the tag's wiki page instead of its posts: on e621 for the tags of an e621 list, on Danbooru otherwise.
 

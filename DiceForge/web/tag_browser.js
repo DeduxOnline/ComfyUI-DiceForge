@@ -4,6 +4,7 @@ import { addStyleOnce, background, element } from "./dom.js";
 import { compact } from "./civitai_meta.js";
 import { tagText } from "./tag_autocomplete.js";
 import { fieldsOf, insertIntoNode, isPromptNode } from "./wildcards.js";
+import { recall, remember, scrollBack } from "./window_memory.js";
 
 // Tag Browser (CLIP Dual Text Encode's menu): the Danbooru / e621 tags of the downloaded lists (tag_autocomplete.py), searched by name or alias,
 // by type (characters, artists, series, general, meta) or your ★ favorites, most used first or by name. + Add puts a tag where the cursor was in
@@ -40,9 +41,12 @@ async function request(path, options) {
 
 export async function openTagBrowser(node) {
   addStyleOnce("dftb-style", STYLE);
-  let kind = "", tags = [], total = 0, loading = 0;
+  const last = recall("tags"); // Opens where it was closed: the search, the type, the order, the scrolling.
+  let kind = TYPES.some(([value]) => value === last.kind) ? last.kind : "", tags = [], total = 0, loading = 0;
   const search = element("input", { placeholder: "Search tags or aliases (spaces or underscores)…" });
   const sort = element("select", {}, element("option", { value: "count" }, "Most used"), element("option", { value: "name" }, "Name"));
+  search.value = typeof last.search === "string" ? last.search : "";
+  sort.value = last.sort === "name" ? "name" : "count";
   const types = element("div", { class: "types" });
   const list = element("div", { class: "list" });
   const status = element("div", { class: "status" });
@@ -50,6 +54,7 @@ export async function openTagBrowser(node) {
   const back = element("div", { class: "dftb-back" });
   const onKey = (event) => { if (event.key === "Escape") { event.stopPropagation(); close(); } };
   function close() {
+    remember("tags", { search: search.value, kind, sort: sort.value, scroll: list.scrollTop });
     back.remove();
     document.removeEventListener("keydown", onKey, true);
   }
@@ -116,7 +121,9 @@ export async function openTagBrowser(node) {
     types, list, status));
   document.body.append(back);
   search.focus();
+  search.setSelectionRange(search.value.length, search.value.length);
   await load();
+  scrollBack(list, last.scroll);
 }
 
 app.registerExtension({

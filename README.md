@@ -122,7 +122,7 @@ Node id: `CLIPTextEncodePositiveNegative`.
 
 Works like two core *CLIP Text Encode (Prompt)* nodes sharing one CLIP model: each prompt is encoded exactly the same way, so the conditioning is identical to the core node's for the same text. On top of that, both prompts support wildcards and `{a|b}` choices, picked from a seed.
 
-Its right-click menu has the prompt tools: **📖 Syntax guide** (every piece of the syntax below with an example; **+ Insert** puts the example where the cursor was, a click copies it), **🕘 Prompt history**, **🎲 Wildcard Browser**, **🎴 LoRA Browser** (to insert trigger words), **🏷 Tag autocomplete** (download tag lists), **🏷 Tag Browser** and **🎨 Prompt styles**.
+Its right-click menu has the prompt tools: **📖 Syntax guide** (every piece of the syntax below with an example; **+ Insert** puts the example where the cursor was, a click copies it), **🕘 Prompt history**, **🎲 Wildcard Browser**, **🎴 LoRA Browser** (to insert trigger words), **🏷 Tag autocomplete** (download tag lists), **🏷 Tag Browser** and **🎨 Prompt styles**. The windows open where you closed them: the Wildcard Browser with its search, ★ Favorites, the file you had open (with its unsaved changes, as long as the file didn't change meanwhile) and where it was scrolled; the Tag Browser with its search, type and order; the syntax guide with its search; the model browsers (below) with their search, tag filter and order. Kept in this browser, also after a reload.
 
 <img src="docs/images/syntax_guide.png" width="980" alt="The Syntax guide window: every piece of the prompt syntax with an example">
 

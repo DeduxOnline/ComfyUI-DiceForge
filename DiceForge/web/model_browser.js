@@ -7,6 +7,7 @@ import { dragSource, dropTarget, pickFolder } from "./move_dialog.js";
 import { addStyleOnce, background, element } from "./dom.js";
 import { blurSwitch, civitaiMedia } from "./media.js";
 import { dateText, statsChips } from "./civitai_meta.js";
+import { recall, remember, scrollBack } from "./window_memory.js";
 
 // Model browsers (node menu): LoRA, Checkpoint, Diffusion Model, Text Encoder and VAE Browser. The model files as cards with a preview, name, base model and trigger words from Civitai
 // (looked up by the file's hash, as in Model info), a folder tree, search and filters. What a card's button does depends on the node it was opened
@@ -150,6 +151,7 @@ async function openBrowser(node, spec, target = targetOf(node, spec)) {
   };
   const blurToggle = blurSwitch(() => draw());
   function close() {
+    remember(`browser.${kind}`, { search: search.value, sort: sort.value, tag: tagFilter.value, scroll: grid.scrollTop }); // Opens where it was closed.
     stopLookUp?.();
     blurToggle.dispose();
     back.remove();
@@ -540,6 +542,9 @@ async function openBrowser(node, spec, target = targetOf(node, spec)) {
       element("button", { onclick: close }, "Close")),
     element("div", { class: "top" }, element("span", { class: "muted" }, hint), status),
     element("div", { class: "main" }, tree, element("div", { class: "cards" }, batch, grid))));
+  const last = recall(`browser.${kind}`);
+  search.value = typeof last.search === "string" ? last.search : "";
+  if ([...sort.options].some((option) => option.value === last.sort)) sort.value = last.sort;
   document.body.append(back);
   say("Loading…");
   try {
@@ -553,8 +558,15 @@ async function openBrowser(node, spec, target = targetOf(node, spec)) {
     base.value = FITS;
     draw();
   }
+  if (typeof last.tag === "string" && last.tag) { // The tags are known once the list is drawn.
+    tagFilter.value = last.tag;
+    if (tagFilter.value) draw();
+  }
   search.focus();
-  grid.querySelector(".card.sel")?.scrollIntoView({ block: "center" });
+  search.setSelectionRange(search.value.length, search.value.length);
+  const selectedCard = grid.querySelector(".card.sel");
+  if (selectedCard) selectedCard.scrollIntoView({ block: "center" }); // The node's model, else where the browser was.
+  else scrollBack(grid, last.scroll);
 }
 
 app.registerExtension({
