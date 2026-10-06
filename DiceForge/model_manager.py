@@ -140,13 +140,9 @@ def new_trash(root):
         return folder
     except OSError:
         return None
-# A kept delete's folder in a trash folder: never outside it, whatever the id.
-def kept_delete(trash, trash_id):
-    trash = os.path.realpath(trash)
-    folder = os.path.realpath(os.path.join(trash, trash_id))
-    if not folder.startswith(trash + os.sep) or not os.path.isdir(folder):
-        return None
-    return folder
+# The deletes kept in this session: id -> (model folder, its folder in the trash). An undo finds its folder here, never by a path made of the id
+# it sends; the trash is emptied when ComfyUI starts, so this session's deletes are all there is to undo.
+kept_deletes = {}
 def empty_trash(trash, kept=0):
     try:
         entries = sorted(name for name in os.listdir(trash) if TRASH_ID.fullmatch(name))
@@ -156,6 +152,7 @@ def empty_trash(trash, kept=0):
         shutil.rmtree(os.path.join(trash, name), ignore_errors=True)
 # When ComfyUI starts: the deletes of the last session are final.
 def empty_all_trash():
+    kept_deletes.clear()
     for kind in MANAGED_KINDS:
         try:
             roots = folder_paths.get_folder_paths(kind)
@@ -183,6 +180,7 @@ def delete_model(kind, name):
             os.replace(file, os.path.join(folder, os.path.basename(file))) # The same drive: only a new name.
         if os.path.isfile(info):
             shutil.move(info, os.path.join(folder, "model_info.json"))
+        kept_deletes[os.path.basename(folder)] = (os.path.abspath(root), folder)
         empty_trash(os.path.dirname(folder), TRASH_KEPT)
     remove_empty_folders(os.path.dirname(path), root)
     drop_list_cache(kind)
@@ -192,8 +190,7 @@ def restore_model(kind, trash_id):
     kind = managed_kind(kind)
     if not isinstance(trash_id, str) or not TRASH_ID.fullmatch(trash_id):
         raise web.HTTPBadRequest(text="Models: that is not a deleted model's id.")
-    root, folder = next(((os.path.abspath(root), kept) for root in folder_paths.get_folder_paths(kind)
-                         for kept in [kept_delete(trash_folder(root), trash_id)] if kept), (None, None))
+    root, folder = kept_deletes.get(trash_id, (None, None))
     try:
         with open(os.path.join(folder, "meta.json"), encoding="utf-8") as file:
             meta = json.load(file)
@@ -212,6 +209,7 @@ def restore_model(kind, trash_id):
         os.makedirs(os.path.dirname(info_file(kind, name)), exist_ok=True)
         shutil.move(os.path.join(folder, "model_info.json"), info_file(kind, name))
     shutil.rmtree(folder, ignore_errors=True)
+    kept_deletes.pop(trash_id, None)
     drop_list_cache(kind)
     return {"restored": name}
 
