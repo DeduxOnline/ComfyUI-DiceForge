@@ -140,8 +140,8 @@ def new_trash(root):
         return folder
     except OSError:
         return None
-# The deletes kept in this session: id -> (model folder, its folder in the trash). An undo finds its folder here, never by a path made of the id
-# it sends; the trash is emptied when ComfyUI starts, so this session's deletes are all there is to undo.
+# The deletes kept in this session: id -> what an undo needs (the model's kind, name, folder, files, its folder in the trash). An undo finds it
+# here, never by a path made of what it sends; the trash is emptied when ComfyUI starts, so this session's deletes are all there is to undo.
 kept_deletes = {}
 def empty_trash(trash, kept=0):
     try:
@@ -180,7 +180,8 @@ def delete_model(kind, name):
             os.replace(file, os.path.join(folder, os.path.basename(file))) # The same drive: only a new name.
         if os.path.isfile(info):
             shutil.move(info, os.path.join(folder, "model_info.json"))
-        kept_deletes[os.path.basename(folder)] = (os.path.abspath(root), folder)
+        kept_deletes[os.path.basename(folder)] = {"kind": kind, "name": name, "root": os.path.abspath(root), "folder": folder,
+                                                  "files": [os.path.basename(file) for file in removed], "info": os.path.isfile(os.path.join(folder, "model_info.json"))}
         empty_trash(os.path.dirname(folder), TRASH_KEPT)
     remove_empty_folders(os.path.dirname(path), root)
     drop_list_cache(kind)
@@ -190,22 +191,19 @@ def restore_model(kind, trash_id):
     kind = managed_kind(kind)
     if not isinstance(trash_id, str) or not TRASH_ID.fullmatch(trash_id):
         raise web.HTTPBadRequest(text="Models: that is not a deleted model's id.")
-    root, folder = kept_deletes.get(trash_id, (None, None))
-    try:
-        with open(os.path.join(folder, "meta.json"), encoding="utf-8") as file:
-            meta = json.load(file)
-        name, files = checked_relative(meta["name"], "file name"), [str(file) for file in meta["files"]]
-    except (TypeError, OSError, ValueError, KeyError):
-        raise web.HTTPNotFound(text="Models: nothing to undo: the deleted model is no longer kept (a restart of ComfyUI empties the trash).") from None
-    if meta.get("kind") != kind or any(os.path.basename(file) != file or file in ("", ".", "..") for file in files):
+    kept = next((entry for key, entry in kept_deletes.items() if key == trash_id), None)
+    if kept is None or not os.path.isdir(kept["folder"]): # Not deleted in this session, or since dropped from the trash.
+        raise web.HTTPNotFound(text="Models: nothing to undo: the deleted model is no longer kept (a restart of ComfyUI empties the trash).")
+    if kept["kind"] != kind:
         raise web.HTTPBadRequest(text="Models: that deleted model can't be brought back here.")
+    root, folder, name, files = kept["root"], kept["folder"], kept["name"], kept["files"]
     target = inside(root, *name.split("/"))
     if os.path.exists(target) or folder_paths.get_full_path(kind, name):
         raise web.HTTPConflict(text=f"Models: there is a {name} again: rename it to bring the deleted one back.")
     os.makedirs(os.path.dirname(target), exist_ok=True)
     for file in files:
         os.replace(os.path.join(folder, file), os.path.join(os.path.dirname(target), file))
-    if meta.get("info") and os.path.isfile(os.path.join(folder, "model_info.json")):
+    if kept["info"] and os.path.isfile(os.path.join(folder, "model_info.json")):
         os.makedirs(os.path.dirname(info_file(kind, name)), exist_ok=True)
         shutil.move(os.path.join(folder, "model_info.json"), info_file(kind, name))
     shutil.rmtree(folder, ignore_errors=True)
