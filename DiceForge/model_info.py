@@ -190,6 +190,7 @@ def browser_entry(kind, name, path, folder_files):
     found = bool(civitai.get("found"))
     return {
         "file": name,
+        "sha256": (info.get("sha256") or "") if fresh else "", # Known once looked up: the browsers find duplicates by it.
         "favorite": info.get("favorite") is True, # ★ in the browsers: kept whatever the file's state, like your notes.
         "size": stat.st_size,
         "mtime": stat.st_mtime,

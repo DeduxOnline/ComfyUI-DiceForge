@@ -175,6 +175,10 @@ def test_browser_cards_carry_the_civitai_page(api, models, civitai, monkeypatch)
     entry = next(item for item in api("GET", "/diceforge/model-browser?kind=loras")[1]["files"] if item["file"] == "ink.safetensors")
     assert entry["tags"][:2] == ["anime", "ink"] and entry["stats"]["likes"] == 2770 and entry["creator"] == "inkmaker"
     assert entry["newer"]["name"] == "v3"
+    assert entry["sha256"] == hashlib.sha256(b"ink").hexdigest() # Looked up: the browsers find duplicates by it.
+    models("loras", "copy of ink.safetensors", b"ink")
+    copy = next(item for item in api("GET", "/diceforge/model-browser?kind=loras")[1]["files"] if item["file"] == "copy of ink.safetensors")
+    assert copy["sha256"] == "" # Not looked up yet.
 
 
 def test_info_looked_up_before_the_page_was_kept_gets_only_the_page(api, models, civitai, monkeypatch):

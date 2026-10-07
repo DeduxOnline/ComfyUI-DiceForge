@@ -223,6 +223,59 @@ for (const vue of [true, false]) {
       }
     });
 
+    test("LoRA Browser: a card's right-click menu, ⧉ duplicates by hash, ⇆ compare two, the keyboard", async ({ page, request }) => {
+      const top = `dup_${vue ? "vue" : "classic"}`, loras = (...parts) => basePath("models", "loras", ...parts);
+      for (const [name, text] of [["a", `same ${top}`], ["b", `same ${top}`], ["c", `other ${top}`]]) writeFile(`models/loras/${top}/${name}.safetensors`, text);
+      try {
+        for (const name of ["a", "b"]) expect((await lookUp(request, "loras", `${top}/${name}.safetensors`)).ok()).toBe(true); // Hashed (not on Civitai).
+        const [loader] = await addNodes(page, [{ type: "LoraLoader" }]);
+        page.on("dialog", (dialog) => (dialog.type() === "prompt" ? dialog.accept(`${top}/c2`) : dialog.accept()));
+        await clickMenu(page, loader, "DiceForge.ModelBrowser", "LoRA Browser");
+        const browser = page.locator(".dflb"), card = (name) => browser.locator(".card", { hasText: `${top}/${name}.safetensors` }), status = browser.locator(".status");
+        await browser.locator(".top input").first().fill(top);
+        await expect(card("a").locator(".dupe")).toHaveText(`⧉ The same file as ${top}/b.safetensors`);
+        await browser.locator("button.only-dupes").click(); // ⧉ Duplicates: only the copies.
+        await expect(browser.locator(".card")).toHaveCount(2);
+        await expect(card("c")).toHaveCount(0);
+        await browser.locator("button.only-dupes").click();
+        await card("a").click({ button: "right" }); // The card's menu: compare with its copy.
+        await page.locator(".df-menu button", { hasText: "⧉ Compare with its copy" }).click();
+        const compared = page.locator(".dfcmp");
+        await expect(compared.locator(".same")).toContainText("The same file");
+        await expect(compared.locator("tr.diff th")).toHaveText(["File"]);
+        await page.keyboard.press("Escape"); // Closes the comparison only.
+        await expect(compared).toHaveCount(0);
+        await expect(browser).toHaveCount(1);
+        await card("a").locator(".title").click({ modifiers: ["ControlOrMeta"] }); // Two picked: ⇆ Compare in the bar.
+        await card("c").locator(".title").click({ modifiers: ["ControlOrMeta"] });
+        await browser.locator(".batch button.batch-compare").click();
+        await expect(compared.locator("tr.diff th")).toHaveText(["File", "Civitai"]);
+        await compared.locator("button.close-compare").click();
+        await page.keyboard.press("Escape"); // Lets go of the picks.
+        // The keyboard: / to the search, F2 renames the picked card, Delete deletes it (↶ Undo), the menu key opens its menu.
+        await browser.locator("h2").click();
+        await page.keyboard.press("/");
+        await expect(browser.locator(".top input").first()).toBeFocused();
+        await card("c").locator(".title").click({ modifiers: ["ControlOrMeta"] });
+        await page.keyboard.press("F2");
+        await expect(status).toContainText(`to ${top}/c2.safetensors`);
+        await card("c2").locator(".title").click({ modifiers: ["ControlOrMeta"] });
+        await page.keyboard.press("Shift+F10");
+        await expect(page.locator(".df-menu button", { hasText: "🗑 Delete" })).toBeVisible();
+        await page.keyboard.press("Escape"); // The menu first.
+        await expect(page.locator(".df-menu")).toHaveCount(0);
+        await page.keyboard.press("Delete");
+        await expect(status).toContainText(`Deleted ${top}/c2.safetensors`);
+        expect(fs.existsSync(loras(top, "c2.safetensors"))).toBe(false);
+        await status.locator("button.undo").click();
+        await expect(status).toContainText("Brought back 1 LoRA.");
+        expect(fs.existsSync(loras(top, "c2.safetensors"))).toBe(true);
+        await page.keyboard.press("Escape");
+      } finally {
+        fs.rmSync(loras(top), { recursive: true, force: true });
+      }
+    });
+
     test("LoRA Stack adds several picked LoRAs at once", async ({ page }) => {
       const [stack] = await addNodes(page, [{ type: "DiceForgeLoraStack" }]);
       await page.locator(".dfls").first().locator("button.add").click();

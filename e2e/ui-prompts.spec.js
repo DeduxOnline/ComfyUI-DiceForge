@@ -227,6 +227,58 @@ for (const vue of [true, false]) {
       }
     });
 
+    test("Wildcard Browser: ⚠ broken references, a rename updates the files that use it, clean up and sort, the keyboard", async ({ page }) => {
+      const top = `fix_${vue ? "vue" : "classic"}`, file = (...parts) => basePath("models", "wildcards", top, ...parts);
+      writeFile(`models/wildcards/${top}/colour.txt`, "red\nblue\n");
+      writeFile(`models/wildcards/${top}/look.txt`, `# looks\n__${top}/colour__ hair\n\nsmile\nsmile\n2::angry\n`);
+      writeFile(`models/wildcards/${top}/list.txt`, "b\n3::a\nC\n");
+      try {
+        const [id] = await addNodes(page, [{ type: "CLIPTextEncodePositiveNegative", pos: [300, 60] }]);
+        page.on("dialog", (dialog) => (dialog.type() === "prompt" ? dialog.accept(`${top}/color`) : dialog.accept()));
+        await clickMenu(page, id, "DiceForge.Wildcards", "Wildcard Browser");
+        const dialog = page.locator(".dfwc"), status = dialog.locator(".status"), row = (name) => dialog.locator(`.row[data-name="${top}/${name}"]`);
+        if (await dialog.locator("button.mode").textContent() === "📄 Lines") await dialog.locator("button.mode").click(); // Lines: the editor.
+        await dialog.locator("button.open-all").click();
+        await row("colour").click({ button: "right" }); // Renamed: look.txt now uses a name no file has.
+        await page.locator(".df-menu button", { hasText: "✎ Rename…" }).click();
+        await expect(status).toContainText(`Renamed ${top}/colour to ${top}/color`);
+        await expect(row("look").locator(".broken")).toHaveAttribute("title", `Uses wildcards that don't exist: __${top}/colour__`);
+        await dialog.locator("button.only-broken").click(); // ⚠ Broken: only such files.
+        await expect(row("look")).toBeVisible();
+        await expect(row("list")).toBeHidden();
+        await dialog.locator("button.only-broken").click();
+        await status.locator("button.more-action").click(); // 🔁 Update the files that use it: a preview, then Replace.
+        await expect(dialog.locator(".replace .find")).toHaveValue(`__${top}/colour__`);
+        await expect(dialog.locator(".replace .change")).toHaveText([`${top}/look ×1__${top}/colour__ hair__${top}/color__ hair`]);
+        await dialog.locator(".replace button.apply").click();
+        await expect(status).toContainText("in 1 file");
+        expect(fs.readFileSync(file("look.txt"), "utf8")).toContain(`__${top}/color__ hair`);
+        await expect(row("look").locator(".broken")).toHaveCount(0);
+        await row("look").locator("button.more").click(); // 🧹 Clean up in the editor (not saved yet).
+        await page.locator(".df-menu button", { hasText: "🧹 Remove duplicates and empty lines" }).click();
+        await expect(dialog.locator(".edit textarea")).toHaveValue(`# looks\n__${top}/color__ hair\nsmile\n2::angry`);
+        await expect(status).toContainText("1 duplicate and 1 empty line dropped");
+        await dialog.locator("button.save").click();
+        await expect(status).toContainText(`Saved ${top}/look.txt`);
+        await row("list").click({ button: "right" });
+        await page.locator(".df-menu button", { hasText: "🔤 Sort lines" }).click();
+        await expect(dialog.locator(".edit textarea")).toHaveValue("3::a\nb\nC"); // By the text, the weight left aside.
+        await expect(dialog.locator("button.save")).toHaveText("Save •");
+        // The keyboard: / to the search, ↓ to a file, Enter puts it in the prompt.
+        await dialog.locator("h2").click();
+        await page.keyboard.press("/");
+        await expect(dialog.locator(".top input").first()).toBeFocused();
+        await page.keyboard.type(`${top}/color`);
+        await page.keyboard.press("ArrowDown");
+        await expect(row("color")).toHaveClass(/cursor/);
+        await page.keyboard.press("Enter");
+        await expect.poll(() => widgetValue(page, id, "positive")).toBe(`__${top}/color__`);
+        await dialog.locator(".top button", { hasText: "Close" }).click();
+      } finally {
+        fs.rmSync(file(), { recursive: true, force: true });
+      }
+    });
+
     test("Wildcard Browser favorites: ☆ stars a file, ★ Favorites shows only them, the autocomplete puts them first", async ({ page }) => {
       const [id] = await addNodes(page, [{ type: "CLIPTextEncodePositiveNegative", pos: [300, 60] }]);
       await clickMenu(page, id, "DiceForge.Wildcards", "Wildcard Browser");
@@ -264,7 +316,7 @@ for (const vue of [true, false]) {
       const dialog = page.locator(".dfwc");
       if (await dialog.locator("button.mode").textContent() === "📄 Lines") await dialog.locator("button.mode").click(); // Start in lines.
       const folder = dialog.locator(`.folder[data-path="${pack}"] > .row`);
-      const menu = page.locator(".dfwc-menu");
+      const menu = page.locator(".df-menu");
       await folder.click({ button: "right" }); // Right-click: the folder's menu.
       await expect(menu.locator("button")).toContainText(["＋ Add", "🎲 Preview picks", "the folder", "＋ New file here…", "⇩ Export zip", "→ yaml"]);
       await menu.locator("button", { hasText: "→ yaml" }).click();
@@ -350,7 +402,7 @@ for (const vue of [true, false]) {
       await page.mouse.move(box.x + 60, box.y + 6 + 10); // The comment line: nothing to add.
       await expect(code.locator("button.line-add")).toBeHidden();
       await found.click({ button: "right" }); // 🎲 Preview picks: what runs would put in for it.
-      await page.locator(".dfwc-menu button", { hasText: "🎲 Preview picks" }).click();
+      await page.locator(".df-menu button", { hasText: "🎲 Preview picks" }).click();
       const picks = dialog.locator(".picks .pick .text");
       await expect(picks).toHaveCount(5);
       for (const text of await picks.allTextContents()) expect(["quiet zebra pose", "loud pose"]).toContain(text); // Weights and all, not the comment.
@@ -364,7 +416,7 @@ for (const vue of [true, false]) {
       await expect(dialog.locator(".status")).toHaveText(`Imported 0 files from ${pack}.zip; 1 already there, kept as they were.`);
       const download = page.waitForEvent("download"); // ⇩ zip on the folder: the pack again, its yaml file too.
       await dialog.locator(`.folder[data-path="${pack}"] > .row`).click({ button: "right" });
-      await page.locator(".dfwc-menu button", { hasText: "⇩ Export zip" }).click();
+      await page.locator(".df-menu button", { hasText: "⇩ Export zip" }).click();
       const file = await download;
       expect(file.suggestedFilename()).toBe(`wildcards-${pack}.zip`);
       const listed = fs.readFileSync(await file.path()).toString("latin1"); // A zip lists its file names as they are.
@@ -583,10 +635,30 @@ for (const vue of [true, false]) {
         await browser.locator(".row", { hasText: "long_sleeves" }).locator("button.pick").click();
         await expect(browser.locator(".basket .count")).toHaveText("2 picked");
         await expect(browser.locator(".basket .tags")).toHaveText("fox tail, long sleeves");
+        await expect(browser.locator('.row[data-tag="long_hair"] .has')).toHaveAttribute("title", "Already in the positive prompt"); // ✓: in a prompt.
+        await expect(browser.locator('.row[data-tag="long_sleeves"] .has')).toHaveAttribute("title", "Already in the negative prompt");
         await browser.locator(".basket button.neg").click();
-        await expect.poll(() => widgetValue(page, id, "negative")).toBe("long sleeves, hatsune miku, fox tail, long sleeves"); // + Add above followed the cursor there.
-        await expect(browser.locator(".status")).toHaveText("Added 2 tags to the negative prompt.");
+        await expect.poll(() => widgetValue(page, id, "negative")).toBe("long sleeves, hatsune miku, fox tail"); // + Add above followed the cursor there.
+        await expect(browser.locator(".status")).toHaveText("Added 1 tag to the negative prompt. 1 was already there."); // Not twice.
         await expect(browser.locator(".basket")).toBeHidden();
+        // 🔗 Related: what Danbooru finds most often with a tag; + puts one in.
+        await browser.locator('.row[data-tag="long_hair"] button.related-open').click();
+        await expect(browser.locator(".related .chip .pick-chip")).toHaveText(["☐ blue_eyes", "☐ hatsune_miku", "☐ smile"]);
+        await browser.locator('.related .chip[data-tag="blue_eyes"] button.add').click();
+        await expect.poll(() => widgetValue(page, id, "negative")).toBe("long sleeves, hatsune miku, fox tail, blue eyes");
+        // The keyboard: ↑ ↓ to a tag, Enter (not twice), Shift+Enter to the negative prompt, Ctrl+Enter to the basket.
+        await page.keyboard.press("/");
+        await expect(browser.locator(".top input")).toBeFocused();
+        await page.keyboard.press("ArrowDown");
+        await page.keyboard.press("ArrowDown");
+        await expect(browser.locator('.row[data-tag="long_sleeves"]')).toHaveClass(/cursor/);
+        await page.keyboard.press("Enter");
+        await expect(browser.locator(".status")).toHaveText("long sleeves is already in the negative prompt.");
+        await page.keyboard.press("ArrowUp");
+        await page.keyboard.press("Shift+Enter");
+        await expect.poll(() => widgetValue(page, id, "negative")).toBe("long sleeves, hatsune miku, fox tail, blue eyes, long hair");
+        await page.keyboard.press("Control+Enter");
+        await expect(browser.locator(".basket .count")).toHaveText("1 picked");
         await page.keyboard.press("Escape");
       } finally {
         fs.rmSync(basePath("user", "DiceForge", "tags"), { recursive: true, force: true }); // No tag suggestions in the other tests.

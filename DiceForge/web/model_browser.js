@@ -8,6 +8,7 @@ import { addStyleOnce, background, element } from "./dom.js";
 import { blurSwitch, civitaiMedia } from "./media.js";
 import { dateText, statsChips } from "./civitai_meta.js";
 import { keepSize, recall, remember, scrollBack } from "./window_memory.js";
+import { closeMenu, menuAt, menuOpen, slashToSearch, typingIn, withMenu } from "./menu.js";
 
 // Model browsers (node menu): LoRA, Checkpoint, Diffusion Model, Text Encoder and VAE Browser. The model files as cards with a preview, name, base model and trigger words from Civitai
 // (looked up by the file's hash, as in Model info), a folder tree, search and filters. What a card's button does depends on the node it was opened
@@ -89,7 +90,13 @@ const STYLE = `
 .dflb .tree .row.sel{background:#2f3f55}.dflb .tree .twist{width:14px;flex:none;color:#999;text-align:center}.dflb .tree .twist:hover{color:#fff}
 .dflb .tree .tools{display:flex;gap:6px;margin-bottom:6px}.dflb .tree .tools button{flex:1}.dflb .tree .row.drop{background:#35584a;outline:1px dashed #8fd0a8}
 .dflb .pic .fav{position:absolute;right:6px;top:6px;background:#000a;border:none;border-radius:5px;color:#ddd;font-size:18px;line-height:1;padding:3px 6px}
-.dflb .pic .fav.on{color:#ffd24a}.dflb .card.picked{border-color:#ffd24a;box-shadow:0 0 0 2px #ffd24a}
+.dflb .pic .fav.on{color:#ffd24a}.dflb .dupe{color:#f0c674;font-size:12px}.dflb button.only-dupes.on{border-color:#f0c674;color:#f0c674}
+.dfcmp-back{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:10003;display:flex;align-items:center;justify-content:center}
+.dfcmp{background:#353535;color:#ddd;border:1px solid #555;border-radius:10px;width:min(1000px,95vw);max-height:90vh;overflow:auto;padding:14px 16px;font:14px system-ui,sans-serif;box-shadow:0 10px 40px #000a;box-sizing:border-box}
+.dfcmp h2{margin:0 0 10px;font-size:20px;color:#fff;display:flex;justify-content:space-between}.dfcmp table{width:100%;border-collapse:collapse;table-layout:fixed}
+.dfcmp th{width:140px;text-align:left;color:#999;font-weight:500;vertical-align:top;padding:5px 6px}.dfcmp td{vertical-align:top;padding:5px 6px;border-left:1px solid #444;word-break:break-word}
+.dfcmp tr{border-top:1px solid #444}.dfcmp tr.diff td{background:#3a3424}.dfcmp .pic{position:relative;height:200px}.dfcmp .pic img,.dfcmp .pic video{max-height:200px;max-width:100%;border-radius:6px}
+.dfcmp .same{color:#f0c674;margin-bottom:8px}.dflb .card.picked{border-color:#ffd24a;box-shadow:0 0 0 2px #ffd24a}
 .dflb .card.picked .pic::after{content:"✓";position:absolute;left:6px;bottom:6px;background:#ffd24a;color:#222;border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-weight:700}
 .dflb .batch{display:flex;gap:6px;align-items:center;flex-wrap:wrap;background:#3d3a2a;border:1px solid #6b5e2c;border-radius:6px;padding:5px 8px;margin-bottom:8px}
 .dflb .batch[hidden]{display:none}.dflb .batch .count{font-weight:600;color:#ffd24a;margin-right:6px}.dflb .batch button{padding:3px 10px;font-size:13px}
@@ -144,15 +151,36 @@ async function openBrowser(node, spec, target = targetOf(node, spec)) {
   const lookAll = element("button", { title: `Compute the hash of every ${what} not looked up yet and ask Civitai about it, one by one` }, "Look up all on Civitai");
   const back = element("div", { class: "dflb-back" });
   const onKey = (event) => {
-    if (event.key !== "Escape" || document.querySelector(".dfmi-back, .dfcv-back, .dfmv-back")) return;
-    event.stopPropagation();
-    if (picked.size) clearPicked(); // The first Escape lets go of the picked cards, the next closes the browser.
-    else close();
+    if (document.querySelector(".dfmi-back, .dfcv-back, .dfmv-back, .dfcmp-back")) return; // A window over the browser has the keys.
+    if (event.key === "Escape") {
+      event.stopPropagation();
+      if (menuOpen()) closeMenu();
+      else if (picked.size) clearPicked(); // The first Escape lets go of the picked cards, the next closes the browser.
+      else close();
+    } else if (!menuOpen() && !slashToSearch(event, search)) cardKeys(event);
   };
+  // The keyboard (not while typing): Ctrl+A picks every card shown, Delete deletes the picked ones (↶ Undo brings them back), F2 renames the one
+  // picked, the menu key (or Shift+F10) opens its menu.
+  function cardKeys(event) {
+    if (typingIn(event)) return;
+    const one = picked.size === 1 ? files.find((entry) => entry.file === [...picked][0]) : null;
+    const key = event.key === "F10" && event.shiftKey ? "ContextMenu" : event.key;
+    const action = {
+      a: (event.ctrlKey || event.metaKey) && (() => { cardsByFile.forEach((_, file) => picked.add(file)); showPicked(); }),
+      Delete: spec.manage && picked.size && (() => background(one ? deleteFile(one) : batchDelete())),
+      F2: spec.manage && one && (() => background(renameFile(one))),
+      ContextMenu: one && cardsByFile.get(one.file) && (() => menuAt(cardsByFile.get(one.file), cardItems(one))),
+    }[key];
+    if (!action) return;
+    event.preventDefault();
+    event.stopPropagation();
+    action();
+  }
   const blurToggle = blurSwitch(() => draw());
   function close() {
     remember(`browser.${kind}`, { search: search.value, sort: sort.value, tag: tagFilter.value, scroll: grid.scrollTop }); // Opens where it was closed.
     stopSize();
+    closeMenu();
     stopLookUp?.();
     blurToggle.dispose();
     back.remove();
@@ -200,6 +228,7 @@ async function openBrowser(node, spec, target = targetOf(node, spec)) {
     const plural = picked.size === 1 ? what : spec.plural;
     batch.replaceChildren(element("span", { class: "count" }, `${picked.size} ${plural} picked`),
       ...(target?.pick && target.multi ? [element("button", { class: "go batch-add", onclick: () => background(batchAdd()) }, `${target.label} all`)] : []),
+      ...(picked.size === 2 ? [element("button", { class: "batch-compare", title: "The two side by side: what differs is marked", onclick: () => compare(...[...picked].map((file) => files.find((entry) => entry.file === file))) }, "⇆ Compare")] : []),
       element("button", { class: "batch-star", onclick: () => background(batchFavorite(true)) }, "★ Star"),
       element("button", { class: "batch-unstar", onclick: () => background(batchFavorite(false)) }, "☆ Unstar"),
       ...(spec.manage ? [element("button", { class: "batch-move", onclick: () => background(batchMove()) }, "⇄ Move…"),
@@ -339,10 +368,58 @@ async function openBrowser(node, spec, target = targetOf(node, spec)) {
     }
     return facts;
   }
+  // ⧉ Duplicates: the same file (the same sha256, known once looked up) under other names; the toolbar button shows only them, side by side.
+  let onlyDupes = false;
+  const copiesOf = (entry) => (entry.sha256 ? files.filter((other) => other !== entry && other.sha256 === entry.sha256) : []);
+  const dupesButton = element("button", { class: "only-dupes", title: `Show only the ${spec.plural} that are the same file as another (by its hash: Look up all hashes them all)`, onclick: () => {
+    onlyDupes = !onlyDupes;
+    draw();
+    if (onlyDupes) {
+      const unknown = files.filter((entry) => !entry.sha256).length;
+      say(`${files.filter((entry) => copiesOf(entry).length).length} ${spec.plural} are the same file as another.${unknown ? ` ${unknown} not looked up yet: Look up all hashes them.` : ""}`);
+    }
+  } }, "⧉ Duplicates");
+  // ⇆ Compare: two side by side, what differs marked (Ctrl+click two cards, then ⇆ Compare; or a card's menu with one other picked).
+  function compare(a, b) {
+    if (!a || !b) return;
+    const facts = [["File", (entry) => entry.file], ["Name", (entry) => entry.name || "—"], ["Size", (entry) => `${(entry.size / 1024 ** 2).toFixed(1)} MB`],
+      ["Base model", (entry) => entry.base_model || "—"], ["Trigger words", (entry) => entry.trigger_words.join(", ") || "—"], ["Your settings", (entry) => entry.settings || "—"],
+      ["Tags", (entry) => (entry.tags ?? []).join(", ") || "—"], ["Downloads", (entry) => entry.stats?.downloads?.toLocaleString() ?? "—"],
+      ["Likes", (entry) => entry.stats?.likes?.toLocaleString() ?? "—"], ["Creator", (entry) => entry.creator || "—"], ["Updated", (entry) => (entry.updated ? dateText(entry.updated) : "—")],
+      ["Newer version", (entry) => entry.newer?.name ?? "—"], ["Civitai", (entry) => (entry.checked ? (entry.found ? "found" : "not on Civitai") : "not looked up")]];
+    const backdrop = element("div", { class: "dfcmp-back" });
+    const shut = () => { backdrop.remove(); document.removeEventListener("keydown", onCompareKey, true); };
+    const onCompareKey = (event) => { if (event.key === "Escape") { event.stopPropagation(); shut(); } };
+    backdrop.addEventListener("mousedown", (event) => { if (event.target === backdrop) shut(); });
+    document.addEventListener("keydown", onCompareKey, true);
+    backdrop.append(element("div", { class: "dfcmp" },
+      element("h2", {}, `⇆ Compare ${spec.plural}`, element("button", { class: "close-compare", onclick: shut }, "✕")),
+      ...(a.sha256 && a.sha256 === b.sha256 ? [element("div", { class: "same" }, "⧉ The same file (the same hash) under two names: one of them can go.")] : []),
+      element("table", {}, element("tr", {}, element("th"), element("td", {}, picture(a)), element("td", {}, picture(b))),
+        ...facts.map(([label, value]) => element("tr", { class: value(a) === value(b) ? "" : "diff" }, element("th", {}, label), element("td", {}, value(a)), element("td", {}, value(b)))))));
+    document.body.append(backdrop);
+  }
+  // The card's right-click menu (and the menu key): everything its buttons do, and more.
+  function cardItems(entry) {
+    const box = cardsByFile.get(entry.file), button = (selector) => box?.querySelector(selector);
+    const other = picked.size === 1 && !picked.has(entry.file) ? files.find((item) => item.file === [...picked][0]) : null;
+    return [
+      ...action(entry).map((go) => [go.textContent, () => go.click()]),
+      ["🛈 Info", () => button(".buttons .info")?.click()],
+      [entry.checked ? "↻ Look up on Civitai again" : "🔍 Look up on Civitai", () => button(".buttons .look-up")?.click()],
+      ...(entry.url ? [["Civitai ↗", () => window.open(entry.url, "_blank", "noopener")]] : []),
+      [entry.favorite ? "☆ Remove the star" : "★ Add to favorites", () => setFavorite(entry, !entry.favorite)],
+      ["📋 Copy the file name", () => { background(navigator.clipboard?.writeText(entry.file)); say(`Copied ${entry.file}.`); }],
+      [picked.has(entry.file) ? "☑ Let go of it" : "☐ Pick it", () => togglePick(entry.file)],
+      ...(other ? [[`⇆ Compare with ${shortName(other.file)}`, () => compare(other, entry)]] : []),
+      ...(copiesOf(entry).length ? [[`⧉ Compare with its copy ${shortName(copiesOf(entry)[0].file)}`, () => compare(entry, copiesOf(entry)[0])]] : []),
+      ...(spec.manage ? ["-", ["✎ Rename…", () => renameFile(entry)], ["⇄ Move…", () => moveFile(entry)], ["🗑 Delete", () => deleteFile(entry)]] : []),
+    ];
+  }
   function card(entry) {
     const words = element("div", { class: "words" }, ...entry.trigger_words.slice(0, 8).map((word) =>
       element("span", { title: "Click to copy", onclick: () => { background(navigator.clipboard?.writeText(word)); say(`Copied "${word}".`); } }, word)));
-    const lookUpButton = element("button", { onclick: async () => {
+    const lookUpButton = element("button", { class: "look-up", onclick: async () => {
       lookUpButton.disabled = true;
       lookUpButton.textContent = "Looking up…";
       try {
@@ -353,7 +430,7 @@ async function openBrowser(node, spec, target = targetOf(node, spec)) {
         lookUpButton.textContent = "Look up failed";
       }
     } }, entry.checked ? "↻ Civitai" : "🔍 Civitai");
-    const info = element("button", { onclick: () => {
+    const info = element("button", { class: "info", onclick: () => {
       background(openModelInfo(kind, entry.file));
       const watch = setInterval(async () => { // When the Info dialog closes, the card shows what it looked up or what you typed there.
         if (document.querySelector(".dfmi-back")) return;
@@ -374,11 +451,13 @@ async function openBrowser(node, spec, target = targetOf(node, spec)) {
       element("div", { class: "body" },
         element("div", { class: "title" }, entry.name || shortName(entry.file)),
         element("div", { class: "muted" }, entry.file, ` · ${(entry.size / 1024 ** 2).toFixed(0)} MB`, note ? ` · ${note}` : ""),
+        ...(copiesOf(entry).length ? [element("div", { class: "dupe", title: "The same file (the same hash): one of them can go" }, `⧉ The same file as ${copiesOf(entry).map((other) => other.file).join(", ")}`)] : []),
         ...civitaiFacts(entry),
         words,
         ...(entry.settings ? [element("div", { class: "muted", title: "Your recommended settings, from Model info" }, `⚙ ${entry.settings}`)] : []),
         element("div", { class: "buttons" }, ...action(entry), info, lookUpButton, ...link, ...manage)));
     if (spec.manage) dragSource(box, kind, entry.file);
+    withMenu(box, () => cardItems(entry));
     box.classList.toggle("picked", picked.has(entry.file));
     box.addEventListener("click", (event) => { // Picking: Ctrl (⌘) or Shift, or any click in ☐ Select mode; not on the card's buttons and links.
       if (event.target.closest("button, a, .words span, .ctags span, .blur") || !(selecting || event.ctrlKey || event.metaKey || event.shiftKey)) return;
@@ -441,7 +520,8 @@ async function openBrowser(node, spec, target = targetOf(node, spec)) {
     const inFolder = folder === FAVORITES ? entry.favorite : !folder || folderOf(entry.file) === folder || folderOf(entry.file).startsWith(folder + "/");
     const baseOk = !base.value || (base.value === FITS ? compareBases(entry.base_model, target.base)?.level !== "bad" : entry.base_model === base.value);
     const tagOk = !tagFilter.value || (entry.tags ?? []).includes(tagFilter.value);
-    return inFolder && baseOk && tagOk && (!query || query.split(/\s+/).every((word) => text.includes(word)));
+    const dupeOk = !onlyDupes || copiesOf(entry).length > 0;
+    return inFolder && baseOk && tagOk && dupeOk && (!query || query.split(/\s+/).every((word) => text.includes(word)));
   }
   // Folders open in the tree, kept per kind between openings (and reloads) in this browser. Subfolders start closed; ▸ opens one, and the folder
   // picked in the tree (or the one a Random loader uses) is opened to.
@@ -523,7 +603,10 @@ async function openBrowser(node, spec, target = targetOf(node, spec)) {
       new: (a, b) => b.mtime - a.mtime,
       base: (a, b) => (a.base_model || "~").localeCompare(b.base_model || "~") || shortName(a.file).localeCompare(shortName(b.file)),
     }[sort.value];
-    const shown = files.filter(matches).sort(order);
+    const dupes = files.filter((entry) => copiesOf(entry).length).length;
+    dupesButton.textContent = dupes ? `⧉ Duplicates (${dupes})` : "⧉ Duplicates";
+    dupesButton.classList.toggle("on", onlyDupes);
+    const shown = files.filter(matches).sort(onlyDupes ? (a, b) => a.sha256.localeCompare(b.sha256) || order(a, b) : order); // Copies next to each other.
     cardsByFile = new Map();
     grid.replaceChildren(...(shown.length ? shown.map(card) : [element("div", { class: "muted" }, files.length ? `No ${what} matches.` : `No ${what} files: put them in ComfyUI/models/${kind}.`)]));
     const missing = files.filter((entry) => !entry.checked).length;
@@ -557,7 +640,7 @@ async function openBrowser(node, spec, target = targetOf(node, spec)) {
   back.append(dialog);
   dialog.append(
     heading,
-    element("div", { class: "top" }, search, base, tagFilter, sort, selectMode, lookAll, blurToggle,
+    element("div", { class: "top" }, search, base, tagFilter, sort, dupesButton, selectMode, lookAll, blurToggle,
       ...(spec.manage && spec.civitai !== false ? [element("button", { class: "go find", title: `Search Civitai and download ${spec.plural} into models/${kind}`, onclick: () => background(openCivitaiSearch({
         kind, title: spec.title, plural: spec.plural, icon: spec.icon, hint: spec.civitaiHint ?? "", base: target?.base, folders: [...new Set(files.map((entry) => folderOf(entry.file)).filter(Boolean))].sort((a, b) => a.localeCompare(b)),
         onChange: () => background(reload().then(() => say("The download is done: it is in the list."))),

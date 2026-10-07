@@ -1,4 +1,5 @@
 import asyncio
+import fnmatch
 import io
 import json
 import os
@@ -11,7 +12,7 @@ from urllib.parse import quote
 import folder_paths
 import yaml
 from aiohttp import web
-from .clip_text_encode_pos_neg import TextLoader, entry_lines, fill_in, find_wildcard, read_text_lines, wildcard_index, yaml_wildcards
+from .clip_text_encode_pos_neg import WILDCARD_PATTERN, TextLoader, entry_lines, fill_in, find_wildcard, read_text_lines, wildcard_index, yaml_wildcards
 from .http_read import read_up_to
 from .model_info import json_body
 # Server side of the Wildcard Browser and the __ autocomplete (web/wildcards.js): the list of wildcards, and creating, reading, saving, renaming and
@@ -276,6 +277,47 @@ def restore_file(trash_id):
     shutil.move(os.path.join(folder, "file.txt"), path)
     shutil.rmtree(folder, ignore_errors=True)
     return name, path, meta.get("favorite") is True
+# The wildcards a file's lines use that no wildcard file answers (__haircolour__ for __hair/color__): the Wildcard Browser marks them. A name
+# with a variable is left out (known only in a run); * and ? count when they match at least one name. lowered: the names in lower case.
+def broken_references(options, names, lowered):
+    broken = set()
+    for line in options:
+        for match in WILDCARD_PATTERN.finditer(line):
+            name = match.group(1)
+            if "${" in name or "\x00" in name:
+                continue
+            if "*" in name or "?" in name:
+                if not any(fnmatch.fnmatchcase(item, name) for item in names):
+                    broken.add(name)
+            elif name.lower() not in lowered:
+                broken.add(name)
+    return sorted(broken)
+# Find and replace in every txt wildcard file (the text as written, case and all): what would change, or (apply) the change itself. Yaml
+# wildcards are only named: they are edited in their yaml file. Lines stay lines: neither text may hold a line break.
+REPLACE_LONGEST = 500
+def replace_in_wildcards(find, replacement, apply):
+    changed, in_yaml = [], []
+    for name, entry in sorted(wildcard_index(refresh=True).items(), key=lambda item: item[0].lower()):
+        if "lines" in entry:
+            if any(find in line for line in entry["lines"]):
+                in_yaml.append(name)
+            continue
+        try:
+            with open(entry["path"], encoding="utf-8", newline="") as file:
+                text = file.read()
+        except (OSError, UnicodeDecodeError): # An unreadable file is not changed.
+            continue
+        count = text.count(find)
+        if not count:
+            continue
+        line = next(line for line in text.splitlines() if find in line).strip()
+        changed.append({"name": name, "count": count, "line": line[:200], "after": line.replace(find, replacement)[:200]})
+        if apply:
+            with open(entry["path"], "w", encoding="utf-8", newline="") as file:
+                file.write(text.replace(find, replacement))
+    if apply:
+        wildcard_index(refresh=True)
+    return {"files": changed, "in_yaml": in_yaml, "applied": apply}
 # 🎲 Preview picks: what runs would put in for a wildcard (or a folder's __folder/*__), as many times, each with a new random seed: the same filling
 # in as the prompt nodes (weights, choices, nested wildcards).
 PREVIEW_MOST = 20
@@ -317,13 +359,16 @@ def register_routes():
         return
     @routes.get("/diceforge/wildcards")
     async def list_wildcards(request):
-        files, favorites = [], read_favorites()
-        for name, entry in sorted(wildcard_index(refresh=True).items(), key=lambda item: item[0].lower()):
+        files, favorites, index = [], read_favorites(), wildcard_index(refresh=True)
+        names = list(index)
+        lowered = {name.lower() for name in names}
+        for name, entry in sorted(index.items(), key=lambda item: item[0].lower()):
             try:
                 options, error = entry_lines(entry), {}
             except ValueError as problem: # One unreadable file doesn't hide the others: it is listed with its error.
                 options, error = [], {"error": str(problem)}
-            files.append({"name": name, "lines": len(options), "preview": options[:3], "favorite": name in favorites,
+            broken = broken_references(options, names, lowered)
+            files.append({"name": name, "lines": len(options), "preview": options[:3], "favorite": name in favorites, **({"broken": broken} if broken else {}),
                           **({"yaml": os.path.basename(entry["path"])} if "lines" in entry else {}), **({"picture": True} if card_picture(entry) else {}), **error})
         return web.json_response({"folders": folder_paths.get_folder_paths("wildcards"), "files": files})
     @routes.get("/diceforge/wildcards/picture")
@@ -466,6 +511,18 @@ def register_routes():
             raise web.HTTPBadRequest(text=f"Wildcards: count must be 1 to {PREVIEW_MOST}.")
         folder = query.get("folder") in ("1", "true")
         return web.json_response(await asyncio.get_running_loop().run_in_executor(None, preview_picks, name, folder, count))
+    @routes.post("/diceforge/wildcards/replace")
+    async def replace_wildcards(request):
+        body = await json_body(request)
+        find, replacement, apply = body.get("find"), body.get("replace", ""), body.get("apply", False)
+        if not isinstance(find, str) or not find or len(find) > REPLACE_LONGEST or not isinstance(replacement, str) or len(replacement) > REPLACE_LONGEST:
+            raise web.HTTPBadRequest(text=f"Wildcards: find (1 to {REPLACE_LONGEST} characters) and replace (up to {REPLACE_LONGEST}) are texts.")
+        if any(mark in find + replacement for mark in "\r\n") or not isinstance(apply, bool):
+            raise web.HTTPBadRequest(text="Wildcards: find and replace work within a line (no line breaks); apply is true or false.")
+        try:
+            return web.json_response(await asyncio.get_running_loop().run_in_executor(None, replace_in_wildcards, find, replacement, apply))
+        except OSError as error:
+            raise web.HTTPBadRequest(text=f"Wildcards: can't replace: {error.strerror or error}.") from None
     @routes.get("/diceforge/wildcards/export")
     async def export_wildcards(request):
         folder = request.rel_url.query.get("folder", "").strip()

@@ -1,6 +1,7 @@
 import { addStyleOnce, background, element } from "./dom.js";
 import { insertIntoNode } from "./wildcards.js";
 import { keepSize, recall, remember, scrollBack } from "./window_memory.js";
+import { slashToSearch } from "./menu.js";
 
 // Syntax guide (CLIP Dual Text Encode's menu): every piece of the prompt syntax with what it does and an example. A click on an example copies it;
 // + Insert puts it where the cursor was in the node's prompts. The search box filters the rows.
@@ -62,7 +63,12 @@ export function openSyntaxGuide(node) {
   const body = element("div", { class: "body" });
   const status = element("div", { class: "status" });
   const back = element("div", { class: "dfsg-back" });
-  const onKey = (event) => { if (event.key === "Escape") { event.stopPropagation(); close(); } };
+  const onKey = (event) => {
+    if (event.key === "Escape") {
+      event.stopPropagation();
+      close();
+    } else slashToSearch(event, search); // / to the search box.
+  };
   function close() {
     remember("syntax", { search: search.value, scroll: body.scrollTop }); // Opens where it was closed.
     stopSize();

@@ -4,6 +4,7 @@ import { addStyleOnce, background, element } from "./dom.js";
 import { dragSource, dropTarget, pickFolder } from "./move_dialog.js";
 import { addHighlightStyle, highlightEnabled, highlightWildcardFile } from "./prompt_highlight.js";
 import { keepSize, recall, remember, scrollBack } from "./window_memory.js";
+import { closeMenu, menuAt, menuButton, menuOpen, moveCursor, slashToSearch, typingIn, withMenu } from "./menu.js";
 
 // Wildcards in CLIP Dual Text Encode: autocomplete after "__" in the prompt fields, and the Wildcard Browser (node menu) with a folder tree,
 // "+ Add" buttons that insert __name__ (or __folder/*__) where the cursor was, and an editor for the files.
@@ -91,6 +92,10 @@ function setField(node, name, text, caret) {
   }
   node.setDirtyCanvas?.(true, true);
 }
+// The field insertIntoNode would put text in: the one asked for, else the one the cursor was last in, else the first.
+function cursorField(node, field) {
+  return field ?? lastCursor.get(node)?.name ?? fieldsOf(node)?.[0] ?? "positive";
+}
 // Inserts at the cursor last in the node's prompt fields (or at the end of the positive prompt), or at the end of the field asked for (field) when
 // the cursor wasn't in it.
 function insertIntoNode(node, token, field) {
@@ -111,12 +116,14 @@ const STYLE = `
 .dfwc-pop{position:fixed;z-index:10001;background:#262626;border:1px solid #555;border-radius:6px;box-shadow:0 6px 20px #000a;font:13px system-ui,sans-serif;color:#ddd;min-width:220px;max-width:420px;max-height:280px;overflow:auto;padding:3px}
 .dfwc-pop div{padding:4px 8px;border-radius:4px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .dfwc-pop div.on{background:#3a5a8a;color:#fff}
-.dfwc-menu{position:fixed;z-index:10002;background:#262626;border:1px solid #555;border-radius:6px;box-shadow:0 6px 20px #000a;padding:4px;display:flex;flex-direction:column;min-width:210px;font:13px system-ui,sans-serif}
-.dfwc-menu button{background:none;border:none;color:#ddd;text-align:left;padding:5px 10px;border-radius:4px;cursor:pointer;font:inherit;white-space:nowrap}.dfwc-menu button:hover{background:#3a5a8a;color:#fff}
-.dfwc-menu hr{border:none;border-top:1px solid #444;margin:3px 2px}
 .dfwc .picks{border:1px solid #4a6a9a;background:#2a3444;border-radius:6px;padding:6px 8px;margin-top:8px;max-height:32%;overflow:auto}
 .dfwc .picks-head{display:flex;gap:8px;align-items:center;margin-bottom:4px}.dfwc .picks .pick{display:flex;gap:8px;align-items:center;padding:3px 0;border-top:1px solid #3a4a64}
 .dfwc .picks .pick .text{flex:1;min-width:0;white-space:pre-wrap;word-break:break-word}.dfwc .picks button{padding:1px 8px;font-size:12px}
+.dfwc .row .broken{color:#ff8a8a;cursor:help}.dfwc .row.cursor{outline:1px solid #6a9ad8;outline-offset:-1px}.dfwc .top{flex-wrap:wrap}
+.dfwc .replace{border:1px solid #6a5a9a;background:#2e2a44;border-radius:6px;padding:6px 8px;margin-top:8px;max-height:36%;overflow:auto}
+.dfwc .replace-head{display:flex;gap:6px;align-items:center;flex-wrap:wrap}.dfwc .replace-head input{flex:1;min-width:140px}
+.dfwc .replace .change{display:flex;gap:8px;padding:3px 0;border-top:1px solid #443c64;font-size:12px}.dfwc .replace .change b{min-width:120px}
+.dfwc .replace .change .after{color:#9c9}.dfwc .replace .change .before{color:#c99;text-decoration:line-through}.dfwc .status button.more-action{margin-left:6px;padding:0 8px;font-size:12px}
 .dfwc .row button.more{border:none;background:none;color:#999;padding:0 4px;font-size:15px}.dfwc .row button.more:hover{color:#fff}.dfwc-pop .n{color:#999;float:right;margin-left:12px}.dfwc-pop .browse{color:#9cc8ff;border-top:1px solid #444;margin-top:2px}
 .dfwc-back{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:10000;display:flex;align-items:center;justify-content:center}
 .dfwc{background:#353535;color:#ddd;border:1px solid #555;border-radius:10px;width:min(1100px,95vw);height:min(760px,90vh);display:flex;flex-direction:column;padding:16px 18px;font:14px system-ui,sans-serif;box-shadow:0 10px 40px #000a;box-sizing:border-box}
@@ -409,22 +416,45 @@ async function openBrowser(node) {
       editor: editor.scrollTop, cards: cards.querySelector(".grid")?.scrollTop ?? 0, ...(dirty ? { draft: editor.value, saved } : {}) });
     stopSize();
     closeMenu();
-    document.removeEventListener("mousedown", outside, true);
     back.remove();
     document.removeEventListener("keydown", onKey, true);
     document.removeEventListener("selectionchange", onSelection);
   };
   const onKey = (event) => {
-    if (event.key !== "Escape" || document.querySelector(".dfmv-back")) return; // The folder picker closes first.
-    event.stopPropagation();
-    if (menu) closeMenu(); // Then a right-click menu, then the browser.
-    else close();
+    if (document.querySelector(".dfmv-back")) return; // The folder picker has the keys (and closes first).
+    if (event.key === "Escape") {
+      event.stopPropagation();
+      if (menuOpen()) closeMenu(); // Then a right-click menu, then the browser.
+      else close();
+      return;
+    }
+    if (menuOpen() || slashToSearch(event, search)) return;
+    treeKeys(event);
   };
+  // The keyboard in the tree (from the search box too): ↑ ↓ pick a file, Enter puts it in the prompt, Shift+Enter opens it, F2 renames it,
+  // Delete deletes it (↶ Undo brings it back), the menu key or Shift+F10 opens its menu. The editor keeps its own keys.
+  function treeKeys(event) {
+    if (event.target === editor || (typingIn(event) && event.target !== search)) return;
+    const rows = [...tree.querySelectorAll(".row[data-name]")].filter((row) => row.offsetParent);
+    const file = () => (listCache?.files ?? []).find((item) => item.name === tree.querySelector(".row.cursor[data-name]")?.dataset.name);
+    const key = event.key, action = {
+      ArrowDown: () => moveCursor(rows, 1), ArrowUp: () => moveCursor(rows, -1),
+      Enter: () => file() && (event.shiftKey ? background(open(file().name)) : add(file().name)),
+      F2: () => file() && !file().yaml && background(renameFile(file().name)),
+      Delete: () => file() && !file().yaml && event.target !== search && background(deleteFile(file().name)),
+      ContextMenu: () => file() && menuAt(tree.querySelector(".row.cursor"), fileItems(file())),
+    }[key === "F10" && event.shiftKey ? "ContextMenu" : key];
+    if (!action || (key === "Enter" && !file())) return;
+    event.preventDefault();
+    event.stopPropagation();
+    action();
+  }
   back.addEventListener("mousedown", (event) => { if (event.target === back) close(); });
   document.addEventListener("keydown", onKey, true);
-  // A message; after a rename, a move or a delete, with ↶ Undo (until the next message).
-  const say = (text, undo) => {
-    status.replaceChildren(text, ...(undo ? [element("button", { class: "undo", title: "Undo it", onclick: () => background(undo()) }, "↶ Undo")] : []));
+  // A message; after a rename, a move or a delete, with ↶ Undo (until the next message), and maybe one more thing to do ([label, action]).
+  const say = (text, undo, more) => {
+    status.replaceChildren(text, ...(undo ? [element("button", { class: "undo", title: "Undo it", onclick: () => background(undo()) }, "↶ Undo")] : []),
+      ...(more ? [element("button", { class: "more-action", onclick: () => background(Promise.resolve().then(more[1])) }, more[0])] : []));
   };
   const add = (token) => { const field = insertIntoNode(node, `__${token}__`); say(`Added __${token}__ to ${field}.`); };
   async function open(name) {
@@ -475,7 +505,8 @@ async function openBrowser(node) {
       markCurrentLine();
     } else draw();
     say(`${moved ? "Moved" : "Renamed"} ${result.renamed} to ${result.to}. Prompts that use __${result.renamed}__ need the new name.`,
-      () => renameTo(result.to, result.renamed, moved)); // Undo: back to its old name and folder.
+      () => renameTo(result.to, result.renamed, moved), // Undo: back to its old name and folder.
+      ["🔁 Update the wildcard files that use it", () => openReplace(`__${result.renamed}__`, `__${result.to}__`)]);
   }
   async function renameFile(name) {
     const to = prompt("New name (folders with /, for example hair/color):", name)?.trim();
@@ -585,6 +616,13 @@ async function openBrowser(node) {
   } }, "Expand all");
   const collapseAll = element("button", { class: "close-all", title: "Close every folder", onclick: () => { opened.clear(); keepOpenFolders(opened); draw(); } }, "Collapse all");
   // ★ Favorites: a star on a file, kept on the server (it follows renames and moves); the toolbar button shows only them.
+  // ⚠ Broken: only the files that use a wildcard no file answers (a typo, a renamed file); shown when there are some.
+  let onlyBroken = false;
+  const brokenButton = element("button", { class: "only-broken", title: "Show only the files that use wildcards that don't exist (⚠ on the row names them)", onclick: () => {
+    onlyBroken = !onlyBroken;
+    brokenButton.classList.toggle("on", onlyBroken);
+    draw();
+  } }, "⚠ Broken");
   let onlyFavorites = false;
   const favoritesButton = element("button", { class: "only-favorites", title: "Show only your favorites (☆ on a file)", onclick: () => {
     onlyFavorites = !onlyFavorites;
@@ -682,23 +720,6 @@ async function openBrowser(node) {
     draw();
   }
   // Right-click on a file or a folder (or its ⋯): everything that can be done with it, so the rows keep only ☆ and + Add.
-  let menu = null;
-  const closeMenu = () => { menu?.remove(); menu = null; };
-  const outside = (event) => { if (menu && !menu.contains(event.target)) closeMenu(); };
-  document.addEventListener("mousedown", outside, true);
-  function showMenu(event, items) {
-    event.preventDefault();
-    event.stopPropagation();
-    closeMenu();
-    menu = element("div", { class: "dfwc-menu", role: "menu" }, ...items.map((item) => (item === "-" ? element("hr") : element("button", { role: "menuitem",
-      title: item[2] ?? "", onclick: () => { closeMenu(); background(Promise.resolve(item[1]())); } }, item[0]))));
-    document.body.append(menu);
-    const box = menu.getBoundingClientRect();
-    menu.style.left = `${Math.max(4, Math.min(event.clientX, innerWidth - box.width - 4))}px`;
-    menu.style.top = `${Math.max(4, Math.min(event.clientY, innerHeight - box.height - 4))}px`;
-  }
-  const moreButton = (items) => element("button", { class: "more", title: "More: open, preview, rename, move, convert, export, delete (or right-click the row)",
-    onclick: (event) => { const box = event.currentTarget.getBoundingClientRect(); showMenu({ preventDefault() {}, stopPropagation() {}, clientX: box.left, clientY: box.bottom }, items()); } }, "⋯");
   function fileItems(file) {
     return [
       ["📝 Open", () => open(file.name)],
@@ -708,7 +729,9 @@ async function openBrowser(node) {
       "-",
       ...(file.yaml ? [["→ txt files", () => convert(file.name, "txt"), "Turn its yaml file into txt files, one per key (the names stay the same)"]]
         : [["✎ Rename…", () => renameFile(file.name)], ["⇄ Move…", () => moveFile(file.name)],
-          ["→ yaml", () => convert(file.name, "yaml"), `Turn ${file.name}.txt into ${file.name.split("/").pop()}.yaml (the name stays the same)`], "-",
+          ["→ yaml", () => convert(file.name, "yaml"), `Turn ${file.name}.txt into ${file.name.split("/").pop()}.yaml (the name stays the same)`],
+          ["🧹 Remove duplicates and empty lines", () => cleanUp(file.name, false), "In the editor: Save keeps it"],
+          ["🔤 Sort lines A→Z (and clean up)", () => cleanUp(file.name, true), "Sorted by the text (a line's N:: weight left aside); comments at the top stay there. In the editor: Save keeps it"], "-",
           ["🗑 Delete", () => deleteFile(file.name)]]),
     ];
   }
@@ -726,6 +749,64 @@ async function openBrowser(node) {
     ];
   }
   // 🎲 Preview picks: what a run would put in for a wildcard (or __folder/*__), a few times, each with + Add to use that very text.
+  // 🧹 Clean up a file in the editor: duplicate and empty lines go (and, sorting, the lines go A→Z by their text, a weight like 3:: left aside);
+  // the comment lines at its top stay there. Not saved: Save keeps it, reopening the file drops it.
+  async function cleanUp(name, sort) {
+    if (selected !== name) await open(name);
+    if (selected !== name || editor.readOnly) return;
+    const result = cleanLines(editor.value, sort);
+    editor.value = result.text;
+    numberLines();
+    markCurrentLine();
+    showDirty();
+    say(`${name}: ${result.duplicates} duplicate${result.duplicates === 1 ? "" : "s"} and ${result.empty} empty line${result.empty === 1 ? "" : "s"} dropped${sort ? ", sorted A→Z" : ""}. Save keeps it.`);
+  }
+  // 🔁 Find and replace in every txt wildcard file: a preview of what changes first, then Replace (after a rename: the old name in the files
+  // that use it). Yaml files are named, not changed.
+  const replacePanel = element("div", { class: "replace", hidden: "" });
+  const findInput = element("input", { class: "find", placeholder: "Find (as written, case and all)" });
+  const replaceInput = element("input", { class: "with", placeholder: "Replace with" });
+  const replaceResults = element("div", { class: "results" });
+  async function replaceCall(apply) {
+    const response = await api.fetchApi("/diceforge/wildcards/replace", { method: "POST", body: JSON.stringify({ find: findInput.value, replace: replaceInput.value, apply }) });
+    if (!response.ok) return say(await response.text());
+    return response.json();
+  }
+  async function previewReplace() {
+    const result = await replaceCall(false);
+    if (!result) return;
+    const count = result.files.reduce((sum, file) => sum + file.count, 0);
+    replaceResults.replaceChildren(
+      element("div", { class: "muted" }, result.files.length ? `${count} in ${result.files.length} file${result.files.length === 1 ? "" : "s"}:` : "Not in any txt file.",
+        ...(result.in_yaml.length ? [` Also in yaml wildcards (edit their yaml files): ${result.in_yaml.join(", ")}.`] : [])),
+      ...result.files.map((file) => element("div", { class: "change" }, element("b", {}, `${file.name} ×${file.count}`),
+        element("span", { class: "before" }, file.line), element("span", { class: "after" }, file.after))),
+      ...(result.files.length ? [element("button", { class: "apply", onclick: () => background(applyReplace(result.files.length)) }, `Replace in ${result.files.length} file${result.files.length === 1 ? "" : "s"}`)] : []));
+  }
+  async function applyReplace(fileCount) {
+    if (selected && editor.value !== saved) return say("Save (or undo) the open file's changes first: the replace would change it under you.");
+    if (!confirm(`Replace “${findInput.value}” with “${replaceInput.value}” in ${fileCount} file${fileCount === 1 ? "" : "s"}?`)) return;
+    const result = await replaceCall(true);
+    if (!result) return;
+    await wildcardList(true);
+    if (selected && result.files.some((file) => file.name === selected)) await open(selected); // The open file as it is now.
+    draw();
+    replaceResults.replaceChildren();
+    say(`Replaced “${findInput.value}” with “${replaceInput.value}” in ${result.files.length} file${result.files.length === 1 ? "" : "s"}.`);
+  }
+  async function openReplace(find = findInput.value, replacement = replaceInput.value) {
+    findInput.value = find;
+    replaceInput.value = replacement;
+    replacePanel.hidden = false;
+    replaceResults.replaceChildren();
+    if (find) await previewReplace();
+    else findInput.focus();
+  }
+  for (const input of [findInput, replaceInput]) input.addEventListener("keydown", (event) => { if (event.key === "Enter") { event.preventDefault(); background(previewReplace()); } });
+  replacePanel.append(element("div", { class: "replace-head" }, element("b", {}, "🔁"), findInput, element("span", {}, "→"), replaceInput,
+    element("button", { class: "preview", onclick: () => background(previewReplace()) }, "Preview"),
+    element("button", { class: "close-replace", title: "Close", onclick: () => { replacePanel.hidden = true; } }, "✕")), replaceResults);
+  const replaceButton = element("button", { class: "replace-open", title: "Find and replace in every wildcard file (a preview first)", onclick: () => background(openReplace()) }, "🔁 Replace");
   const picks = element("div", { class: "picks", hidden: "" });
   async function previewPicks(name, folder = false) {
     const response = await api.fetchApi(`/diceforge/wildcards/preview?name=${encodeURIComponent(name)}${folder ? "&folder=1" : ""}&count=5`);
@@ -759,8 +840,13 @@ async function openBrowser(node) {
     const { files } = listCache ?? { files: [] };
     const query = search.value.trim().toLowerCase();
     const byLine = (file) => lineQuery === query && lineMatches.has(file.name);
-    const shown = files.filter((file) => (!query || file.name.toLowerCase().includes(query) || byLine(file)) && (!onlyFavorites || file.favorite));
-    const allOpen = query || onlyFavorites; // A search or the favorites show their matches in open folders.
+    const brokenCount = files.filter((file) => file.broken).length;
+    if (!brokenCount) onlyBroken = false;
+    brokenButton.hidden = !brokenCount;
+    brokenButton.textContent = `⚠ Broken (${brokenCount})`;
+    brokenButton.classList.toggle("on", onlyBroken);
+    const shown = files.filter((file) => (!query || file.name.toLowerCase().includes(query) || byLine(file)) && (!onlyFavorites || file.favorite) && (!onlyBroken || file.broken));
+    const allOpen = query || onlyFavorites || onlyBroken; // A search or the filters show their matches in open folders.
     const root = { folders: new Map(), files: [] };
     for (const file of shown) {
       let level = root;
@@ -777,8 +863,8 @@ async function openBrowser(node) {
           element("span", { class: "name", title: cardsMode ? "Show its cards (and open or close the folder)" : "Open or close the folder",
             onclick: () => { if (cardsMode) cardFolder = folder.path; toggle(folder.path, cardsMode ? true : undefined); } }, `📁 ${part}`), element("span", { class: "muted" }, "all files"),
           element("button", { class: "add", title: `Insert __${folder.path}/*__`, onclick: () => add(`${folder.path}/*`) }, "+ Add"),
-          moreButton(() => folderItems(folder.path)));
-        row.addEventListener("contextmenu", (event) => showMenu(event, folderItems(folder.path)));
+          menuButton(() => folderItems(folder.path), "More: preview, new file, export, convert (or right-click the row)"));
+        withMenu(row, () => folderItems(folder.path));
         dropTarget(row, "wildcards", (name) => background(moveFile(name, folder.path))); // A file dropped on a folder moves into it.
         return element("div", { class: "folder" + (allOpen || opened.has(folder.path) ? " open" : ""), "data-path": folder.path }, row, element("div", { class: "kids" }, ...drawLevel(folder)));
       }),
@@ -786,13 +872,14 @@ async function openBrowser(node) {
         const row = element("div", { class: "row" + (file.name === selected ? " sel" : ""), "data-name": file.name, title: file.error || file.preview.join("\n") },
           element("span", { class: "name", onclick: () => open(file.name) }, file.name.split("/").pop()),
           ...(query && !file.name.toLowerCase().includes(query) && byLine(file) ? [element("span", { class: "found", title: lineMatches.get(file.name) }, `“${lineMatches.get(file.name)}”`)] : []),
+          ...(file.broken ? [element("span", { class: "broken", title: `Uses wildcards that don't exist: ${file.broken.map((name) => `__${name}__`).join(", ")}` }, "⚠")] : []),
           element("span", { class: "muted", title: file.error || (file.yaml ? `From ${file.yaml}` : "") },
             file.error ? "⚠ can't be read" : `${file.yaml ? "yaml · " : ""}${file.lines} ${file.lines === 1 ? "line" : "lines"}`),
           element("button", { class: "fav" + (file.favorite ? " on" : ""), title: file.favorite ? "A favorite: click to remove the star" : "Add to favorites",
             onclick: () => background(setFavorite(file.name, !file.favorite)) }, file.favorite ? "★" : "☆"),
           element("button", { class: "add", title: `Insert __${file.name}__`, onclick: () => add(file.name) }, "+ Add"),
-          moreButton(() => fileItems(file)));
-        row.addEventListener("contextmenu", (event) => showMenu(event, fileItems(file)));
+          menuButton(() => fileItems(file), "More: open, preview, rename, move, convert, clean up, delete (or right-click the row)"));
+        withMenu(row, () => fileItems(file));
         if (!file.yaml) dragSource(row, "wildcards", file.name); // A yaml wildcard moves with its yaml file only.
         return row;
       }),
@@ -826,8 +913,8 @@ async function openBrowser(node) {
   const heading = element("h2", {}, "Wildcards");
   const stopSize = keepSize(dialog, "wildcards", heading);
   dialog.append(heading,
-    element("div", { class: "top" }, search, modeButton, favoritesButton, expandAll, collapseAll, importButton, exportButton, create, element("button", { onclick: close }, "Close")),
-    element("div", { class: "main" }, tree, editPane, cards), picks, status);
+    element("div", { class: "top" }, search, modeButton, favoritesButton, brokenButton, expandAll, collapseAll, importButton, exportButton, replaceButton, create, element("button", { onclick: close }, "Close")),
+    element("div", { class: "main" }, tree, editPane, cards), picks, replacePanel, status);
   editPane.append(title, code, element("div", { class: "top" }, element("span", { style: "flex:1" }), convertButton, remove, move, rename, save));
   const last = recall("wildcards");
   search.value = typeof last.search === "string" ? last.search : "";
@@ -869,6 +956,27 @@ app.registerExtension({
   },
 });
 
+// A wildcard file without duplicate and empty lines (sorted A→Z by the text, a line's N:: weight left aside, when sort): the comment lines at its
+// top stay there. Also how many lines went.
+export function cleanLines(text, sort) {
+  const lines = text.split("\n").map((line) => line.replace(/\s+$/, ""));
+  let start = 0;
+  while (start < lines.length && (!lines[start].trim() || lines[start].trim().startsWith("#"))) start++;
+  const head = lines.slice(0, start).filter((line) => line.trim()), seen = new Set(), body = [];
+  let duplicates = 0, empty = lines.slice(0, start).length - head.length;
+  for (const line of lines.slice(start)) {
+    if (!line.trim()) empty++;
+    else if (seen.has(line.trim())) duplicates++;
+    else {
+      seen.add(line.trim());
+      body.push(line);
+    }
+  }
+  const key = (line) => line.trim().replace(/^\d+(?:\.\d+)?::/, "");
+  if (sort) body.sort((a, b) => key(a).localeCompare(key(b), undefined, { sensitivity: "base", numeric: true }));
+  return { text: [...head, ...body].join("\n"), duplicates, empty };
+}
+
 // For the prompt syntax highlighting (prompt_highlight.js): the prompt fields of a node, and the wildcard names as last listed.
 const knownWildcards = () => listCache?.files?.map((file) => file.name) ?? null;
-export { insertIntoNode, setField, textareaOf, wildcardList, knownWildcards, fieldsOf, isPromptNode, NODE_TYPE as PROMPT_NODE_TYPE, FIELDS as PROMPT_FIELDS };
+export { insertIntoNode, cursorField, setField, textareaOf, wildcardList, knownWildcards, fieldsOf, isPromptNode, NODE_TYPE as PROMPT_NODE_TYPE, FIELDS as PROMPT_FIELDS };

@@ -17,6 +17,11 @@ nodes and features, a patch for fixes. Each version is a [release on GitHub](htt
   shows what runs would put in for a wildcard or a folder.
 - Model browsers: ↶ Undo of a rename, move or delete (deleted models wait in models/.diceforge_trash until ComfyUI restarts, the last 10).
 - Tag Browser: a basket of picked tags, put into the prompt (or the negative one) all at once.
+- Wildcard Browser: ⚠ on files that use wildcards that don't exist, and ⚠ Broken to show only them; 🔁 Replace in every file, after a preview
+  (offered after a rename: the old name in the files that use it); 🧹 remove duplicate and empty lines, 🔤 sort a file's lines.
+- Tag Browser: ✓ on tags already in a prompt (not added twice); 🔗 related tags from Danbooru.
+- Model browsers: a right-click menu on cards; ⧉ Duplicates (the same file, by its hash); ⇆ Compare two side by side.
+- The keyboard in the browsers: / to the search; ↑ ↓ Enter in the Wildcard and Tag Browsers; Delete, F2 and the menu key on files and cards.
 
 ### Changed
 - Wildcard Browser: the tree takes a third of the window, the editor (or the cards) two thirds.

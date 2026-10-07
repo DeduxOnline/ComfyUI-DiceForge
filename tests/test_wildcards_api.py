@@ -376,3 +376,32 @@ def test_preview_picks_fill_a_wildcard_or_a_folder_in_as_runs_would(api, wildcar
     for query in ("name=../x", "name=hair/color&count=0", "name=hair/color&count=21", "name=hair/color&count=x", ""):
         assert api("GET", f"/diceforge/wildcards/preview?{query}")[0] == 400
 
+
+
+def test_the_list_marks_wildcards_a_file_uses_that_do_not_exist(api, wildcards):
+    wildcards("hair/color.txt", "red\n")
+    wildcards("look.txt", "__hair/color__ and __hair/colour__\n{__Hair/Color__|__eyes__}\n__hair/*__, __nope/*__, __outfit/${gender}__\n")
+    wildcards("pack.yaml", "outfit: [__missing__ dress]\n")
+    files = {entry["name"]: entry for entry in api("GET", "/diceforge/wildcards")[1]["files"]}
+    assert files["look"]["broken"] == ["eyes", "hair/colour", "nope/*"] # Case doesn't matter; a glob that matches is fine; variables are left out.
+    assert files["outfit"]["broken"] == ["missing"] and "broken" not in files["hair/color"]
+
+
+def test_find_and_replace_in_every_txt_file(api, wildcards):
+    wildcards("a.txt", "__hair/colour__, smile\nred __hair/colour__\n")
+    wildcards("b.txt", "nothing here\n")
+    wildcards("pack.yaml", "outfit: [__hair/colour__ dress]\n")
+    body = {"find": "__hair/colour__", "replace": "__hair/color__"}
+    status, preview = api("POST", "/diceforge/wildcards/replace", body)
+    assert status == 200 and preview["applied"] is False and preview["in_yaml"] == ["outfit"]
+    assert preview["files"] == [{"name": "a", "count": 2, "line": "__hair/colour__, smile", "after": "__hair/color__, smile"}]
+    with open(os.path.join(wildcards.folder, "a.txt"), encoding="utf-8") as file:
+        assert "colour" in file.read() # A preview changes nothing.
+    status, done = api("POST", "/diceforge/wildcards/replace", {**body, "apply": True})
+    assert status == 200 and done["applied"] is True and [entry["name"] for entry in done["files"]] == ["a"]
+    with open(os.path.join(wildcards.folder, "a.txt"), encoding="utf-8") as file:
+        assert file.read() == "__hair/color__, smile\nred __hair/color__\n"
+    with open(os.path.join(wildcards.folder, "pack.yaml"), encoding="utf-8") as file:
+        assert "colour" in file.read() # Yaml files are named, not changed.
+    for junk in ({"find": ""}, {"find": "a\nb"}, {"find": "x", "replace": "y\n"}, {"find": "x" * 501}, {"find": 5}, {"find": "x", "apply": "yes"}, {"find": "x", "replace": 3}):
+        assert api("POST", "/diceforge/wildcards/replace", junk)[0] == 400

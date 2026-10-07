@@ -3,7 +3,8 @@ import { api } from "../../scripts/api.js";
 import { addStyleOnce, background, element } from "./dom.js";
 import { compact } from "./civitai_meta.js";
 import { tagText } from "./tag_autocomplete.js";
-import { fieldsOf, insertIntoNode, isPromptNode } from "./wildcards.js";
+import { cursorField, fieldsOf, insertIntoNode, isPromptNode } from "./wildcards.js";
+import { moveCursor, slashToSearch, typingIn } from "./menu.js";
 import { keepSize, recall, remember, scrollBack } from "./window_memory.js";
 
 // Tag Browser (CLIP Dual Text Encode's menu): the Danbooru / e621 tags of the downloaded lists (tag_autocomplete.py), searched by name or alias,
@@ -28,7 +29,11 @@ const STYLE = `
 .dftb .row button{padding:1px 8px;font-size:12px}.dftb .row button.add{border-color:#4a7a4a;color:#bfe8bf}.dftb .row button.neg{border-color:#7a4a4a;color:#f0c0c0}
 .dftb .row button.fav{border:none;background:none;font-size:16px;color:#888;padding:0 2px}.dftb .row button.fav.on{color:#ffd24a}
 .dftb .row a{color:#9cc8ff;text-decoration:none;font-size:13px}.dftb .status{color:#9c9;font-size:13px;min-height:18px}.dftb .more{margin:8px auto;display:block}
-.dftb .empty{color:#999;padding:16px}.dftb [hidden]{display:none!important}
+.dftb .empty{color:#999;padding:16px}.dftb .row .has{color:#7fd47f;font-weight:700;cursor:help}.dftb .row.cursor{outline:1px solid #6a9ad8;outline-offset:-1px}
+.dftb .row button.related-open{border:none;background:none;padding:0 2px;font-size:13px}
+.dftb .related{display:flex;gap:6px;align-items:center;flex-wrap:wrap;background:#2a3a2f;border:1px solid #4a7a5a;border-radius:6px;padding:5px 8px;max-height:120px;overflow:auto}
+.dftb .related .chip{display:inline-flex;border:1px solid #4a7a5a;border-radius:12px;overflow:hidden}.dftb .related .chip.on{border-color:#8fc0ff}
+.dftb .related .chip button{border:none;border-radius:0;padding:1px 7px;font-size:12px;background:#24302a}.dftb .related .chip button.add{color:#bfe8bf;border-left:1px solid #4a7a5a}.dftb [hidden]{display:none!important}
 .dftb .row button.pick{border:none;background:none;font-size:16px;color:#888;padding:0 2px}.dftb .row button.pick.on{color:#8fc0ff}.dftb .row.picked{background:#2a3444}
 .dftb .basket{display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:#2a3444;border:1px solid #4a6a9a;border-radius:6px;padding:5px 8px}
 .dftb .basket .tags{flex:1;min-width:0;color:#cfe0ff;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -42,6 +47,15 @@ async function request(path, options) {
   if (!response.ok) throw new Error(await response.text());
   return response.json();
 }
+
+// The tags a prompt has, in lower case as written (spaces, escaped parentheses), a weight like (smile:1.2) left aside.
+export function promptTags(text) {
+  return new Set(String(text ?? "").split(/[,\n]/).map((part) => {
+    const weighted = /^\((.+):[\d.]+\)$/.exec(part.trim());
+    return (weighted ? weighted[1] : part).trim().toLowerCase();
+  }).filter(Boolean));
+}
+const tagIn = (tags, tag) => tags.has(tagText(tag).toLowerCase()) || tags.has(tag.toLowerCase());
 
 export async function openTagBrowser(node) {
   addStyleOnce("dftb-style", STYLE);
@@ -66,13 +80,36 @@ export async function openTagBrowser(node) {
       element("button", { class: "clear", title: "Empty the basket", onclick: () => { picked.clear(); drawBasket(); draw(true); } }, "Clear"));
   }
   function addPicked(field) {
-    const texts = [...picked.keys()].map(tagText);
-    const where = insertIntoNode(node, texts.join(", "), field);
+    const target = field ?? cursorField(node, undefined), there = fieldTags(target);
+    const fresh = [...picked.keys()].filter((tag) => !tagIn(there, tag)), texts = fresh.map(tagText), skipped = picked.size - fresh.length;
+    const where = texts.length ? insertIntoNode(node, texts.join(", "), field) : target;
     picked.clear();
     drawBasket();
     draw(true);
-    say(`Added ${texts.length} tag${texts.length === 1 ? "" : "s"} to the ${where} prompt.`);
+    say(`Added ${texts.length} tag${texts.length === 1 ? "" : "s"} to the ${where} prompt.${skipped ? ` ${skipped} ${skipped === 1 ? "was" : "were"} already there.` : ""}`);
   }
+  // 🔗 Related: the tags Danbooru finds most often with a tag, as chips (click: into the basket; +: into the prompt).
+  const related = element("div", { class: "related", hidden: "" });
+  async function showRelated(tag) {
+    related.hidden = false;
+    related.replaceChildren(element("span", { class: "muted" }, `🔗 Asking Danbooru about ${tag.tag}…`));
+    let result;
+    try {
+      result = await request(`/diceforge/tags/related?tag=${encodeURIComponent(tag.tag)}`);
+    } catch (error) {
+      related.replaceChildren(element("span", { class: "muted" }, error.message), closeRelated());
+      return;
+    }
+    const chips = result.related.map((item) => {
+      const entry = { ...item, aliases: [] }, on = picked.has(item.tag);
+      return element("span", { class: "chip" + (on ? " on" : ""), "data-tag": item.tag },
+        element("button", { class: "pick-chip", title: `${KIND_NAMES[item.type] ?? item.type}${item.count ? `, ${item.count.toLocaleString()} posts` : ""}: click for the basket`,
+          onclick: () => { togglePick(entry); background(showRelated(tag)); } }, `${on ? "☑" : "☐"} ${item.tag}`),
+        element("button", { class: "add", title: "Put it where the cursor was in the prompts", onclick: () => add(entry) }, "+"));
+    });
+    related.replaceChildren(element("b", {}, `🔗 Often with ${tag.tag}:`), ...(chips.length ? chips : [element("span", { class: "muted" }, " none known.")]), closeRelated());
+  }
+  const closeRelated = () => element("button", { class: "close-related", title: "Close", onclick: () => { related.hidden = true; } }, "✕");
   function togglePick(tag) {
     if (picked.has(tag.tag)) picked.delete(tag.tag);
     else picked.set(tag.tag, tag);
@@ -80,7 +117,26 @@ export async function openTagBrowser(node) {
     draw(true);
   }
   const back = element("div", { class: "dftb-back" });
-  const onKey = (event) => { if (event.key === "Escape") { event.stopPropagation(); close(); } };
+  const onKey = (event) => {
+    if (event.key === "Escape") {
+      event.stopPropagation();
+      close();
+    } else if (!slashToSearch(event, search)) listKeys(event);
+  };
+  // The keyboard (from the search box too): ↑ ↓ pick a tag, Enter puts it where the cursor was, Shift+Enter in the negative prompt, Ctrl+Enter
+  // puts it in the basket (or takes it out).
+  let cursorTag = null;
+  function listKeys(event) {
+    if (typingIn(event) && event.target !== search) return;
+    const tag = () => tags.find((item) => item.tag === cursorTag);
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") cursorTag = moveCursor([...list.querySelectorAll(".row")], event.key === "ArrowDown" ? 1 : -1)?.dataset.tag ?? null;
+    else if (event.key === "Enter" && tag()) {
+      if (event.ctrlKey || event.metaKey) togglePick(tag());
+      else add(tag(), event.shiftKey ? "negative" : undefined);
+    } else return;
+    event.preventDefault();
+    event.stopPropagation();
+  }
   function close() {
     remember("tags", { search: search.value, kind, sort: sort.value, scroll: list.scrollTop });
     stopSize();
@@ -114,23 +170,31 @@ export async function openTagBrowser(node) {
     if (kind === "favorites" && !favorite) await load();
     else draw(true);
   }
+  // What the node's prompts have (✓ on a row): + Add doesn't put a tag twice in the same prompt.
+  const fieldTags = (field) => promptTags(node.widgets?.find((widget) => widget.name === field)?.value);
+  const inPrompts = (tag) => (fieldsOf(node) ?? []).filter((field) => tagIn(fieldTags(field), tag.tag));
   function add(tag, field) {
+    const target = field && fieldsOf(node)?.includes(field) ? field : cursorField(node, undefined);
+    if (tagIn(fieldTags(target), tag.tag)) return say(`${tagText(tag.tag)} is already in the ${target} prompt.`);
     const where = insertIntoNode(node, tagText(tag.tag), field);
+    draw(true);
     say(`Added ${tagText(tag.tag)} to the ${where} prompt.`);
   }
   function row(tag) {
-    const on = picked.has(tag.tag);
-    return element("div", { class: "row" + (on ? " picked" : "") },
+    const on = picked.has(tag.tag), there = inPrompts(tag);
+    return element("div", { class: "row" + (on ? " picked" : "") + (tag.tag === cursorTag ? " cursor" : ""), "data-tag": tag.tag },
       element("button", { class: "pick" + (on ? " on" : ""), title: on ? "In the basket: click to take it out" : "Pick it for the basket (several tags at once)",
         onclick: () => togglePick(tag) }, on ? "☑" : "☐"),
       element("button", { class: "fav" + (tag.favorite ? " on" : ""), title: tag.favorite ? "A favorite: click to remove the star" : "Add to favorites",
         onclick: () => background(setFavorite(tag, !tag.favorite)) }, tag.favorite ? "★" : "☆"),
       element("span", { class: "name", title: tag.aliases.length ? `Also: ${tag.aliases.join(", ")}` : "" }, element("b", {}, tag.tag),
         ...(tag.aliases.length ? [element("span", { class: "aliases" }, tag.aliases.slice(0, 3).join(", "))] : [])),
+      ...(there.length ? [element("span", { class: "has", title: `Already in the ${there.join(" and ")} prompt` }, "✓")] : []),
       element("span", { class: "kind" }, KIND_NAMES[tag.type] ?? tag.type),
       element("span", { class: "count", title: `${tag.count.toLocaleString()} posts` }, compact(tag.count)),
       element("button", { class: "add", title: "Put it where the cursor was in the prompts", onclick: () => add(tag) }, "+ Add"),
       ...(fieldsOf(node)?.includes("negative") ? [element("button", { class: "neg", title: "Put it in the negative prompt", onclick: () => add(tag, "negative") }, "− Neg")] : []),
+      ...(tag.site === "e621" ? [] : [element("button", { class: "related-open", title: "Related: the tags Danbooru finds most often with it", onclick: () => background(showRelated(tag)) }, "🔗")]),
       element("a", { class: "wiki", href: wikiOf(tag)[1](tag.tag), target: "_blank", rel: "noopener", title: `Open its wiki page on ${wikiOf(tag)[0]}` }, "↗"));
   }
   function draw(ready) {
@@ -153,7 +217,7 @@ export async function openTagBrowser(node) {
   dialog.append(
     heading,
     element("div", { class: "top" }, search, sort, element("button", { onclick: close }, "Close")),
-    types, basket, list, status);
+    types, basket, related, list, status);
   document.body.append(back);
   search.focus();
   search.setSelectionRange(search.value.length, search.value.length);

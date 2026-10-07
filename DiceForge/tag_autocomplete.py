@@ -179,6 +179,32 @@ async def download(name):
     return {"list": name, "tags": len(tags)}
 
 
+# 🔗 Related tags (the Tag Browser): the tags Danbooru finds most often with a tag (its related_tag.json), asked once per tag a session.
+RELATED_MOST = 40
+related_cache = {}
+def related_list(data, tag):
+    found = []
+    for item in (data.get("related_tags") if isinstance(data, dict) else None) or []:
+        known = item.get("tag") if isinstance(item, dict) else None
+        if isinstance(known, dict) and isinstance(known.get("name"), str):
+            name, kind, count = known["name"], known.get("category"), known.get("post_count")
+        elif isinstance(item, list) and item and isinstance(item[0], str): # The older answer: [name, category] pairs.
+            name, kind, count = item[0], item[1] if len(item) > 1 else 0, 0
+        else:
+            continue
+        if name != tag and name not in (entry["tag"] for entry in found):
+            found.append({"tag": name, "type": TYPES.get(kind, "general"), "count": count if isinstance(count, int) and count > 0 else 0})
+    return found[:RELATED_MOST]
+async def related_tags(tag):
+    if tag not in related_cache:
+        from .danbooru_enhancer import SITES, ask # Here: that module reads this one's tag lists.
+        site = SITES["danbooru"]
+        related_cache[tag] = related_list(await ask(site, lambda session: site.get(session, "/related_tag.json", {"query": tag}, tag)), tag)
+        while len(related_cache) > 500:
+            related_cache.pop(next(iter(related_cache)))
+    return related_cache[tag]
+
+
 def register_routes():
     try:
         from server import PromptServer
@@ -216,6 +242,15 @@ def register_routes():
         except OSError as error:
             raise web.HTTPBadRequest(text=f"Tag Browser: can't save the favorites: {error.strerror or error}.") from None
         return web.json_response({"favorites": len(names)})
+    @routes.get("/diceforge/tags/related")
+    async def tags_related(request):
+        tag = tag_key(request.rel_url.query.get("tag", ""))
+        if not tag or len(tag) > 200:
+            raise web.HTTPBadRequest(text="Tag Browser: which tag? (tag=...)")
+        try:
+            return web.json_response({"tag": tag, "related": await related_tags(tag)})
+        except ValueError as error: # Danbooru out of reach, busy or refusing.
+            raise web.HTTPBadGateway(text=str(error).replace("Danbooru Tag Enhancer", "Tag Browser")) from None
     @routes.get("/diceforge/tags/lists")
     async def tag_lists(request):
         files = await asyncio.get_running_loop().run_in_executor(None, INDEX.files)

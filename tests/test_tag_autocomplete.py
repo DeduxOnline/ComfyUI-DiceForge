@@ -1,8 +1,10 @@
 # Tag autocomplete (DiceForge/tag_autocomplete.py): tag lists in tagcomplete's CSV format, the search, merging lists, and the download.
+import json
 import os
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib.parse import parse_qs, urlsplit
 import pytest
 from DiceForge import tag_autocomplete
 from DiceForge.tag_autocomplete import TagIndex, parse_tags
@@ -134,3 +136,51 @@ def test_browse_and_favorite_routes(api):
         assert api("GET", f"/diceforge/tags/browse?{query}")[0] == 400
     for body in ({"tag": "", "favorite": True}, {"tag": "x"}, {"tag": 5, "favorite": True}):
         assert api("POST", "/diceforge/tags/favorite", json=body)[0] == 400
+
+
+RELATED = {"query": "1girl", "related_tags": [{"tag": {"name": "1girl", "category": 0, "post_count": 6}}, {"tag": {"name": "solo", "category": 0, "post_count": 5}},
+                                              {"tag": {"name": "hatsune_miku", "category": 4, "post_count": 9}}, {"tag": {"name": "solo"}}, "junk", {"tag": 5}]}
+
+
+@pytest.fixture
+def related_server(monkeypatch):
+    """A stand-in for Danbooru's related_tag.json: RELATED for 1girl, 404 for anything else; it counts the requests."""
+    class Handler(BaseHTTPRequestHandler):
+        def log_message(self, *args):
+            pass
+
+        def do_GET(self):
+            url = urlsplit(self.path)
+            self.server.requests.append(url.path)
+            found = url.path == "/related_tag.json" and parse_qs(url.query).get("query") == ["1girl"]
+            data = json.dumps(RELATED).encode() if found else b'{"error": "not found"}'
+            self.send_response(200 if found else 404)
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    server.requests = []
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    from DiceForge import danbooru_enhancer
+    monkeypatch.setattr(danbooru_enhancer, "DANBOORU_URL", f"http://127.0.0.1:{server.server_port}")
+    tag_autocomplete.related_cache.clear()
+    yield server
+    server.shutdown()
+    tag_autocomplete.related_cache.clear()
+
+
+def test_related_tags_come_from_danbooru_once_per_tag(api, related_server):
+    status, body = api("GET", "/diceforge/tags/related?tag=1girl")
+    assert status == 200 and body["related"] == [{"tag": "solo", "type": "general", "count": 5}, {"tag": "hatsune_miku", "type": "character", "count": 9}]
+    assert api("GET", "/diceforge/tags/related?tag=1girl")[1] == body and related_server.requests == ["/related_tag.json"] # Asked once.
+    assert api("GET", "/diceforge/tags/related?tag=nothing_like_it")[1]["related"] == [] # Unknown to Danbooru: none.
+    assert api("GET", "/diceforge/tags/related")[0] == 400
+
+
+def test_related_tags_read_the_older_answer_and_say_when_danbooru_is_out_of_reach(api):
+    assert tag_autocomplete.related_list({"related_tags": [["solo", 0], ["miku", 4], ["x"]]}, "x") == [
+        {"tag": "solo", "type": "general", "count": 0}, {"tag": "miku", "type": "character", "count": 0}]
+    assert tag_autocomplete.related_list(None, "x") == [] and tag_autocomplete.related_list({"related_tags": "junk"}, "x") == []
+    tag_autocomplete.related_cache.clear()
+    status, text = api("GET", "/diceforge/tags/related?tag=solo") # The tests' Danbooru is out of reach.
+    assert status == 502 and "Tag Browser" in text

@@ -42,7 +42,7 @@ function prepare() {
 }
 
 // Civitai stand-in: /by-hash/<sha256> answers like Civitai's model-versions/by-hash for the test models, /api/v1/models (search: the query filters
-// by name), /tags/danbooru.csv (a tag list), /danbooru/posts/random.json (a Danbooru post of the search) and /danbooru/posts/<id>.json, /e621/posts.json (e621's search) and /e621/posts/<id>.json, /safebooru/index.php (Safebooru's API) and its thumbnails, /api/v1/models/<id> (a model's page) and /api/v1/model-versions/<id> like its API, /download/<id> serves a version's file and /image/... a small image.
+// by name), /tags/danbooru.csv (a tag list), /danbooru/posts/random.json (a Danbooru post of the search), /danbooru/posts/<id>.json and /danbooru/related_tag.json, /e621/posts.json (e621's search) and /e621/posts/<id>.json, /safebooru/index.php (Safebooru's API) and its thumbnails, /api/v1/models/<id> (a model's page) and /api/v1/model-versions/<id> like its API, /download/<id> serves a version's file and /image/... a small image.
 function startCivitai() {
   const json = (response, status, body) => { response.writeHead(status, { "Content-Type": "application/json" }); response.end(JSON.stringify(body)); };
   const server = http.createServer((request, response) => {
@@ -98,6 +98,10 @@ function startCivitai() {
       const post = DANBOORU_POSTS.find((item) => (!ratings || ratings.includes(item.rating))
         && tags.every((tag) => `${item.tag_string_general} ${item.tag_string_character} ${item.tag_string_copyright}`.split(" ").includes(tag)));
       return post ? json(response, 200, post) : json(response, 404, { message: "That record was not found." });
+    }
+    if (url.pathname === "/danbooru/related_tag.json") { // The tags found most with a tag (Danbooru's answer): for long_hair; another tag has none.
+      const related = url.searchParams.get("query") === "long_hair" ? [["long_hair", 0, 5000000], ["blue_eyes", 0, 900000], ["hatsune_miku", 4, 90000], ["smile", 0, 2000000]] : [];
+      return json(response, 200, { query: url.searchParams.get("query"), related_tags: related.map(([name, category, count]) => ({ tag: { name, category, post_count: count } })) });
     }
     const postById = /^\/danbooru\/posts\/(\d+)\.json$/.exec(url.pathname);
     if (postById) {
