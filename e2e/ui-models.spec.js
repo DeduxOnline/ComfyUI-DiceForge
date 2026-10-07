@@ -231,7 +231,7 @@ for (const vue of [true, false]) {
         const [loader] = await addNodes(page, [{ type: "LoraLoader" }]);
         page.on("dialog", (dialog) => (dialog.type() === "prompt" ? dialog.accept(`${top}/c2`) : dialog.accept()));
         await clickMenu(page, loader, "DiceForge.ModelBrowser", "LoRA Browser");
-        const browser = page.locator(".dflb"), card = (name) => browser.locator(".card", { hasText: `${top}/${name}.safetensors` }), status = browser.locator(".status");
+        const browser = page.locator(".dflb"), card = (name) => browser.locator(".card").filter({ has: page.locator(".muted", { hasText: `${top}/${name}.safetensors ·` }) }), status = browser.locator(".status");
         await browser.locator(".top input").first().fill(top);
         await expect(card("a").locator(".dupe")).toHaveText(`⧉ The same file as ${top}/b.safetensors`);
         await browser.locator("button.only-dupes").click(); // ⧉ Duplicates: only the copies.
