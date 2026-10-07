@@ -29,6 +29,8 @@ nodes and features, a patch for fixes. Each version is a [release on GitHub](htt
   to delete the old one); Largest first in the sort; the tree shows each folder's size.
 
 ### Changed
+- Node heights: a node taller than what it shows (a workflow saved so, content that got smaller) is fitted again, in both designs; only
+  a node with a text field or a picture, which grow with it, keeps a height the user gave it.
 - Wildcard Browser: the tree takes a third of the window, the editor (or the cards) two thirds.
 - Tag Browser: ↗ opens the tag's wiki page instead of its posts: on e621 for the tags of an e621 list, on Danbooru otherwise.
 

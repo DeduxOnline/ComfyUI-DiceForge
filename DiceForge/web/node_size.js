@@ -2,17 +2,21 @@ import { app } from "../../scripts/app.js";
 
 // Node height of the DiceForge nodes. Nodes 2.0 draws a node at least as tall as its stored height, and a new node's stored height counts the
 // advanced inputs too, which are hidden until "Show advanced inputs": that left an empty gap under the inputs, also after hiding them again. In
-// Nodes 2.0 the DiceForge nodes store a small height instead, so they fit what they show and grow and shrink with the advanced inputs. A node the
-// user made taller keeps its height. The classic canvas draws from the stored height, so there it is at least the full height, as before.
+// Nodes 2.0 the DiceForge nodes store a small height instead, so they fit what they show and grow and shrink with the advanced inputs. The
+// classic canvas draws from the stored height, so there it is the full height. A node taller than what it shows (a workflow saved so, or
+// content that got smaller) is fitted again too, unless it has something that takes the extra height: a text field or a picture, which grow
+// with the node, so a node the user made taller for them keeps its height.
 const SMALL_HEIGHT = 60;
 const isDiceForge = (node) => /DiceForge/i.test(node.constructor?.nodeData?.python_module ?? "");
 const vueNodes = () => !!app.extensionManager?.setting?.get?.("Comfy.VueNodes.Enabled");
+const stretches = (node) => (node.widgets ?? []).some((widget) => widget.type === "customtext" || widget.inputEl?.tagName === "TEXTAREA"
+  || widget.element?.tagName === "TEXTAREA" || !!widget.element?.querySelector?.("textarea, img, canvas, video"));
 
 export function fitNodeHeight(node) {
-  const full = node.computeSize()[1];
+  const full = node.computeSize()[1], keep = stretches(node);
   if (vueNodes()) {
-    if (node.size[1] > SMALL_HEIGHT && node.size[1] <= full + 1) node.setSize([node.size[0], SMALL_HEIGHT]);
-  } else if (node.size[1] < full) {
+    if (node.size[1] > SMALL_HEIGHT && (!keep || node.size[1] <= full + 1)) node.setSize([node.size[0], SMALL_HEIGHT]);
+  } else if (node.size[1] < full || (!keep && node.size[1] > full + 1)) {
     node.setSize([node.size[0], full]);
   }
   node.setDirtyCanvas?.(true, true);

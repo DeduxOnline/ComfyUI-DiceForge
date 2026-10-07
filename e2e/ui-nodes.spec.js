@@ -207,6 +207,16 @@ for (const vue of [true, false]) {
       await expect(page.locator(".dfip").first().locator("img")).toHaveJSProperty("naturalWidth", file.endsWith("red.png") ? 32 : 16);
     });
 
+    test("a node saved taller than it shows is fitted again, unless a text field takes the extra height", async ({ page }) => { // NOSONAR: expect.poll(...) below.
+      const [plain, sampler] = await addNodes(page, [{ type: "DiceForgeRandomInt" }, { type: "DiceForgeRandomSampler", pos: [400, 40] }]);
+      const workflow = await page.evaluate(() => window.app.graph.serialize());
+      for (const node of workflow.nodes) node.size = [node.size[0], 900]; // As a workflow saved with an empty gap under the inputs.
+      await page.evaluate(async (data) => { window.app.graph.clear(); await window.app.loadGraphData(data); }, workflow);
+      const stored = (id) => page.evaluate((id) => window.app.graph.getNodeById(id).size[1], id);
+      await expect.poll(() => stored(plain)).toBeLessThan(300); // Nothing takes the extra height: it goes.
+      expect(await stored(sampler)).toBe(900); // Its samplers and schedulers fields grow with it: the user's height stays.
+    });
+
     if (vue) {
       test("DiceForge nodes fit their inputs when advanced inputs are shown and hidden", async ({ page }) => { // NOSONAR: expect.poll(...) assertions below.
         const [id] = await addNodes(page, [{ type: "SDXLResolutionListLatent" }]);
