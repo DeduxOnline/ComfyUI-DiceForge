@@ -1,7 +1,8 @@
 import { addStyleOnce, background, element } from "./dom.js";
 import { insertIntoNode } from "./wildcards.js";
 import { keepSize, recall, remember, scrollBack } from "./window_memory.js";
-import { slashToSearch } from "./menu.js";
+import { keysButton, keysOnQuestion, slashToSearch } from "./menu.js";
+const SYNTAX_KEYS = [["/", "Jump to the search"], ["Esc", "Close"], ["?", "These keys"]];
 
 // Syntax guide (CLIP Dual Text Encode's menu): every piece of the prompt syntax with what it does and an example. A click on an example copies it;
 // + Insert puts it where the cursor was in the node's prompts. The search box filters the rows.
@@ -67,7 +68,7 @@ export function openSyntaxGuide(node) {
     if (event.key === "Escape") {
       event.stopPropagation();
       close();
-    } else slashToSearch(event, search); // / to the search box.
+    } else if (!keysOnQuestion(event, "Prompt syntax", SYNTAX_KEYS)) slashToSearch(event, search); // / to the search box.
   };
   function close() {
     remember("syntax", { search: search.value, scroll: body.scrollTop }); // Opens where it was closed.
@@ -102,7 +103,7 @@ export function openSyntaxGuide(node) {
   const stopSize = keepSize(dialog, "syntax", heading);
   back.append(dialog);
   dialog.append(heading,
-    element("div", { class: "top" }, search, element("button", { onclick: close }, "Close")), body, status);
+    element("div", { class: "top" }, search, keysButton("Prompt syntax", SYNTAX_KEYS), element("button", { onclick: close }, "Close")), body, status);
   const last = recall("syntax");
   search.value = typeof last.search === "string" ? last.search : "";
   document.body.append(back);

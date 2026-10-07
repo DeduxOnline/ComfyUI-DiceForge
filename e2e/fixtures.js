@@ -58,7 +58,7 @@ const CIVITAI = Object.fromEntries(Object.values(MODELS).filter((model) => model
 // LoRAs to find on Civitai (the Create of the LoRA Browser): Neon has two versions, the files the stand-in serves for download; Ink is the test
 // LoRA style/ink.safetensors, already here (found by its hash).
 const host = `http://127.0.0.1:${CIVITAI_PORT}`;
-const DOWNLOADS = { 501: "neon lora v2", 502: "neon lora v1", 601: "studio checkpoint" };
+const DOWNLOADS = { 501: "neon lora v2", 502: "neon lora v1", 601: "studio checkpoint", 199: "ink lora v3" };
 const civitaiVersion = (id, name, file, content, base, model = { name: "Neon", type: "LORA" }) => ({
   id, modelId: model.type === "LORA" ? 50 : 60, name, baseModel: base, trainedWords: model.type === "LORA" ? ["neon glow"] : [], availability: "Public", model,
   files: [{ id, name: file, sizeKB: content.length / 1024, primary: true, type: "Model", hashes: { SHA256: sha256(content).toUpperCase() }, downloadUrl: `${host}/download/${id}` }],
@@ -68,6 +68,7 @@ const CIVITAI_VERSIONS = {
   501: civitaiVersion(501, "v2", "neon_glow.safetensors", DOWNLOADS[501], "Illustrious"),
   502: civitaiVersion(502, "v1", "neon_glow_v1.safetensors", DOWNLOADS[502], "SDXL 1.0"),
   601: civitaiVersion(601, "v1", "studio_xl.safetensors", DOWNLOADS[601], "SDXL 1.0", { name: "Studio XL", type: "Checkpoint" }),
+  199: civitaiVersion(199, "v3", "ink_v3.safetensors", DOWNLOADS[199], "Illustrious", { name: "Ink", type: "LORA" }), // Ink's newer version (its page names it).
 };
 const ink = Object.entries(CIVITAI).find(([, version]) => version.model.name === "Ink");
 const CIVITAI_MODELS = [

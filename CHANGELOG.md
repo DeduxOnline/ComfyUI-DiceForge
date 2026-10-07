@@ -22,6 +22,9 @@ nodes and features, a patch for fixes. Each version is a [release on GitHub](htt
 - Tag Browser: ✓ on tags already in a prompt (not added twice); 🔗 related tags from Danbooru.
 - Model browsers: a right-click menu on cards; ⧉ Duplicates (the same file, by its hash); ⇆ Compare two side by side.
 - The keyboard in the browsers: / to the search; ↑ ↓ Enter in the Wildcard and Tag Browsers; Delete, F2 and the menu key on files and cards.
+- ? (or ⌨) in each window shows its keys.
+- Model browsers: 🆕 Updates shows the models with a newer version on Civitai, and a card's menu downloads it next to the old one (then offers
+  to delete the old one); Largest first in the sort; the tree shows each folder's size.
 
 ### Changed
 - Wildcard Browser: the tree takes a third of the window, the editor (or the cards) two thirds.

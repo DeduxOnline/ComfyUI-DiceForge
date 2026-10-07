@@ -4,7 +4,7 @@ import { addStyleOnce, background, element } from "./dom.js";
 import { compact } from "./civitai_meta.js";
 import { tagText } from "./tag_autocomplete.js";
 import { cursorField, fieldsOf, insertIntoNode, isPromptNode } from "./wildcards.js";
-import { moveCursor, slashToSearch, typingIn } from "./menu.js";
+import { keysButton, keysOnQuestion, moveCursor, slashToSearch, typingIn } from "./menu.js";
 import { keepSize, recall, remember, scrollBack } from "./window_memory.js";
 
 // Tag Browser (CLIP Dual Text Encode's menu): the Danbooru / e621 tags of the downloaded lists (tag_autocomplete.py), searched by name or alias,
@@ -56,6 +56,9 @@ export function promptTags(text) {
   }).filter(Boolean));
 }
 const tagIn = (tags, tag) => tags.has(tagText(tag).toLowerCase()) || tags.has(tag.toLowerCase());
+
+const TAG_KEYS = [["/", "Jump to the search"], ["↑ / ↓", "Pick a tag (from the search too)"], ["Enter", "Put it where the cursor was in the prompts"],
+  ["Shift+Enter", "Put it in the negative prompt"], ["Ctrl+Enter", "Put it in the basket (or take it out)"], ["Esc", "Close"], ["?", "These keys"]];
 
 export async function openTagBrowser(node) {
   addStyleOnce("dftb-style", STYLE);
@@ -121,7 +124,7 @@ export async function openTagBrowser(node) {
     if (event.key === "Escape") {
       event.stopPropagation();
       close();
-    } else if (!slashToSearch(event, search)) listKeys(event);
+    } else if (!keysOnQuestion(event, "Tag Browser", TAG_KEYS) && !slashToSearch(event, search)) listKeys(event);
   };
   // The keyboard (from the search box too): ↑ ↓ pick a tag, Enter puts it where the cursor was, Shift+Enter in the negative prompt, Ctrl+Enter
   // puts it in the basket (or takes it out).
@@ -216,7 +219,7 @@ export async function openTagBrowser(node) {
   back.append(dialog);
   dialog.append(
     heading,
-    element("div", { class: "top" }, search, sort, element("button", { onclick: close }, "Close")),
+    element("div", { class: "top" }, search, sort, keysButton("Tag Browser", TAG_KEYS), element("button", { onclick: close }, "Close")),
     types, basket, related, list, status);
   document.body.append(back);
   search.focus();

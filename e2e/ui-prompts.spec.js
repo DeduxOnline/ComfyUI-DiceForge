@@ -526,6 +526,12 @@ for (const vue of [true, false]) {
       await expect(guide).toHaveCount(0);
       await clickMenu(page, id, "DiceForge.Wildcards", "Syntax guide");
       await expect(guide.locator("input")).toHaveValue("lock"); // Opens where it was closed.
+      await guide.locator("h2").click();
+      await page.keyboard.press("?"); // Its keys; Escape closes only them.
+      await expect(page.locator(".df-keys h3")).toHaveText("⌨ Prompt syntax");
+      await page.keyboard.press("Escape");
+      await expect(page.locator(".df-keys")).toHaveCount(0);
+      await expect(guide).toHaveCount(1);
       await expect(guide.locator(".row")).toHaveCount(1);
       const size = () => guide.evaluate((element) => [element.offsetWidth, element.offsetHeight]);
       await guide.evaluate((element) => { element.style.width = "640px"; element.style.height = "480px"; }); // As dragging its corner leaves it.

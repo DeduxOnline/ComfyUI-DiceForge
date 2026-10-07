@@ -8,7 +8,7 @@ import { addStyleOnce, background, element } from "./dom.js";
 import { blurSwitch, civitaiMedia } from "./media.js";
 import { dateText, statsChips } from "./civitai_meta.js";
 import { keepSize, recall, remember, scrollBack } from "./window_memory.js";
-import { closeMenu, menuAt, menuOpen, slashToSearch, typingIn, withMenu } from "./menu.js";
+import { closeMenu, keysButton, keysOnQuestion, menuAt, menuOpen, slashToSearch, typingIn, withMenu } from "./menu.js";
 
 // Model browsers (node menu): LoRA, Checkpoint, Diffusion Model, Text Encoder and VAE Browser. The model files as cards with a preview, name, base model and trigger words from Civitai
 // (looked up by the file's hash, as in Model info), a folder tree, search and filters. What a card's button does depends on the node it was opened
@@ -112,12 +112,13 @@ const STYLE = `
 .dflb .ctags span:hover{background:#4a4a4a;color:#fff}.dflb .ctags span.on{background:#2f3f55;color:#cfe2ff}.dflb .stats{display:flex;flex-wrap:wrap;gap:4px;align-items:center}
 .dflb .stats .stat{background:#232323;border:1px solid #444;border-radius:4px;padding:0 5px;font-size:12px;font-weight:600;color:#ddd}
 .dflb .stats a.newer{background:#2c4a2c;border:1px solid #4a7a4a;color:#bfe8bf;border-radius:4px;padding:0 5px;font-size:12px;text-decoration:none}
-.dflb .buttons{display:flex;gap:5px;flex-wrap:wrap;margin-top:auto}.dflb .buttons button{padding:3px 8px;font-size:12px}.dflb .status{color:#9c9;font-size:13px;min-height:18px}.dflb .status button.undo{margin-left:10px;padding:0 8px;font-size:12px}
+.dflb .buttons{display:flex;gap:5px;flex-wrap:wrap;margin-top:auto}.dflb .buttons button{padding:3px 8px;font-size:12px}.dflb .tree .row .size{color:#888;font-size:11px;white-space:nowrap}.dflb .status{color:#9c9;font-size:13px;min-height:18px}.dflb .status button.more-action{margin-left:6px;padding:0 8px;font-size:12px}.dflb button.only-updates.on{border-color:#7fd4ff;color:#7fd4ff}.dflb .status button.undo{margin-left:10px;padding:0 8px;font-size:12px}
 `;
 const addStyle = () => addStyleOnce("dflb-style", STYLE);
 const pathParts = (file) => file.split(/[\\/]/);
 const folderOf = (file) => pathParts(file).slice(0, -1).join("/");
 const shortName = (file) => pathParts(file).pop().replace(/\.[^.]+$/, "");
+const sizeText = (bytes) => (bytes >= 1024 ** 3 ? `${(bytes / 1024 ** 3).toFixed(1)} GB` : `${Math.max(0.1, bytes / 1024 ** 2).toFixed(1)} MB`);
 
 async function fetchList(kind) {
   const response = await api.fetchApi(`/diceforge/model-browser?kind=${kind}`);
@@ -143,7 +144,7 @@ async function openBrowser(node, spec, target = targetOf(node, spec)) {
   const FITS = "\u0001fits";
   const FAVORITES = "\u0002favorites"; // The ★ Favorites row of the tree, as the picked "folder".
   const sort = element("select", {}, ...[["name", "Name"], ["new", "Newest first"], ["base", "Base model"], ["downloads", "Most downloaded"], ["likes", "Most liked"],
-    ["updated", "Updated on Civitai"]].map(([value, label]) => element("option", { value }, label)));
+    ["updated", "Updated on Civitai"], ["size", "Largest first"]].map(([value, label]) => element("option", { value }, label)));
   const tagFilter = element("select", { class: "tag-filter", title: "Civitai's tags of the models looked up" }, element("option", { value: "" }, "All tags"));
   const status = element("div", { class: "status" });
   const tree = element("div", { class: "tree" });
@@ -157,8 +158,11 @@ async function openBrowser(node, spec, target = targetOf(node, spec)) {
       if (menuOpen()) closeMenu();
       else if (picked.size) clearPicked(); // The first Escape lets go of the picked cards, the next closes the browser.
       else close();
-    } else if (!menuOpen() && !slashToSearch(event, search)) cardKeys(event);
+    } else if (!menuOpen() && !keysOnQuestion(event, `${spec.title} Browser`, KEYS) && !slashToSearch(event, search)) cardKeys(event);
   };
+  const KEYS = [["/", "Jump to the search"], ["Ctrl+click / Shift+click", "Pick cards (Shift: every card between)"], ["Ctrl+A", "Pick every card shown"],
+    ...(spec.manage ? [["Delete", "Delete the picked cards (↶ Undo brings them back)"], ["F2", "Rename the picked card"]] : []),
+    ["Shift+F10 / Menu", "The picked card's menu (or right-click a card)"], ["Esc", "Let go of the picked cards, then close"], ["?", "These keys"]];
   // The keyboard (not while typing): Ctrl+A picks every card shown, Delete deletes the picked ones (↶ Undo brings them back), F2 renames the one
   // picked, the menu key (or Shift+F10) opens its menu.
   function cardKeys(event) {
@@ -189,8 +193,9 @@ async function openBrowser(node, spec, target = targetOf(node, spec)) {
   back.addEventListener("mousedown", (event) => { if (event.target === back) close(); });
   document.addEventListener("keydown", onKey, true);
   // A message; after a rename, a move or a delete, with ↶ Undo (until the next message).
-  const say = (text, undo) => {
-    status.replaceChildren(text, ...(undo ? [element("button", { class: "undo", title: "Undo it", onclick: () => background(undo()) }, "↶ Undo")] : []));
+  const say = (text, undo, more) => {
+    status.replaceChildren(text, ...(undo ? [element("button", { class: "undo", title: "Undo it", onclick: () => background(undo()) }, "↶ Undo")] : []),
+      ...(more ? [element("button", { class: "more-action", onclick: () => background(Promise.resolve().then(more[1])) }, more[0])] : []));
   };
 
   // Picked cards, for the batch bar: picked files, the last one clicked (for Shift ranges), the cards drawn (file -> element) in their order.
@@ -379,6 +384,29 @@ async function openBrowser(node, spec, target = targetOf(node, spec)) {
       say(`${files.filter((entry) => copiesOf(entry).length).length} ${spec.plural} are the same file as another.${unknown ? ` ${unknown} not looked up yet: Look up all hashes them.` : ""}`);
     }
   } }, "⧉ Duplicates");
+  // 🆕 Updates: only the ones with a newer version on Civitai (known once looked up); ⬇ in a card's menu downloads it next to the old one.
+  let onlyUpdates = false;
+  const updatesButton = element("button", { class: "only-updates", title: `Show only the ${spec.plural} with a newer version on Civitai (known once looked up)`, onclick: () => {
+    onlyUpdates = !onlyUpdates;
+    draw();
+  } }, "🆕 Updates");
+  // The newer version, downloaded into the same folder next to the old one; then the old one can go (into the trash: ↶ Undo).
+  async function downloadNewer(entry) {
+    let job;
+    try {
+      job = await call("/diceforge/civitai/download", { method: "POST", body: JSON.stringify({ kind, version_id: entry.newer.id, folder: folderOf(entry.file) }) });
+    } catch (error) {
+      return say(error.message);
+    }
+    while (job.status === "downloading") {
+      say(`Downloading ${entry.newer.name} of ${entry.name || shortName(entry.file)}${job.total ? `: ${Math.floor((100 * job.done) / job.total)}%` : "…"}`);
+      await new Promise((resolve) => setTimeout(resolve, 700));
+      try { job = (await call("/diceforge/civitai/downloads")).jobs.find((item) => item.id === job.id) ?? { ...job, status: "failed", error: "the download is gone" }; } catch { /* Asked again. */ }
+    }
+    if (job.status !== "done") return say(`${entry.newer.name}: ${job.error || job.status}.`);
+    await reload();
+    say(`Downloaded ${job.file} next to ${entry.file}.`, null, [`🗑 Delete the old ${shortName(entry.file)}`, () => deleteFile(entry)]);
+  }
   // ⇆ Compare: two side by side, what differs marked (Ctrl+click two cards, then ⇆ Compare; or a card's menu with one other picked).
   function compare(a, b) {
     if (!a || !b) return;
@@ -412,6 +440,7 @@ async function openBrowser(node, spec, target = targetOf(node, spec)) {
       ["📋 Copy the file name", () => { background(navigator.clipboard?.writeText(entry.file)); say(`Copied ${entry.file}.`); }],
       [picked.has(entry.file) ? "☑ Let go of it" : "☐ Pick it", () => togglePick(entry.file)],
       ...(other ? [[`⇆ Compare with ${shortName(other.file)}`, () => compare(other, entry)]] : []),
+      ...(entry.newer && spec.manage && spec.civitai !== false ? [[`⬇ Download ${entry.newer.name} next to it`, () => downloadNewer(entry), "The newer version from Civitai, into the same folder; then the old one can go"]] : []),
       ...(copiesOf(entry).length ? [[`⧉ Compare with its copy ${shortName(copiesOf(entry)[0].file)}`, () => compare(entry, copiesOf(entry)[0])]] : []),
       ...(spec.manage ? ["-", ["✎ Rename…", () => renameFile(entry)], ["⇄ Move…", () => moveFile(entry)], ["🗑 Delete", () => deleteFile(entry)]] : []),
     ];
@@ -521,7 +550,8 @@ async function openBrowser(node, spec, target = targetOf(node, spec)) {
     const baseOk = !base.value || (base.value === FITS ? compareBases(entry.base_model, target.base)?.level !== "bad" : entry.base_model === base.value);
     const tagOk = !tagFilter.value || (entry.tags ?? []).includes(tagFilter.value);
     const dupeOk = !onlyDupes || copiesOf(entry).length > 0;
-    return inFolder && baseOk && tagOk && dupeOk && (!query || query.split(/\s+/).every((word) => text.includes(word)));
+    const updateOk = !onlyUpdates || !!entry.newer;
+    return inFolder && baseOk && tagOk && dupeOk && updateOk && (!query || query.split(/\s+/).every((word) => text.includes(word)));
   }
   // Folders open in the tree, kept per kind between openings (and reloads) in this browser. Subfolders start closed; ▸ opens one, and the folder
   // picked in the tree (or the one a Random loader uses) is opened to.
@@ -534,9 +564,10 @@ async function openBrowser(node, spec, target = targetOf(node, spec)) {
   };
   function drawTree() {
     const counts = new Map([["", files.length]]);
+    const sizes = new Map([["", files.reduce((sum, entry) => sum + entry.size, 0)]]); // The space each folder takes.
     for (const entry of files) {
       const parts = pathParts(entry.file).slice(0, -1);
-      parts.forEach((_, index) => { const path = parts.slice(0, index + 1).join("/"); counts.set(path, (counts.get(path) ?? 0) + 1); });
+      parts.forEach((_, index) => { const path = parts.slice(0, index + 1).join("/"); counts.set(path, (counts.get(path) ?? 0) + 1); sizes.set(path, (sizes.get(path) ?? 0) + entry.size); });
     }
     const folders = [...counts.keys()].sort((a, b) => a.localeCompare(b));
     const parents = new Set(folders.map((path) => path.split("/").slice(0, -1).join("/")).filter(Boolean));
@@ -568,7 +599,8 @@ async function openBrowser(node, spec, target = targetOf(node, spec)) {
           } }, target.folder.value === path ? "In use" : "Use folder")]
         : [];
       const row = element("div", { class: "row" + (path === folder ? " sel" : ""), "data-path": path, style: `padding-left:${6 + depth * 12}px`, onclick: () => { folder = path; draw(); } },
-        ...(path ? [twist] : []), element("span", { class: "name" }, path ? `📁 ${path.split("/").pop()}` : `All ${spec.plural}`), element("span", { class: "muted" }, counts.get(path)), ...useFolder);
+        ...(path ? [twist] : []), element("span", { class: "name" }, path ? `📁 ${path.split("/").pop()}` : `All ${spec.plural}`), element("span", { class: "muted", title: `${counts.get(path)} ${counts.get(path) === 1 ? what : spec.plural}, ${sizeText(sizes.get(path))} on the disk` }, counts.get(path)),
+        element("span", { class: "size" }, sizeText(sizes.get(path))), ...useFolder);
       if (spec.manage) { // A card dropped on a folder moves there; on "All", to the top folder.
         dropTarget(row, kind, (file) => {
           if (picked.has(file) && picked.size > 1) return background(batchMove(path)); // A picked card takes the other picked ones along.
@@ -600,12 +632,18 @@ async function openBrowser(node, spec, target = targetOf(node, spec)) {
       downloads: (a, b) => (b.stats?.downloads ?? -1) - (a.stats?.downloads ?? -1) || byName(a, b),
       likes: (a, b) => (b.stats?.likes ?? -1) - (a.stats?.likes ?? -1) || byName(a, b),
       updated: (a, b) => (b.updated || "").localeCompare(a.updated || "") || byName(a, b),
+      size: (a, b) => b.size - a.size || byName(a, b),
       new: (a, b) => b.mtime - a.mtime,
       base: (a, b) => (a.base_model || "~").localeCompare(b.base_model || "~") || shortName(a.file).localeCompare(shortName(b.file)),
     }[sort.value];
     const dupes = files.filter((entry) => copiesOf(entry).length).length;
     dupesButton.textContent = dupes ? `⧉ Duplicates (${dupes})` : "⧉ Duplicates";
     dupesButton.classList.toggle("on", onlyDupes);
+    const updates = files.filter((entry) => entry.newer).length;
+    if (!updates) onlyUpdates = false;
+    updatesButton.hidden = !updates;
+    updatesButton.textContent = `🆕 Updates (${updates})`;
+    updatesButton.classList.toggle("on", onlyUpdates);
     const shown = files.filter(matches).sort(onlyDupes ? (a, b) => a.sha256.localeCompare(b.sha256) || order(a, b) : order); // Copies next to each other.
     cardsByFile = new Map();
     grid.replaceChildren(...(shown.length ? shown.map(card) : [element("div", { class: "muted" }, files.length ? `No ${what} matches.` : `No ${what} files: put them in ComfyUI/models/${kind}.`)]));
@@ -640,12 +678,12 @@ async function openBrowser(node, spec, target = targetOf(node, spec)) {
   back.append(dialog);
   dialog.append(
     heading,
-    element("div", { class: "top" }, search, base, tagFilter, sort, dupesButton, selectMode, lookAll, blurToggle,
+    element("div", { class: "top" }, search, base, tagFilter, sort, dupesButton, updatesButton, selectMode, lookAll, blurToggle,
       ...(spec.manage && spec.civitai !== false ? [element("button", { class: "go find", title: `Search Civitai and download ${spec.plural} into models/${kind}`, onclick: () => background(openCivitaiSearch({
         kind, title: spec.title, plural: spec.plural, icon: spec.icon, hint: spec.civitaiHint ?? "", base: target?.base, folders: [...new Set(files.map((entry) => folderOf(entry.file)).filter(Boolean))].sort((a, b) => a.localeCompare(b)),
         onChange: () => background(reload().then(() => say("The download is done: it is in the list."))),
       })) }, "＋ Find on Civitai")] : []),
-      element("button", { onclick: close }, "Close")),
+      keysButton(`${spec.title} Browser`, KEYS), element("button", { onclick: close }, "Close")),
     element("div", { class: "top" }, element("span", { class: "muted" }, hint), status),
     element("div", { class: "main" }, tree, element("div", { class: "cards" }, batch, grid)));
   const last = recall(`browser.${kind}`);

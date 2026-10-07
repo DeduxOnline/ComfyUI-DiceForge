@@ -4,7 +4,7 @@ import { addStyleOnce, background, element } from "./dom.js";
 import { dragSource, dropTarget, pickFolder } from "./move_dialog.js";
 import { addHighlightStyle, highlightEnabled, highlightWildcardFile } from "./prompt_highlight.js";
 import { keepSize, recall, remember, scrollBack } from "./window_memory.js";
-import { closeMenu, menuAt, menuButton, menuOpen, moveCursor, slashToSearch, typingIn, withMenu } from "./menu.js";
+import { closeMenu, keysButton, keysOnQuestion, menuAt, menuButton, menuOpen, moveCursor, slashToSearch, typingIn, withMenu } from "./menu.js";
 
 // Wildcards in CLIP Dual Text Encode: autocomplete after "__" in the prompt fields, and the Wildcard Browser (node menu) with a folder tree,
 // "+ Add" buttons that insert __name__ (or __folder/*__) where the cursor was, and an editor for the files.
@@ -329,6 +329,9 @@ function keepOpenFolders(folders) {
   try { localStorage.setItem(OPEN_KEY, JSON.stringify([...folders])); } catch { /* Private mode or no storage: open only for this visit. */ }
 }
 
+const WILDCARD_KEYS = [["/", "Jump to the search"], ["↑ / ↓", "Pick a file in the tree (from the search too)"], ["Enter", "Put the picked file in the prompt"],
+  ["Shift+Enter", "Open the picked file in the editor"], ["F2", "Rename the picked file"], ["Delete", "Delete the picked file (↶ Undo brings it back)"],
+  ["Shift+F10 / Menu", "The picked file's menu (or right-click a row)"], ["Ctrl+S", "Save the open file (in the editor)"], ["Esc", "Close a menu, then the browser"], ["?", "These keys"]];
 // Wildcard Browser: folder tree (click a folder to open or close it) with search, "+ Add" for files (__name__) and folders (__folder/*__), and the selected file's editor: create, save
 // (button or Ctrl+S; • marks unsaved changes), rename, move to another folder (Move, or drag a file onto a folder) and delete.
 async function openBrowser(node) {
@@ -428,7 +431,7 @@ async function openBrowser(node) {
       else close();
       return;
     }
-    if (menuOpen() || slashToSearch(event, search)) return;
+    if (menuOpen() || keysOnQuestion(event, "Wildcard Browser", WILDCARD_KEYS) || slashToSearch(event, search)) return;
     treeKeys(event);
   };
   // The keyboard in the tree (from the search box too): ↑ ↓ pick a file, Enter puts it in the prompt, Shift+Enter opens it, F2 renames it,
@@ -913,7 +916,7 @@ async function openBrowser(node) {
   const heading = element("h2", {}, "Wildcards");
   const stopSize = keepSize(dialog, "wildcards", heading);
   dialog.append(heading,
-    element("div", { class: "top" }, search, modeButton, favoritesButton, brokenButton, expandAll, collapseAll, importButton, exportButton, replaceButton, create, element("button", { onclick: close }, "Close")),
+    element("div", { class: "top" }, search, modeButton, favoritesButton, brokenButton, expandAll, collapseAll, importButton, exportButton, replaceButton, create, keysButton("Wildcard Browser", WILDCARD_KEYS), element("button", { onclick: close }, "Close")),
     element("div", { class: "main" }, tree, editPane, cards), picks, replacePanel, status);
   editPane.append(title, code, element("div", { class: "top" }, element("span", { style: "flex:1" }), convertButton, remove, move, rename, save));
   const last = recall("wildcards");

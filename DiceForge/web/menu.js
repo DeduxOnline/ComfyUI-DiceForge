@@ -75,3 +75,34 @@ export function moveCursor(rows, step) {
   next.scrollIntoView({ block: "nearest" });
   return next;
 }
+
+// ? in a window: its keys, in a small window over it; any key or click closes it (before the window sees the key).
+const KEYS_STYLE = `
+.df-keys-back{position:fixed;inset:0;z-index:10004;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.35)}
+.df-keys{background:#262626;color:#ddd;border:1px solid #666;border-radius:8px;padding:12px 16px;font:13px system-ui,sans-serif;box-shadow:0 8px 30px #000b;min-width:320px}
+.df-keys h3{margin:0 0 8px;font-size:15px;color:#fff}.df-keys table{border-collapse:collapse}.df-keys td{padding:3px 8px;vertical-align:top}
+.df-keys kbd{background:#3a3a3a;border:1px solid #555;border-radius:4px;padding:0 5px;font:12px ui-monospace,monospace;white-space:nowrap}.df-keys .hint{color:#888;margin-top:8px}
+`;
+export function showKeys(title, keys) {
+  addStyleOnce("df-keys-style", KEYS_STYLE);
+  const back = element("div", { class: "df-keys-back" }, element("div", { class: "df-keys" }, element("h3", {}, `⌨ ${title}`),
+    element("table", {}, ...keys.map(([key, what]) => element("tr", {}, element("td", {}, ...key.split(" / ").flatMap((part, index) => [...(index ? [" / "] : []), element("kbd", {}, part)])),
+      element("td", {}, what)))), element("div", { class: "hint" }, "Any key or click closes this.")));
+  const shut = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    back.remove();
+    window.removeEventListener("keydown", shut, true);
+  };
+  window.addEventListener("keydown", shut, true); // Before the window's own keys: Escape closes only this.
+  back.addEventListener("mousedown", shut);
+  document.body.append(back);
+}
+// ? opens the keys (not while typing); the ⌨ button does too.
+export function keysOnQuestion(event, title, keys) {
+  if (event.key !== "?" || typingIn(event)) return false;
+  event.preventDefault();
+  showKeys(title, keys);
+  return true;
+}
+export const keysButton = (title, keys) => element("button", { class: "keys", title: "The keyboard (or press ?)", onclick: () => showKeys(title, keys) }, "⌨");

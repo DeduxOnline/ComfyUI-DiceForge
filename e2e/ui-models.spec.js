@@ -276,6 +276,48 @@ for (const vue of [true, false]) {
       }
     });
 
+    test("LoRA Browser: 🆕 updates and the new version downloaded next to the old one, largest first and folder sizes, ⌨ the keys", async ({ page, request }) => {
+      const top = `big_${vue ? "vue" : "classic"}`, loras = (...parts) => basePath("models", "loras", ...parts);
+      writeFile(`models/loras/${top}/large.safetensors`, "x".repeat(3 * 1024 * 1024));
+      writeFile(`models/loras/${top}/small.safetensors`, "x");
+      expect((await lookUp(request, "loras", "style/ink.safetensors")).ok()).toBe(true); // Its page names a newer version (v3).
+      try {
+        const [loader] = await addNodes(page, [{ type: "LoraLoader" }]);
+        await clickMenu(page, loader, "DiceForge.ModelBrowser", "LoRA Browser");
+        const browser = page.locator(".dflb"), status = browser.locator(".status");
+        await expect(browser.locator("button.only-updates")).toHaveText("🆕 Updates (1)");
+        await browser.locator("button.only-updates").click(); // Only the ones with a newer version.
+        expect(await cardTitles(page)).toEqual(["Ink - v2 [Illustrious]"]);
+        await browser.locator(".card", { hasText: "Ink - v2" }).click({ button: "right" });
+        await page.locator(".df-menu button", { hasText: "⬇ Download v3 next to it" }).click();
+        await expect(status).toContainText("Downloaded style/ink_v3.safetensors next to style/ink.safetensors.");
+        await expect(status.locator("button.more-action")).toHaveText("🗑 Delete the old ink"); // Offered, not done.
+        expect(fs.readFileSync(loras("style", "ink_v3.safetensors"), "utf8")).toBe("ink lora v3");
+        await browser.locator("button.only-updates").click();
+        // Largest first, and how much each folder takes.
+        await browser.locator(".top input").first().fill(top);
+        await browser.locator(".top select").last().selectOption("size");
+        await expect(browser.locator(".card .title")).toHaveText(["large", "small"]);
+        await expect(browser.locator(`.tree .row[data-path="${top}"] .size`)).toHaveText("3.0 MB");
+        // ⌨: ? (or the button) shows the keys; Escape closes only them.
+        await browser.locator("h2").click();
+        await page.keyboard.press("?");
+        await expect(page.locator(".df-keys h3")).toHaveText("⌨ LoRA Browser");
+        await expect(page.locator(".df-keys")).toContainText("Pick every card shown");
+        await page.keyboard.press("Escape");
+        await expect(page.locator(".df-keys")).toHaveCount(0);
+        await expect(browser).toHaveCount(1);
+        await browser.locator("button.keys").click();
+        await expect(page.locator(".df-keys")).toHaveCount(1);
+        await page.locator(".df-keys-back").click({ position: { x: 5, y: 5 } });
+        await expect(page.locator(".df-keys")).toHaveCount(0);
+        await page.keyboard.press("Escape");
+      } finally {
+        await request.delete("/diceforge/models/file?kind=loras&file=style%2Fink_v3.safetensors");
+        fs.rmSync(loras(top), { recursive: true, force: true });
+      }
+    });
+
     test("LoRA Stack adds several picked LoRAs at once", async ({ page }) => {
       const [stack] = await addNodes(page, [{ type: "DiceForgeLoraStack" }]);
       await page.locator(".dfls").first().locator("button.add").click();
