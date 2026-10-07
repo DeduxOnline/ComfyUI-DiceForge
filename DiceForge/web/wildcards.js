@@ -440,14 +440,16 @@ async function openBrowser(node) {
     if (event.target === editor || (typingIn(event) && event.target !== search)) return;
     const rows = [...tree.querySelectorAll(".row[data-name]")].filter((row) => row.offsetParent);
     const file = () => (listCache?.files ?? []).find((item) => item.name === tree.querySelector(".row.cursor[data-name]")?.dataset.name);
-    const key = event.key, action = {
+    const key = event.key === "F10" && event.shiftKey ? "ContextMenu" : event.key, picked = file();
+    // Only what applies: in the search box, ↑ ↓ and Enter (on a picked file); elsewhere, the keys of a picked file. The rest stays the field's.
+    const action = {
       ArrowDown: () => moveCursor(rows, 1), ArrowUp: () => moveCursor(rows, -1),
-      Enter: () => file() && (event.shiftKey ? background(open(file().name)) : add(file().name)),
-      F2: () => file() && !file().yaml && background(renameFile(file().name)),
-      Delete: () => file() && !file().yaml && event.target !== search && background(deleteFile(file().name)),
-      ContextMenu: () => file() && menuAt(tree.querySelector(".row.cursor"), fileItems(file())),
-    }[key === "F10" && event.shiftKey ? "ContextMenu" : key];
-    if (!action || (key === "Enter" && !file())) return;
+      Enter: picked && (() => (event.shiftKey ? background(open(picked.name)) : add(picked.name))),
+      F2: picked && !picked.yaml && event.target !== search && (() => background(renameFile(picked.name))),
+      Delete: picked && !picked.yaml && event.target !== search && (() => background(deleteFile(picked.name))),
+      ContextMenu: picked && event.target !== search && (() => menuAt(tree.querySelector(".row.cursor"), fileItems(picked))),
+    }[key];
+    if (!action) return;
     event.preventDefault();
     event.stopPropagation();
     action();
@@ -459,7 +461,13 @@ async function openBrowser(node) {
     status.replaceChildren(text, ...(undo ? [element("button", { class: "undo", title: "Undo it", onclick: () => background(undo()) }, "↶ Undo")] : []),
       ...(more ? [element("button", { class: "more-action", onclick: () => background(Promise.resolve().then(more[1])) }, more[0])] : []));
   };
-  const add = (token) => { const field = insertIntoNode(node, `__${token}__`); say(`Added __${token}__ to ${field}.`); };
+  // Into the prompt; the focus stays in the browser (inserting moves it to the prompt field), so its keys go on working.
+  const keepFocus = (insert) => {
+    const focused = document.activeElement, result = insert();
+    if (focused && back.contains(focused)) focused.focus({ preventScroll: true });
+    return result;
+  };
+  const add = (token) => { const field = keepFocus(() => insertIntoNode(node, `__${token}__`)); say(`Added __${token}__ to ${field}.`); };
   async function open(name) {
     const response = await api.fetchApi(`/diceforge/wildcards/file?name=${encodeURIComponent(name)}`);
     if (!response.ok) return say(await response.text());
@@ -840,7 +848,7 @@ async function openBrowser(node) {
         element("button", { class: "again", title: "Other picks", onclick: () => background(previewPicks(name, folder)) }, "🎲 Again"),
         element("button", { class: "close-picks", title: "Close", onclick: () => { picks.hidden = true; } }, "✕")),
       ...result.picks.map((text) => element("div", { class: "pick" }, element("span", { class: "text" }, text || "(nothing)"),
-        element("button", { class: "add", title: "Put this text where the cursor was in the prompts", onclick: () => say(`Added it to ${insertIntoNode(node, text)}.`) }, "+ Add"))));
+        element("button", { class: "add", title: "Put this text where the cursor was in the prompts", onclick: () => say(`Added it to ${keepFocus(() => insertIntoNode(node, text))}.`) }, "+ Add"))));
   }
   // The search finds names, and lines too: the wildcards with a line that has the text (from the server, a moment after typing).
   let lineMatches = new Map(), lineQuery = "", searchTimer = null;

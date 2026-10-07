@@ -85,7 +85,7 @@ export async function openTagBrowser(node) {
   function addPicked(field) {
     const target = field ?? cursorField(node, undefined), there = fieldTags(target);
     const fresh = [...picked.keys()].filter((tag) => !tagIn(there, tag)), texts = fresh.map(tagText), skipped = picked.size - fresh.length;
-    const where = texts.length ? insertIntoNode(node, texts.join(", "), field) : target;
+    const where = texts.length ? keepFocus(() => insertIntoNode(node, texts.join(", "), field)) : target;
     picked.clear();
     drawBasket();
     draw(true);
@@ -174,12 +174,18 @@ export async function openTagBrowser(node) {
     else draw(true);
   }
   // What the node's prompts have (✓ on a row): + Add doesn't put a tag twice in the same prompt.
+  // Inserting moves the focus to the prompt field: it comes back here, so the browser's keys go on working.
+  const keepFocus = (insert) => {
+    const focused = document.activeElement, result = insert();
+    if (focused && back.contains(focused)) focused.focus({ preventScroll: true });
+    return result;
+  };
   const fieldTags = (field) => promptTags(node.widgets?.find((widget) => widget.name === field)?.value);
   const inPrompts = (tag) => (fieldsOf(node) ?? []).filter((field) => tagIn(fieldTags(field), tag.tag));
   function add(tag, field) {
     const target = field && fieldsOf(node)?.includes(field) ? field : cursorField(node, undefined);
     if (tagIn(fieldTags(target), tag.tag)) return say(`${tagText(tag.tag)} is already in the ${target} prompt.`);
-    const where = insertIntoNode(node, tagText(tag.tag), field);
+    const where = keepFocus(() => insertIntoNode(node, tagText(tag.tag), field));
     draw(true);
     say(`Added ${tagText(tag.tag)} to the ${where} prompt.`);
   }
