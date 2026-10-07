@@ -733,6 +733,7 @@ async function openBrowser(node) {
       ...(file.yaml ? [["→ txt files", () => convert(file.name, "txt"), "Turn its yaml file into txt files, one per key (the names stay the same)"]]
         : [["✎ Rename…", () => renameFile(file.name)], ["⇄ Move…", () => moveFile(file.name)],
           ["→ yaml", () => convert(file.name, "yaml"), `Turn ${file.name}.txt into ${file.name.split("/").pop()}.yaml (the name stays the same)`],
+          ["⇦ Add the prompt as a line", () => addPromptLine(file.name), "The node's prompt (the one the cursor was last in) as a new line of this file; in the editor, Save keeps it"],
           ["🧹 Remove duplicates and empty lines", () => cleanUp(file.name, false), "In the editor: Save keeps it"],
           ["🔤 Sort lines A→Z (and clean up)", () => cleanUp(file.name, true), "Sorted by the text (a line's N:: weight left aside); comments at the top stay there. In the editor: Save keeps it"], "-",
           ["🗑 Delete", () => deleteFile(file.name)]]),
@@ -752,6 +753,24 @@ async function openBrowser(node) {
     ];
   }
   // 🎲 Preview picks: what a run would put in for a wildcard (or __folder/*__), a few times, each with + Add to use that very text.
+  // ⇦ Prompt as a line: the node's prompt (the field the cursor was last in) at the end of a file, as one more option. One line: its line breaks
+  // become spaces. Not twice; in the editor, Save keeps it.
+  async function addPromptLine(name) {
+    if (!name) return say("Open (or create) a wildcard file first: the prompt goes in as its new line.");
+    if (selected !== name) await open(name);
+    if (selected !== name) return;
+    if (editor.readOnly) return say("A yaml wildcard: add the line in its yaml file (or turn it into txt files).");
+    const field = cursorField(node);
+    const line = String(node.widgets?.find((widget) => widget.name === field)?.value ?? "").replace(/\s*\n\s*/g, " ").trim();
+    if (!line) return say(`The ${field} prompt is empty: nothing to add.`);
+    const lines = editor.value.split("\n");
+    if (lines.some((item) => item.trim() === line)) return say(`${name} already has the ${field} prompt as a line.`);
+    editor.value = editor.value.trim() ? `${editor.value.replace(/\n+$/, "")}\n${line}` : line;
+    numberLines();
+    showDirty();
+    editor.scrollTop = editor.scrollHeight;
+    say(`Added the ${field} prompt to ${name} as line ${editor.value.split("\n").length}. Save keeps it.`);
+  }
   // 🧹 Clean up a file in the editor: duplicate and empty lines go (and, sorting, the lines go A→Z by their text, a weight like 3:: left aside);
   // the comment lines at its top stay there. Not saved: Save keeps it, reopening the file drops it.
   async function cleanUp(name, sort) {
@@ -918,7 +937,8 @@ async function openBrowser(node) {
   dialog.append(heading,
     element("div", { class: "top" }, search, modeButton, favoritesButton, brokenButton, expandAll, collapseAll, importButton, exportButton, replaceButton, create, keysButton("Wildcard Browser", WILDCARD_KEYS), element("button", { onclick: close }, "Close")),
     element("div", { class: "main" }, tree, editPane, cards), picks, replacePanel, status);
-  editPane.append(title, code, element("div", { class: "top" }, element("span", { style: "flex:1" }), convertButton, remove, move, rename, save));
+  const fromPrompt = element("button", { class: "from-prompt", title: "Add the node's prompt (the one the cursor was last in) to the open file as a new line", onclick: () => background(addPromptLine(selected)) }, "⇦ Prompt as a line");
+  editPane.append(title, code, element("div", { class: "top" }, fromPrompt, element("span", { style: "flex:1" }), convertButton, remove, move, rename, save));
   const last = recall("wildcards");
   search.value = typeof last.search === "string" ? last.search : "";
   onlyFavorites = last.favorites === true;

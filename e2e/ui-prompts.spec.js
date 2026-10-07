@@ -264,6 +264,13 @@ for (const vue of [true, false]) {
         await page.locator(".df-menu button", { hasText: "🔤 Sort lines" }).click();
         await expect(dialog.locator(".edit textarea")).toHaveValue("3::a\nb\nC"); // By the text, the weight left aside.
         await expect(dialog.locator("button.save")).toHaveText("Save •");
+        await setWidget(page, id, "positive", "1girl,\nsmile"); // ⇦ The prompt as a new line (its line break a space), not twice.
+        await row("list").click({ button: "right" });
+        await page.locator(".df-menu button", { hasText: "⇦ Add the prompt as a line" }).click();
+        await expect(dialog.locator(".edit textarea")).toHaveValue("3::a\nb\nC\n1girl, smile");
+        await expect(status).toContainText(`Added the positive prompt to ${top}/list as line 4.`);
+        await dialog.locator("button.from-prompt").click();
+        await expect(status).toContainText(`${top}/list already has the positive prompt as a line.`);
         // The keyboard: / to the search, ↓ to a file, Enter puts it in the prompt.
         await dialog.locator("h2").click();
         await page.keyboard.press("/");
@@ -272,7 +279,7 @@ for (const vue of [true, false]) {
         await page.keyboard.press("ArrowDown");
         await expect(row("color")).toHaveClass(/cursor/);
         await page.keyboard.press("Enter");
-        await expect.poll(() => widgetValue(page, id, "positive")).toBe(`__${top}/color__`);
+        await expect.poll(() => widgetValue(page, id, "positive")).toBe(`1girl,\nsmile, __${top}/color__`);
         await dialog.locator(".top button", { hasText: "Close" }).click();
       } finally {
         fs.rmSync(file(), { recursive: true, force: true });

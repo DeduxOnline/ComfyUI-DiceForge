@@ -23,6 +23,7 @@ nodes and features, a patch for fixes. Each version is a [release on GitHub](htt
 - Model browsers: a right-click menu on cards; ⧉ Duplicates (the same file, by its hash); ⇆ Compare two side by side.
 - The keyboard in the browsers: / to the search; ↑ ↓ Enter in the Wildcard and Tag Browsers; Delete, F2 and the menu key on files and cards.
 - ? (or ⌨) in each window shows its keys.
+- Wildcard Browser: ⇦ Prompt as a line adds the node's prompt to the open file as a new line (one more option of the wildcard).
 - Model browsers: 🆕 Updates shows the models with a newer version on Civitai, and a card's menu downloads it next to the old one (then offers
   to delete the old one); Largest first in the sort; the tree shows each folder's size.
 
