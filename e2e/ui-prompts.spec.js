@@ -112,7 +112,7 @@ for (const vue of [true, false]) {
     test("Wildcard Browser adds wildcards to the prompt and edits files", async ({ page }) => {
       writeFile(`models/wildcards/edit_${vue ? "vue" : "classic"}.txt`, "one\ntwo\n");
       const [id] = await addNodes(page, [{ type: "CLIPTextEncodePositiveNegative", pos: [300, 60], widgets: { positive: "1girl" } }]);
-      expect(await menuItems(page, id, "DiceForge.Wildcards")).toEqual(["📖 Syntax guide", "🎲 Wildcard Browser"]);
+      expect(await menuItems(page, id, "DiceForge.Wildcards")).toEqual(["📖 Syntax guide", "🎲 Wildcard Browser", "✂ Selection → new wildcard…"]);
       await clickMenu(page, id, "DiceForge.Wildcards", "Wildcard Browser");
       await expect(page.locator(".dfwc .row").first()).toBeVisible();
       await page.locator(".dfwc .tree > .row", { hasText: /^color/ }).locator("button.add").click(); // color.txt at the top, not hair/color.txt.
@@ -281,6 +281,34 @@ for (const vue of [true, false]) {
         await page.keyboard.press("Enter");
         await expect.poll(() => widgetValue(page, id, "positive")).toBe(`1girl,\nsmile, __${top}/color__`);
         await dialog.locator(".top button", { hasText: "Close" }).click();
+      } finally {
+        fs.rmSync(file(), { recursive: true, force: true });
+      }
+    });
+
+    test("✂ Selection → new wildcard: the selected part of the prompt becomes a wildcard, __name__ takes its place; a taken name gets it as a line", async ({ page }) => {
+      const top = `cut_${vue ? "vue" : "classic"}`, file = (...parts) => basePath("models", "wildcards", top, ...parts);
+      const [id] = await addNodes(page, [{ type: "CLIPTextEncodePositiveNegative", pos: [300, 60], widgets: { positive: "1girl, red dress, smile" } }]);
+      const field = await promptField(page, id, "positive");
+      const select = async (from, to) => {
+        await field.click();
+        await field.evaluate((textarea, [from, to]) => textarea.setSelectionRange(from, to), [from, to]);
+        await page.keyboard.up("Shift"); // A key up: the selection is remembered, as when the field loses focus.
+      };
+      const answers = [`${top}/dress`, `${top}/dress`];
+      page.on("dialog", (dialog) => (dialog.type() === "prompt" ? dialog.accept(answers.shift()) : dialog.accept()));
+      try {
+        await clickMenu(page, id, "DiceForge.Wildcards", "Selection → new wildcard"); // Nothing selected: a message, nothing done.
+        await expect.poll(() => widgetValue(page, id, "positive")).toBe("1girl, red dress, smile");
+        await select(7, 16); // "red dress"
+        await clickMenu(page, id, "DiceForge.Wildcards", "Selection → new wildcard");
+        await expect.poll(() => widgetValue(page, id, "positive")).toBe(`1girl, __${top}/dress__, smile`);
+        expect(fs.readFileSync(file("dress.txt"), "utf8")).toBe("red dress\n");
+        const text = await widgetValue(page, id, "positive");
+        await select(text.length - 5, text.length); // "smile": the name is taken, so one more line of it.
+        await clickMenu(page, id, "DiceForge.Wildcards", "Selection → new wildcard");
+        await expect.poll(() => widgetValue(page, id, "positive")).toBe(`1girl, __${top}/dress__, __${top}/dress__`);
+        expect(fs.readFileSync(file("dress.txt"), "utf8")).toBe("red dress\nsmile\n");
       } finally {
         fs.rmSync(file(), { recursive: true, force: true });
       }

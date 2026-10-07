@@ -975,6 +975,7 @@ app.registerExtension({
     return isPromptNode(node) ? [
       { content: "📖 Syntax guide", callback: () => import("./syntax_guide.js").then((guide) => guide.openSyntaxGuide(node)).catch((error) => console.error("[DiceForge]", error)) },
       { content: "🎲 Wildcard Browser", callback: () => openBrowser(node) },
+      { content: "✂ Selection → new wildcard…", callback: () => background(selectionToWildcard(node)) },
     ] : [];
   },
 });
@@ -998,6 +999,46 @@ export function cleanLines(text, sort) {
   const key = (line) => line.trim().replace(/^\d+(?:\.\d+)?::/, "");
   if (sort) body.sort((a, b) => key(a).localeCompare(key(b), undefined, { sensitivity: "base", numeric: true }));
   return { text: [...head, ...body].join("\n"), duplicates, empty };
+}
+
+// A message in ComfyUI's corner (a dialog where there is none, for what went wrong).
+function toast(severity, detail) {
+  const toaster = app.extensionManager?.toast;
+  if (toaster?.add) toaster.add({ severity, summary: "Wildcards", detail, life: 5000 });
+  else if (severity !== "success") alert(detail);
+}
+// ✂ Selection → new wildcard: the part of a prompt selected (the last selection in the node's prompt fields) becomes a wildcard file's first
+// line, and __name__ takes its place in the prompt: a prompt split into wildcards, one choice at a time. A name already taken: the selection
+// is added to that file as one more line (asked first).
+async function selectionToWildcard(node) {
+  const cursor = lastCursor.get(node);
+  const text = String(node.widgets?.find((widget) => widget.name === cursor?.name)?.value ?? "");
+  const start = cursor?.start ?? 0, end = cursor?.end ?? 0, picked = text.slice(start, end);
+  if (!cursor || !picked.trim()) return toast("warn", "Select a part of a prompt first: it becomes the new wildcard's first line, and __name__ takes its place.");
+  const line = picked.replace(/\s*\n\s*/g, " ").trim();
+  const suggested = line.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "_").replace(/^_+|_+$/g, "").split("_").slice(0, 3).join("_") || "new";
+  const name = prompt(`A wildcard from “${line.length > 60 ? `${line.slice(0, 60)}…` : line}”: its name (folders with /, for example outfit/dress):`, suggested)?.trim();
+  if (!name) return;
+  const save = (body) => api.fetchApi("/diceforge/wildcards/file", { method: "POST", body: JSON.stringify(body) });
+  let response = await save({ name, text: line, create: true }), what = "Made";
+  if (response.status === 409) { // Taken: one more line of it?
+    if (!confirm(`__${name}__ already exists. Add “${line}” to it as a new line?`)) return;
+    const file = await api.fetchApi(`/diceforge/wildcards/file?name=${encodeURIComponent(name)}`);
+    if (!file.ok) return toast("error", await file.text());
+    const current = await file.json();
+    if (current.readonly) return toast("warn", `__${name}__ comes from a yaml file: add the line there.`);
+    const known = current.text.split("\n").some((item) => item.trim() === line);
+    response = known ? new Response(JSON.stringify({ saved: name })) : await save({ name, text: current.text.trim() ? `${current.text}\n${line}` : line });
+    what = known ? "Used" : "Added a line to";
+  }
+  if (!response.ok) return toast("error", await response.text());
+  const token = `__${(await response.json()).saved}__`;
+  const lead = picked.match(/^\s*/)[0], trail = picked.match(/\s*$/)[0]; // The selection's spaces stay around the wildcard.
+  const caret = start + lead.length + token.length;
+  setField(node, cursor.name, text.slice(0, start) + lead + token + trail + text.slice(end), caret);
+  lastCursor.set(node, { name: cursor.name, start: caret, end: caret });
+  await wildcardList(true);
+  toast("success", `${what} ${token}: it now stands for “${line}” in the ${cursor.name} prompt.`);
 }
 
 // For the prompt syntax highlighting (prompt_highlight.js): the prompt fields of a node, and the wildcard names as last listed.
