@@ -47,6 +47,13 @@ nodes and features, a patch for fixes. Each version is a [release on GitHub](htt
 - Wildcard Browser: the tree takes a third of the window, the editor (or the cards) two thirds.
 - Tag Browser: ↗ opens the tag's wiki page instead of its posts: on e621 for the tags of an e621 list, on Danbooru otherwise.
 
+### Removed
+- The repairs of workflows and files of earlier versions, while DiceForge has no users but its author: SDXL Resolution List's old scale
+  number and resolution list, Resolution Selector without rescale, unknown seed modes and the old vae_alignment input on loading; CLIP Dual
+  Text Encode's links of workflows saved when model was its last output; Danbooru Tag Enhancer's results saved before several posts; Model
+  info's lookup again of data saved before the images' generation data; the seed memory's move from ResolutionForge (and the README's
+  section on updating from it).
+
 ### Fixed
 - README: the inputs and outputs it didn't name yet (Wildcards to Text's `seed`, XY Plot's axes, Variation Seed's `variation_seed`, Danbooru
   Tag Enhancer's `include_general` and `position`, the utility nodes' inputs and outputs).

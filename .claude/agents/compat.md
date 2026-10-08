@@ -40,8 +40,8 @@ stops working when:
    - say how to keep the workflow working.
 
    Ways to keep a workflow working, as DiceForge does:
-   - Accept the old name or value on loading: the node's `onConfigure`, or `beforeConfigureGraph` (CLIP Dual Text Encode moves the links of
-     workflows saved with its old output order: `reorderSavedOutputs` in `prompt_preview.js`).
+   - Accept the old name or value on loading: the node's `onConfigure`, or an extension's `beforeConfigureGraph`, which can change the
+     saved workflow before ComfyUI reads it (moving links when outputs changed order, renaming a node type).
    - Keep an old node type registered as a deprecated node that does the same.
    - Read old saved formats as well as new ones (LoRA Stack: `cleanStack` in `lora_stack.js`, `parse_stack` in `lora_stack.py`).
 

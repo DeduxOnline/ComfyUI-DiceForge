@@ -59,7 +59,7 @@ app.registerExtension({
     function render() {
       const last = node.properties?.dice_forge_danbooru;
       shownFrom = last;
-      const posts = last?.posts || (last?.id ? [{ id: last.id, url: last.url, rating: last.rating }] : []); // Also a result saved before posts.
+      const posts = last?.posts ?? [];
       if (!posts.length) {
         panel.replaceChildren(element("div", { class: "empty" }, "Run the workflow to see the Danbooru posts it takes and the tags they add here."));
       } else {

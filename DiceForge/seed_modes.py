@@ -4,7 +4,6 @@ import logging
 import math
 import os
 import random
-import shutil
 import sqlite3
 import threading
 import time
@@ -93,7 +92,6 @@ class DeckPicker(Picker):
 # list being picked from is read). Delete the file to start over. The least recently used entries are forgotten past MEMORY_LIMIT. Besides where each
 # list is now, it keeps where it was when each seed came, so a seed gives its picks again (recall).
 MEMORY_FILE = os.path.join(folder_paths.get_user_directory(), "DiceForge", "seed_memory.sqlite")
-OLD_MEMORY_FILE = os.path.join(folder_paths.get_user_directory(), "ResolutionForge", "seed_memory.sqlite") # Where it was before the rename to DiceForge.
 MEMORY_LIMIT = 100000
 class SeedMemory:
     def __init__(self, path):
@@ -110,8 +108,6 @@ class SeedMemory:
             self.connection = None
         if self.connection is None:
             os.makedirs(os.path.dirname(self.path), exist_ok=True)
-            if self.path == MEMORY_FILE and not os.path.exists(self.path) and os.path.exists(OLD_MEMORY_FILE):
-                shutil.move(OLD_MEMORY_FILE, self.path) # Keeps the memory from before the rename.
             self.connection = sqlite3.connect(self.path, check_same_thread=False)
             self.opened = self.identity()
             self.connection.execute("CREATE TABLE IF NOT EXISTS memory (mode TEXT, key TEXT, value TEXT, used REAL, PRIMARY KEY (mode, key))")

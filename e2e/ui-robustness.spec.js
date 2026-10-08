@@ -56,7 +56,7 @@ for (const vue of [true, false]) {
       await addNodes(page, ALL_NODES.map((type, index) => ({ type, pos: [40 + (index % 4) * 420, 40 + Math.floor(index / 4) * 460] })));
       const good = JSON.parse(await serialized(page));
       const damages = [
-        (values) => values.slice(0, 1), // Too few values (a node saved by an older version).
+        (values) => values.slice(0, 1), // Too few values.
         (values) => [...values, "extra", 5, null, { x: 1 }], // Too many.
         (values) => values.map(() => null),
         (values) => values.map((value) => (typeof value === "number" ? "not a number" : typeof value === "string" ? 12345 : value)),

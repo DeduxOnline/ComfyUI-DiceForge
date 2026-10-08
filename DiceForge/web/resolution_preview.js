@@ -1,5 +1,4 @@
 import { app } from "../../scripts/app.js";
-import { background } from "./dom.js";
 
 // Live size preview for the DiceForge resolution nodes. Both use the core resolution preview widget; this extension feeds it through two hidden
 // helper widgets: a size or aspect ratio as the ratio ("1216:832") and the megapixels, so the core preview math gives exactly the size to show.
@@ -121,71 +120,6 @@ function previewInput(config, node, last) {
   return { ratio: `${last.width}:${last.height}`, megapixels: (last.width * last.height) / (1024 * 1024) };
 }
 
-// Repairs of nodes saved by older versions. The nested resolution list of SDXL Resolution List can come back with a size where its group belongs
-// ("Any Listed" instead of "Random", and no size list), which the backend can't run: the group whose size list has that value is picked, with it.
-async function repairResolutionGroup(node) {
-  const group = node.widgets?.find((widget) => widget.name === "resolution");
-  const groups = group?.options?.values;
-  if (!group || !Array.isArray(groups) || groups.includes(group.value)) return;
-  const stale = String(group.value);
-  for (const candidate of groups) {
-    group.value = candidate;
-    group.callback?.(candidate);
-    await new Promise((resolve) => setTimeout(resolve, 0)); // The size list of the group is built after the change.
-    const size = node.widgets.find((widget) => widget.name === "resolution.size");
-    if (size?.options?.values?.includes(stale)) {
-      size.value = stale;
-      size.callback?.(stale);
-      console.info(`[DiceForge] ${node.comfyClass} #${node.id}: resolution repaired to ${candidate} / ${stale} (saved by an older version).`);
-      return;
-    }
-  }
-  group.value = groups[0]; // An unknown value: the first group, so the node runs.
-  group.callback?.(groups[0]);
-}
-// Workflows saved while SDXL Resolution List had a scale number (before the rescale list) have that number where rescale now is, and the values
-// after it (multiple, batch, seed_mode) one place off: they are put back, with scale as by percentage (1.5: 150).
-const CONTROL_MODES = ["fixed", "increment", "decrement", "randomize"];
-function savedScale(info) {
-  const values = info?.widgets_values;
-  if (!Array.isArray(values)) return null;
-  const at = values.findIndex((value, index) => CONTROL_MODES.includes(value) && [1, 2, 3].every((offset) => typeof values[index + offset] === "number"));
-  return at < 0 ? null : { scale: values[at + 1], multiple: values[at + 2], batch: values[at + 3], seedMode: values[at + 4] };
-}
-async function migrateScale(node, saved) {
-  const set = (name, value) => {
-    const widget = node.widgets?.find((widget) => widget.name === name);
-    if (!widget || value === undefined) return;
-    widget.value = value;
-    widget.callback?.(value);
-  };
-  set("rescale", "by percentage");
-  await new Promise((resolve) => setTimeout(resolve, 0)); // The percent input is built after the change.
-  set("rescale.percent", Math.max(1, Math.round(saved.scale * 100)));
-  set("multiple", saved.multiple);
-  set("batch", saved.batch);
-  if (node.widgets?.find((widget) => widget.name === "seed_mode")?.options?.values?.includes(saved.seedMode)) set("seed_mode", saved.seedMode);
-  console.info(`[DiceForge] ${node.comfyClass} #${node.id}: scale ${saved.scale} became rescale by percentage ${Math.round(saved.scale * 100)} (saved by an older version).`);
-}
-// A rescale list without a valid mode (a node saved before it had one, with another value in its place): by percentage, at 100.
-async function repairRescale(node) {
-  const rescale = node.widgets?.find((widget) => widget.name === "rescale");
-  if (!rescale || rescale.options?.values?.includes(rescale.value)) return;
-  rescale.value = "by percentage";
-  rescale.callback?.("by percentage");
-  await new Promise((resolve) => setTimeout(resolve, 0));
-  const percent = node.widgets.find((widget) => widget.name === "rescale.percent");
-  if (percent && !(Number(percent.value) > 0)) percent.value = 100;
-}
-// Inputs left from older versions (vae_alignment) that the node no longer has: unconnected ones are removed.
-function removeStaleInputs(node) {
-  const names = new Set((node.widgets ?? []).map((widget) => widget.name));
-  for (let index = (node.inputs?.length ?? 0) - 1; index >= 0; index--) {
-    const input = node.inputs[index];
-    if (input.widget && !names.has(input.widget.name) && input.link == null) node.removeInput(index);
-  }
-}
-
 // Hidden helper widget, added last so saved widget values keep their order.
 function addHelper(node, name, value) {
   const widget = node.addWidget("text", name, value, () => {}, { serialize: false, hidden: true });
@@ -204,19 +138,6 @@ app.registerExtension({
     // The preview reads the helpers (Resolution Selector's preview reads its own inputs when this extension is not loaded).
     const preview = node.widgets.find((widget) => widget.name === "preview");
     if (preview?.options) Object.assign(preview.options, { ratio_widget: "preview_ratio", megapixels_widget: "preview_megapixels", multiple_widget: "multiple" });
-    // Workflows saved before seed_mode existed have a helper's value where seed_mode now is: fall back to the default.
-    const onConfigure = node.onConfigure;
-    node.onConfigure = function (info) {
-      const scale = node.comfyClass === "SDXLResolutionListLatent" ? savedScale(info) : null;
-      const seedMode = node.widgets?.find((widget) => widget.name === "seed_mode");
-      if (seedMode && !seedMode.options?.values?.includes(seedMode.value)) seedMode.value = "random";
-      const result = onConfigure?.apply(this, arguments);
-      background(repairResolutionGroup(node)
-        .then(() => scale && migrateScale(node, scale))
-        .then(() => repairRescale(node))
-        .then(() => removeStaleInputs(node)));
-      return result;
-    };
     let last = null;
     // The node sends the size of each run with the settings it came from.
     const onExecuted = node.onExecuted;

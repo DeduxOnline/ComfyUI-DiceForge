@@ -166,36 +166,8 @@ export function openHistory(node) {
   draw();
 }
 
-// The node's outputs were positive, negative, positive_text, negative_text, model; now model comes first. ComfyUI lays a loaded node's outputs
-// out in the new order but leaves the links on their old slot numbers, so a workflow saved before is put right as it loads (before ComfyUI
-// reads it): this node's outputs in the new order, and each link out of them on its output's new slot (links as arrays or objects, in the
-// workflow and in its subgraphs).
-const OUTPUT_ORDER = ["model", "positive", "negative", "positive_text", "negative_text"];
-export function reorderSavedOutputs(graph) {
-  let changed = 0;
-  const links = Array.isArray(graph?.links) ? graph.links : [];
-  for (const node of Array.isArray(graph?.nodes) ? graph.nodes : []) {
-    const outputs = node?.type === NODE_TYPE && Array.isArray(node.outputs) ? node.outputs : null;
-    const names = outputs?.map((output) => output?.name);
-    if (!names || names.length !== OUTPUT_ORDER.length || names.every((name, index) => name === OUTPUT_ORDER[index]) || !OUTPUT_ORDER.every((name) => names.includes(name))) continue;
-    const slotOf = (old) => OUTPUT_ORDER.indexOf(names[old]);
-    for (const link of links) {
-      if (Array.isArray(link) && link[1] === node.id) link[2] = slotOf(link[2]);
-      else if (link && !Array.isArray(link) && link.origin_id === node.id) link.origin_slot = slotOf(link.origin_slot);
-    }
-    node.outputs = OUTPUT_ORDER.map((name) => outputs.find((output) => output.name === name));
-    node.outputs.forEach((output, slot) => { if ("slot_index" in output) output.slot_index = slot; });
-    changed++;
-  }
-  for (const subgraph of graph?.definitions?.subgraphs ?? []) changed += reorderSavedOutputs(subgraph);
-  return changed;
-}
-
 app.registerExtension({
   name: "DiceForge.PromptPreview",
-  beforeConfigureGraph(graphData) {
-    reorderSavedOutputs(graphData);
-  },
   getNodeMenuItems(node) {
     return node.comfyClass === NODE_TYPE ? [{ content: "🕘 Prompt history", callback: () => openHistory(node) }] : [];
   },

@@ -22,7 +22,6 @@ const MARKERS = [
   ["node.showAdvanced", /showAdvanced/g, "prompt_preview.js"],
   ["Nodes 2.0 setting", /Comfy\.VueNodes\.Enabled/g, "node_size.js, prompt_preview.js"],
   ["getNodeMenuItems hook", /getNodeMenuItems/g, "the node menus of DiceForge"],
-  ["beforeConfigureGraph hook", /beforeConfigureGraph/g, "prompt_preview.js"],
   ["execution_cached event", /execution_cached/g, "dice_grid.js, prompt_preview.js"],
 ];
 

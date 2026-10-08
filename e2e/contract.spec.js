@@ -36,13 +36,12 @@ test.describe("ComfyUI as DiceForge uses it", () => {
       .toEqual([true, true, true]);
   });
 
-  test("loading a workflow calls the hooks DiceForge uses: beforeConfigureGraph, nodeCreated, a node's onConfigure", async ({ page }) => {
+  test("loading a workflow calls the hooks DiceForge uses: nodeCreated, a node's onConfigure", async ({ page }) => {
     await openComfy(page, { vue: false });
     await page.evaluate(() => {
-      window.contractCalls = { beforeConfigureGraph: 0, nodeCreated: 0, onConfigure: 0 };
+      window.contractCalls = { nodeCreated: 0, onConfigure: 0 };
       window.app.registerExtension({
         name: "DiceForge.ContractProbe",
-        beforeConfigureGraph() { window.contractCalls.beforeConfigureGraph++; },
         nodeCreated(node) {
           window.contractCalls.nodeCreated++;
           const onConfigure = node.onConfigure;
@@ -56,7 +55,6 @@ test.describe("ComfyUI as DiceForge uses it", () => {
     await addNodes(page, [{ type: "DiceForgeRandomInt" }]);
     await page.evaluate(async () => window.app.loadGraphData(window.app.graph.serialize()));
     const calls = await page.evaluate(() => window.contractCalls);
-    expect(calls.beforeConfigureGraph, changed("beforeConfigureGraph", "prompt_preview.js")).toBeGreaterThan(0);
     expect(calls.nodeCreated, changed("nodeCreated", "every DiceForge extension")).toBeGreaterThan(1);
     expect(calls.onConfigure, changed("a node's onConfigure on loading", "node_size.js, lora_stack.js and the previews")).toBeGreaterThan(0);
   });

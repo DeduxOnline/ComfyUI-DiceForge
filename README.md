@@ -57,15 +57,6 @@ Every version is listed in [CHANGELOG.md](CHANGELOG.md) and released on [GitHub]
 
 **Requirements:** a recent ComfyUI that includes `comfy_api.latest` (the V3 node API). *Resolution Selector (Random)* also needs the resolution preview widget, which ships with the core *Resolution Selector* node. Older ComfyUI versions will not load these nodes.
 
-### Updating from ResolutionForge
-
-DiceForge was called *ResolutionForge* while it was a resolution pack. To update, delete `ComfyUI/custom_nodes/ResolutionForge` and install the `DiceForge` folder (having both loads the nodes twice).
-
-- Saved workflows keep working: the nodes keep their ids, only their menu moved to **DiceForge**.
-- *Random Int* and *Random Float* got new ids (`DiceForgeRandomInt`, `DiceForgeRandomFloat`): add them again in workflows saved with the first version.
-- The memory file moves by itself from `ComfyUI/user/ResolutionForge` to `ComfyUI/user/DiceForge` on the first run.
-- Earlier versions also had *SDXL Resolution List* and *Resolution Selector (Random)*, which output `width`, `height` and `batch` for **Empty Latent Image**. They were removed: use the *Latent* nodes, which take the same inputs.
-
 ## Nodes
 
 | Node | Menu | Use it when |
@@ -147,8 +138,6 @@ Its right-click menu has the prompt tools: **📖 Syntax guide** (every piece of
 | `negative` | Conditioning from the negative prompt. |
 | `positive_text` | The positive prompt as encoded, with choices, wildcards and variables filled in. |
 | `negative_text` | The negative prompt as encoded, with choices, wildcards and variables filled in. |
-
-`model` used to be the last output: a workflow saved before keeps its connections, they follow their outputs to the new places when it opens.
 
 The text outputs carry the prompt that was actually used, for example to show it with a preview node, put it in a file name, or feed a text encoder for other models (Flux, SD3, video models): leave `clip` unconnected and the node only fills in the prompts, with every seed mode.
 

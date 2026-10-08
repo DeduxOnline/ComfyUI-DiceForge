@@ -707,26 +707,6 @@ for (const vue of [true, false]) {
       }
     });
 
-    test("a workflow saved when model was the last output keeps its connections: they follow their outputs", async ({ page, request }) => {
-      const [encode, preview] = await addNodes(page, [
-        { type: "CLIPTextEncodePositiveNegative", widgets: { positive: "an old {saved|saved} workflow" } }, { type: "PreviewAny", pos: [600, 40] }]);
-      await connect(page, encode, 3, preview, 0);
-      const saved = await page.evaluate((id) => { // As saved before: positive, negative, positive_text, negative_text, model; the link from slot 2.
-        const data = window.app.graph.serialize();
-        const node = data.nodes.find((item) => String(item.id) === String(id));
-        const order = ["positive", "negative", "positive_text", "negative_text", "model"];
-        node.outputs = order.map((name) => node.outputs.find((output) => output.name === name));
-        for (const link of data.links) if (String(link[1]) === String(id)) link[2] = order.indexOf("positive_text");
-        return data;
-      }, encode);
-      await page.evaluate(async (data) => { window.app.graph.clear(); await window.app.loadGraphData(data); }, saved);
-      expect(await page.evaluate((id) => window.app.graph.getNodeById(id).outputs.map((output) => output.name), encode))
-        .toEqual(["model", "positive", "negative", "positive_text", "negative_text"]);
-      await queueFromPage(page, request);
-      const history = Object.values(await (await request.get("/history?max_items=1")).json())[0];
-      expect(history.outputs[String(preview)].text[0]).toBe("an old saved workflow"); // Still from positive_text, now slot 3.
-    });
-
     test("a workflow queued from the page fills in the prompt", async ({ page, request }) => {
       const [encode, preview] = await addNodes(page, [
         { type: "CLIPTextEncodePositiveNegative", widgets: { positive: "a __color__ car, {2$$__characters/*/outfit__}", seed: 3 } },
@@ -870,13 +850,6 @@ for (const vue of [true, false]) {
       await expect(panel.locator(".added")).toHaveText("+ solo, grin, canine");
       await expect(panel.locator("a.thumb img")).not.toHaveClass(/blur/); // e621's safe isn't blurred.
       await expect.poll(() => widgetValue(page, id, "post_ids")).toBe("201"); // Random: this run's post, for fixed mode.
-
-      await page.evaluate((nodeId) => { // A result saved by an older version (one post, no posts list).
-        window.app.graph.getNodeById(nodeId).properties.dice_forge_danbooru = { text: "x, smile", added: "smile", url: "https://danbooru.donmai.us/posts/7", id: 7, search: "x rating:s", rating: "s" };
-      }, id);
-      await expect(panel.locator(".head")).toHaveText("Last run · post #7 (sensitive)");
-      await expect(panel.locator("a.thumb.plain")).toHaveAttribute("href", /\/posts\/7$/);
-      await expect(panel.locator(".added")).toHaveText("+ smile");
     });
   });
 }

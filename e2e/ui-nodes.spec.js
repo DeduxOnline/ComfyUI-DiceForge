@@ -48,22 +48,6 @@ for (const vue of [true, false]) {
       if (vue) await expect(nodeElement(page, id)).toContainText("×");
     });
 
-    test("an SDXL Resolution List saved with the old scale number opens as rescale by percentage", async ({ page }) => {
-      const [id] = await addNodes(page, [{ type: "SDXLResolutionListLatent", widgets: { "resolution.size": "1216 x 832", multiple: 16, batch: 2, seed_mode: "deck" } }]);
-      await setWidget(page, id, "rescale.percent", 150);
-      const workflow = await page.evaluate(() => window.app.graph.serialize());
-      const saved = workflow.nodes.find((node) => node.type === "SDXLResolutionListLatent");
-      const at = saved.widgets_values.indexOf("by percentage");
-      expect(saved.widgets_values.slice(at, at + 2)).toEqual(["by percentage", 150]);
-      saved.widgets_values.splice(at, 2, 1.5); // How the previous version saved it: a scale number (each side 1.5x).
-      await page.evaluate(async (workflow) => { window.app.graph.clear(); await window.app.loadGraphData(workflow); }, workflow);
-      const node = await page.evaluate(() => window.app.graph.nodes.find((node) => node.comfyClass === "SDXLResolutionListLatent").id);
-      await expect.poll(() => widgetValue(page, node, "rescale")).toBe("by percentage");
-      await expect.poll(() => widgetValue(page, node, "rescale.percent")).toBe(150);
-      expect([await widgetValue(page, node, "multiple"), await widgetValue(page, node, "batch"), await widgetValue(page, node, "seed_mode")]).toEqual([16, 2, "deck"]);
-      await expect.poll(() => widgetValue(page, node, "preview_ratio")).toBe("1824:1248");
-    });
-
     test("Resolution Selector previews its size with rescale", async ({ page }) => {
       const [id] = await addNodes(page, [{ type: "ResolutionSelectorRandomLatent", widgets: { aspect_ratio: "16:9 (Widescreen)" } }]);
       await expect.poll(() => widgetValue(page, id, "preview_ratio")).toBe("1368:768");
@@ -73,20 +57,6 @@ for (const vue of [true, false]) {
       await setWidget(page, id, "rescale.longer_side", 1920);
       await expect.poll(() => widgetValue(page, id, "preview_ratio")).toBe("1920:1080");
       if (vue) await expect(nodeElement(page, id)).toContainText("1920 × 1080");
-    });
-
-    test("a Resolution Selector saved before rescale opens at 100% with its values in place", async ({ page }) => {
-      const [id] = await addNodes(page, [{ type: "ResolutionSelectorRandomLatent", widgets: { aspect_ratio: "4:3 (Standard)", megapixels: 2.0, multiple: 64, batch: 3, seed_mode: "deck" } }]);
-      const workflow = await page.evaluate(() => window.app.graph.serialize());
-      const saved = workflow.nodes.find((node) => node.type === "ResolutionSelectorRandomLatent");
-      const at = saved.widgets_values.indexOf("by percentage");
-      saved.widgets_values.splice(at, 2); // How a version without rescale saved it.
-      await page.evaluate(async (workflow) => { window.app.graph.clear(); await window.app.loadGraphData(workflow); }, workflow);
-      const node = await page.evaluate(() => window.app.graph.nodes.find((node) => node.comfyClass === "ResolutionSelectorRandomLatent").id);
-      await expect.poll(() => widgetValue(page, node, "rescale")).toBe("by percentage");
-      await expect.poll(() => widgetValue(page, node, "rescale.percent")).toBe(100);
-      const values = await Promise.all(["aspect_ratio", "megapixels", "multiple", "batch", "seed_mode"].map((name) => widgetValue(page, node, name)));
-      expect(values).toEqual(["4:3 (Standard)", 2.0, 64, 3, "deck"]);
     });
 
     test("Dice Grid's cells panel: star the best cells, save them at full size with their workflow, open a cell's run", async ({ page, request }) => {

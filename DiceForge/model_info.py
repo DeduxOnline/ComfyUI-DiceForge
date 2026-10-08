@@ -164,10 +164,9 @@ async def model_info(kind, name, refresh=False):
         info["sha256"] = await asyncio.get_running_loop().run_in_executor(None, sha256_of, path) # Off the event loop: big files take a while.
         logging.info(f"[DiceForge] Model info: sha256 of {name} in {time.time() - started:.1f}s")
     civitai = info.get("civitai") or {}
-    saved_before_meta = civitai.get("found") and any("page" not in image for image in civitai.get("images") or []) # Saved before the images' generation data was kept.
-    if refresh or not civitai or civitai.get("error") or saved_before_meta:
+    if refresh or not civitai or civitai.get("error"):
         info["civitai"] = await civitai_lookup(info["sha256"])
-    elif civitai.get("found") and not civitai.get("details_checked"): # Looked up before the tags and stats were kept, or they failed: only those.
+    elif civitai.get("found") and not civitai.get("details_checked"): # The model's details (tags, stats) failed last time: only those again.
         async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=30), trust_env=True) as session:
             info["civitai"] = {**civitai, **await civitai_model_details(session, civitai.get("model_id"))}
     write_info(kind, name, info)

@@ -127,17 +127,6 @@ def test_model_browser_and_preview_routes(api, models):
     assert api("GET", "/diceforge/model-browser?kind=nope")[0] == 400
 
 
-def test_info_saved_before_image_meta_is_looked_up_once_more(api, models, civitai):
-    path = models("loras", "old.safetensors", b"weights")
-    stat = os.stat(path)
-    old = {"found": True, "model_name": "Ink", "images": [{"url": "https://image.civitai.com/x/width=450/1.jpeg"}], "checked": 1.0} # No "page", no "meta".
-    write_info("loras", "old.safetensors", {"size": stat.st_size, "mtime": stat.st_mtime, "sha256": "abc", "civitai": old})
-    info = api("GET", "/diceforge/model-info?kind=loras&file=old.safetensors")[1]
-    assert len(civitai) == 1 and all("page" in image for image in info["civitai"]["images"])
-    api("GET", "/diceforge/model-info?kind=loras&file=old.safetensors")
-    assert len(civitai) == 1 # Once: now it has them.
-
-
 INK_PAGE = {
     "id": 11, "name": "Ink", "tags": ["anime", "ink", 5, "", None, "x" * 99], "creator": {"username": "inkmaker"},
     "stats": {"downloadCount": 71087, "thumbsUpCount": 2770, "tippedAmountCount": 920, "commentCount": True},
@@ -181,7 +170,7 @@ def test_browser_cards_carry_the_civitai_page(api, models, civitai, monkeypatch)
     assert copy["sha256"] == "" # Not looked up yet.
 
 
-def test_info_looked_up_before_the_page_was_kept_gets_only_the_page(api, models, civitai, monkeypatch):
+def test_info_without_its_model_details_gets_only_those(api, models, civitai, monkeypatch):
     asked = []
 
     async def details(session, model_id):
@@ -190,7 +179,7 @@ def test_info_looked_up_before_the_page_was_kept_gets_only_the_page(api, models,
     monkeypatch.setattr(model_info, "civitai_model_details", details)
     path = models("loras", "old.safetensors", b"weights")
     stat = os.stat(path)
-    old = {**civitai_summary(CIVITAI_VERSION), "checked": 1.0} # Images with "page": no new lookup for them.
+    old = {**civitai_summary(CIVITAI_VERSION), "checked": 1.0} # The version is known, its model details are not (they failed).
     write_info("loras", "old.safetensors", {"size": stat.st_size, "mtime": stat.st_mtime, "sha256": "abc", "civitai": old})
     info = api("GET", "/diceforge/model-info?kind=loras&file=old.safetensors")[1]
     assert civitai == [] and asked == [11] and info["civitai"]["tags"] == ["anime"] and info["civitai"]["model_name"] == "Ink"
