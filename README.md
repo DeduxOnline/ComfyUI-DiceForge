@@ -929,6 +929,8 @@ DICEFORGE_SCREENSHOTS=1 npx playwright test screenshots.spec.js
 
 The automated tests check what they were written for. For the rest, `.claude/agents` has agents for [Claude Code](https://claude.com/claude-code), each with its own tools in this repository. They report what they find (with pictures, numbers, the file and line, and a fix); only the docs agent edits, and only the docs, when asked to. In Claude Code: "use the tester agent to check the Wildcard Browser", "run the reviewer before I push", "ask the compat agent about the last release".
 
+`CLAUDE.md` holds the project's rules for every Claude Code session in this folder (how a change is made, tested, documented and pushed), so a new session works the same way.
+
 | Agent | What it does | When | Its tools |
 |---|---|---|---|
 | `tester` | Uses DiceForge in a browser like a user, in both node designs, and reports what is broken or looks wrong, with pictures and steps. | After a feature or fix; to hunt for what the tests miss. | `e2e/qa/nodes.js`, `e2e/qa/lib.js` |

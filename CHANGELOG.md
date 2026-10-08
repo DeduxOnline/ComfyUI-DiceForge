@@ -37,6 +37,7 @@ nodes and features, a patch for fixes. Each version is a [release on GitHub](htt
   - `security`: the routes, files, downloads and shown text, tried on the test server (`.github/scripts/security_scan.py`).
   - `docs`: the README and CHANGELOG follow the code (`tests/test_docs.py`).
   - `perf`: times with thousands of wildcards, LoRAs and tags (`e2e/qa/perf.js`).
+- `CLAUDE.md`: the project's rules for Claude Code sessions, so a new one (also on the author's computer) works the same way.
 - New checks in CI: every node is checked for empty areas and cut-off content; the ComfyUI internals DiceForge relies on; workflows saved
   with published releases (from the first one on) open with every value; the README names every node, input and output, and its links and pictures work; code that is never
   allowed (HTML built from text, eval, unsafe yaml, a shell, pickle).
