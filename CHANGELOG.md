@@ -30,7 +30,12 @@ nodes and features, a patch for fixes. Each version is a [release on GitHub](htt
 
 ### Changed
 - Node heights: a node taller than what it shows (a workflow saved so, content that got smaller) is fitted again, in both designs; only
-  a node with a text field or a picture, which grow with it, keeps a height the user gave it.
+  a node with a text field, which grows with it, keeps a height the user gave it.
+
+### Fixed
+- Previews, Dice Grid's cells and LoRA Stack's list are as tall as what they show, in both designs: no more empty area under them in a
+  taller node (the text fields take the extra height), and they no longer keep a height they were once given (the classic canvas grew
+  them with the node, then never gave it back); a new node is no longer made taller by a preview measured before it had its width.
 - Wildcard Browser: the tree takes a third of the window, the editor (or the cards) two thirds.
 - Tag Browser: ↗ opens the tag's wiki page instead of its posts: on e621 for the tags of an e621 list, on Danbooru otherwise.
 

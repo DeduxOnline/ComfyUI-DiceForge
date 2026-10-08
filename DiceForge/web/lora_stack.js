@@ -3,7 +3,7 @@ import { api } from "../../scripts/api.js";
 import { openModelInfo } from "./model_info.js";
 import { openModelBrowser, BROWSERS, compareBases } from "./model_browser.js";
 import { fitNodeHeight } from "./node_size.js";
-import { addStyleOnce, background, element } from "./dom.js";
+import { addStyleOnce, background, element, fitToContent } from "./dom.js";
 
 // LoRA Stack (lora_stack.py): the rows of LoRAs drawn in the node, like rgthree's Power Lora Loader. The node's "loras" text input holds them as JSON;
 // it is hidden and this panel edits it. Each row: on/off, the LoRA (click to change it in the LoRA Browser), Model info, a group, a fixed strength or
@@ -258,7 +258,7 @@ function setUp(node) {
   const panel = element("div", { class: "dfls" });
   // Keys typed in the panel's fields must not reach the canvas shortcuts (Escape still closes dialogs).
   panel.addEventListener("keydown", (event) => { if (event.key !== "Escape" && /^(INPUT|SELECT)$/.test(event.target.tagName)) event.stopPropagation(); });
-  const widget = node.addDOMWidget("lora_stack", "diceforge_lora_stack", panel, { serialize: false, getMinHeight: () => panel.scrollHeight + 6 });
+  const widget = fitToContent(node.addDOMWidget("lora_stack", "diceforge_lora_stack", panel, { serialize: false }), panel);
   widget.serialize = false;
   const read = () => {
     try { return cleanStack(JSON.parse(data.value || "{}")); } catch { return structuredClone(EMPTY); }

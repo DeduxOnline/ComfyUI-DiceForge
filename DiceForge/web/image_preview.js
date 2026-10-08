@@ -1,6 +1,6 @@
 import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
-import { addStyleOnce, background, element } from "./dom.js";
+import { addStyleOnce, background, element, fitToContent } from "./dom.js";
 import { fitNodeHeight } from "./node_size.js";
 
 // Random Image shows, under its inputs, the image the last run picked: the picture, its file and folder, its size (and frames of an animated one) and
@@ -23,7 +23,7 @@ app.registerExtension({
     if (node.comfyClass !== NODE_TYPE) return;
     addStyleOnce("dfip-style", STYLE);
     const panel = element("div", { class: "dfip" });
-    node.addDOMWidget("image_preview", "diceforge_image_preview", panel, { serialize: false, getMinHeight: () => panel.scrollHeight + 4 });
+    fitToContent(node.addDOMWidget("image_preview", "diceforge_image_preview", panel, { serialize: false }), panel);
     let shownFrom; // The pick the panel shows (undefined: not drawn yet).
     function render() {
       const last = node.properties?.dice_forge_image;

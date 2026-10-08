@@ -1,5 +1,5 @@
 import { app } from "../../scripts/app.js";
-import { addStyleOnce, background, element } from "./dom.js";
+import { addStyleOnce, background, element, fitToContent } from "./dom.js";
 import { blurOn } from "./media.js";
 import { fitNodeHeight } from "./node_size.js";
 
@@ -54,7 +54,7 @@ app.registerExtension({
     if (node.comfyClass !== NODE_TYPE) return;
     addStyleOnce("dfdb-style", STYLE);
     const panel = element("div", { class: "dfdb" });
-    node.addDOMWidget("danbooru_preview", "diceforge_danbooru_preview", panel, { serialize: false, getMinHeight: () => panel.scrollHeight + 4 });
+    fitToContent(node.addDOMWidget("danbooru_preview", "diceforge_danbooru_preview", panel, { serialize: false }), panel);
     let shownFrom; // The result the panel shows (undefined: not drawn yet).
     function render() {
       const last = node.properties?.dice_forge_danbooru;

@@ -1,6 +1,6 @@
 import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
-import { addStyleOnce, background, element } from "./dom.js";
+import { addStyleOnce, background, element, fitToContent } from "./dom.js";
 import { fitNodeHeight } from "./node_size.js";
 
 // The cells of Dice Grid's grid under the node, to keep the best ones: click a cell to star it (★), 💾 Save kept puts the starred ones at full size
@@ -33,7 +33,7 @@ app.registerExtension({
     if (node.comfyClass !== NODE_TYPE) return;
     addStyleOnce("dfdg-style", STYLE);
     const panel = element("div", { class: "dfdg" });
-    node.addDOMWidget("grid_cells", "diceforge_grid_cells", panel, { serialize: false, getMinHeight: () => panel.scrollHeight + 4 });
+    fitToContent(node.addDOMWidget("grid_cells", "diceforge_grid_cells", panel, { serialize: false }), panel);
     let cells = [], status = "", stamp = Date.now();
     const say = (text) => { status = text; render(); };
     async function load() {

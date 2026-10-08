@@ -1,6 +1,6 @@
 import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
-import { addStyleOnce, background, element } from "./dom.js";
+import { addStyleOnce, background, element, fitToContent } from "./dom.js";
 import { fitNodeHeight } from "./node_size.js";
 
 // XY Plot shows under its fields what the plot will be: the values of X and Y as the grid's headers, the number of images, or what is wrong with
@@ -36,7 +36,7 @@ app.registerExtension({
     if (node.comfyClass !== NODE_TYPE) return;
     addStyleOnce("dfxy-style", STYLE);
     const panel = element("div", { class: "dfxy" });
-    node.addDOMWidget("xy_preview", "diceforge_xy_preview", panel, { serialize: false, getMinHeight: () => panel.scrollHeight + 4 });
+    fitToContent(node.addDOMWidget("xy_preview", "diceforge_xy_preview", panel, { serialize: false }), panel);
     let shownKey = null, plan = null, error = "", queueing = null; // queueing: { done, stop } while ▶ Queue runs.
     const axis = (name, type, labels) => element("div", { class: "axis" }, element("b", {}, `${name} · ${type}`),
       ...labels.slice(0, SHOWN).map((text) => element("span", {}, text)), ...(labels.length > SHOWN ? [element("span", {}, `+${labels.length - SHOWN}`)] : []));

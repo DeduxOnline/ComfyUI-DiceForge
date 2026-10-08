@@ -1,6 +1,6 @@
 import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
-import { addStyleOnce, background, element } from "./dom.js";
+import { addStyleOnce, background, element, fitToContent } from "./dom.js";
 import { fitNodeHeight } from "./node_size.js";
 import { setField } from "./wildcards.js";
 
@@ -203,7 +203,7 @@ app.registerExtension({
     if (node.comfyClass !== NODE_TYPE) return;
     addStyleOnce("dfpp-style", STYLE);
     const panel = element("div", { class: "dfpp" });
-    node.addDOMWidget("prompt_preview", "diceforge_prompt_preview", panel, { serialize: false, getMinHeight: () => Math.min(panel.scrollHeight, 420) + 4 });
+    fitToContent(node.addDOMWidget("prompt_preview", "diceforge_prompt_preview", panel, { serialize: false }), panel, 420);
     const text = (name) => String(widget(node, name)?.value ?? "");
     const box = (label, value) => {
       const item = element("div", { class: "box", title: "Click to copy" }, element("b", {}, label), value ? value : element("span", { class: "empty" }, "(empty)"));
