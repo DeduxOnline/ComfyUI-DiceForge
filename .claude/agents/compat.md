@@ -21,9 +21,11 @@ stops working when:
 
 ## Tools
 
-- `e2e/workflows/<version>.json`: one workflow per release. It holds every DiceForge node with every widget set away from its default. Each
-  file keeps the workflow as saved, the widget values by name after a save and load in that version, and the prompt the page sent for it.
-  `1.0.0.json` was made from commit d096d13: the state the CHANGELOG's 1.0.0 section describes (no v1.0.0 tag was pushed).
+- `e2e/workflows/<version>.json`: one workflow per published release. It holds every DiceForge node with every widget set away from its
+  default. Each file keeps the workflow as saved, the widget values by name after a save and load in that version, and the prompt the page
+  sent for it.
+- **Before the first published release** (no `v*` tag on GitHub, `e2e/workflows/` empty), DiceForge has no users but its author, and changes
+  that break old workflows are fine. Report breaks as information, not problems, and don't propose migrations for them.
 - `node e2e/qa/compat.js [<version>]`: loads each saved workflow (or one) in the running e2e server's DiceForge, in both designs, and prints
   what it lost or changed. `e2e/compat.spec.js` is the same check in CI. Start the server with `e2e/qa/setup.sh` (once) and
   `e2e/qa/serve.sh start`.

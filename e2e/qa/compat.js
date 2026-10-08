@@ -5,9 +5,9 @@ const fs = require("fs");
 const path = require("path");
 
 const FOLDER = path.join(__dirname, "..", "workflows");
-// The saved workflows, oldest version first.
-const corpus = () => fs.readdirSync(FOLDER).filter((name) => name.endsWith(".json")).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
-  .map((name) => JSON.parse(fs.readFileSync(path.join(FOLDER, name), "utf8")));
+// The saved workflows, oldest version first: one per published release, none before the first.
+const corpus = () => (fs.existsSync(FOLDER) ? fs.readdirSync(FOLDER) : []).filter((name) => name.endsWith(".json"))
+  .sort((a, b) => a.localeCompare(b, undefined, { numeric: true })).map((name) => JSON.parse(fs.readFileSync(path.join(FOLDER, name), "utf8")));
 const asJson = (value) => {
   if (typeof value !== "string" || !/^\s*[[{]/.test(value)) return undefined;
   try { return JSON.parse(value); } catch { return undefined; }

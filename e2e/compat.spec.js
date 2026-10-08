@@ -11,6 +11,9 @@ for (const vue of [true, false]) {
   test.describe(vue ? "Old workflows, Nodes 2.0" : "Old workflows, classic nodes", () => {
     test.beforeEach(async ({ page }) => openComfy(page, { vue }));
 
+    if (!corpus().length) {
+      test.skip("no released version yet: the first published release adds its workflow (e2e/qa/snapshot.js)", () => {});
+    }
     for (const saved of corpus()) {
       test(`a workflow of DiceForge ${saved.diceforge} opens with every node, value and prompt input it had`, async ({ page }) => {
         const now = await load(page, saved.workflow);
