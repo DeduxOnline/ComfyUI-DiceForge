@@ -3,6 +3,7 @@
 const fs = require("fs");
 const { test, expect, basePath, openComfy, addNodes, connect, widgetValue, setWidget, menuItems, queueFromPage, nodeElement } = require("./helpers");
 const { ALL_NODES, lookUp, submenu, clickSubmenu } = require("./ui-shared");
+const { measure, reloadTall } = require("./qa/lib");
 
 for (const vue of [true, false]) {
   test.describe(vue ? "Nodes 2.0" : "classic nodes", () => {
@@ -13,6 +14,18 @@ for (const vue of [true, false]) {
       const widgets = await page.evaluate((ids) => ids.map((id) => window.app.graph.getNodeById(id)?.widgets?.length ?? -1), ids);
       expect(widgets.every((count) => count > 0)).toBe(true);
       if (vue) await expect(nodeElement(page, ids[0])).toBeVisible();
+    });
+
+    test("every DiceForge node fits what it shows: no empty area, nothing cut off, also from a workflow saved too tall", async ({ page }) => { // NOSONAR: expect.poll(...) below.
+      const ids = await addNodes(page, ALL_NODES.map((type, index) => ({ type, pos: [40 + (index % 4) * 520, 40 + Math.floor(index / 4) * 700] })));
+      const problems = async () => {
+        const found = [];
+        for (const [index, id] of ids.entries()) found.push(...(await measure(page, id)).problems.map((problem) => `${ALL_NODES[index]}: ${problem}`));
+        return found;
+      };
+      await expect.poll(problems).toEqual([]); // The checks of the tester's tools (qa/lib.js): previews, lists and the node itself.
+      await reloadTall(page, 900);
+      await expect.poll(problems).toEqual([]);
     });
 
     test("SDXL Resolution List previews fixed sizes live and random sizes after a run", async ({ page, request }) => {

@@ -27,6 +27,9 @@ nodes and features, a patch for fixes. Each version is a [release on GitHub](htt
 - ✂ Selection → new wildcard… (the prompt node's menu): the selected part of a prompt becomes a wildcard, and __name__ takes its place.
 - Model browsers: 🆕 Updates shows the models with a newer version on Civitai, and a card's menu downloads it next to the old one (then offers
   to delete the old one); Largest first in the sort; the tree shows each folder's size.
+- A tester: `.claude/agents/tester.md`, an agent for Claude Code that tests DiceForge in a browser like a user, in both node designs, and
+  reports what it finds with pictures and steps; its tools in `e2e/qa` (setup, the test server, pictures and size checks of every node).
+  The browser tests check every node for empty areas and cut-off content.
 
 ### Changed
 - Node heights: a node taller than what it shows (a workflow saved so, content that got smaller) is fitted again, in both designs; only
