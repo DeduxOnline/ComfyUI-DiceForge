@@ -12,7 +12,7 @@ import { setField } from "./wildcards.js";
 // each with the images its run made (Save Image, Preview Image, VAE Decode + Save... in the same workflow). From an entry: ↺ Seed puts back its
 // prompts, seed and mode (with control after generate on fixed), so the next run gives the same prompts again; Use text puts the prompts as encoded
 // in the fields, every choice made; 📌 keeps it past the 20; ✕ removes it.
-const NODE_TYPE = "CLIPTextEncodePositiveNegative";
+const NODE_TYPE = "DiceForgeCLIPDualTextEncode";
 const STYLE = `
 .dfpp{font:12px system-ui,sans-serif;color:#ccc;display:flex;flex-direction:column;gap:4px;box-sizing:border-box;padding:2px 0;max-height:420px;overflow:auto}
 .dfpp .head{color:#888;display:flex;gap:6px;justify-content:space-between}.dfpp .head .changed{color:#d9b36a}

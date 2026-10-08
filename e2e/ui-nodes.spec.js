@@ -29,7 +29,7 @@ for (const vue of [true, false]) {
     });
 
     test("SDXL Resolution List previews fixed sizes live and random sizes after a run", async ({ page, request }) => {
-      const [id, preview] = await addNodes(page, [{ type: "SDXLResolutionListLatent", widgets: { "resolution.size": "1216 x 832" } }, { type: "PreviewAny", pos: [500, 40] }]);
+      const [id, preview] = await addNodes(page, [{ type: "DiceForgeSDXLResolutionList", widgets: { "resolution.size": "1216 x 832" } }, { type: "PreviewAny", pos: [500, 40] }]);
       await connect(page, id, 1, preview, 0); // An output, so the workflow can run.
       await expect.poll(() => widgetValue(page, id, "preview_ratio")).toBe("1216:832");
       await setWidget(page, id, "rescale.percent", 150); // Each side: 1216 x 832 becomes 1824 x 1248.
@@ -49,7 +49,7 @@ for (const vue of [true, false]) {
     });
 
     test("Resolution Selector previews its size with rescale", async ({ page }) => {
-      const [id] = await addNodes(page, [{ type: "ResolutionSelectorRandomLatent", widgets: { aspect_ratio: "16:9 (Widescreen)" } }]);
+      const [id] = await addNodes(page, [{ type: "DiceForgeResolutionSelector", widgets: { aspect_ratio: "16:9 (Widescreen)" } }]);
       await expect.poll(() => widgetValue(page, id, "preview_ratio")).toBe("1368:768");
       await setWidget(page, id, "rescale.percent", 150);
       await expect.poll(() => widgetValue(page, id, "preview_ratio")).toBe("2048:1152");
@@ -192,7 +192,7 @@ for (const vue of [true, false]) {
 
     test("a node saved taller than it shows is fitted again, unless a text field takes the extra height", async ({ page }) => { // NOSONAR: expect.poll(...) below.
       const [plain, sampler, image, clip] = await addNodes(page, [{ type: "DiceForgeRandomInt" }, { type: "DiceForgeRandomSampler", pos: [400, 40] },
-        { type: "DiceForgeRandomImage", pos: [800, 40] }, { type: "CLIPTextEncodePositiveNegative", pos: [1200, 40] }]);
+        { type: "DiceForgeRandomImage", pos: [800, 40] }, { type: "DiceForgeCLIPDualTextEncode", pos: [1200, 40] }]);
       const workflow = await page.evaluate(() => window.app.graph.serialize());
       for (const node of workflow.nodes) node.size = [node.size[0], 900]; // As a workflow saved with an empty gap under the inputs.
       await page.evaluate(async (data) => { window.app.graph.clear(); await window.app.loadGraphData(data); }, workflow);
@@ -213,7 +213,7 @@ for (const vue of [true, false]) {
 
     if (vue) {
       test("DiceForge nodes fit their inputs when advanced inputs are shown and hidden", async ({ page }) => { // NOSONAR: expect.poll(...) assertions below.
-        const [id] = await addNodes(page, [{ type: "SDXLResolutionListLatent" }]);
+        const [id] = await addNodes(page, [{ type: "DiceForgeSDXLResolutionList" }]);
         const height = async () => (await nodeElement(page, id).boundingBox()).height;
         await expect.poll(async () => page.evaluate((id) => window.app.graph.getNodeById(id).size[1], id)).toBeLessThan(100);
         const before = await height();

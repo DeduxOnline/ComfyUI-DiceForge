@@ -5,16 +5,16 @@
 const fs = require("fs");
 const { test, expect, basePath, openComfy, addNodes, connect, widgetValue, setWidget, menuItems, clickMenu, queueFromPage, nodeElement } = require("./helpers");
 
-const ALL_NODES = ["SDXLResolutionListLatent", "ResolutionSelectorRandomLatent", "CLIPTextEncodePositiveNegative", "DiceForgeWildcardsToText", "DiceForgeRandomInt", "DiceForgeRandomFloat",
+const ALL_NODES = ["DiceForgeSDXLResolutionList", "DiceForgeResolutionSelector", "DiceForgeCLIPDualTextEncode", "DiceForgeWildcardsToText", "DiceForgeRandomInt", "DiceForgeRandomFloat",
   "DiceForgeRandomLora", "DiceForgeRandomCheckpoint", "DiceForgeRandomDiffusionModel", "DiceForgeRandomImage", "DiceForgeGrid", "DiceForgeRandomSampler",
-  "DiceForgeRandomVAE", "LoadVAEDecodeSave", "VAEDecodeSave", "LoadDiffusionModelCLIP", "DiceForgeLoraStack", "DiceForgeXYPlot", "DiceForgeVariationSeed", "DiceForgeHiresUpscale", "DiceForgeDanbooruEnhancer"];
+  "DiceForgeRandomVAE", "DiceForgeLoadVAEDecodeSave", "DiceForgeVAEDecodeSave", "DiceForgeLoadDiffusionModelCLIP", "DiceForgeLoraStack", "DiceForgeXYPlot", "DiceForgeVariationSeed", "DiceForgeHiresUpscale", "DiceForgeDanbooruEnhancer"];
 const STACK = JSON.stringify({ rows: [{ lora: "style/ink.safetensors", strength: 0.7, random: true, min: 0.4, max: 0.9, group: "A", triggers: "custom", trigger_words: ["ink style"] },
   { lora: "detail.safetensors", strength: 1.2, on: false }], groups: { A: { min: 0, max: 1 } }, separate_clip: true });
 // Values that differ from the defaults, so a value lost on the way shows.
 const CHANGES = {
-  SDXLResolutionListLatent: { resolution: "High-Res", "resolution.size": "1152 x 1536", seed: 123456789, rescale: "to longest side", "rescale.longer_side": 2048, multiple: 64, batch: 3, seed_mode: "deck" },
-  ResolutionSelectorRandomLatent: { aspect_ratio: "Random Chaos Portrait", megapixels: 2.3, seed: 42, multiple: 32, batch: 2, max_aspect: 3.5, seed_mode: "balanced", rescale: "to Width/Height", "rescale.width": 1200, "rescale.height": 0 },
-  CLIPTextEncodePositiveNegative: { positive: "портрет, {a|b} __color__ 🎲\nвторая строка", negative: "нет, ${x}", seed: 9007199254740991, seed_mode: "mutate", trim: false },
+  DiceForgeSDXLResolutionList: { resolution: "High-Res", "resolution.size": "1152 x 1536", seed: 123456789, rescale: "to longest side", "rescale.longer_side": 2048, multiple: 64, batch: 3, seed_mode: "deck" },
+  DiceForgeResolutionSelector: { aspect_ratio: "Random Chaos Portrait", megapixels: 2.3, seed: 42, multiple: 32, batch: 2, max_aspect: 3.5, seed_mode: "balanced", rescale: "to Width/Height", "rescale.width": 1200, "rescale.height": 0 },
+  DiceForgeCLIPDualTextEncode: { positive: "портрет, {a|b} __color__ 🎲\nвторая строка", negative: "нет, ${x}", seed: 9007199254740991, seed_mode: "mutate", trim: false },
   DiceForgeRandomInt: { min: -50, max: 50, step: 5, seed: 7, seed_mode: "sequential" },
   DiceForgeRandomFloat: { min: -1.5, max: 2.25, step: 0.25, seed: 8, seed_mode: "shuffle", parts: 7 },
   DiceForgeRandomSampler: { samplers: "euler,\ndpmpp_2m", schedulers: "karras", seed: 11, seed_mode: "deck" },
@@ -86,7 +86,7 @@ for (const vue of [true, false]) {
     });
 
     test("a copied node is independent of the original", async ({ page }) => {
-      const [stack, encode] = await addNodes(page, [{ type: "DiceForgeLoraStack", widgets: { loras: STACK } }, { type: "CLIPTextEncodePositiveNegative", pos: [500, 40], widgets: { positive: "original" } }]);
+      const [stack, encode] = await addNodes(page, [{ type: "DiceForgeLoraStack", widgets: { loras: STACK } }, { type: "DiceForgeCLIPDualTextEncode", pos: [500, 40], widgets: { positive: "original" } }]);
       await page.evaluate(([stack, encode]) => {
         const graph = window.app.graph;
         window.app.canvas.selectItems([graph.getNodeById(stack), graph.getNodeById(encode)]);
@@ -96,9 +96,9 @@ for (const vue of [true, false]) {
       }, [stack, encode]);
       await page.waitForTimeout(500);
       const copies = await page.evaluate(([stack, encode]) => window.app.graph.nodes.filter((node) => ![stack, encode].includes(node.id)).map((node) => [node.id, node.comfyClass]), [stack, encode]);
-      expect(copies.map(([, type]) => type).sort()).toEqual(["CLIPTextEncodePositiveNegative", "DiceForgeLoraStack"]);
+      expect(copies.map(([, type]) => type).sort()).toEqual(["DiceForgeCLIPDualTextEncode", "DiceForgeLoraStack"]);
       const stackCopy = copies.find(([, type]) => type === "DiceForgeLoraStack")[0];
-      const encodeCopy = copies.find(([, type]) => type === "CLIPTextEncodePositiveNegative")[0];
+      const encodeCopy = copies.find(([, type]) => type === "DiceForgeCLIPDualTextEncode")[0];
       expect(await widgetValue(page, stackCopy, "loras")).toBe(STACK);
       await expect(page.locator(".dfls")).toHaveCount(2);
       // Removing a row in the copy's panel leaves the original alone.
@@ -112,7 +112,7 @@ for (const vue of [true, false]) {
 
     test("after a failed run the page keeps working, and the fixed workflow runs", async ({ page, request }) => {
       const [encode, preview] = await addNodes(page, [
-        { type: "CLIPTextEncodePositiveNegative", widgets: { positive: "a __no_such_wildcard__ car" } },
+        { type: "DiceForgeCLIPDualTextEncode", widgets: { positive: "a __no_such_wildcard__ car" } },
         { type: "PreviewAny", pos: [500, 40] },
       ]);
       await connect(page, encode, 3, preview, 0);
@@ -129,7 +129,7 @@ for (const vue of [true, false]) {
       const file = basePath("models", "wildcards", `e2e_unreadable_${vue ? "vue" : "classic"}.txt`);
       fs.writeFileSync(file, Buffer.from([0xea, 0xf0, 0xe0, 0xf1, 0xed, 0xfb, 0xe9, 0x0a]));
       try {
-        const [id] = await addNodes(page, [{ type: "CLIPTextEncodePositiveNegative", pos: [300, 60] }]);
+        const [id] = await addNodes(page, [{ type: "DiceForgeCLIPDualTextEncode", pos: [300, 60] }]);
         await clickMenu(page, id, "DiceForge.Wildcards", "Wildcard Browser");
         const row = page.locator(".dfwc .row", { hasText: `e2e_unreadable_${vue ? "vue" : "classic"}` });
         await expect(row).toContainText("⚠");
@@ -145,7 +145,7 @@ for (const vue of [true, false]) {
     });
 
     test("the autocomplete works with the mouse, in the negative prompt, and closes when the field loses focus", async ({ page }) => {
-      const [id] = await addNodes(page, [{ type: "CLIPTextEncodePositiveNegative", pos: [300, 60] }]);
+      const [id] = await addNodes(page, [{ type: "DiceForgeCLIPDualTextEncode", pos: [300, 60] }]);
       await page.evaluate((id) => { const node = window.app.graph.getNodeById(id); node.showAdvanced = true; node.setDirtyCanvas(true, true); }, id);
       await page.waitForTimeout(500);
       await page.evaluate(([id]) => {
@@ -178,7 +178,7 @@ for (const vue of [true, false]) {
 
     test("after any series of changes, the resolution previews show exactly the size a run makes", async ({ page, request }) => {
       const [sdxl, selector, width1, height1, width2, height2] = await addNodes(page, [
-        { type: "SDXLResolutionListLatent" }, { type: "ResolutionSelectorRandomLatent", pos: [40, 520] },
+        { type: "DiceForgeSDXLResolutionList" }, { type: "DiceForgeResolutionSelector", pos: [40, 520] },
         { type: "PreviewAny", pos: [600, 40] }, { type: "PreviewAny", pos: [600, 260] }, { type: "PreviewAny", pos: [600, 520] }, { type: "PreviewAny", pos: [600, 740] },
       ]);
       await connect(page, sdxl, 1, width1, 0);

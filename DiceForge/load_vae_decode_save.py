@@ -50,7 +50,7 @@ class LoadVAEDecodeSave(io.ComfyNode):
     @classmethod
     def define_schema(cls):
         return io.Schema(
-            node_id="LoadVAEDecodeSave",
+            node_id="DiceForgeLoadVAEDecodeSave",
             display_name="Load VAE + Decode + Save",
             category="DiceForge/image",
             inputs=[
@@ -87,7 +87,7 @@ class VAEDecodeSave(io.ComfyNode):
     @classmethod
     def define_schema(cls):
         return io.Schema(
-            node_id="VAEDecodeSave",
+            node_id="DiceForgeVAEDecodeSave",
             display_name="VAE Decode + Save",
             category="DiceForge/image",
             inputs=[

@@ -19,7 +19,7 @@ class LoadDiffusionModelCLIP(io.ComfyNode):
         single, dual = clip_types()
         files = folder_paths.get_filename_list("text_encoders")
         return io.Schema(
-            node_id="LoadDiffusionModelCLIP",
+            node_id="DiceForgeLoadDiffusionModelCLIP",
             display_name="Load Diffusion Model + CLIP",
             category="DiceForge/loaders",
             description="Loads a diffusion model (like Load Diffusion Model) and its text encoders (like Load CLIP, or DualCLIPLoader when clip_name2 is set) in one node.",

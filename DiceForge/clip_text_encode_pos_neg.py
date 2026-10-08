@@ -491,7 +491,7 @@ class CLIPTextEncodePositiveNegative(io.ComfyNode):
     @classmethod
     def define_schema(cls):
         return io.Schema(
-            node_id="CLIPTextEncodePositiveNegative",
+            node_id="DiceForgeCLIPDualTextEncode",
             display_name="CLIP Dual Text Encode (Wildcards, LoRA)",
             category="DiceForge/conditioning",
             description="Encodes a positive and a negative prompt with the same CLIP model, outputting a conditioning and the filled-in text for each (without a CLIP, just the text, for other text encoders). Supports {a|b} choices, __name__ wildcards and ${name} variables, picked from the seed.",

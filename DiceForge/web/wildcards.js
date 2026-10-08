@@ -8,7 +8,7 @@ import { closeMenu, keysButton, keysOnQuestion, menuAt, menuButton, menuOpen, mo
 
 // Wildcards in CLIP Dual Text Encode: autocomplete after "__" in the prompt fields, and the Wildcard Browser (node menu) with a folder tree,
 // "+ Add" buttons that insert __name__ (or __folder/*__) where the cursor was, and an editor for the files.
-const NODE_TYPE = "CLIPTextEncodePositiveNegative";
+const NODE_TYPE = "DiceForgeCLIPDualTextEncode";
 const FIELDS = ["positive", "negative"];
 // The nodes whose text fields get the prompt tools (autocomplete, highlighting, the browsers' + Add, the syntax guide), and their fields.
 const PROMPT_NODES = { [NODE_TYPE]: FIELDS, DiceForgeWildcardsToText: ["text"] };

@@ -5,11 +5,11 @@ const path = require("path");
 const { test, expect, runPrompt, shown, basePath, writeFile } = require("./helpers");
 const { MODELS, DOWNLOADS } = require("./fixtures");
 
-const NODES = ["SDXLResolutionListLatent", "ResolutionSelectorRandomLatent", "CLIPTextEncodePositiveNegative", "DiceForgeWildcardsToText", "DiceForgeRandomInt", "DiceForgeRandomFloat",
+const NODES = ["DiceForgeSDXLResolutionList", "DiceForgeResolutionSelector", "DiceForgeCLIPDualTextEncode", "DiceForgeWildcardsToText", "DiceForgeRandomInt", "DiceForgeRandomFloat",
   "DiceForgeRandomLora", "DiceForgeRandomCheckpoint", "DiceForgeRandomDiffusionModel", "DiceForgeRandomImage", "DiceForgeGrid", "DiceForgeRandomSampler",
-  "DiceForgeRandomVAE", "LoadVAEDecodeSave", "VAEDecodeSave", "LoadDiffusionModelCLIP", "DiceForgeLoraStack", "DiceForgeXYPlot", "DiceForgeVariationSeed", "DiceForgeHiresUpscale", "DiceForgeDanbooruEnhancer"];
+  "DiceForgeRandomVAE", "DiceForgeLoadVAEDecodeSave", "DiceForgeVAEDecodeSave", "DiceForgeLoadDiffusionModelCLIP", "DiceForgeLoraStack", "DiceForgeXYPlot", "DiceForgeVariationSeed", "DiceForgeHiresUpscale", "DiceForgeDanbooruEnhancer"];
 const clip = (positive, negative = "", { seed = 0, mode = "random" } = {}) => ({
-  1: { class_type: "CLIPTextEncodePositiveNegative", inputs: { positive, negative, seed, seed_mode: mode, trim: true } },
+  1: { class_type: "DiceForgeCLIPDualTextEncode", inputs: { positive, negative, seed, seed_mode: mode, trim: true } },
   2: { class_type: "PreviewAny", inputs: { source: ["1", 3] } },
   3: { class_type: "PreviewAny", inputs: { source: ["1", 4] } },
 });
@@ -25,12 +25,16 @@ test.describe("@api workflows and routes", () => {
   test("ComfyUI loads every DiceForge node", async ({ request }) => {
     const info = await (await request.get("/object_info")).json();
     for (const node of NODES) expect(info[node]?.python_module, node).toContain("DiceForge");
-    for (const [node, section] of [["SDXLResolutionListLatent", "required"], ["ResolutionSelectorRandomLatent", "optional"]]) {
+    // Every DiceForge node, also one missing from the list above, has an id of its own: another pack's node with the same id would replace it.
+    const ids = Object.keys(info).filter((node) => /DiceForge/.test(info[node].python_module ?? ""));
+    expect(ids.filter((node) => !node.startsWith("DiceForge"))).toEqual([]);
+    expect(ids.sort()).toEqual([...NODES].sort());
+    for (const [node, section] of [["DiceForgeSDXLResolutionList", "required"], ["DiceForgeResolutionSelector", "optional"]]) {
       const rescale = info[node].input[section].rescale; // Resolution Selector's is optional: a prompt without it gets 100%.
       expect(rescale[1].options.map((option) => option.key)).toEqual(["by percentage", "to Width/Height", "to longest side"]);
       expect(rescale[1].advanced).toBeFalsy(); // In view, not under the advanced inputs.
     }
-    expect(info.CLIPTextEncodePositiveNegative.input.required.negative[1].advanced).toBe(true);
+    expect(info.DiceForgeCLIPDualTextEncode.input.required.negative[1].advanced).toBe(true);
   });
 
   test("CLIP Dual Text Encode fills in wildcards, yaml keys, weights and variables", async ({ request }) => {
@@ -97,22 +101,22 @@ test.describe("@api workflows and routes", () => {
 
   test("SDXL Resolution List and Resolution Selector make latents of the right size", async ({ request }) => {
     const size = (node) => ({ ...node, 2: { class_type: "PreviewAny", inputs: { source: ["1", 1] } }, 3: { class_type: "PreviewAny", inputs: { source: ["1", 2] } } });
-    let result = await runPrompt(request, size({ 1: { class_type: "SDXLResolutionListLatent", inputs: { resolution: "Standard", "resolution.size": "1216 x 832", seed: 0, rescale: "by percentage", "rescale.percent": 100, multiple: 8, batch: 1, seed_mode: "random" } } }));
+    let result = await runPrompt(request, size({ 1: { class_type: "DiceForgeSDXLResolutionList", inputs: { resolution: "Standard", "resolution.size": "1216 x 832", seed: 0, rescale: "by percentage", "rescale.percent": 100, multiple: 8, batch: 1, seed_mode: "random" } } }));
     expect([shown(result, "2"), shown(result, "3")]).toEqual(["1216", "832"]);
-    result = await runPrompt(request, size({ 1: { class_type: "SDXLResolutionListLatent", inputs: { resolution: "Standard", "resolution.size": "1024 x 1024", seed: 0, rescale: "by percentage", "rescale.percent": 150, multiple: 16, batch: 1, seed_mode: "random" } } }));
+    result = await runPrompt(request, size({ 1: { class_type: "DiceForgeSDXLResolutionList", inputs: { resolution: "Standard", "resolution.size": "1024 x 1024", seed: 0, rescale: "by percentage", "rescale.percent": 150, multiple: 16, batch: 1, seed_mode: "random" } } }));
     expect([shown(result, "2"), shown(result, "3")]).toEqual(["1536", "1536"]); // 150%: each side, 2.25 times the pixels.
-    result = await runPrompt(request, size({ 1: { class_type: "SDXLResolutionListLatent", inputs: { resolution: "Standard", "resolution.size": "832 x 1216", seed: 0, rescale: "to longest side", "rescale.longer_side": 1536, multiple: 8, batch: 1, seed_mode: "random" } } }));
+    result = await runPrompt(request, size({ 1: { class_type: "DiceForgeSDXLResolutionList", inputs: { resolution: "Standard", "resolution.size": "832 x 1216", seed: 0, rescale: "to longest side", "rescale.longer_side": 1536, multiple: 8, batch: 1, seed_mode: "random" } } }));
     expect([shown(result, "2"), shown(result, "3")]).toEqual(["1048", "1536"]);
-    result = await runPrompt(request, size({ 1: { class_type: "SDXLResolutionListLatent", inputs: { resolution: "Standard", "resolution.size": "1216 x 832", seed: 0, rescale: "to Width/Height", "rescale.width": 1920, "rescale.height": 1080, multiple: 8, batch: 1, seed_mode: "random" } } }));
+    result = await runPrompt(request, size({ 1: { class_type: "DiceForgeSDXLResolutionList", inputs: { resolution: "Standard", "resolution.size": "1216 x 832", seed: 0, rescale: "to Width/Height", "rescale.width": 1920, "rescale.height": 1080, multiple: 8, batch: 1, seed_mode: "random" } } }));
     expect([shown(result, "2"), shown(result, "3")]).toEqual(["1920", "1080"]);
     const listed = new Set();
     for (let seed = 0; seed < 4; seed++) {
-      result = await runPrompt(request, size({ 1: { class_type: "SDXLResolutionListLatent", inputs: { resolution: "Random", "resolution.size": "Vertical Listed", seed, rescale: "by percentage", "rescale.percent": 100, multiple: 8, batch: 1, seed_mode: "deck" } } }));
+      result = await runPrompt(request, size({ 1: { class_type: "DiceForgeSDXLResolutionList", inputs: { resolution: "Random", "resolution.size": "Vertical Listed", seed, rescale: "by percentage", "rescale.percent": 100, multiple: 8, batch: 1, seed_mode: "deck" } } }));
       listed.add(`${shown(result, "2")}x${shown(result, "3")}`);
       expect(result.outputs["1"].dice_forge_last_size[0].group).toBe("Random");
     }
     expect([...listed].sort()).toEqual(["640x1536", "768x1344", "832x1216", "896x1152"]);
-    const selector = (inputs) => size({ 1: { class_type: "ResolutionSelectorRandomLatent", inputs: { aspect_ratio: "16:9 (Widescreen)", megapixels: 1.0, seed: 0, multiple: 8, batch: 1, max_aspect: 2.0, seed_mode: "random", ...inputs } } });
+    const selector = (inputs) => size({ 1: { class_type: "DiceForgeResolutionSelector", inputs: { aspect_ratio: "16:9 (Widescreen)", megapixels: 1.0, seed: 0, multiple: 8, batch: 1, max_aspect: 2.0, seed_mode: "random", ...inputs } } });
     result = await runPrompt(request, selector({})); // Without rescale, as before it existed.
     expect([shown(result, "2"), shown(result, "3")]).toEqual(["1368", "768"]);
     result = await runPrompt(request, selector({ rescale: "by percentage", "rescale.percent": 150 }));
@@ -121,7 +125,7 @@ test.describe("@api workflows and routes", () => {
     expect([shown(result, "2"), shown(result, "3")]).toEqual(["1920", "1080"]);
     result = await runPrompt(request, selector({ rescale: "to Width/Height", "rescale.width": 0, "rescale.height": 1152 }));
     expect([shown(result, "2"), shown(result, "3")]).toEqual(["2048", "1152"]);
-    result = await runPrompt(request, size({ 1: { class_type: "ResolutionSelectorRandomLatent", inputs: { aspect_ratio: "Random Chaos Portrait", megapixels: 1.0, seed: 3, multiple: 64, batch: 1, max_aspect: 2.0, seed_mode: "random" } } }));
+    result = await runPrompt(request, size({ 1: { class_type: "DiceForgeResolutionSelector", inputs: { aspect_ratio: "Random Chaos Portrait", megapixels: 1.0, seed: 3, multiple: 64, batch: 1, max_aspect: 2.0, seed_mode: "random" } } }));
     const [width, height] = [Number(shown(result, "2")), Number(shown(result, "3"))];
     expect(width % 64).toBe(0);
     expect(height).toBeGreaterThan(width);
@@ -129,7 +133,7 @@ test.describe("@api workflows and routes", () => {
   });
 
   test("a resolution node from the cache still reports its size to the preview", async ({ request }) => {
-    const prompt = { 1: { class_type: "SDXLResolutionListLatent", inputs: { resolution: "Random", "resolution.size": "Any Listed", seed: 777, rescale: "by percentage", "rescale.percent": 100, multiple: 8, batch: 1, seed_mode: "random" } },
+    const prompt = { 1: { class_type: "DiceForgeSDXLResolutionList", inputs: { resolution: "Random", "resolution.size": "Any Listed", seed: 777, rescale: "by percentage", "rescale.percent": 100, multiple: 8, batch: 1, seed_mode: "random" } },
       2: { class_type: "PreviewAny", inputs: { source: ["1", 1] } } };
     const first = await runPrompt(request, prompt);
     const again = await runPrompt(request, prompt);
@@ -138,31 +142,31 @@ test.describe("@api workflows and routes", () => {
   });
 
   test("VAE Decode + Save and Load VAE + Decode + Save write PNG files with the workflow", async ({ request }) => {
-    let result = await runPrompt(request, { ...pixelSpace, 1: { class_type: "VAEDecodeSave", inputs: { samples: ["12", 0], vae: ["11", 0], filename_prefix: "e2e/vds_%width%x%height%" } } });
+    let result = await runPrompt(request, { ...pixelSpace, 1: { class_type: "DiceForgeVAEDecodeSave", inputs: { samples: ["12", 0], vae: ["11", 0], filename_prefix: "e2e/vds_%width%x%height%" } } });
     expect(result.status).toBe("success");
     expect(result.outputs["1"].images.map((image) => image.filename)).toEqual(["vds_64x48_00001_.png", "vds_64x48_00002_.png"]);
     const png = fs.readFileSync(basePath("output", "e2e", "vds_64x48_00001_.png"));
     expect(png.includes(Buffer.from("workflow"))).toBe(true);
     expect(png.includes(Buffer.from("diceforge_e2e"))).toBe(true);
-    result = await runPrompt(request, { ...pixelSpace, 1: { class_type: "LoadVAEDecodeSave", inputs: { samples: ["12", 0], vae_name: "pixel_space", filename_prefix: "e2e/load_vds" } } });
+    result = await runPrompt(request, { ...pixelSpace, 1: { class_type: "DiceForgeLoadVAEDecodeSave", inputs: { samples: ["12", 0], vae_name: "pixel_space", filename_prefix: "e2e/load_vds" } } });
     expect(result.status).toBe("success");
     expect(outputFiles("e2e", "load_vds_")).toHaveLength(2);
     // image_output: Preview shows without saving, Hide&Save saves without showing, Hide does neither; the vae output feeds the next nodes.
-    result = await runPrompt(request, { ...pixelSpace, 1: { class_type: "VAEDecodeSave", inputs: { samples: ["12", 0], vae: ["11", 0], filename_prefix: "e2e/io_preview", image_output: "Preview" } } });
+    result = await runPrompt(request, { ...pixelSpace, 1: { class_type: "DiceForgeVAEDecodeSave", inputs: { samples: ["12", 0], vae: ["11", 0], filename_prefix: "e2e/io_preview", image_output: "Preview" } } });
     expect(result.outputs["1"].images.every((image) => image.type === "temp")).toBe(true);
     expect(outputFiles("e2e", "io_preview")).toHaveLength(0);
-    result = await runPrompt(request, { ...pixelSpace, 1: { class_type: "LoadVAEDecodeSave", inputs: { samples: ["12", 0], vae_name: "pixel_space", filename_prefix: "e2e/io_quiet", image_output: "Hide&Save" } } });
+    result = await runPrompt(request, { ...pixelSpace, 1: { class_type: "DiceForgeLoadVAEDecodeSave", inputs: { samples: ["12", 0], vae_name: "pixel_space", filename_prefix: "e2e/io_quiet", image_output: "Hide&Save" } } });
     expect(result.status).toBe("success");
     expect(result.outputs["1"]?.images ?? []).toHaveLength(0);
     expect(outputFiles("e2e", "io_quiet")).toHaveLength(2);
     result = await runPrompt(request, { ...pixelSpace,
-      1: { class_type: "LoadVAEDecodeSave", inputs: { samples: ["12", 0], vae_name: "pixel_space", filename_prefix: "e2e/io_hidden", image_output: "Hide" } },
+      1: { class_type: "DiceForgeLoadVAEDecodeSave", inputs: { samples: ["12", 0], vae_name: "pixel_space", filename_prefix: "e2e/io_hidden", image_output: "Hide" } },
       2: { class_type: "VAEEncode", inputs: { pixels: ["1", 0], vae: ["1", 1] } }, // The loaded VAE, passed on.
-      3: { class_type: "VAEDecodeSave", inputs: { samples: ["2", 0], vae: ["1", 1], filename_prefix: "e2e/io_again_%width%x%height%" } } });
+      3: { class_type: "DiceForgeVAEDecodeSave", inputs: { samples: ["2", 0], vae: ["1", 1], filename_prefix: "e2e/io_again_%width%x%height%" } } });
     expect(result.status).toBe("success");
     expect(outputFiles("e2e", "io_hidden")).toHaveLength(0);
     expect(outputFiles("e2e", "io_again_64x48")).toHaveLength(2);
-    expect((await request.post("/prompt", { data: { prompt: { ...pixelSpace, 1: { class_type: "VAEDecodeSave", inputs: { samples: ["12", 0], vae: ["11", 0], filename_prefix: "x", image_output: "Sideways" } } } } })).status()).toBe(400);
+    expect((await request.post("/prompt", { data: { prompt: { ...pixelSpace, 1: { class_type: "DiceForgeVAEDecodeSave", inputs: { samples: ["12", 0], vae: ["11", 0], filename_prefix: "x", image_output: "Sideways" } } } } })).status()).toBe(400);
   });
 
   test("Dice Grid collects runs and saves the finished grid", async ({ request }) => {
@@ -223,7 +227,7 @@ test.describe("@api workflows and routes", () => {
   test("Wildcards to Text fills in a prompt from the seed, as CLIP Dual Text Encode does", async ({ request }) => {
     const prompt = (seed) => ({
       1: { class_type: "DiceForgeWildcardsToText", inputs: { text: "a __color__ car, {big|small}", seed, seed_mode: "deck", trim: true } },
-      2: { class_type: "CLIPTextEncodePositiveNegative", inputs: { positive: "a __color__ car, {big|small}", negative: "", seed, seed_mode: "deck", trim: true } },
+      2: { class_type: "DiceForgeCLIPDualTextEncode", inputs: { positive: "a __color__ car, {big|small}", negative: "", seed, seed_mode: "deck", trim: true } },
       3: { class_type: "PreviewAny", inputs: { source: ["1", 0] } }, 4: { class_type: "PreviewAny", inputs: { source: ["2", 3] } },
     });
     for (const seed of [0, 1, 2]) {
@@ -286,11 +290,11 @@ test.describe("@api workflows and routes", () => {
   test("Danbooru Tag Enhancer in fixed mode comes from the cache until a wildcard file changes; it fits between two CLIP Dual Text Encodes", async ({ request }) => {
     writeFile("models/wildcards/e2e_booru.txt", "hatsune miku\n");
     const chain = () => ({
-      1: { class_type: "CLIPTextEncodePositiveNegative", inputs: { positive: "__e2e_booru__, {masterpiece|masterpiece}", negative: "", seed: 0, seed_mode: "random", trim: true } },
+      1: { class_type: "DiceForgeCLIPDualTextEncode", inputs: { positive: "__e2e_booru__, {masterpiece|masterpiece}", negative: "", seed: 0, seed_mode: "random", trim: true } },
       2: { class_type: "DiceForgeDanbooruEnhancer", inputs: { tags: ["1", 3], source: "danbooru", rating: "general", mode: "fixed", post_ids: "101", posts: 1,
         max_tags: 15, include_general: true, include_appearance: true, include_clothes: true, include_background: true, include_count: true,
         include_character: false, include_copyright: false, include_artist: false, exclude: "", position: "after", wildcard_seed: 7 } },
-      3: { class_type: "CLIPTextEncodePositiveNegative", inputs: { positive: ["2", 0], negative: "", seed: 0, seed_mode: "random", trim: true } },
+      3: { class_type: "DiceForgeCLIPDualTextEncode", inputs: { positive: ["2", 0], negative: "", seed: 0, seed_mode: "random", trim: true } },
       4: { class_type: "PreviewAny", inputs: { source: ["3", 3] } },
     });
     const first = await runPrompt(request, chain());

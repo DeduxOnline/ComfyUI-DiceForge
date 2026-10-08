@@ -83,7 +83,7 @@ async function routes() {
 
 async function windows(page) {
   const times = {};
-  const [clip, loader] = await addNodes(page, [{ type: "CLIPTextEncodePositiveNegative", pos: [300, 60] }, { type: "LoraLoader", pos: [900, 60] }]);
+  const [clip, loader] = await addNodes(page, [{ type: "DiceForgeCLIPDualTextEncode", pos: [300, 60] }, { type: "LoraLoader", pos: [900, 60] }]);
   const openAndClose = async (open, ready, close) => {
     const start = performance.now();
     await open();

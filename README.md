@@ -109,7 +109,7 @@ The anime prompt builder *Prompt Director* lives in its own repository: [DeduxOn
 
 <img src="docs/images/clip_dual_text_encode.png" width="448" alt="CLIP Dual Text Encode in Nodes 2.0 with wildcards, variables and choices">
 
-Node id: `CLIPTextEncodePositiveNegative`.
+Node id: `DiceForgeCLIPDualTextEncode`.
 
 Works like two core *CLIP Text Encode (Prompt)* nodes sharing one CLIP model: each prompt is encoded exactly the same way, so the conditioning is identical to the core node's for the same text. On top of that, both prompts support wildcards and `{a|b}` choices, picked from a seed.
 
@@ -390,7 +390,7 @@ How it picks:
 
 <img src="docs/images/sdxl_resolution_list.png" width="339" alt="SDXL Resolution List in Nodes 2.0, Advanced section open, rescaled by 150%">
 
-Node id: `SDXLResolutionListLatent`.
+Node id: `DiceForgeSDXLResolutionList`.
 
 The resolution is a nested list: first pick a group in `resolution`, then a size of that group in `size`. The Random Chaos group also shows `max_aspect`.
 
@@ -451,7 +451,7 @@ The `size` list shows width x height; the aspect ratios are given here for refer
 
 <img src="docs/images/resolution_selector.png" width="393" alt="Resolution Selector (Random) in Nodes 2.0, 16:9 rescaled to a longest side of 1920">
 
-Node id: `ResolutionSelectorRandomLatent`.
+Node id: `DiceForgeResolutionSelector`.
 
 It works like the core ComfyUI *Resolution Selector* followed by **Empty Latent Image**, using the same size calculation, and adds random aspect ratios. For fixed ratios, the size is identical to the core node's.
 

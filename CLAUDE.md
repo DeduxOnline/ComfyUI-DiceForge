@@ -89,16 +89,13 @@ Development → Agents).
 Update this section as the steps get done, and remove it when they all are.
 
 - **Done:** every node and window; unit and end-to-end tests in both designs, the ComfyUI contract and the old-workflow tests; the agents;
-  CI green on `main`.
+  every node id starting with `DiceForge` (`tests/test_node_ids.py` keeps it so); CI green on `main`.
 - **Next, in this order:**
-  1. **Breaking changes while there is no release.** Proposed, not decided yet (ask the author): a `DiceForge` prefix for the six node ids
-     without one (`SDXLResolutionListLatent`, `ResolutionSelectorRandomLatent`, `CLIPTextEncodePositiveNegative`, `LoadVAEDecodeSave`,
-     `VAEDecodeSave`, `LoadDiffusionModelCLIP`). Node ids are shared by every node pack, and generic ones can clash with another pack's.
-  2. **A full pass of the agents:** `tester`, `security`, `perf` (also `--scale 3`), `docs`, `comfy-watcher` against ComfyUI master. Then fix
+  1. **A full pass of the agents:** `tester`, `security`, `perf` (also `--scale 3`), `docs`, `comfy-watcher` against ComfyUI master. Then fix
      what they find. Known already: adding 100 nodes takes about 3 s in Nodes 2.0 and 0.6 s in the classic canvas.
-  3. **The first release, 1.0.0** (it was never published):
+  2. **The first release, 1.0.0** (it was never published):
      - fold `[Unreleased]` into the `[1.0.0]` section of the CHANGELOG;
      - the author adds `REGISTRY_ACCESS_TOKEN`;
      - tag `v1.0.0`;
      - save the release's workflow for the old-workflow tests (`node e2e/qa/snapshot.js --version 1.0.0`, README → Releasing).
-  4. **After it:** a weekly `comfy-watcher` run.
+  3. **After it:** a weekly `comfy-watcher` run.

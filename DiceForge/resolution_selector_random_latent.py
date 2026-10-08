@@ -36,7 +36,7 @@ class ResolutionSelectorRandomLatent(io.ComfyNode):
     @classmethod
     def define_schema(cls):
         return io.Schema(
-            node_id="ResolutionSelectorRandomLatent",
+            node_id="DiceForgeResolutionSelector",
             display_name="Resolution Selector (Random)",
             category="DiceForge/latent",
             description="Calculate a size from an aspect ratio and a megapixel target (or a random aspect ratio from the seed) and output an empty latent of that size.",

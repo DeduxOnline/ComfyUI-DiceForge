@@ -79,7 +79,7 @@ for (const vue of [true, false]) {
     test.beforeEach(async ({ page }) => openComfy(page, { vue }));
 
     test("a node's class, data and DOM widgets", async ({ page }) => {
-      const [clip, spare] = await addNodes(page, [{ type: "CLIPTextEncodePositiveNegative" }, { type: "DiceForgeRandomInt", pos: [600, 40] }]);
+      const [clip, spare] = await addNodes(page, [{ type: "DiceForgeCLIPDualTextEncode" }, { type: "DiceForgeRandomInt", pos: [600, 40] }]);
       const facts = await page.evaluate(([clip, spare]) => {
         const node = window.app.graph.getNodeById(clip), other = window.app.graph.getNodeById(spare);
         const plain = other.addDOMWidget("contract_probe", "contract_probe", document.createElement("div"), { serialize: false });
@@ -90,7 +90,7 @@ for (const vue of [true, false]) {
         window.app.graph.remove(other);
         return result;
       }, [clip, spare]);
-      expect(facts.comfyClass, changed("node.comfyClass", "most of DiceForge/web")).toBe("CLIPTextEncodePositiveNegative");
+      expect(facts.comfyClass, changed("node.comfyClass", "most of DiceForge/web")).toBe("DiceForgeCLIPDualTextEncode");
       expect(facts.module, changed("node.constructor.nodeData.python_module", "node_size.js")).toMatch(/DiceForge/i);
       expect(facts.methods, changed("these node methods", "most of DiceForge/web")).toEqual([]);
       expect(facts.margin, changed("a DOM widget's default margin (the classic canvas makes the element 2 × margin shorter)", "dom.js fitToContent")).toBe(10);
@@ -99,7 +99,7 @@ for (const vue of [true, false]) {
     });
 
     test("a panel sized by computeSize gets exactly that height", async ({ page }) => {
-      const [clip] = await addNodes(page, [{ type: "CLIPTextEncodePositiveNegative" }]);
+      const [clip] = await addNodes(page, [{ type: "DiceForgeCLIPDualTextEncode" }]);
       await page.evaluate(() => new Promise((resolve) => {
         window.app.canvas.draw(true, true);
         requestAnimationFrame(() => requestAnimationFrame(resolve)); // The DOM widgets' boxes follow a frame later.
@@ -120,7 +120,7 @@ for (const vue of [true, false]) {
     });
 
     test("prompt fields: a textarea in the node", async ({ page }) => {
-      const [clip] = await addNodes(page, [{ type: "CLIPTextEncodePositiveNegative" }]);
+      const [clip] = await addNodes(page, [{ type: "DiceForgeCLIPDualTextEncode" }]);
       const textareas = await page.evaluate((id) => {
         const widget = window.app.graph.getNodeById(id).widgets.find((item) => item.name === "positive");
         return { inputEl: widget.inputEl?.tagName ?? "", inNode: document.querySelectorAll(`[data-node-id="${id}"] textarea`).length };
@@ -130,7 +130,7 @@ for (const vue of [true, false]) {
     });
 
     test("the node menu asks DiceForge for its entries (getNodeMenuItems)", async ({ page }) => {
-      const [clip] = await addNodes(page, [{ type: "CLIPTextEncodePositiveNegative", pos: [200, 150] }]);
+      const [clip] = await addNodes(page, [{ type: "DiceForgeCLIPDualTextEncode", pos: [200, 150] }]);
       const point = vue
         ? await page.locator(`[data-node-id="${clip}"] [data-testid^="node-header"]`).boundingBox().then((box) => ({ x: box.x + box.width / 2, y: box.y + box.height / 2 }))
         : await page.evaluate((id) => {
@@ -145,7 +145,7 @@ for (const vue of [true, false]) {
 
     if (vue) {
       test("Show advanced inputs sets node.showAdvanced", async ({ page }) => {
-        const [clip] = await addNodes(page, [{ type: "CLIPTextEncodePositiveNegative" }]);
+        const [clip] = await addNodes(page, [{ type: "DiceForgeCLIPDualTextEncode" }]);
         await page.locator(`[data-node-id="${clip}"]`).getByText(/Show advanced inputs/).click();
         await expect.poll(() => page.evaluate((id) => window.app.graph.getNodeById(id).showAdvanced, clip),
           changed("node.showAdvanced (Show advanced inputs in Nodes 2.0)", "prompt_preview.js")).toBe(true);

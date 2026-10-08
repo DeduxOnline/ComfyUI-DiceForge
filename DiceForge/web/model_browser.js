@@ -18,7 +18,7 @@ import { closeMenu, keysButton, keysOnQuestion, menuAt, menuOpen, slashToSearch,
 // ☆ on a card makes it a favorite (kept in its Model info, so it goes with the file); ★ Favorites in the tree shows only those.
 // Several at once: Ctrl+click picks cards (Shift+click a range, or ☐ Select to pick with plain clicks), and the bar above the cards stars, moves,
 // deletes or adds (LoRA Stack) all of them; dragging a picked card onto a folder moves every picked one.
-const CLIP_NODE = "CLIPTextEncodePositiveNegative";
+const CLIP_NODE = "DiceForgeCLIPDualTextEncode";
 const BROWSERS = [
   { kind: "loras", icon: "🎴", title: "LoRA", one: "LoRA", plural: "LoRAs", widget: /lora/i, random: "DiceForgeRandomLora", randomName: "Random LoRA", triggers: true, manage: true },
   { kind: "checkpoints", icon: "🗃️", title: "Checkpoint", one: "checkpoint", plural: "checkpoints", widget: /ckpt|checkpoint/i, random: "DiceForgeRandomCheckpoint", randomName: "Random Checkpoint", triggers: false, manage: true },

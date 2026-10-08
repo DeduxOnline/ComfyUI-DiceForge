@@ -67,7 +67,7 @@ const rescaleSettings = (node) => ({
 
 // Per node: the settings that decide the size (the seed is left out: with "randomize" it changes right after each run), and the preview for fixed choices.
 const NODES = {
-  SDXLResolutionListLatent: {
+  DiceForgeSDXLResolutionList: {
     settings: (node) => ({
       group: widgetValue(node, "resolution"),
       size: String(widgetValue(node, "resolution.size") ?? ""),
@@ -88,7 +88,7 @@ const NODES = {
       return { ratio: `${width}:${height}`, megapixels: (width * height) / (1024 * 1024) };
     },
   },
-  ResolutionSelectorRandomLatent: {
+  DiceForgeResolutionSelector: {
     settings: (node) => ({
       aspect_ratio: String(widgetValue(node, "aspect_ratio") ?? ""),
       megapixels: Number(widgetValue(node, "megapixels") ?? 1),

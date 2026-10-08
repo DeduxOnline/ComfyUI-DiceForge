@@ -105,7 +105,7 @@ class SDXLResolutionListLatent(io.ComfyNode):
     def define_schema(cls):
         size = lambda options, tooltip, default=None: io.Combo.Input("size", options=list(options), default=default or next(iter(options)), tooltip=tooltip)
         return io.Schema(
-            node_id="SDXLResolutionListLatent",
+            node_id="DiceForgeSDXLResolutionList",
             display_name="SDXL Resolution List",
             category="DiceForge/latent",
             description="Pick a resolution from the SDXL list (or at random from the seed) and output an empty latent of that size.",

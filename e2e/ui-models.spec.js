@@ -426,7 +426,7 @@ for (const vue of [true, false]) {
     });
 
     test("Diffusion Model Browser puts a model in Load Diffusion Model and a folder in Random Diffusion Model", async ({ page }) => {
-      const [loader, random, both] = await addNodes(page, [{ type: "UNETLoader", widgets: { unet_name: "flux1-dev.safetensors" } }, { type: "DiceForgeRandomDiffusionModel", pos: [500, 40] }, { type: "LoadDiffusionModelCLIP", pos: [900, 40] }]);
+      const [loader, random, both] = await addNodes(page, [{ type: "UNETLoader", widgets: { unet_name: "flux1-dev.safetensors" } }, { type: "DiceForgeRandomDiffusionModel", pos: [500, 40] }, { type: "DiceForgeLoadDiffusionModelCLIP", pos: [900, 40] }]);
       for (const id of [loader, random]) expect(await menuItems(page, id, "DiceForge.ModelBrowser")).toEqual(["🧊 Diffusion Model Browser"]);
       expect(await menuItems(page, both, "DiceForge.ModelBrowser")).toEqual(["🧊 Diffusion Model Browser", "🔤 Text Encoder Browser (clip_name1)", "🔤 Text Encoder Browser (clip_name2)"]);
       await clickMenu(page, loader, "DiceForge.ModelBrowser", "Diffusion Model Browser");
@@ -446,7 +446,7 @@ for (const vue of [true, false]) {
 
     test("Model browsers find model lists in every form: a function, objects, or no list (Asset API); Text Encoder and VAE Browsers", async ({ page }) => {
       const [checkpoint, diffusion, asset, both, vae] = await addNodes(page, [{ type: "CheckpointLoaderSimple" }, { type: "UNETLoader", pos: [420, 40] },
-        { type: "UNETLoader", pos: [820, 40], widgets: { unet_name: "flux1-dev.safetensors" } }, { type: "LoadDiffusionModelCLIP", pos: [40, 420] }, { type: "VAELoader", pos: [500, 420] }]);
+        { type: "UNETLoader", pos: [820, 40], widgets: { unet_name: "flux1-dev.safetensors" } }, { type: "DiceForgeLoadDiffusionModelCLIP", pos: [40, 420] }, { type: "VAELoader", pos: [500, 420] }]);
       await page.evaluate(([checkpoint, diffusion, asset]) => {
         const widget = (id, name) => window.app.graph.getNodeById(id).widgets.find((item) => item.name === name);
         const files = widget(checkpoint, "ckpt_name").options.values.slice();
@@ -511,7 +511,7 @@ for (const vue of [true, false]) {
       await lookUp(request, "loras", "style/ink.safetensors");
       const [lora, encode, sampler, latent] = await addNodes(page, [
         { type: "LoraLoader", widgets: { lora_name: "style/ink.safetensors" } },
-        { type: "CLIPTextEncodePositiveNegative", pos: [420, 40] },
+        { type: "DiceForgeCLIPDualTextEncode", pos: [420, 40] },
         { type: "KSampler", pos: [840, 40], widgets: { sampler_name: "euler", scheduler: "simple" } },
         { type: "EmptyLatentImage", pos: [420, 480] },
       ]);

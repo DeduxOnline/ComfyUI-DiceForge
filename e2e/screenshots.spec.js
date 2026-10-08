@@ -31,13 +31,13 @@ test.describe("README screenshots (Nodes 2.0)", () => {
   test.beforeEach(async ({ page }) => openComfy(page, { vue: true }));
 
   test("resolution nodes", async ({ page }) => {
-    const [sdxl] = await addNodes(page, [{ type: "SDXLResolutionListLatent", pos: [400, 220], widgets: { "resolution.size": "1216 x 832" } }]);
+    const [sdxl] = await addNodes(page, [{ type: "DiceForgeSDXLResolutionList", pos: [400, 220], widgets: { "resolution.size": "1216 x 832" } }]);
     await setWidget(page, sdxl, "rescale.percent", 150);
     await showAdvanced(page, sdxl);
     await expect(nodeElement(page, sdxl)).toContainText("1824 × 1248");
     await shot(page, [sdxl], "sdxl_resolution_list.png");
     await page.evaluate(() => window.app.graph.clear());
-    const [selector] = await addNodes(page, [{ type: "ResolutionSelectorRandomLatent", pos: [400, 220], widgets: { aspect_ratio: "16:9 (Widescreen)" } }]);
+    const [selector] = await addNodes(page, [{ type: "DiceForgeResolutionSelector", pos: [400, 220], widgets: { aspect_ratio: "16:9 (Widescreen)" } }]);
     await setWidget(page, selector, "rescale", "to longest side");
     await setWidget(page, selector, "rescale.longer_side", 1920);
     await expect(nodeElement(page, selector)).toContainText("1920 × 1080");
@@ -45,7 +45,7 @@ test.describe("README screenshots (Nodes 2.0)", () => {
   });
 
   test("CLIP Dual Text Encode and the autocomplete", async ({ page, request }) => {
-    const [id, text] = await addNodes(page, [{ type: "CLIPTextEncodePositiveNegative", pos: [400, 220], widgets: {
+    const [id, text] = await addNodes(page, [{ type: "DiceForgeCLIPDualTextEncode", pos: [400, 220], widgets: {
       positive: "${g={male|female}}photo of a __outfit/${g}__ person, {2$$__characters/*/outfit__}, __color__ hair, {3::smiling|serious}",
       negative: "blurry, lowres", seed: 42, seed_mode: "deck" } }, { type: "PreviewAny", pos: [1700, 220] }]);
     await connect(page, id, 3, text, 0);
@@ -175,9 +175,9 @@ test.describe("README screenshots (Nodes 2.0)", () => {
 
   test("utility nodes", async ({ page }) => {
     const ids = await addNodes(page, [
-      { type: "VAEDecodeSave", pos: [400, 220] },
-      { type: "LoadVAEDecodeSave", pos: [720, 220] },
-      { type: "LoadDiffusionModelCLIP", pos: [1040, 220], widgets: { unet_name: "flux1-dev.safetensors", clip_name1: "clip_l.safetensors" } },
+      { type: "DiceForgeVAEDecodeSave", pos: [400, 220] },
+      { type: "DiceForgeLoadVAEDecodeSave", pos: [720, 220] },
+      { type: "DiceForgeLoadDiffusionModelCLIP", pos: [1040, 220], widgets: { unet_name: "flux1-dev.safetensors", clip_name1: "clip_l.safetensors" } },
     ]);
     await expect(nodeElement(page, ids[2])).toContainText("flux1-dev.safetensors");
     await shot(page, ids, "utility_nodes.png");
@@ -193,7 +193,7 @@ test.describe("README screenshots (Nodes 2.0)", () => {
     await shot(page, [words, text], "wildcards_to_text.png");
 
     const [encode, prompt, image, show] = await addNodes(page, [
-      { type: "CLIPTextEncodePositiveNegative", pos: [400, 700], widgets: { positive: "1girl, {red|blue|green} dress, __hair/style__", seed: 5, control_after_generate: "increment" } },
+      { type: "DiceForgeCLIPDualTextEncode", pos: [400, 700], widgets: { positive: "1girl, {red|blue|green} dress, __hair/style__", seed: 5, control_after_generate: "increment" } },
       { type: "PreviewAny", pos: [1000, 700] },
       { type: "EmptyImage", pos: [1300, 700], widgets: { width: 64, height: 64 } },
       { type: "PreviewImage", pos: [1600, 700] },
@@ -220,7 +220,7 @@ test.describe("README screenshots (Nodes 2.0)", () => {
   test("Wildcard Browser cards", async ({ page }) => {
     writeFile("models/wildcards/POSES.yaml", "POSES:\n  sitting: sitting, hands on lap,\n  standing: standing, arms crossed,\n  kneeling: kneeling,\n  lying: lying on back,\n");
     for (const [index, pose] of ["sitting", "standing", "kneeling"].entries()) writeFile(`models/wildcards/POSES/${pose}.png`, png(120, 160, [[150, 110, 190], [190, 120, 100], [100, 160, 140]][index]));
-    const [id] = await addNodes(page, [{ type: "CLIPTextEncodePositiveNegative", pos: [400, 220], widgets: { positive: "1girl" } }]);
+    const [id] = await addNodes(page, [{ type: "DiceForgeCLIPDualTextEncode", pos: [400, 220], widgets: { positive: "1girl" } }]);
     await clickMenu(page, id, "DiceForge.Wildcards", "Wildcard Browser");
     const dialog = page.locator(".dfwc");
     if (await dialog.locator("button.mode").textContent() === "🃏 Cards") await dialog.locator("button.mode").click();

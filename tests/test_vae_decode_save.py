@@ -32,7 +32,7 @@ def saved_files(ui):
 @pytest.fixture
 def with_workflow(monkeypatch):
     """The prompt and workflow that ComfyUI gives a node while it runs (saved in the PNG)."""
-    hidden = types.SimpleNamespace(prompt={"1": {"class_type": "VAEDecodeSave"}}, extra_pnginfo={"workflow": {"nodes": []}}, unique_id="1")
+    hidden = types.SimpleNamespace(prompt={"1": {"class_type": "DiceForgeVAEDecodeSave"}}, extra_pnginfo={"workflow": {"nodes": []}}, unique_id="1")
     monkeypatch.setattr(VAEDecodeSave, "hidden", hidden, raising=False)
     monkeypatch.setattr(LoadVAEDecodeSave, "hidden", hidden, raising=False)
 

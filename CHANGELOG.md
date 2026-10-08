@@ -43,6 +43,11 @@ nodes and features, a patch for fixes. Each version is a [release on GitHub](htt
   allowed (HTML built from text, eval, unsafe yaml, a shell, pickle).
 
 ### Changed
+- Every node id starts with DiceForge, so no other node pack can take a DiceForge node's place in a workflow (ComfyUI-RuiquNodes has a
+  VAEDecodeSave): `SDXLResolutionListLatent` is now `DiceForgeSDXLResolutionList`, `ResolutionSelectorRandomLatent`
+  `DiceForgeResolutionSelector`, `CLIPTextEncodePositiveNegative` `DiceForgeCLIPDualTextEncode`, `LoadVAEDecodeSave`
+  `DiceForgeLoadVAEDecodeSave`, `VAEDecodeSave` `DiceForgeVAEDecodeSave` and `LoadDiffusionModelCLIP` `DiceForgeLoadDiffusionModelCLIP`. The
+  names in the menus stay the same; workflows saved with the old ids show these nodes as missing.
 - Node heights: a node taller than what it shows (a workflow saved so, content that got smaller) is fitted again, in both designs; only
   a node with a text field, which grows with it, keeps a height the user gave it.
 - Wildcard Browser: the tree takes a third of the window, the editor (or the cards) two thirds.

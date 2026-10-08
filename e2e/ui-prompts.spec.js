@@ -11,7 +11,7 @@ for (const vue of [true, false]) {
     test.beforeEach(async ({ page }) => openComfy(page, { vue }));
 
     test("typing __ in CLIP Dual Text Encode suggests wildcards", async ({ page }) => {
-      const [id] = await addNodes(page, [{ type: "CLIPTextEncodePositiveNegative", pos: [300, 60] }]);
+      const [id] = await addNodes(page, [{ type: "DiceForgeCLIPDualTextEncode", pos: [300, 60] }]);
       const positive = await promptField(page, id, "positive");
       await positive.click();
       await page.keyboard.type("1girl, __hair/st");
@@ -35,7 +35,7 @@ for (const vue of [true, false]) {
     });
 
     test("the autocomplete opens under the caret, also on a zoomed canvas and on a later line", async ({ page }) => {
-      const [id] = await addNodes(page, [{ type: "CLIPTextEncodePositiveNegative", pos: [100, 60], widgets: {
+      const [id] = await addNodes(page, [{ type: "DiceForgeCLIPDualTextEncode", pos: [100, 60], widgets: {
         positive: "masterpiece, best quality, 1girl, __color__ hair, multiple views, dynamic pose, from above, standing, looking at viewer, long hair" } }]);
       await page.evaluate(() => { window.app.canvas.ds.scale = 1.5; window.app.canvas.setDirty(true, true); });
       await page.waitForTimeout(500);
@@ -60,7 +60,7 @@ for (const vue of [true, false]) {
         await new Promise((resolve) => setTimeout(resolve, delay));
         await route.continue();
       });
-      const [id] = await addNodes(page, [{ type: "CLIPTextEncodePositiveNegative", pos: [300, 60] }]);
+      const [id] = await addNodes(page, [{ type: "DiceForgeCLIPDualTextEncode", pos: [300, 60] }]);
       const positive = await promptField(page, id, "positive");
       await positive.click();
       await page.keyboard.type("__hair/st");
@@ -73,7 +73,7 @@ for (const vue of [true, false]) {
 
     test("the prompt fields highlight the syntax, with missing wildcards in red", async ({ page }) => {
       const prompt = "${g={male|female}}a __color__ {2$$3::!hat|__nope__|bow} \\{x\\} (smile:1.2) ${g} // note\n/* block */ embedding:easy";
-      const [id] = await addNodes(page, [{ type: "CLIPTextEncodePositiveNegative", widgets: { positive: prompt } }]);
+      const [id] = await addNodes(page, [{ type: "DiceForgeCLIPDualTextEncode", widgets: { positive: prompt } }]);
       const field = await promptField(page, id, "positive");
       const layer = field.locator("xpath=preceding-sibling::div[contains(concat(' ', @class, ' '), ' dfhl ')][1]");
       await expect(layer).toHaveCount(1);
@@ -111,7 +111,7 @@ for (const vue of [true, false]) {
 
     test("Wildcard Browser adds wildcards to the prompt and edits files", async ({ page }) => {
       writeFile(`models/wildcards/edit_${vue ? "vue" : "classic"}.txt`, "one\ntwo\n");
-      const [id] = await addNodes(page, [{ type: "CLIPTextEncodePositiveNegative", pos: [300, 60], widgets: { positive: "1girl" } }]);
+      const [id] = await addNodes(page, [{ type: "DiceForgeCLIPDualTextEncode", pos: [300, 60], widgets: { positive: "1girl" } }]);
       expect(await menuItems(page, id, "DiceForge.Wildcards")).toEqual(["📖 Syntax guide", "🎲 Wildcard Browser", "✂ Selection → new wildcard…"]);
       await clickMenu(page, id, "DiceForge.Wildcards", "Wildcard Browser");
       await expect(page.locator(".dfwc .row").first()).toBeVisible();
@@ -138,7 +138,7 @@ for (const vue of [true, false]) {
     });
 
     test("Wildcard Browser folders open and close, and stay so", async ({ page }) => {
-      const [id] = await addNodes(page, [{ type: "CLIPTextEncodePositiveNegative", pos: [300, 60] }]);
+      const [id] = await addNodes(page, [{ type: "DiceForgeCLIPDualTextEncode", pos: [300, 60] }]);
       await page.evaluate(() => localStorage.removeItem("diceforge.wildcards.open"));
       await clickMenu(page, id, "DiceForge.Wildcards", "Wildcard Browser");
       const hair = page.locator('.dfwc .folder[data-path="hair"]');
@@ -169,7 +169,7 @@ for (const vue of [true, false]) {
       writeFile(`models/wildcards/${top}/from/x.txt`, "one\ntwo\n");
       writeFile(`models/wildcards/${top}/to/y.txt`, "y\n");
       try {
-        const [id] = await addNodes(page, [{ type: "CLIPTextEncodePositiveNegative", pos: [300, 60] }]);
+        const [id] = await addNodes(page, [{ type: "DiceForgeCLIPDualTextEncode", pos: [300, 60] }]);
         await clickMenu(page, id, "DiceForge.Wildcards", "Wildcard Browser");
         await page.locator(".dfwc button.open-all").click();
         await page.locator(`.dfwc .row[data-name="${top}/from/x"] .name`).click();
@@ -200,7 +200,7 @@ for (const vue of [true, false]) {
       const top = `wmem_${vue ? "vue" : "classic"}`;
       writeFile(`models/wildcards/${top}/notes.txt`, "alpha\nbeta\n");
       try {
-        const [id] = await addNodes(page, [{ type: "CLIPTextEncodePositiveNegative", pos: [300, 60] }]);
+        const [id] = await addNodes(page, [{ type: "DiceForgeCLIPDualTextEncode", pos: [300, 60] }]);
         await clickMenu(page, id, "DiceForge.Wildcards", "Wildcard Browser");
         await page.locator(".dfwc .top input").first().fill(top);
         await page.locator(`.dfwc .row[data-name="${top}/notes"] .name`).click();
@@ -233,7 +233,7 @@ for (const vue of [true, false]) {
       writeFile(`models/wildcards/${top}/look.txt`, `# looks\n__${top}/colour__ hair\n\nsmile\nsmile\n2::angry\n`);
       writeFile(`models/wildcards/${top}/list.txt`, "b\n3::a\nC\n");
       try {
-        const [id] = await addNodes(page, [{ type: "CLIPTextEncodePositiveNegative", pos: [300, 60] }]);
+        const [id] = await addNodes(page, [{ type: "DiceForgeCLIPDualTextEncode", pos: [300, 60] }]);
         page.on("dialog", (dialog) => (dialog.type() === "prompt" ? dialog.accept(`${top}/color`) : dialog.accept()));
         await clickMenu(page, id, "DiceForge.Wildcards", "Wildcard Browser");
         const dialog = page.locator(".dfwc"), status = dialog.locator(".status"), row = (name) => dialog.locator(`.row[data-name="${top}/${name}"]`);
@@ -288,7 +288,7 @@ for (const vue of [true, false]) {
 
     test("✂ Selection → new wildcard: the selected part of the prompt becomes a wildcard, __name__ takes its place; a taken name gets it as a line", async ({ page }) => {
       const top = `cut_${vue ? "vue" : "classic"}`, file = (...parts) => basePath("models", "wildcards", top, ...parts);
-      const [id] = await addNodes(page, [{ type: "CLIPTextEncodePositiveNegative", pos: [300, 60], widgets: { positive: "1girl, red dress, smile" } }]);
+      const [id] = await addNodes(page, [{ type: "DiceForgeCLIPDualTextEncode", pos: [300, 60], widgets: { positive: "1girl, red dress, smile" } }]);
       const field = await promptField(page, id, "positive");
       const select = async (from, to) => {
         await field.click();
@@ -315,7 +315,7 @@ for (const vue of [true, false]) {
     });
 
     test("Wildcard Browser favorites: ☆ stars a file, ★ Favorites shows only them, the autocomplete puts them first", async ({ page }) => {
-      const [id] = await addNodes(page, [{ type: "CLIPTextEncodePositiveNegative", pos: [300, 60] }]);
+      const [id] = await addNodes(page, [{ type: "DiceForgeCLIPDualTextEncode", pos: [300, 60] }]);
       await clickMenu(page, id, "DiceForge.Wildcards", "Wildcard Browser");
       await page.locator(".dfwc button.open-all").click();
       const style = page.locator('.dfwc .row[data-name="hair/style"]');
@@ -345,7 +345,7 @@ for (const vue of [true, false]) {
       const file = (...parts) => basePath("models", "wildcards", ...parts);
       writeFile(`models/wildcards/${pack}/sitting.txt`, "sitting\n");
       writeFile(`models/wildcards/${pack}/standing.txt`, "standing\nstanding, arms crossed\n");
-      const [id] = await addNodes(page, [{ type: "CLIPTextEncodePositiveNegative", pos: [300, 60], widgets: { positive: "1girl" } }]);
+      const [id] = await addNodes(page, [{ type: "DiceForgeCLIPDualTextEncode", pos: [300, 60], widgets: { positive: "1girl" } }]);
       page.on("dialog", (confirmation) => confirmation.accept());
       await clickMenu(page, id, "DiceForge.Wildcards", "Wildcard Browser");
       const dialog = page.locator(".dfwc");
@@ -386,7 +386,7 @@ for (const vue of [true, false]) {
     test("Wildcard Browser's editor has the autocomplete: wildcards and LoRAs while typing, Escape closes only the list", async ({ page }) => {
       const file = `complete_${vue ? "vue" : "classic"}`; // A file of its own: the tests share the server's files.
       writeFile(`models/wildcards/${file}.txt`, "one\n");
-      const [id] = await addNodes(page, [{ type: "CLIPTextEncodePositiveNegative", pos: [300, 60] }]);
+      const [id] = await addNodes(page, [{ type: "DiceForgeCLIPDualTextEncode", pos: [300, 60] }]);
       await clickMenu(page, id, "DiceForge.Wildcards", "Wildcard Browser");
       const dialog = page.locator(".dfwc");
       if (await dialog.locator("button.mode").textContent() === "📄 Lines") await dialog.locator("button.mode").click(); // Lines: the editor.
@@ -413,7 +413,7 @@ for (const vue of [true, false]) {
 
     test("Wildcard Browser imports a zip card pack, finds wildcards by their lines, and + puts a line in the prompt", async ({ page }) => {
       const pack = `ZIP_${vue ? "vue" : "classic"}`; // A pack of its own: the tests share the server's files.
-      const [id] = await addNodes(page, [{ type: "CLIPTextEncodePositiveNegative", pos: [300, 60], widgets: { positive: "1girl" } }]);
+      const [id] = await addNodes(page, [{ type: "DiceForgeCLIPDualTextEncode", pos: [300, 60], widgets: { positive: "1girl" } }]);
       await clickMenu(page, id, "DiceForge.Wildcards", "Wildcard Browser");
       const dialog = page.locator(".dfwc");
       if (await dialog.locator("button.mode").textContent() === "📄 Lines") await dialog.locator("button.mode").click(); // Lines: the editor.
@@ -462,7 +462,7 @@ for (const vue of [true, false]) {
 
     test("Wildcard Browser creates, renames and deletes files", async ({ page }) => {
       const tag = vue ? "vue" : "classic", wildcards = (...parts) => basePath("models", "wildcards", ...parts);
-      const [id] = await addNodes(page, [{ type: "CLIPTextEncodePositiveNegative", pos: [300, 60] }]);
+      const [id] = await addNodes(page, [{ type: "DiceForgeCLIPDualTextEncode", pos: [300, 60] }]);
       await clickMenu(page, id, "DiceForge.Wildcards", "Wildcard Browser");
       const answers = [`crud_${tag}/new`, `crud_${tag}/new`, `crud_${tag}_done/renamed`]; // The prompts in order: new file, the same name again, rename.
       page.on("dialog", (dialog) => (dialog.type() === "confirm" ? dialog.accept() : dialog.accept(answers.shift())));
@@ -523,7 +523,7 @@ for (const vue of [true, false]) {
       writeFile(`models/wildcards/${pack}.yaml`, `${pack}:\n  sitting: sitting,\n  standing: standing,\n  bare: no picture here,\n`);
       writeFile(`models/wildcards/${pack}/sitting.png`, png(30, 40, [200, 80, 80]));
       writeFile(`models/wildcards/${pack}/standing.png`, png(30, 40, [80, 80, 200]));
-      const [id] = await addNodes(page, [{ type: "CLIPTextEncodePositiveNegative", pos: [300, 60], widgets: { positive: "1girl" } }]);
+      const [id] = await addNodes(page, [{ type: "DiceForgeCLIPDualTextEncode", pos: [300, 60], widgets: { positive: "1girl" } }]);
       await clickMenu(page, id, "DiceForge.Wildcards", "Wildcard Browser");
       const dialog = page.locator(".dfwc");
       if (await dialog.locator("button.mode").textContent() === "📄 Lines") await dialog.locator("button.mode").click(); // Start in lines.
@@ -545,7 +545,7 @@ for (const vue of [true, false]) {
     });
 
     test("Syntax guide: the prompt syntax by topic, searched, an example inserted into the prompt", async ({ page }) => {
-      const [id] = await addNodes(page, [{ type: "CLIPTextEncodePositiveNegative", pos: [300, 60], widgets: { positive: "1girl" } }]);
+      const [id] = await addNodes(page, [{ type: "DiceForgeCLIPDualTextEncode", pos: [300, 60], widgets: { positive: "1girl" } }]);
       const menu = await page.evaluate((id) => window.app.extensions.flatMap((extension) => extension.getNodeMenuItems?.(window.app.graph.getNodeById(id)) ?? [])
         .filter(Boolean).map((item) => item.content), id);
       expect(menu[0]).toBe("📖 Syntax guide"); // First in the node's menu.
@@ -583,7 +583,7 @@ for (const vue of [true, false]) {
       await lookUp(request, "checkpoints", "illustrious_base.safetensors");
       const [checkpoint, encode] = await addNodes(page, [
         { type: "CheckpointLoaderSimple", widgets: { ckpt_name: "illustrious_base.safetensors" } },
-        { type: "CLIPTextEncodePositiveNegative", pos: [460, 40], widgets: { positive: "1girl, smile", negative: "" } },
+        { type: "DiceForgeCLIPDualTextEncode", pos: [460, 40], widgets: { positive: "1girl, smile", negative: "" } },
       ]);
       const items = () => page.evaluate((id) => window.app.extensions.find((item) => item.name === "DiceForge.PromptStyles")
         .getNodeMenuItems(window.app.graph.getNodeById(id))[0].submenu.options.filter(Boolean).map((item) => item.content), encode);
@@ -620,7 +620,7 @@ for (const vue of [true, false]) {
     });
 
     test("Tag autocomplete: the Danbooru list downloaded from the node's menu, then the most used tags while a word is typed", async ({ page }) => {
-      const [id] = await addNodes(page, [{ type: "CLIPTextEncodePositiveNegative", pos: [300, 60] }]);
+      const [id] = await addNodes(page, [{ type: "DiceForgeCLIPDualTextEncode", pos: [300, 60] }]);
       const menu = () => page.evaluate((id) => window.app.extensions.find((item) => item.name === "DiceForge.TagAutocomplete")
         .getNodeMenuItems(window.app.graph.getNodeById(id))[0].submenu.options.map((item) => item.content), id);
       await expect.poll(menu).toContain("⬇ Download: Danbooru (anime: Illustrious, NoobAI, Anima, Pony)");
@@ -709,7 +709,7 @@ for (const vue of [true, false]) {
 
     test("a workflow queued from the page fills in the prompt", async ({ page, request }) => {
       const [encode, preview] = await addNodes(page, [
-        { type: "CLIPTextEncodePositiveNegative", widgets: { positive: "a __color__ car, {2$$__characters/*/outfit__}", seed: 3 } },
+        { type: "DiceForgeCLIPDualTextEncode", widgets: { positive: "a __color__ car, {2$$__characters/*/outfit__}", seed: 3 } },
         { type: "PreviewAny", pos: [500, 40] },
       ]);
       await connect(page, encode, 3, preview, 0);
@@ -743,7 +743,7 @@ for (const vue of [true, false]) {
 
     test("the prompt history keeps the last runs with their images: put back a seed, use a text, pin, remove", async ({ page, request }) => {
       const [encode, preview, image, show] = await addNodes(page, [
-        { type: "CLIPTextEncodePositiveNegative", widgets: { positive: "a {red|blue|green|white|black|pink} car", seed: 1, control_after_generate: "increment" } },
+        { type: "DiceForgeCLIPDualTextEncode", widgets: { positive: "a {red|blue|green|white|black|pink} car", seed: 1, control_after_generate: "increment" } },
         { type: "PreviewAny", pos: [500, 40] },
         { type: "EmptyImage", pos: [40, 520], widgets: { width: 32, height: 32 } },
         { type: "PreviewImage", pos: [400, 520] },

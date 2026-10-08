@@ -62,7 +62,7 @@ const { addNodes } = require("../../../helpers");
 (async () => {
   for (const vue of [true, false]) {
     const { browser, page, errors } = await open({ vue });
-    const [id] = await addNodes(page, [{ type: "CLIPTextEncodePositiveNegative", pos: [60, 60] }]);
+    const [id] = await addNodes(page, [{ type: "DiceForgeCLIPDualTextEncode", pos: [60, 60] }]);
     // ... use the node like a user: click, type, right-click, press keys ...
     console.log(await shot(page, id, `clip_${vue ? "vue" : "classic"}`), errors);
     await browser.close();
