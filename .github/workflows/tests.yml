@@ -87,7 +87,7 @@ jobs:
         run: python .github/scripts/sonar_summary.py
 
   e2e:
-    # Four jobs at once, each with its own ComfyUI server (the tests of one server share its files and memory, so they run one at a time).
+    # Five jobs at once, each with its own ComfyUI server (the tests of one server share its files and memory, so they run one at a time).
     name: End-to-end tests (${{ matrix.group }})
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -103,6 +103,8 @@ jobs:
             files: ui-models.spec.js
           - group: robustness
             files: robustness.spec.js ui-robustness.spec.js
+          - group: ComfyUI contract and old workflows
+            files: contract.spec.js compat.spec.js
     steps:
       - uses: actions/checkout@v5
 

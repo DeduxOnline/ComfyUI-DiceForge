@@ -53,7 +53,8 @@ async function lookAt(page, vue, type) {
       rows.push({ title: `${design} · ${type}`, pictures: looks.map((item) => ({ label: `${item.state} · stored ${item.stored}${item.problems.length ? " · ⚠" : ""}`, file: item.file })) });
     }
     for (let start = 0; start < rows.length; start += PER_SHEET) {
-      console.log(`sheet: ${await sheet(browser, rows.slice(start, start + PER_SHEET), `nodes/sheet_${design}_${start / PER_SHEET + 1}`)}`);
+      const name = `nodes/sheet_${design}_${start / PER_SHEET + 1}`;
+      console.log(`sheet: ${await sheet(browser, rows.slice(start, start + PER_SHEET), name)}`);
     }
     errors.push(...pageErrors.map((error) => `${design}: ${error}`));
     await browser.close();

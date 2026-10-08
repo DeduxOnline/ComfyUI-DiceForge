@@ -1,0 +1,3186 @@
+{
+ "diceforge": "1.0.0",
+ "comfyui": "0.37.0",
+ "made": "2026-10-08",
+ "types": [
+  "CLIPTextEncodePositiveNegative",
+  "DiceForgeDanbooruEnhancer",
+  "DiceForgeGrid",
+  "DiceForgeHiresUpscale",
+  "DiceForgeLoraStack",
+  "DiceForgeRandomCheckpoint",
+  "DiceForgeRandomDiffusionModel",
+  "DiceForgeRandomFloat",
+  "DiceForgeRandomImage",
+  "DiceForgeRandomInt",
+  "DiceForgeRandomLora",
+  "DiceForgeRandomSampler",
+  "DiceForgeRandomVAE",
+  "DiceForgeVariationSeed",
+  "DiceForgeWildcardsToText",
+  "DiceForgeXYPlot",
+  "LoadDiffusionModelCLIP",
+  "LoadVAEDecodeSave",
+  "ResolutionSelectorRandomLatent",
+  "SDXLResolutionListLatent",
+  "VAEDecodeSave"
+ ],
+ "widgets": {
+  "1": {
+   "type": "CLIPTextEncodePositiveNegative",
+   "widgets": {
+    "positive": "compat positive кот",
+    "negative": "compat negative кот",
+    "seed": 1,
+    "seed_mode": "deck",
+    "trim": false
+   }
+  },
+  "2": {
+   "type": "DiceForgeDanbooruEnhancer",
+   "widgets": {
+    "tags": "compat tags кот",
+    "source": "e621",
+    "rating": "sensitive",
+    "mode": "fixed",
+    "post_ids": "compat post_ids кот",
+    "posts": 2,
+    "max_tags": 16,
+    "include_general": false,
+    "include_appearance": false,
+    "include_clothes": false,
+    "include_background": false,
+    "include_count": false,
+    "include_character": true,
+    "include_copyright": true,
+    "include_artist": true,
+    "exclude": "compat exclude кот",
+    "position": "before",
+    "wildcard_seed": 1
+   }
+  },
+  "3": {
+   "type": "DiceForgeGrid",
+   "widgets": {
+    "count": 1,
+    "columns": 1,
+    "cell_width": 392,
+    "save": false,
+    "filename_prefix": "compat filename_prefix кот",
+    "name": "compat name кот",
+    "new_grid": true,
+    "legend": "compat legend кот",
+    "legend_position": "bottom",
+    "numbered": true
+   }
+  },
+  "4": {
+   "type": "DiceForgeHiresUpscale",
+   "widgets": {
+    "model_name": "None",
+    "rescale_after_model": false,
+    "rescale_method": "nearest-exact",
+    "rescale": "to Width/Height",
+    "rescale.width": 1544,
+    "rescale.height": 8,
+    "crop": "center",
+    "vae_name": "pixel_space",
+    "image_output": "Hide",
+    "filename_prefix": "compat filename_prefix кот"
+   }
+  },
+  "5": {
+   "type": "DiceForgeLoraStack",
+   "widgets": {
+    "loras": "{\"rows\":[{\"lora\":\"style/ink.safetensors\",\"strength\":0.8,\"on\":true},{\"lora\":\"detail.safetensors\",\"strength\":0.5,\"on\":false}],\"groups\":{},\"separate_clip\":false}",
+    "seed": 1,
+    "seed_mode": "deck"
+   }
+  },
+  "6": {
+   "type": "DiceForgeRandomCheckpoint",
+   "widgets": {
+    "folder": "sdxl",
+    "seed": 1,
+    "seed_mode": "deck"
+   }
+  },
+  "7": {
+   "type": "DiceForgeRandomDiffusionModel",
+   "widgets": {
+    "folder": "flux",
+    "seed": 1,
+    "seed_mode": "deck",
+    "weight_dtype": "fp8_e4m3fn"
+   }
+  },
+  "8": {
+   "type": "DiceForgeRandomFloat",
+   "widgets": {
+    "min": 0.01,
+    "max": 1.01,
+    "step": 0.01,
+    "seed": 1,
+    "seed_mode": "deck",
+    "parts": 11
+   }
+  },
+  "9": {
+   "type": "DiceForgeRandomImage",
+   "widgets": {
+    "folder": "e2e",
+    "seed": 1,
+    "seed_mode": "deck",
+    "path": "compat path кот"
+   }
+  },
+  "10": {
+   "type": "DiceForgeRandomInt",
+   "widgets": {
+    "min": 1,
+    "max": 11,
+    "step": 2,
+    "seed": 1,
+    "seed_mode": "deck"
+   }
+  },
+  "11": {
+   "type": "DiceForgeRandomLora",
+   "widgets": {
+    "folder": "style",
+    "strength_model": 1.01,
+    "strength_clip": 1.01,
+    "seed": 1,
+    "seed_mode": "deck",
+    "include_none": true
+   }
+  },
+  "12": {
+   "type": "DiceForgeRandomSampler",
+   "widgets": {
+    "samplers": "compat samplers кот",
+    "schedulers": "compat schedulers кот",
+    "seed": 1,
+    "seed_mode": "deck"
+   }
+  },
+  "13": {
+   "type": "DiceForgeRandomVAE",
+   "widgets": {
+    "folder": "(all)",
+    "seed": 1,
+    "seed_mode": "deck"
+   }
+  },
+  "14": {
+   "type": "DiceForgeVariationSeed",
+   "widgets": {
+    "variation_seed": 1,
+    "variation_strength": 0.11
+   }
+  },
+  "15": {
+   "type": "DiceForgeWildcardsToText",
+   "widgets": {
+    "text": "compat text кот",
+    "seed": 1,
+    "seed_mode": "deck",
+    "trim": false
+   }
+  },
+  "16": {
+   "type": "DiceForgeXYPlot",
+   "widgets": {
+    "x_type": "none",
+    "x_values": "compat x_values кот",
+    "y_type": "none",
+    "y_values": "compat y_values кот",
+    "index": 1,
+    "seed": 1,
+    "steps": 29,
+    "cfg": 6,
+    "sampler_name": "euler",
+    "scheduler": "simple",
+    "denoise": 0.99,
+    "lora_name": "detail.safetensors",
+    "lora_strength": 1.01,
+    "variation_seed": 1,
+    "variation_strength": 0.01
+   }
+  },
+  "17": {
+   "type": "LoadDiffusionModelCLIP",
+   "widgets": {
+    "unet_name": "flux1-dev.safetensors",
+    "clip_name1": "t5xxl_fp16.safetensors",
+    "clip_name2": "clip_l.safetensors",
+    "type": "stable_cascade",
+    "weight_dtype": "fp8_e4m3fn",
+    "device": "cpu"
+   }
+  },
+  "18": {
+   "type": "LoadVAEDecodeSave",
+   "widgets": {
+    "vae_name": "pixel_space",
+    "filename_prefix": "compat filename_prefix кот",
+    "image_output": "Hide"
+   }
+  },
+  "19": {
+   "type": "ResolutionSelectorRandomLatent",
+   "widgets": {
+    "aspect_ratio": "2:3 (Portrait Photo)",
+    "megapixels": 1.1,
+    "seed": 1,
+    "multiple": 16,
+    "batch": 2,
+    "max_aspect": 2.01,
+    "seed_mode": "deck",
+    "rescale": "to Width/Height",
+    "rescale.width": 1544,
+    "rescale.height": 8
+   }
+  },
+  "20": {
+   "type": "SDXLResolutionListLatent",
+   "widgets": {
+    "resolution": "High-Res",
+    "resolution.size": "1152 x 1536",
+    "seed": 1,
+    "rescale": "to Width/Height",
+    "rescale.width": 1544,
+    "rescale.height": 8,
+    "multiple": 16,
+    "batch": 2,
+    "seed_mode": "deck"
+   }
+  },
+  "21": {
+   "type": "VAEDecodeSave",
+   "widgets": {
+    "filename_prefix": "compat filename_prefix кот",
+    "image_output": "Hide"
+   }
+  }
+ },
+ "prompt": {
+  "1": {
+   "inputs": {
+    "positive": "compat positive кот",
+    "negative": "compat negative кот",
+    "seed": 1,
+    "seed_mode": "deck",
+    "trim": false
+   },
+   "class_type": "CLIPTextEncodePositiveNegative",
+   "_meta": {
+    "title": "CLIP Dual Text Encode (Wildcards, LoRA)"
+   }
+  },
+  "2": {
+   "inputs": {
+    "tags": "compat tags кот",
+    "source": "e621",
+    "rating": "sensitive",
+    "mode": "fixed",
+    "post_ids": "compat post_ids кот",
+    "posts": 2,
+    "max_tags": 16,
+    "include_general": false,
+    "include_appearance": false,
+    "include_clothes": false,
+    "include_background": false,
+    "include_count": false,
+    "include_character": true,
+    "include_copyright": true,
+    "include_artist": true,
+    "exclude": "compat exclude кот",
+    "position": "before",
+    "wildcard_seed": 1
+   },
+   "class_type": "DiceForgeDanbooruEnhancer",
+   "_meta": {
+    "title": "Danbooru Tag Enhancer"
+   }
+  },
+  "3": {
+   "inputs": {
+    "count": 1,
+    "columns": 1,
+    "cell_width": 392,
+    "save": false,
+    "filename_prefix": "compat filename_prefix кот",
+    "name": "compat name кот",
+    "new_grid": true,
+    "legend": "compat legend кот",
+    "legend_position": "bottom",
+    "numbered": true
+   },
+   "class_type": "DiceForgeGrid",
+   "_meta": {
+    "title": "Dice Grid"
+   }
+  },
+  "4": {
+   "inputs": {
+    "model_name": "None",
+    "rescale_after_model": false,
+    "rescale_method": "nearest-exact",
+    "rescale": "to Width/Height",
+    "rescale.width": 1544,
+    "rescale.height": 8,
+    "crop": "center",
+    "vae_name": "pixel_space",
+    "image_output": "Hide",
+    "filename_prefix": "compat filename_prefix кот"
+   },
+   "class_type": "DiceForgeHiresUpscale",
+   "_meta": {
+    "title": "HiresFix (Load VAE)"
+   }
+  },
+  "5": {
+   "inputs": {
+    "loras": "{\"rows\":[{\"lora\":\"style/ink.safetensors\",\"strength\":0.8,\"on\":true},{\"lora\":\"detail.safetensors\",\"strength\":0.5,\"on\":false}],\"groups\":{},\"separate_clip\":false}",
+    "seed": 1,
+    "seed_mode": "deck"
+   },
+   "class_type": "DiceForgeLoraStack",
+   "_meta": {
+    "title": "LoRA Stack"
+   }
+  },
+  "6": {
+   "inputs": {
+    "folder": "sdxl",
+    "seed": 1,
+    "seed_mode": "deck"
+   },
+   "class_type": "DiceForgeRandomCheckpoint",
+   "_meta": {
+    "title": "Random Checkpoint"
+   }
+  },
+  "7": {
+   "inputs": {
+    "folder": "flux",
+    "seed": 1,
+    "seed_mode": "deck",
+    "weight_dtype": "fp8_e4m3fn"
+   },
+   "class_type": "DiceForgeRandomDiffusionModel",
+   "_meta": {
+    "title": "Random Diffusion Model"
+   }
+  },
+  "8": {
+   "inputs": {
+    "min": 0.01,
+    "max": 1.01,
+    "step": 0.01,
+    "seed": 1,
+    "seed_mode": "deck",
+    "parts": 11
+   },
+   "class_type": "DiceForgeRandomFloat",
+   "_meta": {
+    "title": "Random Float"
+   }
+  },
+  "9": {
+   "inputs": {
+    "folder": "e2e",
+    "seed": 1,
+    "seed_mode": "deck",
+    "path": "compat path кот"
+   },
+   "class_type": "DiceForgeRandomImage",
+   "_meta": {
+    "title": "Random Image"
+   }
+  },
+  "10": {
+   "inputs": {
+    "min": 1,
+    "max": 11,
+    "step": 2,
+    "seed": 1,
+    "seed_mode": "deck"
+   },
+   "class_type": "DiceForgeRandomInt",
+   "_meta": {
+    "title": "Random Int"
+   }
+  },
+  "11": {
+   "inputs": {
+    "folder": "style",
+    "strength_model": 1.01,
+    "strength_clip": 1.01,
+    "seed": 1,
+    "seed_mode": "deck",
+    "include_none": true
+   },
+   "class_type": "DiceForgeRandomLora",
+   "_meta": {
+    "title": "Random LoRA"
+   }
+  },
+  "12": {
+   "inputs": {
+    "samplers": "compat samplers кот",
+    "schedulers": "compat schedulers кот",
+    "seed": 1,
+    "seed_mode": "deck"
+   },
+   "class_type": "DiceForgeRandomSampler",
+   "_meta": {
+    "title": "Random Sampler"
+   }
+  },
+  "13": {
+   "inputs": {
+    "folder": "(all)",
+    "seed": 1,
+    "seed_mode": "deck"
+   },
+   "class_type": "DiceForgeRandomVAE",
+   "_meta": {
+    "title": "Random VAE"
+   }
+  },
+  "14": {
+   "inputs": {
+    "variation_seed": 1,
+    "variation_strength": 0.11
+   },
+   "class_type": "DiceForgeVariationSeed",
+   "_meta": {
+    "title": "Variation Seed"
+   }
+  },
+  "15": {
+   "inputs": {
+    "text": "compat text кот",
+    "seed": 1,
+    "seed_mode": "deck",
+    "trim": false
+   },
+   "class_type": "DiceForgeWildcardsToText",
+   "_meta": {
+    "title": "Wildcards to Text"
+   }
+  },
+  "16": {
+   "inputs": {
+    "x_type": "none",
+    "x_values": "compat x_values кот",
+    "y_type": "none",
+    "y_values": "compat y_values кот",
+    "index": 1,
+    "seed": 1,
+    "steps": 29,
+    "cfg": 6,
+    "sampler_name": "euler",
+    "scheduler": "simple",
+    "denoise": 0.99,
+    "lora_name": "detail.safetensors",
+    "lora_strength": 1.01,
+    "variation_seed": 1,
+    "variation_strength": 0.01
+   },
+   "class_type": "DiceForgeXYPlot",
+   "_meta": {
+    "title": "XY Plot"
+   }
+  },
+  "17": {
+   "inputs": {
+    "unet_name": "flux1-dev.safetensors",
+    "clip_name1": "t5xxl_fp16.safetensors",
+    "clip_name2": "clip_l.safetensors",
+    "type": "stable_cascade",
+    "weight_dtype": "fp8_e4m3fn",
+    "device": "cpu"
+   },
+   "class_type": "LoadDiffusionModelCLIP",
+   "_meta": {
+    "title": "Load Diffusion Model + CLIP"
+   }
+  },
+  "18": {
+   "inputs": {
+    "vae_name": "pixel_space",
+    "filename_prefix": "compat filename_prefix кот",
+    "image_output": "Hide"
+   },
+   "class_type": "LoadVAEDecodeSave",
+   "_meta": {
+    "title": "Load VAE + Decode + Save"
+   }
+  },
+  "19": {
+   "inputs": {
+    "aspect_ratio": "2:3 (Portrait Photo)",
+    "megapixels": 1.1,
+    "seed": 1,
+    "multiple": 16,
+    "batch": 2,
+    "max_aspect": 2.01,
+    "seed_mode": "deck",
+    "rescale": "to Width/Height",
+    "rescale.width": 1544,
+    "rescale.height": 8
+   },
+   "class_type": "ResolutionSelectorRandomLatent",
+   "_meta": {
+    "title": "Resolution Selector (Random)"
+   }
+  },
+  "20": {
+   "inputs": {
+    "resolution": "High-Res",
+    "resolution.size": "1152 x 1536",
+    "seed": 1,
+    "rescale": "to Width/Height",
+    "rescale.width": 1544,
+    "rescale.height": 8,
+    "multiple": 16,
+    "batch": 2,
+    "seed_mode": "deck"
+   },
+   "class_type": "SDXLResolutionListLatent",
+   "_meta": {
+    "title": "SDXL Resolution List"
+   }
+  },
+  "21": {
+   "inputs": {
+    "filename_prefix": "compat filename_prefix кот",
+    "image_output": "Hide"
+   },
+   "class_type": "VAEDecodeSave",
+   "_meta": {
+    "title": "VAE Decode + Save"
+   }
+  }
+ },
+ "workflow": {
+  "id": "f8a54356-aeb1-4fc7-9813-6a9a455f1812",
+  "revision": 0,
+  "last_node_id": 21,
+  "last_link_id": 0,
+  "nodes": [
+   {
+    "id": 1,
+    "type": "CLIPTextEncodePositiveNegative",
+    "pos": [
+     40,
+     40
+    ],
+    "size": [
+     400,
+     455
+    ],
+    "flags": {},
+    "order": 0,
+    "mode": 0,
+    "inputs": [
+     {
+      "localized_name": "model",
+      "name": "model",
+      "shape": 7,
+      "type": "MODEL",
+      "link": null
+     },
+     {
+      "localized_name": "clip",
+      "name": "clip",
+      "shape": 7,
+      "type": "CLIP",
+      "link": null
+     },
+     {
+      "localized_name": "positive",
+      "name": "positive",
+      "type": "STRING",
+      "widget": {
+       "name": "positive"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "negative",
+      "name": "negative",
+      "type": "STRING",
+      "widget": {
+       "name": "negative"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "seed",
+      "name": "seed",
+      "type": "INT",
+      "widget": {
+       "name": "seed"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "seed_mode",
+      "name": "seed_mode",
+      "type": "COMBO",
+      "widget": {
+       "name": "seed_mode"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "trim",
+      "name": "trim",
+      "type": "BOOLEAN",
+      "widget": {
+       "name": "trim"
+      },
+      "link": null
+     }
+    ],
+    "outputs": [
+     {
+      "localized_name": "model",
+      "name": "model",
+      "type": "MODEL",
+      "links": null
+     },
+     {
+      "localized_name": "positive",
+      "name": "positive",
+      "type": "CONDITIONING",
+      "links": null
+     },
+     {
+      "localized_name": "negative",
+      "name": "negative",
+      "type": "CONDITIONING",
+      "links": null
+     },
+     {
+      "localized_name": "positive_text",
+      "name": "positive_text",
+      "type": "STRING",
+      "links": null
+     },
+     {
+      "localized_name": "negative_text",
+      "name": "negative_text",
+      "type": "STRING",
+      "links": null
+     }
+    ],
+    "properties": {
+     "Node name for S&R": "CLIPTextEncodePositiveNegative"
+    },
+    "widgets_values": [
+     "compat positive кот",
+     "compat negative кот",
+     1,
+     "randomize",
+     "deck",
+     false,
+     ""
+    ],
+    "widgets_values_named": {
+     "positive": "compat positive кот",
+     "negative": "compat negative кот",
+     "seed": 1,
+     "control_after_generate": "randomize",
+     "seed_mode": "deck",
+     "trim": false,
+     "prompt_preview": ""
+    }
+   },
+   {
+    "id": 2,
+    "type": "DiceForgeDanbooruEnhancer",
+    "pos": [
+     560,
+     40
+    ],
+    "size": [
+     400,
+     817
+    ],
+    "flags": {},
+    "order": 1,
+    "mode": 0,
+    "inputs": [
+     {
+      "localized_name": "prompt",
+      "name": "prompt",
+      "shape": 7,
+      "type": "STRING",
+      "link": null
+     },
+     {
+      "localized_name": "tags",
+      "name": "tags",
+      "type": "STRING",
+      "widget": {
+       "name": "tags"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "source",
+      "name": "source",
+      "type": "COMBO",
+      "widget": {
+       "name": "source"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "rating",
+      "name": "rating",
+      "type": "COMBO",
+      "widget": {
+       "name": "rating"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "mode",
+      "name": "mode",
+      "type": "COMBO",
+      "widget": {
+       "name": "mode"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "post_ids",
+      "name": "post_ids",
+      "type": "STRING",
+      "widget": {
+       "name": "post_ids"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "posts",
+      "name": "posts",
+      "type": "INT",
+      "widget": {
+       "name": "posts"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "max_tags",
+      "name": "max_tags",
+      "type": "INT",
+      "widget": {
+       "name": "max_tags"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "include_general",
+      "name": "include_general",
+      "type": "BOOLEAN",
+      "widget": {
+       "name": "include_general"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "include_appearance",
+      "name": "include_appearance",
+      "type": "BOOLEAN",
+      "widget": {
+       "name": "include_appearance"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "include_clothes",
+      "name": "include_clothes",
+      "type": "BOOLEAN",
+      "widget": {
+       "name": "include_clothes"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "include_background",
+      "name": "include_background",
+      "type": "BOOLEAN",
+      "widget": {
+       "name": "include_background"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "include_count",
+      "name": "include_count",
+      "type": "BOOLEAN",
+      "widget": {
+       "name": "include_count"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "include_character",
+      "name": "include_character",
+      "type": "BOOLEAN",
+      "widget": {
+       "name": "include_character"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "include_copyright",
+      "name": "include_copyright",
+      "type": "BOOLEAN",
+      "widget": {
+       "name": "include_copyright"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "include_artist",
+      "name": "include_artist",
+      "type": "BOOLEAN",
+      "widget": {
+       "name": "include_artist"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "exclude",
+      "name": "exclude",
+      "type": "STRING",
+      "widget": {
+       "name": "exclude"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "position",
+      "name": "position",
+      "type": "COMBO",
+      "widget": {
+       "name": "position"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "wildcard_seed",
+      "name": "wildcard_seed",
+      "type": "INT",
+      "widget": {
+       "name": "wildcard_seed"
+      },
+      "link": null
+     }
+    ],
+    "outputs": [
+     {
+      "localized_name": "text",
+      "name": "text",
+      "type": "STRING",
+      "links": null
+     },
+     {
+      "localized_name": "added_tags",
+      "name": "added_tags",
+      "type": "STRING",
+      "links": null
+     },
+     {
+      "localized_name": "post_url",
+      "name": "post_url",
+      "type": "STRING",
+      "links": null
+     },
+     {
+      "localized_name": "post_id",
+      "name": "post_id",
+      "type": "INT",
+      "links": null
+     }
+    ],
+    "properties": {
+     "Node name for S&R": "DiceForgeDanbooruEnhancer"
+    },
+    "widgets_values": [
+     "compat tags кот",
+     "e621",
+     "sensitive",
+     "fixed",
+     "compat post_ids кот",
+     2,
+     16,
+     false,
+     false,
+     false,
+     false,
+     false,
+     true,
+     true,
+     true,
+     "compat exclude кот",
+     "before",
+     1,
+     ""
+    ],
+    "widgets_values_named": {
+     "tags": "compat tags кот",
+     "source": "e621",
+     "rating": "sensitive",
+     "mode": "fixed",
+     "post_ids": "compat post_ids кот",
+     "posts": 2,
+     "max_tags": 16,
+     "include_general": false,
+     "include_appearance": false,
+     "include_clothes": false,
+     "include_background": false,
+     "include_count": false,
+     "include_character": true,
+     "include_copyright": true,
+     "include_artist": true,
+     "exclude": "compat exclude кот",
+     "position": "before",
+     "wildcard_seed": 1,
+     "danbooru_preview": ""
+    }
+   },
+   {
+    "id": 3,
+    "type": "DiceForgeGrid",
+    "pos": [
+     1080,
+     40
+    ],
+    "size": [
+     400,
+     617
+    ],
+    "flags": {},
+    "order": 2,
+    "mode": 0,
+    "inputs": [
+     {
+      "localized_name": "image",
+      "name": "image",
+      "type": "IMAGE",
+      "link": null
+     },
+     {
+      "localized_name": "label",
+      "name": "label",
+      "shape": 7,
+      "type": "STRING",
+      "link": null
+     },
+     {
+      "localized_name": "row_label",
+      "name": "row_label",
+      "shape": 7,
+      "type": "STRING",
+      "link": null
+     },
+     {
+      "localized_name": "count",
+      "name": "count",
+      "type": "INT",
+      "widget": {
+       "name": "count"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "columns",
+      "name": "columns",
+      "type": "INT",
+      "widget": {
+       "name": "columns"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "cell_width",
+      "name": "cell_width",
+      "type": "INT",
+      "widget": {
+       "name": "cell_width"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "save",
+      "name": "save",
+      "type": "BOOLEAN",
+      "widget": {
+       "name": "save"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "filename_prefix",
+      "name": "filename_prefix",
+      "type": "STRING",
+      "widget": {
+       "name": "filename_prefix"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "name",
+      "name": "name",
+      "type": "STRING",
+      "widget": {
+       "name": "name"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "new_grid",
+      "name": "new_grid",
+      "type": "BOOLEAN",
+      "widget": {
+       "name": "new_grid"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "legend",
+      "name": "legend",
+      "type": "STRING",
+      "widget": {
+       "name": "legend"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "legend_position",
+      "name": "legend_position",
+      "type": "COMBO",
+      "widget": {
+       "name": "legend_position"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "numbered",
+      "name": "numbered",
+      "type": "BOOLEAN",
+      "widget": {
+       "name": "numbered"
+      },
+      "link": null
+     }
+    ],
+    "outputs": [
+     {
+      "localized_name": "grid",
+      "name": "grid",
+      "type": "IMAGE",
+      "links": null
+     },
+     {
+      "localized_name": "cells",
+      "name": "cells",
+      "type": "INT",
+      "links": null
+     }
+    ],
+    "properties": {
+     "Node name for S&R": "DiceForgeGrid"
+    },
+    "widgets_values": [
+     1,
+     1,
+     392,
+     false,
+     "compat filename_prefix кот",
+     "compat name кот",
+     true,
+     "compat legend кот",
+     "bottom",
+     true,
+     ""
+    ],
+    "widgets_values_named": {
+     "count": 1,
+     "columns": 1,
+     "cell_width": 392,
+     "save": false,
+     "filename_prefix": "compat filename_prefix кот",
+     "name": "compat name кот",
+     "new_grid": true,
+     "legend": "compat legend кот",
+     "legend_position": "bottom",
+     "numbered": true,
+     "grid_cells": ""
+    }
+   },
+   {
+    "id": 4,
+    "type": "DiceForgeHiresUpscale",
+    "pos": [
+     1600,
+     40
+    ],
+    "size": [
+     277.66015625,
+     314
+    ],
+    "flags": {},
+    "order": 3,
+    "mode": 0,
+    "inputs": [
+     {
+      "localized_name": "image",
+      "name": "image",
+      "type": "IMAGE",
+      "link": null
+     },
+     {
+      "localized_name": "model_name",
+      "name": "model_name",
+      "type": "COMBO",
+      "widget": {
+       "name": "model_name"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "rescale_after_model",
+      "name": "rescale_after_model",
+      "type": "BOOLEAN",
+      "widget": {
+       "name": "rescale_after_model"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "rescale_method",
+      "name": "rescale_method",
+      "type": "COMBO",
+      "widget": {
+       "name": "rescale_method"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "rescale",
+      "name": "rescale",
+      "type": "COMFY_DYNAMICCOMBO_V3",
+      "widget": {
+       "name": "rescale"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "width",
+      "name": "rescale.width",
+      "type": "INT",
+      "widget": {
+       "name": "rescale.width"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "height",
+      "name": "rescale.height",
+      "type": "INT",
+      "widget": {
+       "name": "rescale.height"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "crop",
+      "name": "crop",
+      "type": "COMBO",
+      "widget": {
+       "name": "crop"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "vae_name",
+      "name": "vae_name",
+      "type": "COMBO",
+      "widget": {
+       "name": "vae_name"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "image_output",
+      "name": "image_output",
+      "type": "COMBO",
+      "widget": {
+       "name": "image_output"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "filename_prefix",
+      "name": "filename_prefix",
+      "type": "STRING",
+      "widget": {
+       "name": "filename_prefix"
+      },
+      "link": null
+     }
+    ],
+    "outputs": [
+     {
+      "localized_name": "image",
+      "name": "image",
+      "type": "IMAGE",
+      "links": null
+     },
+     {
+      "localized_name": "latent",
+      "name": "latent",
+      "type": "LATENT",
+      "links": null
+     },
+     {
+      "localized_name": "vae",
+      "name": "vae",
+      "type": "VAE",
+      "links": null
+     }
+    ],
+    "properties": {
+     "Node name for S&R": "DiceForgeHiresUpscale"
+    },
+    "widgets_values": [
+     "None",
+     false,
+     "nearest-exact",
+     "to Width/Height",
+     1544,
+     8,
+     "center",
+     "pixel_space",
+     "Hide",
+     "compat filename_prefix кот"
+    ],
+    "widgets_values_named": {
+     "model_name": "None",
+     "rescale_after_model": false,
+     "rescale_method": "nearest-exact",
+     "rescale": "to Width/Height",
+     "rescale.width": 1544,
+     "rescale.height": 8,
+     "crop": "center",
+     "vae_name": "pixel_space",
+     "image_output": "Hide",
+     "filename_prefix": "compat filename_prefix кот"
+    }
+   },
+   {
+    "id": 5,
+    "type": "DiceForgeLoraStack",
+    "pos": [
+     2120,
+     40
+    ],
+    "size": [
+     460,
+     417
+    ],
+    "flags": {},
+    "order": 4,
+    "mode": 0,
+    "inputs": [
+     {
+      "localized_name": "model",
+      "name": "model",
+      "type": "MODEL",
+      "link": null
+     },
+     {
+      "localized_name": "clip",
+      "name": "clip",
+      "shape": 7,
+      "type": "CLIP",
+      "link": null
+     },
+     {
+      "localized_name": "loras",
+      "name": "loras",
+      "type": "STRING",
+      "widget": {
+       "name": "loras"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "seed",
+      "name": "seed",
+      "type": "INT",
+      "widget": {
+       "name": "seed"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "seed_mode",
+      "name": "seed_mode",
+      "type": "COMBO",
+      "widget": {
+       "name": "seed_mode"
+      },
+      "link": null
+     }
+    ],
+    "outputs": [
+     {
+      "localized_name": "model",
+      "name": "model",
+      "type": "MODEL",
+      "links": null
+     },
+     {
+      "localized_name": "clip",
+      "name": "clip",
+      "type": "CLIP",
+      "links": null
+     },
+     {
+      "localized_name": "triggers",
+      "name": "triggers",
+      "type": "STRING",
+      "links": null
+     },
+     {
+      "localized_name": "lora_info",
+      "name": "lora_info",
+      "type": "STRING",
+      "links": null
+     }
+    ],
+    "properties": {
+     "Node name for S&R": "DiceForgeLoraStack"
+    },
+    "widgets_values": [
+     "{\"rows\":[{\"lora\":\"style/ink.safetensors\",\"strength\":0.8,\"on\":true},{\"lora\":\"detail.safetensors\",\"strength\":0.5,\"on\":false}],\"groups\":{},\"separate_clip\":false}",
+     1,
+     "randomize",
+     "deck"
+    ],
+    "widgets_values_named": {
+     "loras": "{\"rows\":[{\"lora\":\"style/ink.safetensors\",\"strength\":0.8,\"on\":true},{\"lora\":\"detail.safetensors\",\"strength\":0.5,\"on\":false}],\"groups\":{},\"separate_clip\":false}",
+     "seed": 1,
+     "control_after_generate": "randomize",
+     "seed_mode": "deck"
+    }
+   },
+   {
+    "id": 6,
+    "type": "DiceForgeRandomCheckpoint",
+    "pos": [
+     40,
+     840
+    ],
+    "size": [
+     270,
+     190
+    ],
+    "flags": {},
+    "order": 5,
+    "mode": 0,
+    "inputs": [
+     {
+      "localized_name": "folder",
+      "name": "folder",
+      "type": "COMBO",
+      "widget": {
+       "name": "folder"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "seed",
+      "name": "seed",
+      "type": "INT",
+      "widget": {
+       "name": "seed"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "seed_mode",
+      "name": "seed_mode",
+      "type": "COMBO",
+      "widget": {
+       "name": "seed_mode"
+      },
+      "link": null
+     }
+    ],
+    "outputs": [
+     {
+      "localized_name": "model",
+      "name": "model",
+      "type": "MODEL",
+      "links": null
+     },
+     {
+      "localized_name": "clip",
+      "name": "clip",
+      "type": "CLIP",
+      "links": null
+     },
+     {
+      "localized_name": "vae",
+      "name": "vae",
+      "type": "VAE",
+      "links": null
+     },
+     {
+      "localized_name": "ckpt_name",
+      "name": "ckpt_name",
+      "type": "STRING",
+      "links": null
+     }
+    ],
+    "properties": {
+     "Node name for S&R": "DiceForgeRandomCheckpoint"
+    },
+    "widgets_values": [
+     "sdxl",
+     1,
+     "randomize",
+     "deck"
+    ],
+    "widgets_values_named": {
+     "folder": "sdxl",
+     "seed": 1,
+     "control_after_generate": "randomize",
+     "seed_mode": "deck"
+    }
+   },
+   {
+    "id": 7,
+    "type": "DiceForgeRandomDiffusionModel",
+    "pos": [
+     560,
+     840
+    ],
+    "size": [
+     270,
+     174
+    ],
+    "flags": {},
+    "order": 6,
+    "mode": 0,
+    "inputs": [
+     {
+      "localized_name": "folder",
+      "name": "folder",
+      "type": "COMBO",
+      "widget": {
+       "name": "folder"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "seed",
+      "name": "seed",
+      "type": "INT",
+      "widget": {
+       "name": "seed"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "seed_mode",
+      "name": "seed_mode",
+      "type": "COMBO",
+      "widget": {
+       "name": "seed_mode"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "weight_dtype",
+      "name": "weight_dtype",
+      "type": "COMBO",
+      "widget": {
+       "name": "weight_dtype"
+      },
+      "link": null
+     }
+    ],
+    "outputs": [
+     {
+      "localized_name": "model",
+      "name": "model",
+      "type": "MODEL",
+      "links": null
+     },
+     {
+      "localized_name": "model_name",
+      "name": "model_name",
+      "type": "STRING",
+      "links": null
+     }
+    ],
+    "properties": {
+     "Node name for S&R": "DiceForgeRandomDiffusionModel"
+    },
+    "widgets_values": [
+     "flux",
+     1,
+     "randomize",
+     "deck",
+     "fp8_e4m3fn"
+    ],
+    "widgets_values_named": {
+     "folder": "flux",
+     "seed": 1,
+     "control_after_generate": "randomize",
+     "seed_mode": "deck",
+     "weight_dtype": "fp8_e4m3fn"
+    }
+   },
+   {
+    "id": 8,
+    "type": "DiceForgeRandomFloat",
+    "pos": [
+     1080,
+     840
+    ],
+    "size": [
+     270,
+     202
+    ],
+    "flags": {},
+    "order": 7,
+    "mode": 0,
+    "inputs": [
+     {
+      "localized_name": "min",
+      "name": "min",
+      "type": "FLOAT",
+      "widget": {
+       "name": "min"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "max",
+      "name": "max",
+      "type": "FLOAT",
+      "widget": {
+       "name": "max"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "step",
+      "name": "step",
+      "type": "FLOAT",
+      "widget": {
+       "name": "step"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "seed",
+      "name": "seed",
+      "type": "INT",
+      "widget": {
+       "name": "seed"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "seed_mode",
+      "name": "seed_mode",
+      "type": "COMBO",
+      "widget": {
+       "name": "seed_mode"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "parts",
+      "name": "parts",
+      "type": "INT",
+      "widget": {
+       "name": "parts"
+      },
+      "link": null
+     }
+    ],
+    "outputs": [
+     {
+      "localized_name": "value",
+      "name": "value",
+      "type": "FLOAT",
+      "links": null
+     }
+    ],
+    "properties": {
+     "Node name for S&R": "DiceForgeRandomFloat"
+    },
+    "widgets_values": [
+     0.01,
+     1.01,
+     0.01,
+     1,
+     "randomize",
+     "deck",
+     11
+    ],
+    "widgets_values_named": {
+     "min": 0.01,
+     "max": 1.01,
+     "step": 0.01,
+     "seed": 1,
+     "control_after_generate": "randomize",
+     "seed_mode": "deck",
+     "parts": 11
+    }
+   },
+   {
+    "id": 9,
+    "type": "DiceForgeRandomImage",
+    "pos": [
+     1600,
+     840
+    ],
+    "size": [
+     270,
+     330
+    ],
+    "flags": {},
+    "order": 8,
+    "mode": 0,
+    "inputs": [
+     {
+      "localized_name": "folder",
+      "name": "folder",
+      "type": "COMBO",
+      "widget": {
+       "name": "folder"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "seed",
+      "name": "seed",
+      "type": "INT",
+      "widget": {
+       "name": "seed"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "seed_mode",
+      "name": "seed_mode",
+      "type": "COMBO",
+      "widget": {
+       "name": "seed_mode"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "path",
+      "name": "path",
+      "type": "STRING",
+      "widget": {
+       "name": "path"
+      },
+      "link": null
+     }
+    ],
+    "outputs": [
+     {
+      "localized_name": "image",
+      "name": "image",
+      "type": "IMAGE",
+      "links": null
+     },
+     {
+      "localized_name": "mask",
+      "name": "mask",
+      "type": "MASK",
+      "links": null
+     },
+     {
+      "localized_name": "file_name",
+      "name": "file_name",
+      "type": "STRING",
+      "links": null
+     }
+    ],
+    "properties": {
+     "Node name for S&R": "DiceForgeRandomImage"
+    },
+    "widgets_values": [
+     "e2e",
+     1,
+     "randomize",
+     "deck",
+     "compat path кот",
+     ""
+    ],
+    "widgets_values_named": {
+     "folder": "e2e",
+     "seed": 1,
+     "control_after_generate": "randomize",
+     "seed_mode": "deck",
+     "path": "compat path кот",
+     "image_preview": ""
+    }
+   },
+   {
+    "id": 10,
+    "type": "DiceForgeRandomInt",
+    "pos": [
+     2120,
+     840
+    ],
+    "size": [
+     270,
+     178
+    ],
+    "flags": {},
+    "order": 9,
+    "mode": 0,
+    "inputs": [
+     {
+      "localized_name": "min",
+      "name": "min",
+      "type": "INT",
+      "widget": {
+       "name": "min"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "max",
+      "name": "max",
+      "type": "INT",
+      "widget": {
+       "name": "max"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "step",
+      "name": "step",
+      "type": "INT",
+      "widget": {
+       "name": "step"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "seed",
+      "name": "seed",
+      "type": "INT",
+      "widget": {
+       "name": "seed"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "seed_mode",
+      "name": "seed_mode",
+      "type": "COMBO",
+      "widget": {
+       "name": "seed_mode"
+      },
+      "link": null
+     }
+    ],
+    "outputs": [
+     {
+      "localized_name": "value",
+      "name": "value",
+      "type": "INT",
+      "links": null
+     }
+    ],
+    "properties": {
+     "Node name for S&R": "DiceForgeRandomInt"
+    },
+    "widgets_values": [
+     1,
+     11,
+     2,
+     1,
+     "randomize",
+     "deck"
+    ],
+    "widgets_values_named": {
+     "min": 1,
+     "max": 11,
+     "step": 2,
+     "seed": 1,
+     "control_after_generate": "randomize",
+     "seed_mode": "deck"
+    }
+   },
+   {
+    "id": 11,
+    "type": "DiceForgeRandomLora",
+    "pos": [
+     40,
+     1640
+    ],
+    "size": [
+     270,
+     242
+    ],
+    "flags": {},
+    "order": 10,
+    "mode": 0,
+    "inputs": [
+     {
+      "localized_name": "model",
+      "name": "model",
+      "type": "MODEL",
+      "link": null
+     },
+     {
+      "localized_name": "clip",
+      "name": "clip",
+      "shape": 7,
+      "type": "CLIP",
+      "link": null
+     },
+     {
+      "localized_name": "folder",
+      "name": "folder",
+      "type": "COMBO",
+      "widget": {
+       "name": "folder"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "strength_model",
+      "name": "strength_model",
+      "type": "FLOAT",
+      "widget": {
+       "name": "strength_model"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "strength_clip",
+      "name": "strength_clip",
+      "type": "FLOAT",
+      "widget": {
+       "name": "strength_clip"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "seed",
+      "name": "seed",
+      "type": "INT",
+      "widget": {
+       "name": "seed"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "seed_mode",
+      "name": "seed_mode",
+      "type": "COMBO",
+      "widget": {
+       "name": "seed_mode"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "include_none",
+      "name": "include_none",
+      "type": "BOOLEAN",
+      "widget": {
+       "name": "include_none"
+      },
+      "link": null
+     }
+    ],
+    "outputs": [
+     {
+      "localized_name": "model",
+      "name": "model",
+      "type": "MODEL",
+      "links": null
+     },
+     {
+      "localized_name": "clip",
+      "name": "clip",
+      "type": "CLIP",
+      "links": null
+     },
+     {
+      "localized_name": "lora_name",
+      "name": "lora_name",
+      "type": "STRING",
+      "links": null
+     }
+    ],
+    "properties": {
+     "Node name for S&R": "DiceForgeRandomLora"
+    },
+    "widgets_values": [
+     "style",
+     1.01,
+     1.01,
+     1,
+     "randomize",
+     "deck",
+     true
+    ],
+    "widgets_values_named": {
+     "folder": "style",
+     "strength_model": 1.01,
+     "strength_clip": 1.01,
+     "seed": 1,
+     "control_after_generate": "randomize",
+     "seed_mode": "deck",
+     "include_none": true
+    }
+   },
+   {
+    "id": 12,
+    "type": "DiceForgeRandomSampler",
+    "pos": [
+     560,
+     1640
+    ],
+    "size": [
+     400,
+     294
+    ],
+    "flags": {},
+    "order": 11,
+    "mode": 0,
+    "inputs": [
+     {
+      "localized_name": "samplers",
+      "name": "samplers",
+      "type": "STRING",
+      "widget": {
+       "name": "samplers"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "schedulers",
+      "name": "schedulers",
+      "type": "STRING",
+      "widget": {
+       "name": "schedulers"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "seed",
+      "name": "seed",
+      "type": "INT",
+      "widget": {
+       "name": "seed"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "seed_mode",
+      "name": "seed_mode",
+      "type": "COMBO",
+      "widget": {
+       "name": "seed_mode"
+      },
+      "link": null
+     }
+    ],
+    "outputs": [
+     {
+      "localized_name": "sampler_name",
+      "name": "sampler_name",
+      "type": "COMBO",
+      "links": null
+     },
+     {
+      "localized_name": "scheduler",
+      "name": "scheduler",
+      "type": "COMBO",
+      "links": null
+     },
+     {
+      "localized_name": "label",
+      "name": "label",
+      "type": "STRING",
+      "links": null
+     },
+     {
+      "localized_name": "sampler_text",
+      "name": "sampler_text",
+      "type": "STRING",
+      "links": null
+     },
+     {
+      "localized_name": "scheduler_text",
+      "name": "scheduler_text",
+      "type": "STRING",
+      "links": null
+     }
+    ],
+    "properties": {
+     "Node name for S&R": "DiceForgeRandomSampler"
+    },
+    "widgets_values": [
+     "compat samplers кот",
+     "compat schedulers кот",
+     1,
+     "randomize",
+     "deck"
+    ],
+    "widgets_values_named": {
+     "samplers": "compat samplers кот",
+     "schedulers": "compat schedulers кот",
+     "seed": 1,
+     "control_after_generate": "randomize",
+     "seed_mode": "deck"
+    }
+   },
+   {
+    "id": 13,
+    "type": "DiceForgeRandomVAE",
+    "pos": [
+     1080,
+     1640
+    ],
+    "size": [
+     270,
+     150
+    ],
+    "flags": {},
+    "order": 12,
+    "mode": 0,
+    "inputs": [
+     {
+      "localized_name": "folder",
+      "name": "folder",
+      "type": "COMBO",
+      "widget": {
+       "name": "folder"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "seed",
+      "name": "seed",
+      "type": "INT",
+      "widget": {
+       "name": "seed"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "seed_mode",
+      "name": "seed_mode",
+      "type": "COMBO",
+      "widget": {
+       "name": "seed_mode"
+      },
+      "link": null
+     }
+    ],
+    "outputs": [
+     {
+      "localized_name": "vae",
+      "name": "vae",
+      "type": "VAE",
+      "links": null
+     },
+     {
+      "localized_name": "vae_name",
+      "name": "vae_name",
+      "type": "STRING",
+      "links": null
+     }
+    ],
+    "properties": {
+     "Node name for S&R": "DiceForgeRandomVAE"
+    },
+    "widgets_values": [
+     "(all)",
+     1,
+     "randomize",
+     "deck"
+    ],
+    "widgets_values_named": {
+     "folder": "(all)",
+     "seed": 1,
+     "control_after_generate": "randomize",
+     "seed_mode": "deck"
+    }
+   },
+   {
+    "id": 14,
+    "type": "DiceForgeVariationSeed",
+    "pos": [
+     1600,
+     1640
+    ],
+    "size": [
+     270,
+     126
+    ],
+    "flags": {},
+    "order": 13,
+    "mode": 0,
+    "inputs": [
+     {
+      "localized_name": "model",
+      "name": "model",
+      "type": "MODEL",
+      "link": null
+     },
+     {
+      "localized_name": "variation_seed",
+      "name": "variation_seed",
+      "type": "INT",
+      "widget": {
+       "name": "variation_seed"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "variation_strength",
+      "name": "variation_strength",
+      "type": "FLOAT",
+      "widget": {
+       "name": "variation_strength"
+      },
+      "link": null
+     }
+    ],
+    "outputs": [
+     {
+      "localized_name": "model",
+      "name": "model",
+      "type": "MODEL",
+      "links": null
+     },
+     {
+      "localized_name": "label",
+      "name": "label",
+      "type": "STRING",
+      "links": null
+     }
+    ],
+    "properties": {
+     "Node name for S&R": "DiceForgeVariationSeed"
+    },
+    "widgets_values": [
+     1,
+     "randomize",
+     0.11
+    ],
+    "widgets_values_named": {
+     "variation_seed": 1,
+     "control_after_generate": "randomize",
+     "variation_strength": 0.11
+    }
+   },
+   {
+    "id": 15,
+    "type": "DiceForgeWildcardsToText",
+    "pos": [
+     2120,
+     1640
+    ],
+    "size": [
+     400,
+     200
+    ],
+    "flags": {},
+    "order": 14,
+    "mode": 0,
+    "inputs": [
+     {
+      "localized_name": "text",
+      "name": "text",
+      "type": "STRING",
+      "widget": {
+       "name": "text"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "seed",
+      "name": "seed",
+      "type": "INT",
+      "widget": {
+       "name": "seed"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "seed_mode",
+      "name": "seed_mode",
+      "type": "COMBO",
+      "widget": {
+       "name": "seed_mode"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "trim",
+      "name": "trim",
+      "type": "BOOLEAN",
+      "widget": {
+       "name": "trim"
+      },
+      "link": null
+     }
+    ],
+    "outputs": [
+     {
+      "localized_name": "text",
+      "name": "text",
+      "type": "STRING",
+      "links": null
+     }
+    ],
+    "properties": {
+     "Node name for S&R": "DiceForgeWildcardsToText"
+    },
+    "widgets_values": [
+     "compat text кот",
+     1,
+     "randomize",
+     "deck",
+     false
+    ],
+    "widgets_values_named": {
+     "text": "compat text кот",
+     "seed": 1,
+     "control_after_generate": "randomize",
+     "seed_mode": "deck",
+     "trim": false
+    }
+   },
+   {
+    "id": 16,
+    "type": "DiceForgeXYPlot",
+    "pos": [
+     40,
+     2440
+    ],
+    "size": [
+     400,
+     726
+    ],
+    "flags": {},
+    "order": 15,
+    "mode": 0,
+    "inputs": [
+     {
+      "localized_name": "model",
+      "name": "model",
+      "shape": 7,
+      "type": "MODEL",
+      "link": null
+     },
+     {
+      "localized_name": "clip",
+      "name": "clip",
+      "shape": 7,
+      "type": "CLIP",
+      "link": null
+     },
+     {
+      "localized_name": "x_type",
+      "name": "x_type",
+      "type": "COMBO",
+      "widget": {
+       "name": "x_type"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "x_values",
+      "name": "x_values",
+      "type": "STRING",
+      "widget": {
+       "name": "x_values"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "y_type",
+      "name": "y_type",
+      "type": "COMBO",
+      "widget": {
+       "name": "y_type"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "y_values",
+      "name": "y_values",
+      "type": "STRING",
+      "widget": {
+       "name": "y_values"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "index",
+      "name": "index",
+      "type": "INT",
+      "widget": {
+       "name": "index"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "seed",
+      "name": "seed",
+      "type": "INT",
+      "widget": {
+       "name": "seed"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "steps",
+      "name": "steps",
+      "type": "INT",
+      "widget": {
+       "name": "steps"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "cfg",
+      "name": "cfg",
+      "type": "FLOAT",
+      "widget": {
+       "name": "cfg"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "sampler_name",
+      "name": "sampler_name",
+      "type": "COMBO",
+      "widget": {
+       "name": "sampler_name"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "scheduler",
+      "name": "scheduler",
+      "type": "COMBO",
+      "widget": {
+       "name": "scheduler"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "denoise",
+      "name": "denoise",
+      "type": "FLOAT",
+      "widget": {
+       "name": "denoise"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "lora_name",
+      "name": "lora_name",
+      "type": "COMBO",
+      "widget": {
+       "name": "lora_name"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "lora_strength",
+      "name": "lora_strength",
+      "type": "FLOAT",
+      "widget": {
+       "name": "lora_strength"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "variation_seed",
+      "name": "variation_seed",
+      "shape": 7,
+      "type": "INT",
+      "widget": {
+       "name": "variation_seed"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "variation_strength",
+      "name": "variation_strength",
+      "shape": 7,
+      "type": "FLOAT",
+      "widget": {
+       "name": "variation_strength"
+      },
+      "link": null
+     }
+    ],
+    "outputs": [
+     {
+      "localized_name": "model",
+      "name": "model",
+      "type": "MODEL",
+      "links": null
+     },
+     {
+      "localized_name": "clip",
+      "name": "clip",
+      "type": "CLIP",
+      "links": null
+     },
+     {
+      "localized_name": "seed",
+      "name": "seed",
+      "type": "INT",
+      "links": null
+     },
+     {
+      "localized_name": "steps",
+      "name": "steps",
+      "type": "INT",
+      "links": null
+     },
+     {
+      "localized_name": "cfg",
+      "name": "cfg",
+      "type": "FLOAT",
+      "links": null
+     },
+     {
+      "localized_name": "sampler_name",
+      "name": "sampler_name",
+      "type": "COMBO",
+      "links": null
+     },
+     {
+      "localized_name": "scheduler",
+      "name": "scheduler",
+      "type": "COMBO",
+      "links": null
+     },
+     {
+      "localized_name": "denoise",
+      "name": "denoise",
+      "type": "FLOAT",
+      "links": null
+     },
+     {
+      "localized_name": "x_label",
+      "name": "x_label",
+      "type": "STRING",
+      "links": null
+     },
+     {
+      "localized_name": "y_label",
+      "name": "y_label",
+      "type": "STRING",
+      "links": null
+     },
+     {
+      "localized_name": "count",
+      "name": "count",
+      "type": "INT",
+      "links": null
+     },
+     {
+      "localized_name": "columns",
+      "name": "columns",
+      "type": "INT",
+      "links": null
+     },
+     {
+      "localized_name": "new_grid",
+      "name": "new_grid",
+      "type": "BOOLEAN",
+      "links": null
+     }
+    ],
+    "properties": {
+     "Node name for S&R": "DiceForgeXYPlot"
+    },
+    "widgets_values": [
+     "none",
+     "compat x_values кот",
+     "none",
+     "compat y_values кот",
+     1,
+     1,
+     "randomize",
+     29,
+     6,
+     "euler",
+     "simple",
+     0.99,
+     "detail.safetensors",
+     1.01,
+     1,
+     0.01,
+     ""
+    ],
+    "widgets_values_named": {
+     "x_type": "none",
+     "x_values": "compat x_values кот",
+     "y_type": "none",
+     "y_values": "compat y_values кот",
+     "index": 1,
+     "seed": 1,
+     "control_after_generate": "randomize",
+     "steps": 29,
+     "cfg": 6,
+     "sampler_name": "euler",
+     "scheduler": "simple",
+     "denoise": 0.99,
+     "lora_name": "detail.safetensors",
+     "lora_strength": 1.01,
+     "variation_seed": 1,
+     "variation_strength": 0.01,
+     "xy_preview": ""
+    }
+   },
+   {
+    "id": 17,
+    "type": "LoadDiffusionModelCLIP",
+    "pos": [
+     560,
+     2440
+    ],
+    "size": [
+     288.8384765625,
+     198
+    ],
+    "flags": {},
+    "order": 16,
+    "mode": 0,
+    "inputs": [
+     {
+      "localized_name": "unet_name",
+      "name": "unet_name",
+      "type": "COMBO",
+      "widget": {
+       "name": "unet_name"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "clip_name1",
+      "name": "clip_name1",
+      "type": "COMBO",
+      "widget": {
+       "name": "clip_name1"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "clip_name2",
+      "name": "clip_name2",
+      "type": "COMBO",
+      "widget": {
+       "name": "clip_name2"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "type",
+      "name": "type",
+      "type": "COMBO",
+      "widget": {
+       "name": "type"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "weight_dtype",
+      "name": "weight_dtype",
+      "type": "COMBO",
+      "widget": {
+       "name": "weight_dtype"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "device",
+      "name": "device",
+      "type": "COMBO",
+      "widget": {
+       "name": "device"
+      },
+      "link": null
+     }
+    ],
+    "outputs": [
+     {
+      "localized_name": "model",
+      "name": "model",
+      "type": "MODEL",
+      "links": null
+     },
+     {
+      "localized_name": "clip",
+      "name": "clip",
+      "type": "CLIP",
+      "links": null
+     }
+    ],
+    "properties": {
+     "Node name for S&R": "LoadDiffusionModelCLIP"
+    },
+    "widgets_values": [
+     "flux1-dev.safetensors",
+     "t5xxl_fp16.safetensors",
+     "clip_l.safetensors",
+     "stable_cascade",
+     "fp8_e4m3fn",
+     "cpu"
+    ],
+    "widgets_values_named": {
+     "unet_name": "flux1-dev.safetensors",
+     "clip_name1": "t5xxl_fp16.safetensors",
+     "clip_name2": "clip_l.safetensors",
+     "type": "stable_cascade",
+     "weight_dtype": "fp8_e4m3fn",
+     "device": "cpu"
+    }
+   },
+   {
+    "id": 18,
+    "type": "LoadVAEDecodeSave",
+    "pos": [
+     1080,
+     2440
+    ],
+    "size": [
+     281.558203125,
+     126
+    ],
+    "flags": {},
+    "order": 17,
+    "mode": 0,
+    "inputs": [
+     {
+      "localized_name": "samples",
+      "name": "samples",
+      "type": "LATENT",
+      "link": null
+     },
+     {
+      "localized_name": "vae_name",
+      "name": "vae_name",
+      "type": "COMBO",
+      "widget": {
+       "name": "vae_name"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "filename_prefix",
+      "name": "filename_prefix",
+      "type": "STRING",
+      "widget": {
+       "name": "filename_prefix"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "image_output",
+      "name": "image_output",
+      "shape": 7,
+      "type": "COMBO",
+      "widget": {
+       "name": "image_output"
+      },
+      "link": null
+     }
+    ],
+    "outputs": [
+     {
+      "localized_name": "images",
+      "name": "images",
+      "type": "IMAGE",
+      "links": null
+     },
+     {
+      "localized_name": "vae",
+      "name": "vae",
+      "type": "VAE",
+      "links": null
+     }
+    ],
+    "properties": {
+     "Node name for S&R": "LoadVAEDecodeSave"
+    },
+    "widgets_values": [
+     "pixel_space",
+     "compat filename_prefix кот",
+     "Hide"
+    ],
+    "widgets_values_named": {
+     "vae_name": "pixel_space",
+     "filename_prefix": "compat filename_prefix кот",
+     "image_output": "Hide"
+    }
+   },
+   {
+    "id": 19,
+    "type": "ResolutionSelectorRandomLatent",
+    "pos": [
+     1600,
+     2440
+    ],
+    "size": [
+     296.1529296875,
+     382
+    ],
+    "flags": {},
+    "order": 18,
+    "mode": 0,
+    "inputs": [
+     {
+      "localized_name": "aspect_ratio",
+      "name": "aspect_ratio",
+      "type": "COMBO",
+      "widget": {
+       "name": "aspect_ratio"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "megapixels",
+      "name": "megapixels",
+      "type": "FLOAT",
+      "widget": {
+       "name": "megapixels"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "seed",
+      "name": "seed",
+      "type": "INT",
+      "widget": {
+       "name": "seed"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "multiple",
+      "name": "multiple",
+      "type": "INT",
+      "widget": {
+       "name": "multiple"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "batch",
+      "name": "batch",
+      "type": "INT",
+      "widget": {
+       "name": "batch"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "max_aspect",
+      "name": "max_aspect",
+      "type": "FLOAT",
+      "widget": {
+       "name": "max_aspect"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "seed_mode",
+      "name": "seed_mode",
+      "type": "COMBO",
+      "widget": {
+       "name": "seed_mode"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "preview",
+      "name": "preview",
+      "shape": 7,
+      "type": "RESOLUTION_PREVIEW",
+      "widget": {
+       "name": "preview"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "rescale",
+      "name": "rescale",
+      "shape": 7,
+      "type": "COMFY_DYNAMICCOMBO_V3",
+      "widget": {
+       "name": "rescale"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "width",
+      "name": "rescale.width",
+      "type": "INT",
+      "widget": {
+       "name": "rescale.width"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "height",
+      "name": "rescale.height",
+      "type": "INT",
+      "widget": {
+       "name": "rescale.height"
+      },
+      "link": null
+     }
+    ],
+    "outputs": [
+     {
+      "localized_name": "latent",
+      "name": "latent",
+      "type": "LATENT",
+      "links": null
+     },
+     {
+      "localized_name": "width",
+      "name": "width",
+      "type": "INT",
+      "links": null
+     },
+     {
+      "localized_name": "height",
+      "name": "height",
+      "type": "INT",
+      "links": null
+     },
+     {
+      "localized_name": "seed",
+      "name": "seed",
+      "type": "INT",
+      "links": null
+     }
+    ],
+    "properties": {
+     "Node name for S&R": "ResolutionSelectorRandomLatent"
+    },
+    "widgets_values": [
+     "2:3 (Portrait Photo)",
+     1.1,
+     1,
+     "randomize",
+     16,
+     2,
+     2.01,
+     "deck",
+     "to Width/Height",
+     1544,
+     8,
+     "1536:16",
+     0.0234375
+    ],
+    "widgets_values_named": {
+     "aspect_ratio": "2:3 (Portrait Photo)",
+     "megapixels": 1.1,
+     "seed": 1,
+     "control_after_generate": "randomize",
+     "multiple": 16,
+     "batch": 2,
+     "max_aspect": 2.01,
+     "seed_mode": "deck",
+     "rescale": "to Width/Height",
+     "rescale.width": 1544,
+     "rescale.height": 8,
+     "preview_ratio": "1536:16",
+     "preview_megapixels": 0.0234375
+    }
+   },
+   {
+    "id": 20,
+    "type": "SDXLResolutionListLatent",
+    "pos": [
+     2120,
+     2440
+    ],
+    "size": [
+     270,
+     358
+    ],
+    "flags": {},
+    "order": 19,
+    "mode": 0,
+    "inputs": [
+     {
+      "localized_name": "resolution",
+      "name": "resolution",
+      "type": "COMFY_DYNAMICCOMBO_V3",
+      "widget": {
+       "name": "resolution"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "size",
+      "name": "resolution.size",
+      "type": "COMBO",
+      "widget": {
+       "name": "resolution.size"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "seed",
+      "name": "seed",
+      "type": "INT",
+      "widget": {
+       "name": "seed"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "rescale",
+      "name": "rescale",
+      "type": "COMFY_DYNAMICCOMBO_V3",
+      "widget": {
+       "name": "rescale"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "width",
+      "name": "rescale.width",
+      "type": "INT",
+      "widget": {
+       "name": "rescale.width"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "height",
+      "name": "rescale.height",
+      "type": "INT",
+      "widget": {
+       "name": "rescale.height"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "multiple",
+      "name": "multiple",
+      "type": "INT",
+      "widget": {
+       "name": "multiple"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "batch",
+      "name": "batch",
+      "type": "INT",
+      "widget": {
+       "name": "batch"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "seed_mode",
+      "name": "seed_mode",
+      "type": "COMBO",
+      "widget": {
+       "name": "seed_mode"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "preview",
+      "name": "preview",
+      "shape": 7,
+      "type": "RESOLUTION_PREVIEW",
+      "widget": {
+       "name": "preview"
+      },
+      "link": null
+     }
+    ],
+    "outputs": [
+     {
+      "localized_name": "latent",
+      "name": "latent",
+      "type": "LATENT",
+      "links": null
+     },
+     {
+      "localized_name": "width",
+      "name": "width",
+      "type": "INT",
+      "links": null
+     },
+     {
+      "localized_name": "height",
+      "name": "height",
+      "type": "INT",
+      "links": null
+     },
+     {
+      "localized_name": "seed",
+      "name": "seed",
+      "type": "INT",
+      "links": null
+     }
+    ],
+    "properties": {
+     "Node name for S&R": "SDXLResolutionListLatent"
+    },
+    "widgets_values": [
+     "High-Res",
+     "1152 x 1536",
+     1,
+     "randomize",
+     "to Width/Height",
+     1544,
+     8,
+     16,
+     2,
+     "deck",
+     "1552:16",
+     0.023681640625
+    ],
+    "widgets_values_named": {
+     "resolution": "High-Res",
+     "resolution.size": "1152 x 1536",
+     "seed": 1,
+     "control_after_generate": "randomize",
+     "rescale": "to Width/Height",
+     "rescale.width": 1544,
+     "rescale.height": 8,
+     "multiple": 16,
+     "batch": 2,
+     "seed_mode": "deck",
+     "preview_ratio": "1552:16",
+     "preview_megapixels": 0.023681640625
+    }
+   },
+   {
+    "id": 21,
+    "type": "VAEDecodeSave",
+    "pos": [
+     40,
+     3240
+    ],
+    "size": [
+     270,
+     102
+    ],
+    "flags": {},
+    "order": 20,
+    "mode": 0,
+    "inputs": [
+     {
+      "localized_name": "samples",
+      "name": "samples",
+      "type": "LATENT",
+      "link": null
+     },
+     {
+      "localized_name": "vae",
+      "name": "vae",
+      "type": "VAE",
+      "link": null
+     },
+     {
+      "localized_name": "filename_prefix",
+      "name": "filename_prefix",
+      "type": "STRING",
+      "widget": {
+       "name": "filename_prefix"
+      },
+      "link": null
+     },
+     {
+      "localized_name": "image_output",
+      "name": "image_output",
+      "shape": 7,
+      "type": "COMBO",
+      "widget": {
+       "name": "image_output"
+      },
+      "link": null
+     }
+    ],
+    "outputs": [
+     {
+      "localized_name": "images",
+      "name": "images",
+      "type": "IMAGE",
+      "links": null
+     },
+     {
+      "localized_name": "vae",
+      "name": "vae",
+      "type": "VAE",
+      "links": null
+     }
+    ],
+    "properties": {
+     "Node name for S&R": "VAEDecodeSave"
+    },
+    "widgets_values": [
+     "compat filename_prefix кот",
+     "Hide"
+    ],
+    "widgets_values_named": {
+     "filename_prefix": "compat filename_prefix кот",
+     "image_output": "Hide"
+    }
+   }
+  ],
+  "links": [],
+  "groups": [],
+  "config": {},
+  "extra": {
+   "ds": {
+    "scale": 1,
+    "offset": [
+     0,
+     0
+    ]
+   }
+  },
+  "version": 0.4
+ }
+}

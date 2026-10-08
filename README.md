@@ -323,7 +323,7 @@ In YAML, put quotes around a line that starts with `{`, `[`, `!` or contains `: 
 
 <img src="docs/images/wildcards_to_text.png" width="873" alt="Wildcards to Text filling in a prompt, shown by Preview as Text">
 
-One prompt field with the same syntax as CLIP Dual Text Encode (wildcards, `{a|b}` choices, variables, comments, the seed modes), and a `text` output: the prompt filled in, for any text encoder (Flux, SD3, video models), a text input, a file name or another prompt node. The same text, seed and mode give the same text as CLIP Dual Text Encode's `positive_text`. Its field has the same tools: the `__` and tag autocomplete, syntax highlighting, and in its right-click menu the Syntax guide, Wildcard Browser and Tag Browser. `<lora:...>` tags stay in the text, for a node that reads them. Under the advanced inputs: `seed_mode` and `trim`.
+One prompt field with the same syntax as CLIP Dual Text Encode (wildcards, `{a|b}` choices, variables, comments, the seed modes), and a `text` output: the prompt filled in, for any text encoder (Flux, SD3, video models), a text input, a file name or another prompt node. The same `text`, `seed` and `seed_mode` give the same text as CLIP Dual Text Encode's `positive_text`. Its field has the same tools: the `__` and tag autocomplete, syntax highlighting, and in its right-click menu the Syntax guide, Wildcard Browser and Tag Browser. `<lora:...>` tags stay in the text, for a node that reads them. Under the advanced inputs: `seed_mode` and `trim`.
 
 ### Tag autocomplete (Danbooru, e621)
 
@@ -382,7 +382,7 @@ How it picks:
 - On e621 the search may have more tags, and all the posts come in one request (e621 asks for at most two requests a second, which the node keeps to).
 - `rating`, from safe on: `general` (the default), `sensitive` (suggestive), `questionable` (nudity), `explicit`. e621 has three ratings: its safe is both `general` and `sensitive`. One of them, two next to each other (`general + sensitive`, `sensitive + questionable`, `questionable + explicit`), `up to questionable`, `sensitive and up` (everything but general), or `any`.
 - **`posts`** (Advanced, 1 to 5): several posts of the search at once. Their tags go together, the ones more of the posts share first: steadier than the tags of one picture.
-- From the posts, the general tags that your prompt lacks are added (characters, series and artists too, with `include_character`, `include_copyright`, `include_artist` under Advanced). Switches leave out kinds of tags, so your prompt keeps its own:
+- From the posts, the general tags that your prompt lacks are added (`include_general`: pose, clothes, background…; characters, series and artists too, with `include_character`, `include_copyright`, `include_artist` under Advanced). Switches leave out kinds of tags, so your prompt keeps its own:
 
   | Switch (Advanced, on by default) | Off leaves out |
   |---|---|
@@ -392,7 +392,7 @@ How it picks:
   | `include_count` | people-count tags: 1girl, 2girls, 1boy, multiple_boys, solo, no_humans… |
 
   So with appearance and clothes off, your character keeps its look and outfit and the post adds the pose and scene.
-- They come the most used first, at most `max_tags` (15; 0 for all), `after` or `before` your tags, written as the models learned them (spaces, escaped parentheses), without the **`exclude`** list. In `exclude`, `*` is any text: `*censor*` leaves out `bar_censor`, `censored` and `mosaic_censoring`, `*_text` every `english_text`, `japanese_text`… The default leaves out signatures, watermarks, usernames, speech bubbles, text and censoring.
+- They come the most used first, at most `max_tags` (15; 0 for all), `after` or `before` your tags (`position`), written as the models learned them (spaces, escaped parentheses), without the **`exclude`** list. In `exclude`, `*` is any text: `*censor*` leaves out `bar_censor`, `censored` and `mosaic_censoring`, `*_text` every `english_text`, `japanese_text`… The default leaves out signatures, watermarks, usernames, speech bubbles, text and censoring.
 - It needs Danbooru: offline, the node says so. When Danbooru is busy (503, 429: overloaded, or limiting many requests for a while), the node asks again after 1 and 3 seconds, then says so: try again in a minute.
 
 ## Image sizes
@@ -642,7 +642,7 @@ Right-click **KSampler**, **KSampler (Advanced)** or any other node with `steps`
 
 ### Variation Seed
 
-Variations of a picture, as A1111's *variation seed* (subseed): the same composition with small differences. KSampler starts from noise made from its seed; Variation Seed blends that noise with the noise of a second seed, the variation seed, by `variation_strength`. The blend is spherical (slerp), so the noise keeps the size the model expects.
+Variations of a picture, as A1111's *variation seed* (subseed): the same composition with small differences. KSampler starts from noise made from its seed; Variation Seed blends that noise with the noise of a second seed, the variation seed (`variation_seed`), by `variation_strength`. The blend is spherical (slerp), so the noise keeps the size the model expects.
 
 1. Put it on the model line, right before KSampler: the loader's (or LoRA Stack's) `model` in, its `model` out to KSampler.
 2. Set KSampler's seed to the picture you like and its *control after generate* to *fixed*.
@@ -688,7 +688,7 @@ How to connect it:
 
 1. Connect `seed`, `steps`, `cfg`, `sampler_name`, `scheduler` and `denoise` to KSampler (drag each onto KSampler's field of the same name). For a LoRA axis, put XY Plot between the loader and KSampler: `model` and `clip` in, `model` and `clip` out (to KSampler and the prompt encoder).
 2. Connect `x_label` to Dice Grid's `label`, `y_label` to `row_label`, and `count`, `columns` and `new_grid` to the Dice Grid fields of the same name. Dice Grid then starts a fresh grid on the first cell, and saves it after the last one with the values as column and row headers.
-3. Pick what changes on X and on Y and type the values. The node shows the headers and the number of images; click **▶ Queue N images** (click again to stop queueing).
+3. Pick what changes on X and on Y (`x_type`, `y_type`) and type the values (`x_values`, `y_values`). The node shows the headers and the number of images; click **▶ Queue N images** (click again to stop queueing).
 
 | Axis | Values | Example |
 |---|---|---|
@@ -699,7 +699,7 @@ How to connect it:
 | `variation seed`, `variation strength` | As [Variation Seed](#variation-seed): seeds (`1-8`), strengths (`0-0.3:0.05`); the other one is set under **Advanced** (`variation_strength` 0.1 for a seed axis). Needs `model` connected, its output to KSampler. | `1-8` · `0, 0.05, 0.1, 0.2` |
 | `none` | Nothing changes (Y `none`: one row of images) | |
 
-- The other settings (`seed`, `steps`, `cfg`, `sampler_name`, `scheduler`, and under **Advanced** `denoise`, `lora_name`, `lora_strength`) are used for every cell, except the ones on an axis. With a `lora strength` axis, `lora_name` is the LoRA it changes.
+- The other settings (`seed`, `steps`, `cfg`, `sampler_name`, `scheduler`, and under **Advanced** `denoise`, `lora_name`, `lora_strength`, `variation_seed`, `variation_strength`) are used for every cell, except the ones on an axis. With a `lora strength` axis, `lora_name` is the LoRA it changes.
 - `index` is the cell of a run, row by row. **▶ Queue** sets it for each run and puts it back to 0; Run alone makes the cell at `index`.
 - Up to 64 values per axis and 256 images in all. A field the node can't read is shown in red under it, and stops the run with the same message.
 - Set KSampler's own *control after generate* to *fixed*, or connect `seed`: otherwise every cell gets another seed.
@@ -879,10 +879,10 @@ The browsers are offered for every node whose list holds model files, whatever t
 
 <img src="docs/images/utility_nodes.png" width="976" alt="VAE Decode + Save, Load VAE + Decode + Save and Load Diffusion Model + CLIP in Nodes 2.0">
 
-- **Load VAE + Decode + Save** (`DiceForge/image`, `DiceForge/load_vae_decode_save.py`): Load VAE, VAE Decode and Save Image in one node. It decodes the latent with the chosen VAE and saves PNG files with the workflow, like Save Image, and passes the images on. The VAE stays loaded between runs while its name stays the same. The `vae` output passes the VAE on (for VAE Encode in a hires fix or inpaint).
+- **Load VAE + Decode + Save** (`DiceForge/image`, `DiceForge/load_vae_decode_save.py`): Load VAE, VAE Decode and Save Image in one node. It decodes the latent (`samples`) with the VAE picked in `vae_name` and saves PNG files with the workflow under `filename_prefix`, like Save Image, and passes the images on (`images`). The VAE stays loaded between runs while its name stays the same. The `vae` output passes the VAE on (for VAE Encode in a hires fix or inpaint).
 - **VAE Decode + Save** (`DiceForge/image`): the same without Load VAE, with the VAE from its `vae` input (the VAE of Load Checkpoint, Load VAE, Random VAE…).
 - `image_output` decides what both do with the images, as in Easy-Use's samplers: *Hide* (only passed on), *Preview* (shown, not saved), *Save* (saved and shown, the default) or *Hide&Save* (saved, not shown).
-- **Load Diffusion Model + CLIP** (`DiceForge/loaders`, `DiceForge/load_diffusion_model_clip.py`): Load Diffusion Model and Load CLIP in one node, for models that come as separate files (Flux, Anima, Qwen-Image...): the model from `models/diffusion_models` and one text encoder, or two like DualCLIPLoader when `clip_name2` is set. The CLIP type is checked against the number of files before anything loads.
+- **Load Diffusion Model + CLIP** (`DiceForge/loaders`, `DiceForge/load_diffusion_model_clip.py`): Load Diffusion Model and Load CLIP in one node, for models that come as separate files (Flux, Anima, Qwen-Image...): the model (`unet_name`) from `models/diffusion_models` and one text encoder (`clip_name1`), or two like DualCLIPLoader when `clip_name2` is set. The CLIP `type` is checked against the number of files before anything loads. Under the advanced inputs, as in the core loaders: `weight_dtype` (the model's precision) and `device` (where the text encoders run). Outputs: `model` and `clip`, as the two core loaders give them.
 
 ## Development
 
@@ -895,6 +895,8 @@ Two test suites, next to `DiceForge` (not copied into ComfyUI). Both need a Comf
 The `tests` folder has unit tests for every node and server route: seed modes, prompt syntax and wildcards (txt, yaml, globs, weights, variables, `<lora:>` tags), the resolution nodes (including the preview's rounding against the node's), the random nodes and loaders, LoRA Stack (strengths, groups, trigger words, presets), Model info, the model browsers and model files (Civitai search and downloads, rename, move, delete), KSampler presets, prompt styles, the tag lists and Tag Browser, Danbooru Tag Enhancer (with a stand-in for Danbooru), XY Plot, Variation Seed, both hires fixes, VAE Decode + Save, Dice Grid (keeping cells) and the release script.
 
 The `test_properties_*.py` files check rules that must hold for *any* input, with [Hypothesis](https://hypothesis.readthedocs.io) generating hundreds of inputs per rule: every pick comes from its options and is reproducible from the seed; deck deals every option once per round (also within one prompt, across the end of a round); `combinations` lists every possible prompt exactly once; locks, variables, escapes, comments and the comma and space clean-up keep their promises in every seed mode; any text (fuzzed prompt syntax, any Unicode) resolves or stops with a clear error, quickly; every size is a positive multiple of `multiple` and keeps what `rescale` promises; Random Int, Float and Sampler stay in their range; any LoRA Stack data runs or is refused clearly; Dice Grid renders any labels; and no file name from a request reaches outside its folder. `test_robustness.py` damages things on purpose: a seed memory, grid manifest, model info or preset file that is broken, wildcard files in other encodings or deleted while indexed, junk requests to every route (always a 4xx answer, never a server error), many threads at once, the same picks in every Python process, and the frontend's `__` autocomplete knowing the same letters as the server.
+
+Three test files check the project itself: `test_docs.py` (every node, input and output is in this README, and every link and picture of it works), `test_security_scan.py` (what is never allowed in the code: HTML built from text, eval, unsafe yaml, a shell, pickle, TLS without certificate checks; `.github/scripts/security_scan.py`) and `test_review_checks.py` (the checks of a change before it is pushed, `.github/scripts/review_checks.py`).
 
 They run inside a real ComfyUI checkout, on the CPU, with [pytest](https://pytest.org) and Hypothesis:
 
@@ -915,6 +917,8 @@ The `e2e` folder has end-to-end tests with [Playwright](https://playwright.dev):
 - **Workflows** (`api.spec.js`, no browser): workflows queued through ComfyUI's own queue, as the Run button does: every node is loaded, CLIP Dual Text Encode fills in wildcards, yaml keys, weights and variables; deck and combinations deal every option over runs; the same inputs come from ComfyUI's cache until a wildcard file changes; shuffle remembers between runs; the resolution nodes make latents of the right size; VAE Decode + Save writes PNG files with the workflow; Dice Grid saves a finished grid; Random Image loads a folder; Random Sampler's outputs are accepted by KSampler; and the server routes of the Wildcard Browser, Model info, the model browsers and LoRA Stack presets.
 - **Robustness on the real server** (`robustness.spec.js`, no browser): junk HTTP requests to every DiceForge route (always a 4xx answer, never a server error) and names that try to reach outside DiceForge's folders (`../`, absolute paths, encoded slashes: nothing read, written or deleted outside); an error in a node stops only that prompt, with a clear message, and the next prompt runs; prompts with invalid inputs are refused by ComfyUI; the seed memory file damaged or replaced while ComfyUI runs, damaged wildcard (BOM, other encodings, broken yaml), model info, preset and Dice Grid files; many prompts queued at once; every seed mode through the queue (the same seed from ComfyUI's cache with the same prompt, mutate changing one choice per new seed, combinations listing every prompt once); text in any script and emoji; a 50 000-line wildcard; Random Chaos keeping its orientation and the side `rescale` sets.
 - **Browser** (`ui-prompts.spec.js`, `ui-models.spec.js`, `ui-nodes.spec.js`, in both node designs, Nodes 2.0 and classic): every node can be added; the resolution preview; CLIP Dual Text Encode's preview, history, syntax highlighting, `__` and `<lora:` autocomplete, tag autocomplete, Tag Browser and prompt styles; the Wildcard Browser; Model info and **Use these settings**; every model browser (Civitai search and downloads, batch actions, favorites, moving files); LoRA Stack (adding from the browser, 🎲, groups, 🏷 trigger words, the base model marks, presets, reloading the workflow); KSampler presets; XY Plot's queue button; Dice Grid's kept cells; Random Image's and Danbooru Tag Enhancer's previews; a workflow run from the page; node heights (advanced inputs, workflows saved too tall, previews as tall as their content); and every node, new and from a workflow saved too tall, checked for empty areas and cut-off content. `ui-robustness.spec.js`, in both designs too: every DiceForge node keeps every value through saving and loading a workflow twice; damaged workflows (too few, too many or wrong values, junk LoRA Stack data) open without breaking the page; copied nodes are independent; after a failed run the page keeps working; the Wildcard Browser marks an unreadable file; the autocomplete with the mouse, in the negative prompt and after another wildcard; random series of changes to both resolution nodes, after which the preview must show exactly the size the run makes; 64 nodes at once. Any error in the page fails the test.
+- **ComfyUI as DiceForge uses it** (`contract.spec.js`, in both designs): the ComfyUI internals the frontend relies on, each test naming one and the files that use it: the margin and sizing of DOM widgets in the classic canvas, the rows and body of a node in Nodes 2.0, the extension hooks (node menus, loading a workflow), the run events, the settings. On the weekly run against ComfyUI master, a failure here says what an update changed.
+- **Old workflows** (`compat.spec.js`, in both designs): a workflow saved with each released version (`e2e/workflows/<version>.json`, every DiceForge node with every widget away from its default) opens with every node, every widget value under its name, and every input of the prompt it sends to the server.
 
 ```sh
 cd ComfyUI-DiceForge/e2e
@@ -932,19 +936,34 @@ cd ComfyUI-DiceForge/e2e
 DICEFORGE_SCREENSHOTS=1 npx playwright test screenshots.spec.js
 ```
 
-#### By eye: the tester agent
+#### Agents
 
-The automated tests check what they were written for. For the rest there is a tester, `.claude/agents/tester.md`: an agent for [Claude Code](https://claude.com/claude-code) that opens ComfyUI in a browser, in both node designs, uses the nodes and windows like a user and reports what is broken or looks wrong, with pictures and steps to reproduce. It doesn't change the code. In Claude Code: "use the tester agent to check the Wildcard Browser", or "... to check every node".
+The automated tests check what they were written for. For the rest, `.claude/agents` has agents for [Claude Code](https://claude.com/claude-code), each with its own tools in this repository. They report what they find (with pictures, numbers, the file and line, and a fix); only the docs agent edits, and only the docs, when asked to. In Claude Code: "use the tester agent to check the Wildcard Browser", "run the reviewer before I push", "ask the compat agent about the last release".
 
-Its tools are in `e2e/qa`, and work without it too:
+| Agent | What it does | When | Its tools |
+|---|---|---|---|
+| `tester` | Uses DiceForge in a browser like a user, in both node designs, and reports what is broken or looks wrong, with pictures and steps. | After a feature or fix; to hunt for what the tests miss. | `e2e/qa/nodes.js`, `e2e/qa/lib.js` |
+| `reviewer` | Reviews a change before it is pushed: what would make CI red, bugs, both designs, Sonar's rules, tests and docs that should come with it. | Before every push. | `.github/scripts/review_checks.py` |
+| `comfy-watcher` | Compares the tested ComfyUI with a newer one: what changed in the parts DiceForge relies on, and what breaks. | A new ComfyUI or frontend release; a red weekly run against master. | `e2e/contract.spec.js`, `e2e/qa/internals.js`, `COMFYUI_REF=… e2e/qa/setup.sh` |
+| `compat` | Checks that workflows of earlier versions keep their nodes, values and prompt, and the same seed the same result; adds a release's workflow to the corpus. | Before a release; after changing a node's inputs or saved formats. | `e2e/qa/compat.js`, `e2e/qa/snapshot.js`, `e2e/workflows/` |
+| `security` | Goes through the routes, file handling, downloads and the text the frontend shows, and tries the attacks on the local test server. | After changes to routes, files or downloads; before a release. | `.github/scripts/security_scan.py --inventory` |
+| `docs` | Checks that the README and CHANGELOG say what the code does; fixes them and makes the screenshots again when asked. | After features; before a release. | `tests/test_docs.py`, `e2e/screenshots.spec.js` |
+| `perf` | Measures the routes, windows and canvas with thousands of wildcards, LoRAs and tags, and profiles what is slow. | After changes to lists, search or the canvas; before a release. | `e2e/qa/perf.js` |
+
+The tools work without the agents too:
 
 ```sh
-e2e/qa/setup.sh          # once per machine: ComfyUI at the tested version next to this repository, its packages, the e2e packages, Chromium
-e2e/qa/serve.sh start    # the e2e server in the background (e2e/qa/serve.sh stop to stop it)
-node e2e/qa/nodes.js     # every node in both designs: pictures side by side in e2e/qa/out/nodes, and the size checks
+e2e/qa/setup.sh                      # once per machine: ComfyUI at the tested version next to this repository, its packages, the e2e packages, Chromium
+e2e/qa/serve.sh start                # the e2e server in the background (e2e/qa/serve.sh stop to stop it)
+node e2e/qa/nodes.js                 # every node in both designs: pictures side by side in e2e/qa/out/nodes, and the size checks
+node e2e/qa/compat.js                # the saved workflows of earlier versions, opened in this one
+node e2e/qa/perf.js                  # the times with a lot of data, against their budgets and the last run
+node e2e/qa/internals.js             # where the ComfyUI internals DiceForge relies on are in its frontend build
+python .github/scripts/review_checks.py origin/main   # the checks of what is not pushed yet
+python .github/scripts/security_scan.py --inventory   # never-allowed code, and every route, file change and request
 ```
 
-`nodes.js` takes a picture of every DiceForge node new, with its advanced inputs shown and hidden again, and from a workflow saved too tall, and measures each one for empty areas and cut-off content (`e2e/qa/lib.js`, whose checks the browser tests use too). What they make goes to `e2e/qa/out`, which is not in git.
+`nodes.js` takes a picture of every DiceForge node new, with its advanced inputs shown and hidden again, and from a workflow saved too tall, and measures each one for empty areas and cut-off content (`e2e/qa/lib.js`, whose checks the browser tests use too). At a release, `node e2e/qa/snapshot.js --version x.y.z` with that release on the e2e server adds its workflow to `e2e/workflows`. What the tools make goes to `e2e/qa/out`, which is not in git.
 
 #### On GitHub
 

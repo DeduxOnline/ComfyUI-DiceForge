@@ -2,10 +2,12 @@
 # What the QA tools and the e2e tests need on a fresh machine (a cloud session), each step skipped when already done: ComfyUI at the version the
 # tests pin (.github/workflows/tests.yml) next to this repository, its Python packages (CPU PyTorch) in ComfyUI/venv, the e2e packages and a
 # Chromium. Then start the server: e2e/qa/serve.sh start.
+# Another ComfyUI version, for example master next to the tested one: COMFYUI_REF=master COMFYUI_PATH=../ComfyUI-master e2e/qa/setup.sh
+# Then the same COMFYUI_PATH for serve.sh; the unit tests: COMFYUI_PATH=../ComfyUI-master ../ComfyUI-master/venv/bin/python -m pytest tests.
 set -euo pipefail
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"
 COMFY="${COMFYUI_PATH:-$REPO/../ComfyUI}"
-REF="$(grep -o "'[0-9a-f]\{40\}'" "$REPO/.github/workflows/tests.yml" | head -1 | tr -d "'")"
+REF="${COMFYUI_REF:-$(grep -o "'[0-9a-f]\{40\}'" "$REPO/.github/workflows/tests.yml" | head -1 | tr -d "'")}"
 
 if [[ ! -f "$COMFY/main.py" ]]; then
   echo "ComfyUI ${REF:0:10} -> $COMFY"

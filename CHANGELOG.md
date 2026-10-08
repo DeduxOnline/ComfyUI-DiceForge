@@ -27,20 +27,32 @@ nodes and features, a patch for fixes. Each version is a [release on GitHub](htt
 - ✂ Selection → new wildcard… (the prompt node's menu): the selected part of a prompt becomes a wildcard, and __name__ takes its place.
 - Model browsers: 🆕 Updates shows the models with a newer version on Civitai, and a card's menu downloads it next to the old one (then offers
   to delete the old one); Largest first in the sort; the tree shows each folder's size.
-- A tester: `.claude/agents/tester.md`, an agent for Claude Code that tests DiceForge in a browser like a user, in both node designs, and
-  reports what it finds with pictures and steps; its tools in `e2e/qa` (setup, the test server, pictures and size checks of every node).
-  The browser tests check every node for empty areas and cut-off content.
+- Agents for Claude Code (`.claude/agents`), each with its tools in this repository (README → Development → Agents):
+  - `tester`: tests DiceForge in a browser like a user, in both node designs, and reports what it finds with pictures and steps
+    (`e2e/qa`: setup, the test server, pictures and size checks of every node).
+  - `reviewer`: reviews a change before it is pushed (`.github/scripts/review_checks.py`: line endings, routes left out of the robustness
+    tests, what Sonar flags, missing tests and docs).
+  - `comfy-watcher`: what a newer ComfyUI changes in the parts DiceForge relies on (`e2e/contract.spec.js`, `e2e/qa/internals.js`).
+  - `compat`: workflows of earlier versions keep their nodes, values and prompt (`e2e/workflows`, `e2e/qa/compat.js`, `e2e/qa/snapshot.js`).
+  - `security`: the routes, files, downloads and shown text, tried on the test server (`.github/scripts/security_scan.py`).
+  - `docs`: the README and CHANGELOG follow the code (`tests/test_docs.py`).
+  - `perf`: times with thousands of wildcards, LoRAs and tags (`e2e/qa/perf.js`).
+- New checks in CI: every node is checked for empty areas and cut-off content; the ComfyUI internals DiceForge relies on; a workflow saved
+  with 1.0.0 opens with every value; the README names every node, input and output, and its links and pictures work; code that is never
+  allowed (HTML built from text, eval, unsafe yaml, a shell, pickle).
 
 ### Changed
 - Node heights: a node taller than what it shows (a workflow saved so, content that got smaller) is fitted again, in both designs; only
   a node with a text field, which grows with it, keeps a height the user gave it.
+- Wildcard Browser: the tree takes a third of the window, the editor (or the cards) two thirds.
+- Tag Browser: ↗ opens the tag's wiki page instead of its posts: on e621 for the tags of an e621 list, on Danbooru otherwise.
 
 ### Fixed
+- README: the inputs and outputs it didn't name yet (Wildcards to Text's `seed`, XY Plot's axes, Variation Seed's `variation_seed`, Danbooru
+  Tag Enhancer's `include_general` and `position`, the utility nodes' inputs and outputs).
 - Previews, Dice Grid's cells and LoRA Stack's list are as tall as what they show, in both designs: no more empty area under them in a
   taller node (the text fields take the extra height), and they no longer keep a height they were once given (the classic canvas grew
   them with the node, then never gave it back); a new node is no longer made taller by a preview measured before it had its width.
-- Wildcard Browser: the tree takes a third of the window, the editor (or the cards) two thirds.
-- Tag Browser: ↗ opens the tag's wiki page instead of its posts: on e621 for the tags of an e621 list, on Danbooru otherwise.
 
 ## [1.0.0] - 2026-10-03
 
