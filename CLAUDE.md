@@ -93,9 +93,22 @@ Update this section as the steps get done, and remove it when they all are.
 - **Next, in this order:**
   1. **A full pass of the agents:** `tester`, `security`, `perf` (also `--scale 3`), `docs`, `comfy-watcher` against ComfyUI master. Then fix
      what they find. Known already: adding 100 nodes takes about 3 s in Nodes 2.0 and 0.6 s in the classic canvas.
-  2. **The first release, 1.0.0** (it was never published):
+  2. **What ComfyUI offers node packs and DiceForge doesn't use yet** (docs.comfy.org → Custom Nodes and Registry, read 2026-10-10):
+     - `pyproject.toml`: `requires-comfyui` and a minimum `comfyui-frontend-package` in `dependencies`, since DiceForge needs the V3
+       schema's DynamicCombo and the Nodes 2.0 design (find the first versions that have what it uses); `Icon` is empty, and `Banner`
+       is missing. Without the minimums the Registry offers DiceForge to an old ComfyUI it doesn't work in.
+     - `example_workflows/` at the repository root: workflow JSON files, each with a `.jpg` of the same name, that ComfyUI's template
+       browser shows as a DiceForge section (an Anima text-to-image like the author's `Anima_DiceForge`, an SDXL one, an XY Plot).
+     - Node help: `DiceForge/web/docs/<node id>.md` (and `<node id>/<locale>.md`), Markdown with pictures and video shown in ComfyUI's
+       node help panel instead of the description; the README's node sections are most of it.
+     - Optional: `subgraphs/` (blueprints in the subgraph browser), `locales/` (node, input and tooltip names in other languages).
+  3. **The first release, 1.0.0** (it was never published):
      - fold `[Unreleased]` into the `[1.0.0]` section of the CHANGELOG;
      - the author adds `REGISTRY_ACCESS_TOKEN`;
      - tag `v1.0.0`;
      - save the release's workflow for the old-workflow tests (`node e2e/qa/snapshot.js --version 1.0.0`, README → Releasing).
-  3. **After it:** a weekly `comfy-watcher` run.
+  4. **After it:**
+     - a weekly `comfy-watcher` run;
+     - a renamed node, or one whose inputs change, gets a Node Replacement (`io.NodeReplace` registered in the extension's `on_load`,
+       docs.comfy.org/custom-nodes/backend/node-replacement): the frontend offers the upgrade when it opens an old workflow and keeps
+       links and values. Use it instead of hand-written repairs, with a workflow in the old-workflow corpus that shows it working.
