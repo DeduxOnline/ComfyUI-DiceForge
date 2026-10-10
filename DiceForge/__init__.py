@@ -19,6 +19,7 @@ from .lora_stack import LoraStack
 from .hires_upscale import HiresUpscale
 from .danbooru_enhancer import DanbooruTagEnhancer
 from .variation_seed import VariationSeed
+from .anima_nag import AnimaNAG
 from .xy_plot import XYPlot # Also the route of its preview on the node (web/xy_plot.js).
 from . import model_info # Server routes of the Model info dialog (web/model_info.js).
 from . import wildcards_api # Server routes of the Wildcard Browser and the __ autocomplete (web/wildcards.js).
@@ -31,6 +32,6 @@ WEB_DIRECTORY = "./web" # Frontend extension: feeds the live size previews of th
 class DiceForgeExtension(ComfyExtension):
     @override
     async def get_node_list(self):
-        return [SDXLResolutionListLatent, ResolutionSelectorRandomLatent, CLIPTextEncodePositiveNegative, WildcardsToText, RandomIntSeedModes, RandomFloatSeedModes, RandomLoraLoader, RandomCheckpointLoader, RandomDiffusionModelLoader, RandomImageLoader, DiceGrid, RandomSampler, RandomVAELoader, LoadVAEDecodeSave, VAEDecodeSave, LoadDiffusionModelCLIP, LoraStack, XYPlot, VariationSeed, HiresUpscale, DanbooruTagEnhancer]
+        return [SDXLResolutionListLatent, ResolutionSelectorRandomLatent, CLIPTextEncodePositiveNegative, WildcardsToText, RandomIntSeedModes, RandomFloatSeedModes, RandomLoraLoader, RandomCheckpointLoader, RandomDiffusionModelLoader, RandomImageLoader, DiceGrid, RandomSampler, RandomVAELoader, LoadVAEDecodeSave, VAEDecodeSave, LoadDiffusionModelCLIP, LoraStack, XYPlot, VariationSeed, AnimaNAG, HiresUpscale, DanbooruTagEnhancer]
 async def comfy_entrypoint():
     return DiceForgeExtension()

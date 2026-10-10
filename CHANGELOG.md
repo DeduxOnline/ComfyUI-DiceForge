@@ -41,6 +41,9 @@ nodes and features, a patch for fixes. Each version is a [release on GitHub](htt
 - New checks in CI: every node is checked for empty areas and cut-off content; the ComfyUI internals DiceForge relies on; workflows saved
   with published releases (from the first one on) open with every value; the README names every node, input and output, and its links and pictures work; code that is never
   allowed (HTML built from text, eval, unsafe yaml, a shell, pickle).
+- Anima NAG (DiceForge/sampling): Normalized Attention Guidance for Anima, so the negative prompt works with a Turbo LoRA at CFG 1 and removes
+  what CFG alone leaves in at a higher CFG. It uses KSampler's negative prompt and costs almost nothing above CFG 1. ComfyUI's own NAG node
+  doesn't change Anima.
 
 ### Changed
 - Every node id starts with DiceForge, so no other node pack can take a DiceForge node's place in a workflow (ComfyUI-RuiquNodes has a

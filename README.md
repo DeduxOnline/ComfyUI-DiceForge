@@ -29,7 +29,7 @@ Around the nodes, DiceForge adds tools to ComfyUI's right-click menus: [model br
 - [Prompts](#prompts): [CLIP Dual Text Encode](#clip-dual-text-encode-wildcards-lora), [Wildcards to Text](#wildcards-to-text), [wildcards](#wildcard-files), [tag autocomplete](#tag-autocomplete-danbooru-e621), [Tag Browser](#tag-browser), [prompt styles](#prompt-styles), [Danbooru Tag Enhancer](#danbooru-tag-enhancer)
 - [Image sizes](#image-sizes): [SDXL Resolution List](#sdxl-resolution-list), [Resolution Selector](#resolution-selector-random), [seed modes for sizes](#seed-modes-for-sizes)
 - [Random nodes](#random-nodes): [Random Int and Float](#random-int-and-random-float), [random loaders](#random-lora-random-checkpoint-random-diffusion-model-and-random-vae), [Random Image](#random-image), [Random Sampler](#random-sampler)
-- [Sampling and upscaling](#sampling-and-upscaling): [KSampler presets](#ksampler-presets), [Variation Seed](#variation-seed), [HiresFix (Load VAE)](#hiresfix-load-vae)
+- [Sampling and upscaling](#sampling-and-upscaling): [KSampler presets](#ksampler-presets), [Variation Seed](#variation-seed), [Anima NAG](#anima-nag), [HiresFix (Load VAE)](#hiresfix-load-vae)
 - [Comparing results](#comparing-results): [XY Plot](#xy-plot), [Dice Grid](#dice-grid)
 - [LoRAs and models](#loras-and-models): [LoRA Stack](#lora-stack), [Model info](#model-info), [model browsers](#model-browsers)
 - [Utility nodes](#utility-nodes) · [Development](#development) ([tests](#tests), [releasing](#releasing))
@@ -78,6 +78,7 @@ Every version is listed in [CHANGELOG.md](CHANGELOG.md) and released on [GitHub]
 | [**Load Diffusion Model + CLIP**](#utility-nodes) | DiceForge/loaders | You want Load Diffusion Model and Load CLIP in one node, for models that come as separate files (Flux, Anima, Qwen-Image...). |
 | **Sampling and upscaling** | | |
 | [**Variation Seed**](#variation-seed) | DiceForge/sampling | You like a picture and want it again with small differences (folds, hair, background, a hand), as A1111's variation seed. |
+| [**Anima NAG**](#anima-nag) | DiceForge/sampling | You use Anima with a Turbo LoRA (CFG 1), where the negative prompt does nothing, or the negative prompt isn't strong enough at a higher CFG. |
 | [**HiresFix (Load VAE)**](#hiresfix-load-vae) | DiceForge/image | You want Easy-Use's HiresFix with the VAE picked from a list: upscale model, rescale, preview or save, and a latent for your own second KSampler pass. |
 | **Comparing results** | | |
 | [**XY Plot**](#xy-plot) | DiceForge/sampling | You want an X/Y comparison in one node: seed, steps, CFG, sampler, scheduler, LoRA, LoRA strength, denoise or variation seed/strength on each axis, every combination queued with one button. |
@@ -649,6 +650,32 @@ Variations of a picture, as A1111's *variation seed* (subseed): the same composi
 - With several Variation Seed nodes in a row, the last one counts.
 - [XY Plot](#xy-plot) has `variation seed` and `variation strength` axes: a grid of variations of one picture (with `variation_strength` 0.1 under Advanced), or of strengths.
 
+### Anima NAG
+
+Normalized Attention Guidance ([NAG](https://chendaryen.github.io/NAG.github.io/)) for Anima: the negative prompt also steers every cross-attention of the model. With a Turbo LoRA (CFG 1) the negative prompt otherwise does nothing; at a higher CFG it adds to it, for things CFG alone leaves in the picture.
+
+1. Put it on the model line, right before KSampler: the loader's (or LoRA Stack's) `model` in, its `model` out to KSampler.
+2. Write what you don't want in KSampler's negative prompt, as usual: NAG uses that one, there is no second negative.
+
+| Input | Default | Description |
+|---|---|---|
+| `model` | | An Anima model (2B, 2.9B, 3.8B; bf16 or compressed), after LoRAs. |
+| `nag_scale` | 5 | How far from the negative prompt: 1 is off, about 3–7 a clear push. Higher ones change more of the picture. |
+| `nag_alpha` | 0.5 | How much of the guided attention goes in: 0 is off, 1 all of it. |
+| `nag_tau` | 1.5 | Under **Advanced**: the most the guidance may grow the attention's size, as a multiple of the positive prompt's. It keeps a high scale from burning the picture. |
+
+| Output | Description |
+|---|---|
+| `model` | The model with NAG: connect it to KSampler. |
+
+A witch on a hill with `witch hat, hat, headwear` in the negative prompt (Anima base, 896×1152, two seeds, RTX 5060): with the Turbo LoRA at CFG 1 she keeps her hat without NAG and loses it with NAG at the defaults; at CFG 4 she keeps it even with the negative prompt, and loses it with NAG. The pose, the broom and the moon stay.
+
+- In each block, the cross-attention runs once more for the positive prompt, with the negative prompt's text, and the two are blended. The negative is the one ComfyUI already has for CFG, through Anima's own text adapter.
+- At CFG above 1 it costs almost nothing (30 steps: 43 s with, 44 s without). At CFG 1 ComfyUI normally skips the negative prompt, so the node turns it back on: 10 Turbo steps took 13–14 s instead of 5 s.
+- It needs the positive and negative prompts in the same batch, as ComfyUI runs them unless the VRAM is too low; a step that runs them apart has no NAG.
+- ComfyUI's own *Normalized Attention Guidance* node doesn't change Anima: it patches an attention output that Anima doesn't pass through.
+- With several Anima NAG nodes in a row, the last one counts. On a model other than Anima it stops with an error that says so.
+
 ### HiresFix (Load VAE)
 
 Like Easy-Use's *HiresFix*, with the VAE picked from a list instead of a `vae` input: the image of the first pass is made bigger with an upscale model, rescaled, shown or saved, and encoded into a latent for a second KSampler pass (denoise 0.3–0.5). It prepares the image and the latent for your own KSampler.
@@ -881,7 +908,7 @@ Two test suites, next to `DiceForge` (not copied into ComfyUI). Both need a Comf
 
 #### Unit tests
 
-The `tests` folder has unit tests for every node and server route: seed modes, prompt syntax and wildcards (txt, yaml, globs, weights, variables, `<lora:>` tags), the resolution nodes (including the preview's rounding against the node's), the random nodes and loaders, LoRA Stack (strengths, groups, trigger words, presets), Model info, the model browsers and model files (Civitai search and downloads, rename, move, delete), KSampler presets, prompt styles, the tag lists and Tag Browser, Danbooru Tag Enhancer (with a stand-in for Danbooru), XY Plot, Variation Seed, both hires fixes, VAE Decode + Save, Dice Grid (keeping cells) and the release script.
+The `tests` folder has unit tests for every node and server route: seed modes, prompt syntax and wildcards (txt, yaml, globs, weights, variables, `<lora:>` tags), the resolution nodes (including the preview's rounding against the node's), the random nodes and loaders, LoRA Stack (strengths, groups, trigger words, presets), Model info, the model browsers and model files (Civitai search and downloads, rename, move, delete), KSampler presets, prompt styles, the tag lists and Tag Browser, Danbooru Tag Enhancer (with a stand-in for Danbooru), XY Plot, Variation Seed, Anima NAG (on Anima's own attention), both hires fixes, VAE Decode + Save, Dice Grid (keeping cells) and the release script.
 
 The `test_properties_*.py` files check rules that must hold for *any* input, with [Hypothesis](https://hypothesis.readthedocs.io) generating hundreds of inputs per rule: every pick comes from its options and is reproducible from the seed; deck deals every option once per round (also within one prompt, across the end of a round); `combinations` lists every possible prompt exactly once; locks, variables, escapes, comments and the comma and space clean-up keep their promises in every seed mode; any text (fuzzed prompt syntax, any Unicode) resolves or stops with a clear error, quickly; every size is a positive multiple of `multiple` and keeps what `rescale` promises; Random Int, Float and Sampler stay in their range; any LoRA Stack data runs or is refused clearly; Dice Grid renders any labels; and no file name from a request reaches outside its folder. `test_robustness.py` damages things on purpose: a seed memory, grid manifest, model info or preset file that is broken, wildcard files in other encodings or deleted while indexed, junk requests to every route (always a 4xx answer, never a server error), many threads at once, the same picks in every Python process, and the frontend's `__` autocomplete knowing the same letters as the server.
 

@@ -7,7 +7,7 @@ const { MODELS, DOWNLOADS } = require("./fixtures");
 
 const NODES = ["DiceForgeSDXLResolutionList", "DiceForgeResolutionSelector", "DiceForgeCLIPDualTextEncode", "DiceForgeWildcardsToText", "DiceForgeRandomInt", "DiceForgeRandomFloat",
   "DiceForgeRandomLora", "DiceForgeRandomCheckpoint", "DiceForgeRandomDiffusionModel", "DiceForgeRandomImage", "DiceForgeGrid", "DiceForgeRandomSampler",
-  "DiceForgeRandomVAE", "DiceForgeLoadVAEDecodeSave", "DiceForgeVAEDecodeSave", "DiceForgeLoadDiffusionModelCLIP", "DiceForgeLoraStack", "DiceForgeXYPlot", "DiceForgeVariationSeed", "DiceForgeHiresUpscale", "DiceForgeDanbooruEnhancer"];
+  "DiceForgeRandomVAE", "DiceForgeLoadVAEDecodeSave", "DiceForgeVAEDecodeSave", "DiceForgeLoadDiffusionModelCLIP", "DiceForgeLoraStack", "DiceForgeXYPlot", "DiceForgeVariationSeed", "DiceForgeAnimaNAG", "DiceForgeHiresUpscale", "DiceForgeDanbooruEnhancer"];
 const clip = (positive, negative = "", { seed = 0, mode = "random" } = {}) => ({
   1: { class_type: "DiceForgeCLIPDualTextEncode", inputs: { positive, negative, seed, seed_mode: mode, trim: true } },
   2: { class_type: "PreviewAny", inputs: { source: ["1", 3] } },
@@ -249,6 +249,21 @@ test.describe("@api workflows and routes", () => {
     });
     const errors = Object.values(result.rejected.node_errors).flatMap((node) => node.errors.map((error) => `${error.type} ${error.extra_info?.input_name ?? ""}`));
     expect(errors.join()).toContain("required_input_missing model"); // No checkpoint here: only the links are checked.
+    expect(errors.join()).not.toContain("return_type_mismatch");
+  });
+
+  test("Anima NAG's model goes to KSampler, with scale, alpha and tau in view or under the advanced inputs", async ({ request }) => {
+    const info = (await (await request.get("/object_info/DiceForgeAnimaNAG")).json()).DiceForgeAnimaNAG;
+    expect(Object.keys(info.input.required)).toEqual(["model", "nag_scale", "nag_alpha", "nag_tau"]);
+    expect(info.input.required.nag_tau[1].advanced).toBe(true);
+    expect(info.output).toEqual(["MODEL"]);
+    const result = await runPrompt(request, {
+      1: { class_type: "DiceForgeAnimaNAG", inputs: { nag_scale: 5, nag_alpha: 0.5, nag_tau: 1.5 } },
+      2: { class_type: "KSampler", inputs: { model: ["1", 0], seed: 0, steps: 1, cfg: 1, sampler_name: "euler", scheduler: "normal", denoise: 1 } },
+      3: { class_type: "PreviewAny", inputs: { source: ["2", 0] } },
+    });
+    const errors = Object.values(result.rejected.node_errors).flatMap((node) => node.errors.map((error) => `${error.type} ${error.extra_info?.input_name ?? ""}`));
+    expect(errors.join()).toContain("required_input_missing model"); // No Anima model here: only the links are checked.
     expect(errors.join()).not.toContain("return_type_mismatch");
   });
 
