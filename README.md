@@ -26,7 +26,7 @@ Around the nodes, DiceForge adds tools to ComfyUI's right-click menus: [model br
 ## Contents
 
 - [Installation](#installation) · [Nodes](#nodes) · [Quick start](#quick-start)
-- [Prompts](#prompts): [CLIP Dual Text Encode](#clip-dual-text-encode-wildcards-lora), [Wildcards to Text](#wildcards-to-text), [wildcards](#wildcard-files), [tag autocomplete](#tag-autocomplete-danbooru-e621), [Tag Browser](#tag-browser), [prompt styles](#prompt-styles), [Danbooru Tag Enhancer](#danbooru-tag-enhancer)
+- [Prompts](#prompts): [CLIP Dual Text Encode](#clip-dual-text-encode-wildcards-lora), [Wildcards to Text](#wildcards-to-text), [Wildcard Note](#wildcard-note), [wildcards](#wildcard-files), [tag autocomplete](#tag-autocomplete-danbooru-e621), [Tag Browser](#tag-browser), [prompt styles](#prompt-styles), [Danbooru Tag Enhancer](#danbooru-tag-enhancer)
 - [Image sizes](#image-sizes): [SDXL Resolution List](#sdxl-resolution-list), [Resolution Selector](#resolution-selector-random), [seed modes for sizes](#seed-modes-for-sizes)
 - [Random nodes](#random-nodes): [Random Int and Float](#random-int-and-random-float), [random loaders](#random-lora-random-checkpoint-random-diffusion-model-and-random-vae), [Random Image](#random-image), [Random Sampler](#random-sampler)
 - [Sampling and upscaling](#sampling-and-upscaling): [KSampler presets](#ksampler-presets), [Variation Seed](#variation-seed), [Anima NAG](#anima-nag), [HiresFix (Load VAE)](#hiresfix-load-vae)
@@ -64,6 +64,7 @@ Every version is listed in [CHANGELOG.md](CHANGELOG.md) and released on [GitHub]
 | **Prompts** | | |
 | [**CLIP Dual Text Encode (Wildcards, LoRA)**](#clip-dual-text-encode-wildcards-lora) | DiceForge/conditioning | You want positive and negative prompts in one node, with wildcards, `{a\|b}` choices, variables, locked choices and `<lora:>` tags that follow the seed modes. It also outputs the filled-in text, and works without a CLIP as a text-only prompt builder for other encoders. |
 | [**Wildcards to Text**](#wildcards-to-text) | DiceForge/conditioning | You want only the text: one prompt with the same syntax (wildcards, choices, variables, seed modes) filled in, for any text encoder or text input. |
+| [**Wildcard Note**](#wildcard-note) | DiceForge/utils | You want to collect wildcard lines while you work, with the `__` autocomplete, and put them into a wildcard file with one button. |
 | [**Danbooru Tag Enhancer**](#danbooru-tag-enhancer) | DiceForge/conditioning | You want a richer prompt from a few tags: it adds the tags of a random Danbooru or e621 post that has your tags, the way anime and furry models were trained. |
 | **Image sizes** | | |
 | [**SDXL Resolution List**](#sdxl-resolution-list) | DiceForge/latent | You want the standard SDXL sizes (1024x1024, 1216x832, ...) from a fixed list, or picked at random, rescaled like Easy-Use's HiresFix. |
@@ -86,7 +87,7 @@ Every version is listed in [CHANGELOG.md](CHANGELOG.md) and released on [GitHub]
 | **Decoding and saving** | | |
 | [**Load VAE + Decode + Save, VAE Decode + Save**](#utility-nodes) | DiceForge/image | You want VAE Decode and Save Image (and Load VAE) in one node, with Easy-Use's *image_output* choice. |
 
-All nodes use the ComfyUI V3 node schema: in the Nodes 2.0 frontend, the secondary inputs (including `seed_mode`) sit in the node's **Advanced** section. Every node works in both node designs, Nodes 2.0 and classic.
+All nodes but Wildcard Note (a note, which lives in the frontend like ComfyUI's Note) use the ComfyUI V3 node schema: in the Nodes 2.0 frontend, the secondary inputs (including `seed_mode`) sit in the node's **Advanced** section. Every node works in both node designs, Nodes 2.0 and classic.
 
 The anime prompt builder *Prompt Director* lives in its own repository: [DeduxOnline/ComfyUI-PromptDirector](https://github.com/DeduxOnline/ComfyUI-PromptDirector).
 
@@ -314,6 +315,16 @@ In YAML, put quotes around a line that starts with `{`, `[`, `!` or contains `: 
 <img src="docs/images/wildcards_to_text.png" width="873" alt="Wildcards to Text filling in a prompt, shown by Preview as Text">
 
 One prompt field with the same syntax as CLIP Dual Text Encode (wildcards, `{a|b}` choices, variables, comments, the seed modes), and a `text` output: the prompt filled in, for any text encoder (Flux, SD3, video models), a text input, a file name or another prompt node. The same `text`, `seed` and `seed_mode` give the same text as CLIP Dual Text Encode's `positive_text`. Its field has the same tools: the `__` and tag autocomplete, syntax highlighting, and in its right-click menu the Syntax guide, Wildcard Browser and Tag Browser. `<lora:...>` tags stay in the text, for a node that reads them. Under the advanced inputs: `seed_mode` and `trim`.
+
+### Wildcard Note
+
+A note, like ComfyUI's **Note**, for the lines of a wildcard: write them while you work, with the prompt fields' tools (the `__` and tag autocomplete, syntax highlighting, and the Syntax guide, Wildcard Browser and Tag Browser in its right-click menu), and **💾 Save to WildCard** puts them into a wildcard file. It is not run with the workflow.
+
+- `text`: the lines, one per line. Each is trimmed, and empty lines and repeats are left out.
+- `wildcard`: the txt wildcard file they go to, or **＋ New file…**, which asks for a name (folders with `/`, for example `outfit/dress`). A yaml file's wildcards aren't in the list: they are edited in their yaml file. The list follows the files made, renamed and deleted in the Wildcard Browser; **↻ Refresh the file list** in the right-click menu reads the wildcards folders again, after a file was added by hand.
+- `mode`: **add lines** puts the note's lines after the file's, leaving out the lines the file already has (its comments stay); **replace file** puts them in place of the file's lines, after asking.
+
+A name without a file makes that file. After a save, the list points at the file saved, so the next lines go to the same file.
 
 ### Tag autocomplete (Danbooru, e621)
 

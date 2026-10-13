@@ -3,7 +3,7 @@
 
 const ALL_NODES = ["DiceForgeSDXLResolutionList", "DiceForgeResolutionSelector", "DiceForgeCLIPDualTextEncode", "DiceForgeWildcardsToText", "DiceForgeRandomInt", "DiceForgeRandomFloat",
   "DiceForgeRandomLora", "DiceForgeRandomCheckpoint", "DiceForgeRandomDiffusionModel", "DiceForgeRandomImage", "DiceForgeGrid", "DiceForgeRandomSampler",
-  "DiceForgeRandomVAE", "DiceForgeLoadVAEDecodeSave", "DiceForgeVAEDecodeSave", "DiceForgeLoadDiffusionModelCLIP", "DiceForgeLoraStack", "DiceForgeXYPlot", "DiceForgeVariationSeed", "DiceForgeAnimaNAG", "DiceForgeHiresUpscale", "DiceForgeDanbooruEnhancer"];
+  "DiceForgeRandomVAE", "DiceForgeLoadVAEDecodeSave", "DiceForgeVAEDecodeSave", "DiceForgeLoadDiffusionModelCLIP", "DiceForgeLoraStack", "DiceForgeXYPlot", "DiceForgeVariationSeed", "DiceForgeAnimaNAG", "DiceForgeHiresUpscale", "DiceForgeDanbooruEnhancer", "DiceForgeWildcardNote"];
 
 // A prompt field of CLIP Dual Text Encode, marked so a locator finds it in either design (Nodes 2.0: the node's textareas in order; classic: the
 // widget's own textarea).

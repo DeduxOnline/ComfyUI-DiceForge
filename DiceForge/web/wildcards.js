@@ -11,18 +11,27 @@ import { closeMenu, keysButton, keysOnQuestion, menuAt, menuButton, menuOpen, mo
 const NODE_TYPE = "DiceForgeCLIPDualTextEncode";
 const FIELDS = ["positive", "negative"];
 // The nodes whose text fields get the prompt tools (autocomplete, highlighting, the browsers' + Add, the syntax guide), and their fields.
-const PROMPT_NODES = { [NODE_TYPE]: FIELDS, DiceForgeWildcardsToText: ["text"] };
+const PROMPT_NODES = { [NODE_TYPE]: FIELDS, DiceForgeWildcardsToText: ["text"], DiceForgeWildcardNote: ["text"] };
 const fieldsOf = (node) => PROMPT_NODES[node?.comfyClass] ?? null;
 const isPromptNode = (node) => !!fieldsOf(node);
 
 // The wildcard list, fetched once and shared: keystrokes while it loads wait for the same request instead of each sending one (their answers could
-// come back in any order). listCache is the last list that arrived, for drawing the browser.
+// come back in any order). listCache is the last list that arrived, for drawing the browser; the listeners hear of each new list (Wildcard Note's
+// file list follows the files made, renamed and deleted elsewhere).
 let listCache = null, listRequest = null;
+const listListeners = new Set();
+export const onWildcardList = (listener) => listListeners.add(listener);
 function wildcardList(refresh = false) {
   if (!listRequest || refresh) {
     const request = api.fetchApi("/diceforge/wildcards")
       .then((response) => (response.ok ? response.json() : Promise.reject(new Error(`${response.status}`))))
-      .then((list) => { if (listRequest === request) listCache = list; return list; }, // An older request finishing late doesn't win.
+      .then((list) => { // An older request finishing late doesn't win.
+        if (listRequest === request) {
+          listCache = list;
+          listListeners.forEach((listener) => listener(list));
+        }
+        return list;
+      },
         () => { if (listRequest === request) listRequest = null; return listCache ?? { files: [], folders: [] }; }); // Failed: the next use asks again.
     listRequest = request;
   }
@@ -1010,7 +1019,7 @@ export function cleanLines(text, sort) {
 }
 
 // A message in ComfyUI's corner (a dialog where there is none, for what went wrong).
-function toast(severity, detail) {
+export function toast(severity, detail) {
   const toaster = app.extensionManager?.toast;
   if (toaster?.add) toaster.add({ severity, summary: "Wildcards", detail, life: 5000 });
   else if (severity !== "success") alert(detail);

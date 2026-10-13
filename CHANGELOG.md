@@ -8,6 +8,8 @@ nodes and features, a patch for fixes. Each version is a [release on GitHub](htt
 ## [Unreleased]
 
 ### Added
+- Wildcard Note (DiceForge/utils): a note for a wildcard's lines, with the prompt fields' tools; 💾 Save to WildCard adds its new lines to the
+  wildcard file picked in its list, puts them in place of the file's lines, or makes a new file.
 - The windows open where they were closed: Wildcard Browser (search, ★ Favorites, the open file with its unsaved changes, scrolling), Tag Browser
   (search, type, order), syntax guide (search), model browsers (search, tag filter, order).
 - The windows can be resized by their bottom-right corner and keep their size (a double-click on the title: the default size).

@@ -7,7 +7,7 @@ const { test, expect, basePath, openComfy, addNodes, connect, widgetValue, setWi
 
 const ALL_NODES = ["DiceForgeSDXLResolutionList", "DiceForgeResolutionSelector", "DiceForgeCLIPDualTextEncode", "DiceForgeWildcardsToText", "DiceForgeRandomInt", "DiceForgeRandomFloat",
   "DiceForgeRandomLora", "DiceForgeRandomCheckpoint", "DiceForgeRandomDiffusionModel", "DiceForgeRandomImage", "DiceForgeGrid", "DiceForgeRandomSampler",
-  "DiceForgeRandomVAE", "DiceForgeLoadVAEDecodeSave", "DiceForgeVAEDecodeSave", "DiceForgeLoadDiffusionModelCLIP", "DiceForgeLoraStack", "DiceForgeXYPlot", "DiceForgeVariationSeed", "DiceForgeAnimaNAG", "DiceForgeHiresUpscale", "DiceForgeDanbooruEnhancer"];
+  "DiceForgeRandomVAE", "DiceForgeLoadVAEDecodeSave", "DiceForgeVAEDecodeSave", "DiceForgeLoadDiffusionModelCLIP", "DiceForgeLoraStack", "DiceForgeXYPlot", "DiceForgeVariationSeed", "DiceForgeAnimaNAG", "DiceForgeHiresUpscale", "DiceForgeDanbooruEnhancer", "DiceForgeWildcardNote"];
 const STACK = JSON.stringify({ rows: [{ lora: "style/ink.safetensors", strength: 0.7, random: true, min: 0.4, max: 0.9, group: "A", triggers: "custom", trigger_words: ["ink style"] },
   { lora: "detail.safetensors", strength: 1.2, on: false }], groups: { A: { min: 0, max: 1 } }, separate_clip: true });
 // Values that differ from the defaults, so a value lost on the way shows.
@@ -20,6 +20,7 @@ const CHANGES = {
   DiceForgeRandomSampler: { samplers: "euler,\ndpmpp_2m", schedulers: "karras", seed: 11, seed_mode: "deck" },
   DiceForgeGrid: { count: 9, columns: 3, cell_width: 256, save: false, filename_prefix: "e2e/ui grid", name: "ui grid", legend: "легенда", legend_position: "bottom", numbered: true },
   DiceForgeLoraStack: { loras: STACK, seed: 99, seed_mode: "shuffle" },
+  DiceForgeWildcardNote: { text: "строка, __color__\nsecond line", wildcard: "hair/style", mode: "replace file" },
 };
 const values = (page, id) => page.evaluate((id) => Object.fromEntries(window.app.graph.getNodeById(id).widgets
   .filter((widget) => !["preview_ratio", "preview_megapixels"].includes(widget.name) && widget.serialize !== false && widget.type !== "button")

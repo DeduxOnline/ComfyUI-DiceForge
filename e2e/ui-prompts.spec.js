@@ -1,8 +1,8 @@
-// End-to-end in the browser, the prompts: autocomplete, syntax highlighting, the Wildcard Browser, Wildcards to Text, the Syntax guide,
+// End-to-end in the browser, the prompts: autocomplete, syntax highlighting, the Wildcard Browser, Wildcards to Text, Wildcard Note, the Syntax guide,
 // prompt styles, the tag autocomplete, the prompt preview and history, and Danbooru Tag Enhancer, in both node designs (Nodes 2.0 and
 // classic), against the real server. Each test builds its own graph.
 const fs = require("fs");
-const { test, expect, basePath, writeFile, openComfy, addNodes, connect, widgetValue, setWidget, menuItems, clickMenu, queueFromPage } = require("./helpers");
+const { test, expect, basePath, writeFile, openComfy, addNodes, connect, widgetValue, setWidget, menuItems, clickMenu, queueFromPage, nodeElement } = require("./helpers");
 const { png, zip } = require("./fixtures");
 const { promptField, lookUp } = require("./ui-shared");
 
@@ -312,6 +312,62 @@ for (const vue of [true, false]) {
       } finally {
         fs.rmSync(file(), { recursive: true, force: true });
       }
+    });
+
+    test("Wildcard Note: 💾 Save to WildCard adds its new lines to the picked file, replaces the file's lines, or makes a new file", async ({ page }) => {
+      const top = `note_${vue ? "vue" : "classic"}`, file = (...parts) => basePath("models", "wildcards", top, ...parts);
+      writeFile(`models/wildcards/${top}/colors.txt`, "# my colors\nred\nblue\n");
+      const answers = [`${top}/fresh`];
+      page.on("dialog", (dialog) => (dialog.type() === "prompt" ? dialog.accept(answers.shift()) : dialog.accept()));
+      const [id] = await addNodes(page, [{ type: "DiceForgeWildcardNote", pos: [300, 60], widgets: { text: "blue\n  green  \n\nyellow\ngreen" } }]);
+      const choices = () => page.evaluate((id) => window.app.graph.getNodeById(id).widgets.find((widget) => widget.name === "wildcard").options.values, id);
+      const text = (name) => (fs.existsSync(file(name)) ? fs.readFileSync(file(name), "utf8") : null);
+      const save = async () => {
+        if (vue) await nodeElement(page, id).getByRole("button", { name: /Save to WildCard/ }).click(); // The button in the node.
+        else await page.evaluate((id) => window.app.graph.getNodeById(id).widgets.find((widget) => widget.type === "button").callback(), id);
+      };
+      try {
+        await expect.poll(choices).toContain(`${top}/colors`);
+        expect((await choices())[0]).toBe("＋ New file…");
+        expect(await choices()).not.toContain("characters/alice/outfit"); // A yaml file's wildcards are edited in the yaml file.
+        await setWidget(page, id, "wildcard", `${top}/colors`);
+        await save(); // Added: the lines the file doesn't have yet, each once; its comment stays.
+        await expect.poll(() => text("colors.txt")).toBe("# my colors\nred\nblue\ngreen\nyellow\n");
+        await save(); // Nothing new: the file stays as it is.
+        await page.waitForTimeout(500);
+        expect(text("colors.txt")).toBe("# my colors\nred\nblue\ngreen\nyellow\n");
+        await setWidget(page, id, "mode", "replace file");
+        await save(); // Replaced, once confirmed.
+        await expect.poll(() => text("colors.txt")).toBe("blue\ngreen\nyellow\n");
+        await setWidget(page, id, "wildcard", "＋ New file…");
+        await setWidget(page, id, "mode", "add lines");
+        await save(); // A new file, named in the prompt.
+        await expect.poll(() => text("fresh.txt")).toBe("blue\ngreen\nyellow\n");
+        expect(answers).toEqual([]);
+        expect(await widgetValue(page, id, "wildcard")).toBe(`${top}/fresh`); // The next save goes to it,
+        await expect.poll(choices).toContain(`${top}/fresh`); // and the list has it.
+        await setWidget(page, id, "text", "  \n");
+        await save(); // An empty note writes nothing.
+        await page.waitForTimeout(500);
+        expect(text("fresh.txt")).toBe("blue\ngreen\nyellow\n");
+        // A note is not part of a run: the prompt sent to the server doesn't have it.
+        expect(await page.evaluate(async (id) => String(id) in (await window.app.graphToPrompt()).output, id)).toBe(false);
+      } finally {
+        fs.rmSync(file(), { recursive: true, force: true });
+      }
+    });
+
+    test("Wildcard Note's text has the prompt tools: __ suggests wildcards, and the node menu has the Wildcard Browser", async ({ page }) => {
+      const [id] = await addNodes(page, [{ type: "DiceForgeWildcardNote", pos: [300, 60] }]);
+      expect(await menuItems(page, id, "DiceForge.Wildcards")).toEqual(["📖 Syntax guide", "🎲 Wildcard Browser", "✂ Selection → new wildcard…"]);
+      expect(await menuItems(page, id, "DiceForge.WildcardNote")).toEqual(["↻ Refresh the file list"]);
+      const field = vue ? nodeElement(page, id).locator("textarea").first() : page.locator(`[data-e2e="${id}-text"]`);
+      if (!vue) await page.evaluate((id) => window.app.graph.getNodeById(id).widgets.find((widget) => widget.name === "text").inputEl.setAttribute("data-e2e", `${id}-text`), id);
+      await field.click();
+      await page.keyboard.type("__hair/st");
+      await expect(page.locator(".dfwc-pop")).toContainText("__hair/style__");
+      await page.keyboard.press("Enter");
+      await expect.poll(() => widgetValue(page, id, "text")).toBe("__hair/style__");
     });
 
     test("Wildcard Browser favorites: ☆ stars a file, ★ Favorites shows only them, the autocomplete puts them first", async ({ page }) => {
