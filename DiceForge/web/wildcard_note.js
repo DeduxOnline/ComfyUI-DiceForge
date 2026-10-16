@@ -11,8 +11,8 @@ const NEW_FILE = "＋ New file…";
 const ADD = "add lines", REPLACE = "replace file";
 
 const widgetOf = (node, name) => node.widgets?.find((widget) => widget.name === name);
-// The files a note can write to: the txt wildcards (a yaml file's wildcards are edited in the yaml file), after the new file.
-const fileChoices = (list) => [NEW_FILE, ...(list?.files ?? []).filter((file) => !file.yaml).map((file) => file.name)];
+// The wildcards a note can write to (txt files and yaml keys, a yaml key in its yaml file), after the new file.
+const fileChoices = (list) => [NEW_FILE, ...(list?.files ?? []).map((file) => file.name)];
 function showChoices(node, list) {
   const files = widgetOf(node, "wildcard");
   if (files) files.options.values = fileChoices(list);
@@ -25,7 +25,7 @@ const noteLines = (node) => [...new Set(String(widgetOf(node, "text")?.value ?? 
 const linesWord = (count) => `${count} line${count === 1 ? "" : "s"}`;
 
 // What the save writes ({ text, create, done }), or null when there is nothing to write (a message said why). A name without a file makes the
-// file; a yaml wildcard is not written; replacing a file's lines is asked first.
+// file; replacing a file's lines is asked first.
 async function plannedSave(name, lines, mode) {
   const file = await api.fetchApi(`/diceforge/wildcards/file?name=${encodeURIComponent(name)}`);
   if (file.status === 404) return { text: lines.join("\n"), create: true, done: `Made __${name}__ with the note's ${linesWord(lines.length)}` };
@@ -34,10 +34,6 @@ async function plannedSave(name, lines, mode) {
     return null;
   }
   const current = await file.json();
-  if (current.readonly) {
-    toast("warn", `__${name}__ comes from a yaml file: add the lines there.`);
-    return null;
-  }
   if (mode === REPLACE) {
     if (!confirm(`Replace the lines of __${name}__ with the note's ${linesWord(lines.length)}?`)) return null;
     return { text: lines.join("\n"), done: `Replaced the lines of __${name}__ with the note's ${linesWord(lines.length)}` };

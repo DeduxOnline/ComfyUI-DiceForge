@@ -214,7 +214,11 @@ ROUTES = [("POST", "/diceforge/wildcards/file"), ("POST", "/diceforge/lora-prese
           ("GET", "/diceforge/wildcards/search"), ("POST", "/diceforge/wildcards/restore"), ("GET", "/diceforge/wildcards/export?folder=../x"),
           ("GET", "/diceforge/wildcards/export?folder=nope"), ("GET", "/diceforge/wildcards/export"), ("POST", "/diceforge/models/restore"),
           ("GET", "/diceforge/wildcards/preview?name=nope"), ("GET", "/diceforge/wildcards/preview?name=../x&count=x"),
-          ("POST", "/diceforge/wildcards/replace"), ("GET", "/diceforge/tags/related")]
+          ("POST", "/diceforge/wildcards/replace"), ("GET", "/diceforge/tags/related"),
+          ("GET", "/diceforge/wildcards/cards"), ("GET", "/diceforge/wildcards/cards?folder=../x"), ("GET", "/diceforge/wildcards/picture?name=nope&line=x"),
+          ("POST", "/diceforge/wildcards/picture?name=nope&line=-1"), ("DELETE", "/diceforge/wildcards/picture?name=nope&line=99999999"),
+          ("GET", "/diceforge/wildcards/yaml"), ("GET", "/diceforge/wildcards/yaml?file=../x.yaml"), ("POST", "/diceforge/wildcards/yaml"),
+          ("DELETE", "/diceforge/wildcards/yaml?file=nope.yaml")]
 JUNK_BODIES = ["not json", "", "[]", "5", "null", '"text"', '{"loras": 5}', '{"loras": [1, null, {"a": 1}, "x.safetensors"]}', '{"items": 5}',
                '{"items": [1, null, "x", {"kind": 5, "file": []}, {"kind": "loras", "file": "../../x"}]}', '{"kind": "loras", "file": "x", "user": [1]}',
                '{"kind": "loras", "file": "x", "user": {"name": {"a": 1}}}', '{"name": 5}', '{"name": "ok", "stack": 5}', '{"name": "ok", "stack": {"rows": "x"}}',

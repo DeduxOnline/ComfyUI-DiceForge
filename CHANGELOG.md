@@ -8,6 +8,12 @@ nodes and features, a patch for fixes. Each version is a [release on GitHub](htt
 ## [Unreleased]
 
 ### Added
+- Wildcard Browser: yaml wildcards are edited, no longer read-only. A yaml file is one row of the tree, opened whole in the lines view and
+  saved as written (comments too); in the cards view its row shows its cards, which are edited on the card (🖊), renamed, moved, deleted with
+  ↶ Undo and added (＋ New card) in their yaml file, keeping its comments and layout. 🔁 Replace changes yaml wildcards too.
+- Wildcard Browser: 🂠 Card per line, a yaml card of several lines as a card per line with its own picture, and the A1111 Wildcard Gallery's
+  picture places (cards/POSES/sitting.jpeg, POSES/standing/[0].jpeg for a line).
+- Wildcard Note writes to yaml wildcards too.
 - Wildcard Note (DiceForge/utils): a note for a wildcard's lines, with the prompt fields' tools; 💾 Save to WildCard adds its new lines to the
   wildcard file picked in its list, puts them in place of the file's lines, or makes a new file.
 - The windows open where they were closed: Wildcard Browser (search, ★ Favorites, the open file with its unsaved changes, scrolling), Tag Browser
@@ -66,6 +72,7 @@ nodes and features, a patch for fixes. Each version is a [release on GitHub](htt
   section on updating from it).
 
 ### Fixed
+- Wildcard Browser: opening another file asks before the open file's unsaved changes are dropped.
 - README: the inputs and outputs it didn't name yet (Wildcards to Text's `seed`, XY Plot's axes, Variation Seed's `variation_seed`, Danbooru
   Tag Enhancer's `include_general` and `position`, the utility nodes' inputs and outputs).
 - Previews, Dice Grid's cells and LoRA Stack's list are as tall as what they show, in both designs: no more empty area under them in a

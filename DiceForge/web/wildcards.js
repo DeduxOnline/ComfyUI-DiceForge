@@ -20,7 +20,7 @@ const isPromptNode = (node) => !!fieldsOf(node);
 // file list follows the files made, renamed and deleted elsewhere).
 let listCache = null, listRequest = null;
 const listListeners = new Set();
-export const onWildcardList = (listener) => listListeners.add(listener);
+export const onWildcardList = (listener) => { listListeners.add(listener); return () => listListeners.delete(listener); }; // Gives what stops it.
 function wildcardList(refresh = false) {
   if (!listRequest || refresh) {
     const request = api.fetchApi("/diceforge/wildcards")
@@ -152,7 +152,6 @@ const STYLE = `
 .dfwc .code textarea.src{flex:1;min-width:0;resize:none;border:none;border-radius:0;padding:6px 8px;white-space:pre;overflow:auto;position:relative;z-index:1;outline:none;
   background:transparent;color:transparent;-webkit-text-fill-color:transparent;caret-color:#eee}
 .dfwc .code textarea.src::placeholder{color:#888;-webkit-text-fill-color:#888}.dfwc .code textarea.src::selection{background:rgba(90,140,230,.4)}
-.dfwc .code.readonly .hl{color:#aaa}
 .dfwc .code button.line-add{position:absolute;left:3px;z-index:2;width:18px;height:18px;padding:0;border-radius:4px;font:13px/16px system-ui,sans-serif;border-color:#4a7a4a;color:#bfe8bf;background:#253325}
 .dfwc .row .found{color:#9cc8ff;font-style:italic;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:45%}.dfwc.drop-zip{outline:3px dashed #8fd0a8}
 .dfwc [hidden]{display:none!important}.dfwc .cards{flex:1;display:flex;flex-direction:column;gap:8px;min-width:0;min-height:0}
@@ -163,8 +162,8 @@ const STYLE = `
 .dfwc .card .pic img{width:100%;height:100%;object-fit:cover;display:block}.dfwc .card .pic .none{color:#888;font-size:12px;padding:10px;text-align:center;word-break:break-word}
 .dfwc .card .info{padding:6px 8px;display:flex;flex-direction:column;gap:4px;flex:1}.dfwc .card .title{font-weight:600;color:#fff;word-break:break-word;cursor:pointer}
 .dfwc .card .line{color:#aaa;font-size:12px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;word-break:break-word}
-.dfwc .card .actions{display:flex;gap:6px;justify-content:space-between;align-items:center;margin-top:auto}
-.dfwc button.mode.on{border-color:#6a9ad8;background:#2f3f55}
+.dfwc .card .actions{display:flex;flex-wrap:wrap;gap:4px;align-items:center;margin-top:auto}.dfwc .card .actions button{white-space:nowrap}.dfwc .card .actions button.add{margin-left:auto}.dfwc .card .title-row{display:flex;align-items:flex-start;gap:4px}.dfwc .card .title-row .title{flex:1}.dfwc .card .title-row button.more{padding:0 6px;font-size:12px}
+.dfwc button.mode.on,.dfwc button.line-cards.on{border-color:#6a9ad8;background:#2f3f55}.dfwc .card.line-card .title{font-weight:500}
 .dfwc .row{display:flex;align-items:center;gap:6px;padding:3px 6px;border-radius:4px}.dfwc .row:hover{background:#2c2c2c}
 .dfwc .row .name{flex:1;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dfwc .row.sel{background:#2f3f55}
 .dfwc .folder>.row .name{font-weight:600}.dfwc .folder>.row .name::before{content:"▸ ";color:#999}.dfwc .folder.open>.row .name::before{content:"▾ "}
@@ -172,8 +171,10 @@ const STYLE = `
 .dfwc button.only-favorites.on{border-color:#b8962e;color:#ffd24a}.dfwc .row.drop,.dfwc .tree.drop{background:#35584a;outline:1px dashed #8fd0a8}.dfwc .folder:not(.open)>.kids{display:none}.dfwc .muted{color:#999;font-size:12px}
 .dfwc button{background:#222;color:#eee;border:1px solid #666;border-radius:6px;padding:5px 12px;cursor:pointer;font:inherit}.dfwc button:hover{background:#2c2c2c}
 .dfwc button.convert{padding:1px 7px;font-size:12px;border-color:#5a6f9a;color:#bcd0f5}.dfwc .row button.export{padding:1px 7px;font-size:12px}.dfwc .edit button.convert{padding:5px 12px;font-size:inherit}
-.dfwc .card .actions button.picture,.dfwc .card .actions button.no-picture{padding:1px 6px;font-size:12px}.dfwc .card.drop{outline:2px dashed #8fd0a8}
-.dfwc button:disabled{opacity:.5;cursor:default}.dfwc button.delete:not(:disabled){border-color:#8a4a4a;color:#f0b0b0}.dfwc textarea[readonly]{color:#aaa}.dfwc button.add{padding:1px 8px;font-size:12px;border-color:#4a7a4a;color:#bfe8bf}.dfwc .status{color:#9c9;min-height:18px;font-size:13px}.dfwc .status button.undo{margin-left:10px;padding:0 8px;font-size:12px}
+.dfwc .card .actions button.picture,.dfwc .card .actions button.no-picture,.dfwc .card .actions button.edit-card{padding:1px 6px;font-size:12px}
+.dfwc .card .card-edit{display:flex;flex-direction:column;gap:6px;padding:6px 8px;flex:1}.dfwc .card .card-edit textarea{min-height:120px;resize:vertical;font:12px/18px ui-monospace,monospace;white-space:pre}
+.dfwc .card .card-edit .buttons{display:flex;gap:6px;justify-content:flex-end}.dfwc .card .card-edit button{padding:2px 10px;font-size:12px}.dfwc .card.drop{outline:2px dashed #8fd0a8}
+.dfwc button:disabled{opacity:.5;cursor:default}.dfwc button.delete:not(:disabled){border-color:#8a4a4a;color:#f0b0b0}.dfwc button.add{padding:1px 8px;font-size:12px;border-color:#4a7a4a;color:#bfe8bf}.dfwc .status{color:#9c9;min-height:18px;font-size:13px}.dfwc .status button.undo{margin-left:10px;padding:0 8px;font-size:12px}
 `;
 const addStyle = () => addStyleOnce("dfwc-style", STYLE);
 
@@ -331,6 +332,7 @@ for (const type of ["keyup", "mouseup", "focusin"]) document.addEventListener(ty
 // Folders open in the Wildcard Browser, kept between openings (and reloads) in this browser. Folders start closed; a search opens them all.
 const OPEN_KEY = "diceforge.wildcards.open";
 const CARDS_KEY = "diceforge.wildcards.cards";
+const LINE_CARDS_KEY = "diceforge.wildcards.lineCards";
 function openFolders() {
   try { return new Set(JSON.parse(localStorage.getItem(OPEN_KEY)) || []); } catch { return new Set(); }
 }
@@ -390,7 +392,16 @@ async function openBrowser(node) {
   // + next to a line's number puts that line in the prompt (without its 3:: weight), where the cursor was in the node's fields.
   const lineAdd = element("button", { class: "line-add", hidden: true, title: "Add this line to the prompt" }, "+");
   code.append(lineAdd);
-  const lineText = (index) => (editor.value.split("\n")[index] ?? "").trim().replace(/^\d+(?:\.\d+)?::/, "").trim();
+  // A line's option: in a yaml file, the text after "key:" or "- ", without its quotes (a key of keys, or a [list] on one line, has none).
+  function yamlOption(line) {
+    const value = (/^\s*-\s+(.+)$/.exec(line) ?? /^\s*[^#:\s][^:]*:\s+(\S.*)$/.exec(line))?.[1].trim() ?? "";
+    if (/^[[{]/.test(value)) return "";
+    return /^(["']).*\1$/.test(value) ? value.slice(1, -1) : value;
+  }
+  const lineText = (index) => {
+    const line = editor.value.split("\n")[index] ?? "";
+    return (selectedYaml ? yamlOption(line) : line).trim().replace(/^\d+(?:\.\d+)?::/, "").trim();
+  };
   code.addEventListener("mousemove", (event) => {
     if (event.target === lineAdd) return;
     const index = Math.floor((event.clientY - code.getBoundingClientRect().top - 6 + editor.scrollTop) / 20);
@@ -413,8 +424,8 @@ async function openBrowser(node) {
   const move = element("button", { class: "move", disabled: true, title: "Move the file to another folder (or drag it onto a folder in the tree)" }, "⇄ Move");
   const remove = element("button", { class: "delete", disabled: true }, "Delete");
   const convertButton = element("button", { class: "convert", disabled: true }, "→ yaml");
-  let selected = null, saved = "", selectedYaml = false;
-  const showDirty = () => { save.textContent = selected && !editor.readOnly && editor.value !== saved ? "Save •" : "Save"; };
+  let selected = null, saved = "", selectedYaml = null; // selectedYaml: the yaml file open whole (its path in the wildcards folder).
+  const showDirty = () => { save.textContent = selected && editor.value !== saved ? "Save •" : "Save"; };
   editor.addEventListener("input", showDirty);
   editor.addEventListener("keydown", (event) => {
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") { event.preventDefault(); event.stopPropagation(); save.click(); }
@@ -423,10 +434,11 @@ async function openBrowser(node) {
   const dialog = element("div", { class: "dfwc" }), editPane = element("div", { class: "edit" });
   const close = () => {
     // Opens again where it was: the search, ★ Favorites, the open file (its unsaved changes too, if the file stays the same), the scrolling.
-    const dirty = selected && !editor.readOnly && editor.value !== saved;
+    const dirty = selected && editor.value !== saved;
     remember("wildcards", { search: search.value, favorites: onlyFavorites, cardFolder, selected, caret: editor.selectionStart, tree: tree.scrollTop,
       editor: editor.scrollTop, cards: cards.querySelector(".grid")?.scrollTop ?? 0, ...(dirty ? { draft: editor.value, saved } : {}) });
     stopSize();
+    stopLines();
     closeMenu();
     back.remove();
     document.removeEventListener("keydown", onKey, true);
@@ -448,15 +460,22 @@ async function openBrowser(node) {
   function treeKeys(event) {
     if (event.target === editor || (typingIn(event) && event.target !== search)) return;
     const rows = [...tree.querySelectorAll(".row[data-name]")].filter((row) => row.offsetParent);
-    const file = () => (listCache?.files ?? []).find((item) => item.name === tree.querySelector(".row.cursor[data-name]")?.dataset.name);
-    const key = event.key === "F10" && event.shiftKey ? "ContextMenu" : event.key, picked = file();
+    const key = event.key === "F10" && event.shiftKey ? "ContextMenu" : event.key, picked = treeFiles.get(tree.querySelector(".row.cursor[data-name]")?.dataset.name);
     // Only what applies: in the search box, ↑ ↓ and Enter (on a picked file); elsewhere, the keys of a picked file. The rest stays the field's.
+    // A yaml file's row: Enter opens it (its cards, in the cards mode).
+    const enter = () => {
+      if (picked.yamlFile && cardsMode) {
+        cardFolder = picked.name;
+        draw();
+      } else if (event.shiftKey || picked.yamlFile) background(open(picked.name));
+      else add(picked.name);
+    };
     const action = {
       ArrowDown: () => moveCursor(rows, 1), ArrowUp: () => moveCursor(rows, -1),
-      Enter: picked && (() => (event.shiftKey ? background(open(picked.name)) : add(picked.name))),
-      F2: picked && !picked.yaml && event.target !== search && (() => background(renameFile(picked.name))),
-      Delete: picked && !picked.yaml && event.target !== search && (() => background(deleteFile(picked.name))),
-      ContextMenu: picked && event.target !== search && (() => menuAt(tree.querySelector(".row.cursor"), fileItems(picked))),
+      Enter: picked && enter,
+      F2: picked && !picked.yamlFile && event.target !== search && (() => background(renameFile(picked.name))),
+      Delete: picked && event.target !== search && (() => background(deleteFile(picked.name))),
+      ContextMenu: picked && event.target !== search && (() => menuAt(tree.querySelector(".row.cursor"), picked.yamlFile ? yamlItems(picked) : fileItems(picked))),
     }[key];
     if (!action) return;
     event.preventDefault();
@@ -477,53 +496,80 @@ async function openBrowser(node) {
     return result;
   };
   const add = (token) => { const field = keepFocus(() => insertIntoNode(node, `__${token}__`)); say(`Added __${token}__ to ${field}.`); };
-  async function open(name) {
-    const response = await api.fetchApi(`/diceforge/wildcards/file?name=${encodeURIComponent(name)}`);
+  // Opens a txt wildcard, or a yaml file whole (by its path, or by one of its wildcards: the editor goes to that key's line). Another file's unsaved
+  // changes are not dropped without asking (keepEdits: the caller puts them back, as a rename does).
+  async function open(name, keepEdits = false) {
+    const yamlFile = /\.ya?ml$/i.test(name) ? name : (listCache?.files ?? []).find((file) => file.name === name)?.yaml_file;
+    if (!keepEdits && selected && selected !== (yamlFile ?? name) && editor.value !== saved && !confirm(`Drop the unsaved changes of ${selected}?`)) return;
+    const response = await api.fetchApi(yamlFile ? `/diceforge/wildcards/yaml?file=${encodeURIComponent(yamlFile)}` : `/diceforge/wildcards/file?name=${encodeURIComponent(name)}`);
     if (!response.ok) return say(await response.text());
     const file = await response.json();
-    selected = name;
-    const parts = name.split("/").slice(0, -1); // The file's folders open, so it shows in the tree.
+    selected = yamlFile ?? name;
+    selectedYaml = yamlFile ?? null;
+    const parts = selected.split("/").slice(0, -1); // The file's folders open, so it shows in the tree.
     parts.forEach((_, index) => opened.add(parts.slice(0, index + 1).join("/")));
     keepOpenFolders(opened);
-    title.replaceChildren(element("b", {}, `__${name}__`), " ", element("span", { class: "muted" }, file.path));
+    title.replaceChildren(element("b", {}, yamlFile ? `📜 ${yamlFile}` : `__${name}__`), " ", element("span", { class: "muted" }, file.path));
     editor.value = saved = file.text;
-    editor.scrollTop = 0;
-    editor.setSelectionRange(0, 0);
+    const key = yamlFile && yamlFile !== name ? name.split("/").pop() : null;
+    const at = key ? Math.max(0, file.text.split("\n").findIndex((line) => line.trim().startsWith(`${key}:`))) : 0;
+    const caret = file.text.split("\n").slice(0, at).join("\n").length + (at ? 1 : 0);
+    editor.scrollTop = Math.max(0, 20 * at - 60);
+    editor.setSelectionRange(caret, caret);
     numberLines();
     markCurrentLine();
-    editor.readOnly = !!file.readonly; // A yaml wildcard is one key of a yaml file: edited in that file.
-    code.classList.toggle("readonly", editor.readOnly);
-    save.disabled = rename.disabled = move.disabled = remove.disabled = !!file.readonly;
-    selectedYaml = !!file.readonly;
-    convertButton.disabled = false;
-    convertButton.textContent = selectedYaml ? "→ txt" : "→ yaml";
-    convertButton.title = selectedYaml ? "Turn its yaml file into txt files, one per key (the names stay the same)" : `Turn ${name}.txt into ${name.split("/").pop()}.yaml (the name stays the same)`;
+    save.disabled = remove.disabled = convertButton.disabled = false;
+    rename.disabled = move.disabled = fromPrompt.disabled = !!yamlFile; // A yaml file's keys are renamed in its text (or in the cards mode).
+    convertButton.textContent = yamlFile ? "→ txt" : "→ yaml";
+    convertButton.title = yamlFile ? "Turn the yaml file into txt files, one per key (the names stay the same)" : `Turn ${name}.txt into ${name.split("/").pop()}.yaml (the name stays the same)`;
     showDirty();
-    say(file.readonly ? "From a yaml file: read-only here, edit the yaml file to change it." : "");
+    say(yamlFile ? `${yamlFile}, whole: its wildcards are its keys (key: lines). Save checks that it reads as yaml first.` : "");
     draw();
   }
   save.addEventListener("click", async () => {
     if (!selected) return say("Select or create a file first.");
     const text = editor.value;
-    const response = await api.fetchApi("/diceforge/wildcards/file", { method: "POST", body: JSON.stringify({ name: selected, text }) });
+    const response = selectedYaml ? await api.fetchApi("/diceforge/wildcards/yaml", { method: "POST", body: JSON.stringify({ file: selectedYaml, text }) })
+      : await api.fetchApi("/diceforge/wildcards/file", { method: "POST", body: JSON.stringify({ name: selected, text }) });
     if (response.ok) saved = text;
-    say(response.ok ? `Saved ${selected}.txt.` : await response.text());
+    say(response.ok ? `Saved ${selected}${selectedYaml ? "" : ".txt"}.` : await response.text());
     showDirty();
     await wildcardList(true);
     draw();
   });
+  // A yaml wildcard changed elsewhere (on its card, renamed, deleted, a new key next to it) while its yaml file is open in the lines view: refused
+  // while the file has unsaved changes there, and the file read again after, so a Save there doesn't undo the change.
+  const openYamlOf = (name) => {
+    const yamlFile = (listCache?.files ?? []).find((file) => file.name === name)?.yaml_file;
+    return yamlFile && yamlFile === selectedYaml ? yamlFile : null;
+  };
+  function yamlBusy(name) {
+    if (!openYamlOf(name) || editor.value === saved) return false;
+    say(`${selectedYaml} is open in the lines view with unsaved changes: save (or undo) them first.`);
+    return true;
+  }
+  async function rereadYaml(yamlFile) {
+    if (!yamlFile || selectedYaml !== yamlFile) return draw();
+    const caret = editor.selectionStart, top = editor.scrollTop;
+    await open(yamlFile);
+    editor.setSelectionRange(Math.min(caret, editor.value.length), Math.min(caret, editor.value.length));
+    editor.scrollTop = top;
+    markCurrentLine();
+  }
   async function renameTo(name, to, moved) {
+    if (yamlBusy(name)) return;
+    const reread = openYamlOf(name);
     const response = await api.fetchApi("/diceforge/wildcards/rename", { method: "POST", body: JSON.stringify({ name, to }) });
     if (!response.ok) return say(await response.text());
     const result = await response.json();
     await wildcardList(true);
     if (name === selected) { // The open file: it stays open under its new name, with its unsaved changes.
       const edited = editor.value !== saved ? editor.value : null;
-      await open(result.to);
+      await open(result.to, true);
       if (edited != null) editor.value = edited, showDirty();
       numberLines();
       markCurrentLine();
-    } else draw();
+    } else await rereadYaml(reread);
     say(`${moved ? "Moved" : "Renamed"} ${result.renamed} to ${result.to}. Prompts that use __${result.renamed}__ need the new name.`,
       () => renameTo(result.to, result.renamed, moved), // Undo: back to its old name and folder.
       ["🔁 Update the wildcard files that use it", () => openReplace(`__${result.renamed}__`, `__${result.to}__`)]);
@@ -541,25 +587,34 @@ async function openBrowser(node) {
     await renameTo(name, `${destination ? `${destination}/` : ""}${parts.at(-1)}`, true);
   }
   move.addEventListener("click", () => { if (selected) background(moveFile(selected)); });
+  // The editor without a file (the open one was deleted or converted).
+  function clearEditor() {
+    selected = selectedYaml = null;
+    editor.value = saved = "";
+    numberLines();
+    markCurrentLine();
+    rename.disabled = move.disabled = remove.disabled = convertButton.disabled = true;
+    fromPrompt.disabled = false;
+    showDirty();
+    title.replaceChildren("Select a file to see and edit its lines, one option per line (# starts a comment).");
+  }
+  // Deletes a txt file, a yaml wildcard (its key, from its yaml file), or a whole yaml file (by its path).
   async function deleteFile(name) {
-    if (!confirm(`Delete the wildcard file ${name}.txt? (↶ Undo brings it back.)`)) return;
-    const response = await api.fetchApi(`/diceforge/wildcards/file?name=${encodeURIComponent(name)}`, { method: "DELETE" });
+    const whole = /\.ya?ml$/i.test(name), yamlFile = !whole && (listCache?.files ?? []).find((file) => file.name === name)?.yaml;
+    const keys = whole ? (listCache?.files ?? []).filter((file) => file.yaml_file === name).length : 0;
+    let what = `the wildcard file ${name}.txt`, done = `Deleted ${name}.txt.`;
+    if (whole) [what, done] = [`${name} and its ${keys} wildcard${keys === 1 ? "" : "s"}`, `Deleted ${name}.`];
+    else if (yamlFile) [what, done] = [`__${name}__ from ${yamlFile}`, `Deleted __${name}__ from ${yamlFile}.`];
+    if (!whole && yamlBusy(name)) return;
+    if (!confirm(`Delete ${what}? (↶ Undo brings it back.)`)) return;
+    const reread = whole ? null : openYamlOf(name);
+    const response = await api.fetchApi(whole ? `/diceforge/wildcards/yaml?file=${encodeURIComponent(name)}` : `/diceforge/wildcards/file?name=${encodeURIComponent(name)}`, { method: "DELETE" });
     if (!response.ok) return say(await response.text());
-    if (name === selected) { // The open file: the editor empties.
-      selected = null;
-      editor.value = saved = "";
-      numberLines();
-      markCurrentLine();
-      editor.readOnly = false;
-      code.classList.remove("readonly");
-      rename.disabled = move.disabled = remove.disabled = convertButton.disabled = true;
-      showDirty();
-      title.replaceChildren("Select a file to see and edit its lines, one option per line (# starts a comment).");
-    }
+    if (name === selected) clearEditor(); // The open file: the editor empties.
     const { undo } = await response.json();
     await wildcardList(true);
-    draw();
-    say(`Deleted ${name}.txt.`, () => restore(undo));
+    await rereadYaml(reread);
+    say(done, () => restore(undo));
   }
   remove.addEventListener("click", () => { if (selected) background(deleteFile(selected)); });
   // Undo a delete: the file comes back where it was (from the server's trash), with its star, and opens.
@@ -583,19 +638,22 @@ async function openBrowser(node) {
   // txt ⇄ yaml: a txt file or a folder of them becomes one yaml file (hair/ -> hair.yaml), a yaml file becomes one txt file per key. The
   // wildcard names stay the same, so prompts keep working; card pictures stay where they are.
   async function convert(name, to) {
-    if (selected && editor.value !== saved && (selected === name || selected.startsWith(`${name}/`))) return say("Save (or undo) your changes first.");
+    const yamlOf = (listCache?.files ?? []).find((file) => file.name === name)?.yaml_file;
+    if (selected && editor.value !== saved && (selected === name || selected.startsWith(`${name}/`) || selected === yamlOf)) return say("Save (or undo) your changes first.");
     const what = to === "yaml" ? `the txt wildcards ${name} into ${name.split("/").pop()}.yaml` : `the yaml file of ${name} into txt files, one per key`;
     if (!confirm(`Convert ${what}? The wildcard names stay the same.`)) return;
     const response = await api.fetchApi("/diceforge/wildcards/convert", { method: "POST", body: JSON.stringify({ name, to }) });
     if (!response.ok) return say(await response.text());
     const result = await response.json();
     await wildcardList(true);
+    if (selectedYaml && selectedYaml === yamlOf && to === "txt") clearEditor(); // The open yaml file is txt files now.
     if (selected && result.names.includes(selected)) await open(selected);
     else draw();
     say(to === "yaml" ? `Converted ${result.names.length} wildcard${result.names.length === 1 ? "" : "s"} into ${result.path}.`
       : `Converted ${result.removed.join(", ")} into ${result.names.length} txt file${result.names.length === 1 ? "" : "s"}.`);
   }
-  convertButton.addEventListener("click", () => { if (selected) background(convert(selected, selectedYaml ? "txt" : "yaml")); });
+  const keyOf = (yamlFile) => (listCache?.files ?? []).find((file) => file.yaml_file === yamlFile)?.name; // Any of a yaml file's wildcards.
+  convertButton.addEventListener("click", () => { if (selected) background(convert(selectedYaml ? keyOf(selectedYaml) : selected, selectedYaml ? "txt" : "yaml")); });
   // ⇪ Import zip: a card pack or any zip of wildcards into the wildcards folder, with its paths (files already there are kept). A zip dropped on
   // the browser does the same.
   async function importZip(file) {
@@ -614,14 +672,26 @@ async function openBrowser(node) {
     input.addEventListener("change", () => background(importZip(input.files?.[0])));
     input.click();
   } }, "⇪ Import zip");
-  async function createFile(suggested) {
-    const name = prompt("New wildcard file name (folders with /, for example hair/color):", suggested);
-    if (!name) return;
-    const response = await api.fetchApi("/diceforge/wildcards/file", { method: "POST", body: JSON.stringify({ name, text: "", create: true }) });
+  async function createFile(suggested, nextTo) {
+    const yamlFile = nextTo && (listCache?.files ?? []).find((file) => file.name === nextTo)?.yaml;
+    if (yamlFile && yamlBusy(nextTo)) return null;
+    const name = prompt(yamlFile ? `New wildcard in ${yamlFile} (its name, folders with /):` : "New wildcard file name (folders with /, for example hair/color):", suggested)?.trim();
+    if (!name) return null;
+    const reread = yamlFile ? openYamlOf(nextTo) : null;
+    const response = await api.fetchApi("/diceforge/wildcards/file", { method: "POST", body: JSON.stringify({ name, text: "", create: true, ...(yamlFile ? { next_to: nextTo } : {}) }) });
     if (!response.ok) return say(await response.text());
+    const { saved: created } = await response.json();
     await wildcardList(true);
-    await open((await response.json()).saved);
+    if (cardsMode) await rereadYaml(reread);
+    else await open(created);
+    say(yamlFile ? `Added __${created}__ to ${yamlFile}.` : `Made ${created}.txt.`);
+    return created;
   }
+  // The yaml wildcard whose file a new wildcard of a folder goes into: one directly in the folder, when the folder has no txt files.
+  const yamlIn = (folder) => {
+    const direct = (listCache?.files ?? []).filter((file) => file.name.split("/").slice(0, -1).join("/") === folder);
+    return direct.length && direct.every((file) => file.yaml) ? direct[0].name : null;
+  };
   const create = element("button", { onclick: () => background(createFile(search.value.trim())) }, "+ New file");
   const opened = openFolders();
   const toggle = (path, open = !opened.has(path)) => {
@@ -650,7 +720,10 @@ async function openBrowser(node) {
     draw();
   } }, "★ Favorites");
   // Two ways to see the wildcards: 📄 Lines (the tree and the editor) and 🃏 Cards (a folder's wildcards as cards, with their pictures: a yaml card
-  // pack's POSES/sitting.jpeg next to POSES.yaml; + Add inserts one card, 🎲 a random card of the folder). The mode is remembered.
+  // pack's POSES/sitting.jpeg next to POSES.yaml; + Add inserts one card, 🎲 a random card of the folder; 🖊 edits a card's lines on the card, ⋯ or a
+  // right-click renames, moves or deletes it, + New card adds one to the folder, into its yaml file when the folder's cards come from one).
+  // 🂠 Card per line: a yaml key of several lines shows each line as a card of its own, with its own picture (POSES/standing/[0].jpeg, as the A1111
+  // Wildcard Gallery's packs keep them); its + Add puts in that line's text. The modes are remembered.
   let cardsMode = false, cardFolder = null;
   try { cardsMode = localStorage.getItem(CARDS_KEY) === "1"; } catch { /* No storage: lines. */ }
   const modeButton = element("button", { class: "mode", title: "Show the wildcards as cards with their pictures (yaml card packs), or as lines with the editor" });
@@ -661,31 +734,98 @@ async function openBrowser(node) {
     draw();
   };
   modeButton.addEventListener("click", () => setMode(!cardsMode));
+  let lineCards = true;
+  try { lineCards = localStorage.getItem(LINE_CARDS_KEY) !== "0"; } catch { /* No storage: a card per line. */ }
   let pictureVersion = Date.now(); // Changes with a new picture: the browser doesn't show the old one from its cache.
-  const pictureURL = (name) => api.apiURL(`/diceforge/wildcards/picture?name=${encodeURIComponent(name)}&v=${pictureVersion}`);
+  // A card's picture, or a line's (line: its index in the key's list).
+  const pictureQuery = (name, line) => `name=${encodeURIComponent(name)}` + (line == null ? "" : `&line=${line}`);
+  const pictureURL = (name, line) => api.apiURL(`/diceforge/wildcards/picture?${pictureQuery(name, line)}&v=${pictureVersion}`);
+  const whose = (name, line) => (line == null ? `__${name}__` : `line ${line + 1} of __${name}__`);
   // A card's example picture (yaml cards): 🖼 picks a file, or drop a picture on the card; ✕ removes it. Saved next to the yaml file.
-  async function setPicture(name, file) {
+  async function setPicture(name, file, line) {
     if (!file) return;
-    const response = await api.fetchApi(`/diceforge/wildcards/picture?name=${encodeURIComponent(name)}`, { method: "POST", body: file });
+    const response = await api.fetchApi(`/diceforge/wildcards/picture?${pictureQuery(name, line)}`, { method: "POST", body: file });
     if (!response.ok) return say(await response.text());
     pictureVersion = Date.now();
     await wildcardList(true);
-    say(`New picture for __${name}__.`);
+    say(`New picture for ${whose(name, line)}.`);
     draw();
   }
-  async function removePicture(name) {
-    if (!confirm(`Remove the picture of __${name}__?`)) return;
-    const response = await api.fetchApi(`/diceforge/wildcards/picture?name=${encodeURIComponent(name)}`, { method: "DELETE" });
+  async function removePicture(name, line) {
+    if (!confirm(`Remove the picture of ${whose(name, line)}?`)) return;
+    const response = await api.fetchApi(`/diceforge/wildcards/picture?${pictureQuery(name, line)}`, { method: "DELETE" });
     if (!response.ok) return say(await response.text());
     await wildcardList(true);
-    say(`Removed the picture of __${name}__.`);
+    say(`Removed the picture of ${whose(name, line)}.`);
     draw();
   }
-  const pickPicture = (name) => {
+  const pickPicture = (name, line) => {
     const input = element("input", { type: "file", accept: "image/png,image/jpeg,image/webp,image/gif" });
-    input.addEventListener("change", () => background(setPicture(name, input.files?.[0])));
+    input.addEventListener("change", () => background(setPicture(name, input.files?.[0], line)));
     input.click();
   };
+  // A picture file dropped on a card becomes its picture.
+  function dropPicture(box, onFile) {
+    box.addEventListener("dragover", (event) => { if (event.dataTransfer?.types?.includes("Files")) { event.preventDefault(); box.classList.add("drop"); } });
+    box.addEventListener("dragleave", () => box.classList.remove("drop"));
+    box.addEventListener("drop", (event) => {
+      if (!event.dataTransfer?.files?.length) return;
+      event.preventDefault();
+      box.classList.remove("drop");
+      background(onFile(event.dataTransfer.files[0]));
+    });
+  }
+  // The lines of the shown folder's yaml cards, from the server: { folder, cards: name -> { lines: [{ index, text }], pictures: Set of line indexes } };
+  // a new wildcard list (a save, a new picture...) asks again.
+  let cardLines = null, linesLoading = null, linesLoad = null; // linesLoad: the last request, for what waits for its cards.
+  const stopLines = onWildcardList(() => { cardLines = null; });
+  async function loadCardLines(folder) {
+    linesLoading = folder;
+    try {
+      const response = await api.fetchApi("/diceforge/wildcards/cards" + (folder ? `?folder=${encodeURIComponent(folder)}` : ""));
+      if (!response.ok) return say(await response.text());
+      const { cards: found } = await response.json();
+      cardLines = { folder, cards: new Map(found.map((item) => [item.name, { lines: item.lines, pictures: new Set(item.pictures) }])) };
+    } finally {
+      linesLoading = null;
+    }
+    if (cardsMode) draw();
+  }
+  function lineCard(file, line, place, count) {
+    const has = cardLines.cards.get(file.name).pictures.has(line.index);
+    const pic = element("div", { class: "pic", title: line.text });
+    if (has) {
+      const img = element("img", { src: pictureURL(file.name, line.index), loading: "lazy", alt: line.text });
+      img.addEventListener("error", () => img.replaceWith(element("span", { class: "none" }, line.text)));
+      pic.append(img);
+    } else pic.append(element("span", { class: "none" }, line.text));
+    const items = () => lineItems(file, line, has);
+    const info = element("div", { class: "info" },
+      element("div", { class: "title-row" },
+        element("span", { class: "title", title: `A line of __${file.name}__: open it in the lines view`, onclick: () => { setMode(false); background(open(file.name)); } },
+          `${file.name.split("/").pop()} · ${place + 1}/${count}`),
+        menuButton(items, "More: the line's picture, the card's edit, rename, delete (or right-click the card)")),
+      element("span", { class: "line", title: line.text }, line.text),
+      element("div", { class: "actions" },
+        element("button", { class: "picture", title: "Choose a picture for this line (or drop one on the card)", onclick: () => pickPicture(file.name, line.index) }, "🖼"),
+        ...(has ? [element("button", { class: "no-picture", title: "Remove the line's picture", onclick: () => background(removePicture(file.name, line.index)) }, "✕")] : []),
+        element("button", { class: "add", title: "Put this line's text where the cursor was in the prompts", onclick: () => addLine(line.text) }, "+ Add")));
+    const box = element("div", { class: "card line-card", "data-name": file.name, "data-line": String(line.index) }, pic, info);
+    withMenu(box, items);
+    dropPicture(box, (picture) => setPicture(file.name, picture, line.index));
+    return box;
+  }
+  function lineItems(file, line, has) {
+    return [
+      [`＋ Add __${file.name}__`, () => add(file.name), "The whole card: one of its lines each run"],
+      ["🖼 Choose a picture for this line…", () => pickPicture(file.name, line.index)],
+      ...(has ? [["✕ Remove this line's picture", () => removePicture(file.name, line.index)]] : []),
+      "-",
+      ...cardItems(file),
+    ];
+  }
+  // A line's text (without its 3:: weight) into the prompt.
+  const addLine = (text) => say(`Added it to ${keepFocus(() => insertIntoNode(node, text.replace(/^\d+(?:\.\d+)?::/, "").trim()))}.`);
   function card(file) {
     const pic = element("div", { class: "pic", title: file.preview.join("\n") });
     if (file.picture) {
@@ -697,40 +837,115 @@ async function openBrowser(node) {
       element("button", { class: "picture", title: "Choose an example picture for this card (or drop one on the card)", onclick: () => pickPicture(file.name) }, "🖼"),
       ...(file.picture ? [element("button", { class: "no-picture", title: "Remove the picture", onclick: () => background(removePicture(file.name)) }, "✕")] : []),
     ] : [];
-    const box = element("div", { class: "card", "data-name": file.name }, pic,
-      element("div", { class: "info" },
+    const info = element("div", { class: "info" },
+      element("div", { class: "title-row" },
         element("span", { class: "title", title: "Open it in the lines view", onclick: () => { setMode(false); background(open(file.name)); } }, file.name.split("/").pop()),
-        element("span", { class: "line", title: file.preview.join("\n") }, file.lines > 1 ? `${file.lines} lines: ${file.preview.join(" · ")}` : file.preview[0] ?? ""),
-        element("div", { class: "actions" },
-          element("button", { class: "fav" + (file.favorite ? " on" : ""), title: file.favorite ? "A favorite: click to remove the star" : "Add to favorites",
-            onclick: () => background(setFavorite(file.name, !file.favorite)) }, file.favorite ? "★" : "☆"),
-          ...pictureButtons,
-          element("button", { class: "add", title: `Insert __${file.name}__`, onclick: () => add(file.name) }, "+ Add"))));
-    if (file.yaml) { // A picture file dropped on the card becomes its picture.
-      box.addEventListener("dragover", (event) => { if (event.dataTransfer?.types?.includes("Files")) { event.preventDefault(); box.classList.add("drop"); } });
-      box.addEventListener("dragleave", () => box.classList.remove("drop"));
-      box.addEventListener("drop", (event) => {
-        if (!event.dataTransfer?.files?.length) return;
-        event.preventDefault();
-        box.classList.remove("drop");
-        background(setPicture(file.name, event.dataTransfer.files[0]));
-      });
-    }
+        menuButton(() => cardItems(file), "More: edit, rename, move, preview, delete (or right-click the card)")),
+      element("span", { class: "line", title: file.preview.join("\n") }, file.lines > 1 ? `${file.lines} lines: ${file.preview.join(" · ")}` : file.preview[0] ?? ""),
+      element("div", { class: "actions" },
+        element("button", { class: "fav" + (file.favorite ? " on" : ""), title: file.favorite ? "A favorite: click to remove the star" : "Add to favorites",
+          onclick: () => background(setFavorite(file.name, !file.favorite)) }, file.favorite ? "★" : "☆"),
+        element("button", { class: "edit-card", title: "Edit its lines here, on the card", onclick: () => background(editCard(box, info, file.name)) }, "🖊"),
+        ...pictureButtons,
+        element("button", { class: "add", title: `Insert __${file.name}__`, onclick: () => add(file.name) }, "+ Add")));
+    const box = element("div", { class: "card", "data-name": file.name }, pic, info);
+    withMenu(box, () => cardItems(file));
+    if (file.yaml) dropPicture(box, (picture) => setPicture(file.name, picture));
     return box;
   }
+  // A card's lines edited on the card: Save writes them (into its yaml file for a yaml card), Cancel or Esc leaves them.
+  async function editCard(box, info, name) {
+    if (selected === name && editor.value !== saved) return say(`${name} is open in the lines view with unsaved changes: save them there first.`);
+    if (yamlBusy(name)) return;
+    const response = await api.fetchApi(`/diceforge/wildcards/file?name=${encodeURIComponent(name)}`);
+    if (!response.ok) return say(await response.text());
+    const file = await response.json();
+    const text = element("textarea", { class: "card-lines", wrap: "off", spellcheck: "false", placeholder: "One option per line" });
+    text.value = file.text;
+    const leave = () => { form.replaceWith(info); };
+    const store = async () => {
+      if (yamlBusy(name)) return;
+      const reread = openYamlOf(name);
+      const saving = await api.fetchApi("/diceforge/wildcards/file", { method: "POST", body: JSON.stringify({ name, text: text.value }) });
+      if (!saving.ok) return say(await saving.text());
+      await wildcardList(true);
+      if (selected === name) await open(name); // The lines view shows the card as saved.
+      else await rereadYaml(reread);
+      say(`Saved __${name}__` + (file.yaml ? ` in ${file.yaml}.` : "."));
+    };
+    const form = element("div", { class: "card-edit" }, text, element("div", { class: "buttons" },
+      element("button", { class: "cancel", onclick: leave }, "Cancel"), element("button", { class: "save-card", onclick: () => background(store()) }, "Save")));
+    text.addEventListener("keydown", (event) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") { event.preventDefault(); event.stopPropagation(); background(store()); }
+      else if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); leave(); }
+    });
+    info.replaceWith(form);
+    text.focus();
+  }
+  function cardItems(file) {
+    const box = () => cards.querySelector(`.card[data-name="${CSS.escape(file.name)}"]`);
+    return [
+      ["🖊 Edit the lines", () => editCard(box(), box().querySelector(".info"), file.name)],
+      ["📝 Open in the lines view", () => { setMode(false); return open(file.name); }],
+      ["🎲 Preview picks", () => previewPicks(file.name), "What a run would put in for it: a few random picks"],
+      "-",
+      ["✎ Rename…", () => renameFile(file.name)], ["⇄ Move…", () => moveFile(file.name), file.yaml ? `Among the wildcards of ${file.yaml}` : undefined],
+      "-",
+      ["🗑 Delete", () => deleteFile(file.name)],
+    ];
+  }
+  // + New card: a wildcard in the shown folder, into its yaml file when the folder's cards come from one.
+  async function newCard() {
+    const yamlFile = isYamlFile(cardFolder), prefix = yamlFile ? keyPrefix(cardFolder) : cardFolder;
+    const created = await createFile(prefix ? `${prefix}/` : "", yamlFile ? keyOf(cardFolder) : yamlIn(cardFolder ?? ""));
+    if (!created) return;
+    await linesLoad?.catch(() => {}); // Drawn again once the cards' lines are in: then its lines, on the card.
+    cards.querySelector(`.card[data-name="${CSS.escape(created)}"] .edit-card`)?.click();
+  }
+  // The cards of a folder (its txt files and its yaml files' wildcards) or of a yaml file (cardFolder is then its path).
+  const isYamlFile = (path) => /\.ya?ml$/i.test(path ?? "");
+  const inCards = (file) => (isYamlFile(cardFolder) ? file.yaml_file === cardFolder : !cardFolder || (file.yaml_file ?? file.name).startsWith(`${cardFolder}/`));
+  // The folder a yaml file's wildcards are named in (POSES for POSES.yaml with POSES: {...}): the start their names share.
+  function keyPrefix(yamlFile) {
+    const names = (listCache?.files ?? []).filter((file) => file.yaml_file === yamlFile).map((file) => file.name.split("/").slice(0, -1));
+    const shared = names[0] ?? [];
+    return shared.filter((part, index) => names.every((parts) => parts[index] === part)).join("/");
+  }
+  // A remembered folder or yaml file that is no longer in the tree: the yaml file whose wildcards are named in it (a folder of keys, as the tree
+  // showed them before), else none.
+  function knownCardFolder(path) {
+    const all = listCache?.files ?? [];
+    if (!path || all.some((file) => file.yaml_file === path || (file.yaml_file ?? file.name).startsWith(`${path}/`))) return path;
+    const yamlFiles = [...new Set(all.map((file) => file.yaml_file).filter(Boolean))];
+    return yamlFiles.find((yamlFile) => keyPrefix(yamlFile) === path) ?? null;
+  }
   function drawCards(shown) {
-    if (cardFolder == null) { // The first time: the folder of the first wildcard with a picture.
+    cardFolder = knownCardFolder(cardFolder);
+    if (cardFolder == null) { // The first time: the yaml file or folder of the first wildcard with a picture.
       const first = shown.find((file) => file.picture);
-      cardFolder = first ? first.name.split("/").slice(0, -1).join("/") : "";
+      cardFolder = first?.yaml_file ?? (first ? first.name.split("/").slice(0, -1).join("/") : "");
     }
-    const inFolder = shown.filter((file) => !cardFolder || file.name.startsWith(`${cardFolder}/`));
+    const inFolder = shown.filter(inCards);
+    const yamlFile = isYamlFile(cardFolder), group = yamlFile ? keyPrefix(cardFolder) : cardFolder; // Its wildcards' common folder: __group/*__.
+    if (lineCards && cardLines?.folder !== group && linesLoading !== group) {
+      linesLoad = loadCardLines(group);
+      background(linesLoad);
+    }
+    const linesOf = (file) => (lineCards && file.yaml && cardLines?.folder === group ? cardLines.cards.get(file.name)?.lines ?? [] : []);
+    const shownCards = inFolder.flatMap((file) => (linesOf(file).length > 1 ? linesOf(file).map((line, place, all) => () => lineCard(file, line, place, all.length)) : [() => card(file)]));
     const limit = 400; // A huge folder: the first ones, the search narrows it.
     cards.replaceChildren(
-      element("div", { class: "cards-head" }, element("b", {}, `📁 ${cardFolder || "All wildcards"}`),
-        element("span", { class: "muted" }, `${inFolder.length} card${inFolder.length === 1 ? "" : "s"} · click a folder in the tree to see its cards`),
-        ...(cardFolder ? [element("button", { class: "add random", title: `Insert __${cardFolder}/*__: a random card of the folder each run`, onclick: () => add(`${cardFolder}/*`) }, "🎲 + Add random")] : [])),
-      element("div", { class: "grid" }, ...(inFolder.length ? inFolder.slice(0, limit).map(card) : [element("div", { class: "muted" }, "No wildcards here.")]),
-        ...(inFolder.length > limit ? [element("div", { class: "muted" }, `${inFolder.length - limit} more: search to narrow them.`)] : [])));
+      element("div", { class: "cards-head" }, element("b", {}, yamlFile ? `📜 ${cardFolder}` : `📁 ${cardFolder || "All wildcards"}`),
+        element("span", { class: "muted" }, `${shownCards.length} card${shownCards.length === 1 ? "" : "s"} · click a folder or a yaml file in the tree to see its cards`),
+        element("button", { class: "line-cards" + (lineCards ? " on" : ""), title: "A yaml card of several lines as a card per line, each with its own picture", onclick: () => {
+          lineCards = !lineCards;
+          try { localStorage.setItem(LINE_CARDS_KEY, lineCards ? "1" : "0"); } catch { /* No storage: for this visit. */ }
+          draw();
+        } }, "🂠 Card per line"),
+        element("button", { class: "new-card", title: "A new wildcard here (into the yaml file, or the folder's yaml file when its cards come from one), then its lines", onclick: () => background(newCard()) }, "＋ New card"),
+        ...(group ? [element("button", { class: "add random", title: `Insert __${group}/*__: a random card of them each run`, onclick: () => add(`${group}/*`) }, "🎲 + Add random")] : [])),
+      element("div", { class: "grid" }, ...(shownCards.length ? shownCards.slice(0, limit).map((make) => make()) : [element("div", { class: "muted" }, "No wildcards here.")]),
+        ...(shownCards.length > limit ? [element("div", { class: "muted" }, `${shownCards.length - limit} more: search to narrow them.`)] : [])));
   }
   async function setFavorite(name, favorite) {
     const response = await api.fetchApi("/diceforge/wildcards/favorite", { method: "POST", body: JSON.stringify({ name, favorite }) });
@@ -747,13 +962,29 @@ async function openBrowser(node) {
       ["🎲 Preview picks", () => previewPicks(file.name), "What a run would put in for it: a few random picks"],
       [file.favorite ? "☆ Remove the star" : "★ Add to favorites", () => setFavorite(file.name, !file.favorite)],
       "-",
-      ...(file.yaml ? [["→ txt files", () => convert(file.name, "txt"), "Turn its yaml file into txt files, one per key (the names stay the same)"]]
-        : [["✎ Rename…", () => renameFile(file.name)], ["⇄ Move…", () => moveFile(file.name)],
-          ["→ yaml", () => convert(file.name, "yaml"), `Turn ${file.name}.txt into ${file.name.split("/").pop()}.yaml (the name stays the same)`],
-          ["⇦ Add the prompt as a line", () => addPromptLine(file.name), "The node's prompt (the one the cursor was last in) as a new line of this file; in the editor, Save keeps it"],
-          ["🧹 Remove duplicates and empty lines", () => cleanUp(file.name, false), "In the editor: Save keeps it"],
-          ["🔤 Sort lines A→Z (and clean up)", () => cleanUp(file.name, true), "Sorted by the text (a line's N:: weight left aside); comments at the top stay there. In the editor: Save keeps it"], "-",
-          ["🗑 Delete", () => deleteFile(file.name)]]),
+      ["✎ Rename…", () => renameFile(file.name)], ["⇄ Move…", () => moveFile(file.name), file.yaml ? `Among the wildcards of ${file.yaml}` : undefined],
+      file.yaml ? ["→ txt files", () => convert(file.name, "txt"), "Turn its yaml file into txt files, one per key (the names stay the same)"]
+        : ["→ yaml", () => convert(file.name, "yaml"), `Turn ${file.name}.txt into ${file.name.split("/").pop()}.yaml (the name stays the same)`],
+      ["⇦ Add the prompt as a line", () => addPromptLine(file.name), "The node's prompt (the one the cursor was last in) as a new line of this file; in the editor, Save keeps it"],
+      ["🧹 Remove duplicates and empty lines", () => cleanUp(file.name, false), "In the editor: Save keeps it"],
+      ["🔤 Sort lines A→Z (and clean up)", () => cleanUp(file.name, true), "Sorted by the text (a line's N:: weight left aside); comments at the top stay there. In the editor: Save keeps it"], "-",
+      ["🗑 Delete", () => deleteFile(file.name)],
+    ];
+  }
+  // A yaml file's row: open it whole, see its cards, add a wildcard to it, turn it into txt files, delete it.
+  function yamlItems(file) {
+    const prefix = keyPrefix(file.name);
+    return [
+      ["📝 Open", () => { setMode(false); return open(file.name); }],
+      ["🃏 Its cards", () => { cardFolder = file.name; setMode(true); }],
+      ["＋ New wildcard in it…", () => {
+        if (!cardsMode) return createFile(prefix ? `${prefix}/` : "", keyOf(file.name));
+        cardFolder = file.name;
+        return newCard();
+      }, "A new key of the yaml file, with its own name"],
+      ["→ txt files", () => convert(keyOf(file.name), "txt"), "Turn the yaml file into txt files, one per key (the names stay the same)"],
+      "-",
+      ["🗑 Delete the file", () => deleteFile(file.name), `The yaml file and its ${file.keys} wildcard${file.keys === 1 ? "" : "s"} (↶ Undo brings it back)`],
     ];
   }
   function folderItems(path) {
@@ -763,6 +994,7 @@ async function openBrowser(node) {
       ["🎲 Preview picks", () => previewPicks(path, true), "What a run would put in for __folder/*__: a few random picks"],
       [opened.has(path) ? "▸ Close the folder" : "▾ Open the folder", () => toggle(path)],
       "-",
+      ...(yamlIn(path) ? [[`＋ New wildcard in ${(listCache?.files ?? []).find((file) => file.name === yamlIn(path))?.yaml}…`, () => createFile(`${path}/`, yamlIn(path))]] : []),
       ["＋ New file here…", () => createFile(`${path}/`)],
       ["⇩ Export zip", () => exportZip(path), "Download the folder as a zip (with a card pack's yaml file)"],
       ...(inside.some((file) => !file.yaml) ? [["→ yaml", () => convert(path, "yaml"), `Turn the folder's txt files into ${path.split("/").pop()}.yaml (the names stay the same)`]] : []),
@@ -776,7 +1008,6 @@ async function openBrowser(node) {
     if (!name) return say("Open (or create) a wildcard file first: the prompt goes in as its new line.");
     if (selected !== name) await open(name);
     if (selected !== name) return;
-    if (editor.readOnly) return say("A yaml wildcard: add the line in its yaml file (or turn it into txt files).");
     const field = cursorField(node);
     const line = String(node.widgets?.find((widget) => widget.name === field)?.value ?? "").replace(/\s*\n\s*/g, " ").trim();
     if (!line) return say(`The ${field} prompt is empty: nothing to add.`);
@@ -792,7 +1023,7 @@ async function openBrowser(node) {
   // the comment lines at its top stay there. Not saved: Save keeps it, reopening the file drops it.
   async function cleanUp(name, sort) {
     if (selected !== name) await open(name);
-    if (selected !== name || editor.readOnly) return;
+    if (selected !== name) return;
     const result = cleanLines(editor.value, sort);
     editor.value = result.text;
     numberLines();
@@ -800,8 +1031,8 @@ async function openBrowser(node) {
     showDirty();
     say(`${name}: ${result.duplicates} duplicate${result.duplicates === 1 ? "" : "s"} and ${result.empty} empty line${result.empty === 1 ? "" : "s"} dropped${sort ? ", sorted A→Z" : ""}. Save keeps it.`);
   }
-  // 🔁 Find and replace in every txt wildcard file: a preview of what changes first, then Replace (after a rename: the old name in the files
-  // that use it). Yaml files are named, not changed.
+  // 🔁 Find and replace in every wildcard, txt files and yaml keys: a preview of what changes first, then Replace (after a rename: the old name
+  // in the files that use it).
   const replacePanel = element("div", { class: "replace", hidden: "" });
   const findInput = element("input", { class: "find", placeholder: "Find (as written, case and all)" });
   const replaceInput = element("input", { class: "with", placeholder: "Replace with" });
@@ -816,8 +1047,7 @@ async function openBrowser(node) {
     if (!result) return;
     const count = result.files.reduce((sum, file) => sum + file.count, 0);
     replaceResults.replaceChildren(
-      element("div", { class: "muted" }, result.files.length ? `${count} in ${result.files.length} file${result.files.length === 1 ? "" : "s"}:` : "Not in any txt file.",
-        ...(result.in_yaml.length ? [` Also in yaml wildcards (edit their yaml files): ${result.in_yaml.join(", ")}.`] : [])),
+      element("div", { class: "muted" }, result.files.length ? `${count} in ${result.files.length} wildcard${result.files.length === 1 ? "" : "s"}:` : "Not in any wildcard."),
       ...result.files.map((file) => element("div", { class: "change" }, element("b", {}, `${file.name} ×${file.count}`),
         element("span", { class: "before" }, file.line), element("span", { class: "after" }, file.after))),
       ...(result.files.length ? [element("button", { class: "apply", onclick: () => background(applyReplace(result.files.length)) }, `Replace in ${result.files.length} file${result.files.length === 1 ? "" : "s"}`)] : []));
@@ -828,7 +1058,7 @@ async function openBrowser(node) {
     const result = await replaceCall(true);
     if (!result) return;
     await wildcardList(true);
-    if (selected && result.files.some((file) => file.name === selected)) await open(selected); // The open file as it is now.
+    if (selected && (selectedYaml || result.files.some((file) => file.name === selected))) await open(selected); // The open file as it is now.
     draw();
     replaceResults.replaceChildren();
     say(`Replaced “${findInput.value}” with “${replaceInput.value}” in ${result.files.length} file${result.files.length === 1 ? "" : "s"}.`);
@@ -875,6 +1105,28 @@ async function openBrowser(node) {
       } catch { /* No answer: names only. */ }
     }, 250);
   }
+  // The tree (both modes): txt files, and a row for each yaml file (in its folder, by its path) in place of its wildcards. A yaml file shows when one
+  // of its wildcards does, or its own name matches the search. Its row opens it whole (lines) or shows its cards (cards).
+  let treeFiles = new Map();
+  function asFiles(shown, files, query) {
+    const rows = shown.filter((file) => !file.yaml_file);
+    const yamlFiles = new Set(shown.filter((file) => file.yaml_file).map((file) => file.yaml_file));
+    if (query && !onlyFavorites && !onlyBroken) files.forEach((file) => { if (file.yaml_file?.toLowerCase().includes(query)) yamlFiles.add(file.yaml_file); });
+    for (const name of yamlFiles) {
+      const keys = files.filter((file) => file.yaml_file === name);
+      rows.push({ name, yamlFile: true, keys: keys.length, preview: keys.slice(0, 3).map((file) => file.name.split("/").pop()) });
+    }
+    return rows.sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
+  }
+  function yamlRow(file) {
+    const row = element("div", { class: "row yaml-file" + (file.name === (cardsMode ? cardFolder : selected) ? " sel" : ""), "data-name": file.name,
+      title: `Wildcards: ${file.preview.join(", ")}${file.keys > 3 ? "…" : ""}` },
+      element("span", { class: "name", onclick: () => { if (cardsMode) { cardFolder = file.name; draw(); } else background(open(file.name)); } }, `📜 ${file.name.split("/").pop()}`),
+      element("span", { class: "muted" }, `yaml · ${file.keys} wildcard${file.keys === 1 ? "" : "s"}`),
+      menuButton(() => yamlItems(file), "More: open, turn into txt files, delete (or right-click the row)"));
+    withMenu(row, () => yamlItems(file));
+    return row;
+  }
   function draw() {
     const { files } = listCache ?? { files: [] };
     const query = search.value.trim().toLowerCase();
@@ -887,7 +1139,9 @@ async function openBrowser(node) {
     const shown = files.filter((file) => (!query || file.name.toLowerCase().includes(query) || byLine(file)) && (!onlyFavorites || file.favorite) && (!onlyBroken || file.broken));
     const allOpen = query || onlyFavorites || onlyBroken; // A search or the filters show their matches in open folders.
     const root = { folders: new Map(), files: [] };
-    for (const file of shown) {
+    treeFiles = new Map();
+    for (const file of asFiles(shown, files, query)) {
+      treeFiles.set(file.name, file);
       let level = root;
       const parts = file.name.split("/");
       parts.slice(0, -1).forEach((part, index) => {
@@ -908,6 +1162,7 @@ async function openBrowser(node) {
         return element("div", { class: "folder" + (allOpen || opened.has(folder.path) ? " open" : ""), "data-path": folder.path }, row, element("div", { class: "kids" }, ...drawLevel(folder)));
       }),
       ...level.files.map((file) => {
+        if (file.yamlFile) return yamlRow(file);
         const row = element("div", { class: "row" + (file.name === selected ? " sel" : ""), "data-name": file.name, title: file.error || file.preview.join("\n") },
           element("span", { class: "name", onclick: () => open(file.name) }, file.name.split("/").pop()),
           ...(query && !file.name.toLowerCase().includes(query) && byLine(file) ? [element("span", { class: "found", title: lineMatches.get(file.name) }, `“${lineMatches.get(file.name)}”`)] : []),
@@ -919,7 +1174,7 @@ async function openBrowser(node) {
           element("button", { class: "add", title: `Insert __${file.name}__`, onclick: () => add(file.name) }, "+ Add"),
           menuButton(() => fileItems(file), "More: open, preview, rename, move, convert, clean up, delete (or right-click the row)"));
         withMenu(row, () => fileItems(file));
-        if (!file.yaml) dragSource(row, "wildcards", file.name); // A yaml wildcard moves with its yaml file only.
+        dragSource(row, "wildcards", file.name); // A yaml wildcard moves among its yaml file's wildcards only (the server says so otherwise).
         return row;
       }),
     ];
@@ -967,9 +1222,9 @@ async function openBrowser(node) {
   searchLines();
   search.focus();
   search.setSelectionRange(search.value.length, search.value.length);
-  if (typeof last.selected === "string" && listCache?.files?.some((file) => file.name === last.selected)) {
+  if (typeof last.selected === "string" && listCache?.files?.some((file) => file.name === last.selected || file.yaml_file === last.selected)) {
     await open(last.selected);
-    if (typeof last.draft === "string" && !editor.readOnly && editor.value === last.saved) { // Changed on disk since: the file as it is now.
+    if (typeof last.draft === "string" && editor.value === last.saved) { // Changed on disk since: the file as it is now.
       editor.value = last.draft;
       showDirty();
       numberLines();
@@ -1043,7 +1298,6 @@ async function selectionToWildcard(node) {
     const file = await api.fetchApi(`/diceforge/wildcards/file?name=${encodeURIComponent(name)}`);
     if (!file.ok) return toast("error", await file.text());
     const current = await file.json();
-    if (current.readonly) return toast("warn", `__${name}__ comes from a yaml file: add the line there.`);
     const known = current.text.split("\n").some((item) => item.trim() === line);
     response = known ? new Response(JSON.stringify({ saved: name })) : await save({ name, text: current.text.trim() ? `${current.text}\n${line}` : line });
     what = known ? "Used" : "Added a line to";

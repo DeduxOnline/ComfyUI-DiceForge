@@ -159,7 +159,7 @@ for (const vue of [true, false]) {
       await page.locator(".dfwc .top input").first().fill("");
       await expect(style).toBeHidden();
       await page.locator(".dfwc button.open-all").click();
-      await expect(page.locator('.dfwc .folder[data-path="characters/alice"] .row', { hasText: "outfit" })).toBeVisible();
+      await expect(page.locator('.dfwc .row[data-name="pack.yaml"]')).toContainText("yaml · 2 wildcards"); // A yaml file: one row, whole.
       await page.locator(".dfwc button.close-all").click();
       await page.keyboard.press("Escape");
     });
@@ -329,7 +329,7 @@ for (const vue of [true, false]) {
       try {
         await expect.poll(choices).toContain(`${top}/colors`);
         expect((await choices())[0]).toBe("＋ New file…");
-        expect(await choices()).not.toContain("characters/alice/outfit"); // A yaml file's wildcards are edited in the yaml file.
+        expect(await choices()).toContain("characters/alice/outfit"); // A yaml key too: saved into its yaml file.
         await setWidget(page, id, "wildcard", `${top}/colors`);
         await save(); // Added: the lines the file doesn't have yet, each once; its comment stays.
         await expect.poll(() => text("colors.txt")).toBe("# my colors\nred\nblue\ngreen\nyellow\n");
@@ -406,7 +406,7 @@ for (const vue of [true, false]) {
       await clickMenu(page, id, "DiceForge.Wildcards", "Wildcard Browser");
       const dialog = page.locator(".dfwc");
       if (await dialog.locator("button.mode").textContent() === "📄 Lines") await dialog.locator("button.mode").click(); // Start in lines.
-      const folder = dialog.locator(`.folder[data-path="${pack}"] > .row`);
+      const folder = dialog.locator(`.folder[data-path="${pack}"] > .row`), yamlRow = dialog.locator(`.row[data-name="${pack}.yaml"]`);
       const menu = page.locator(".df-menu");
       await folder.click({ button: "right" }); // Right-click: the folder's menu.
       await expect(menu.locator("button")).toContainText(["＋ Add", "🎲 Preview picks", "the folder", "＋ New file here…", "⇩ Export zip", "→ yaml"]);
@@ -414,13 +414,14 @@ for (const vue of [true, false]) {
       await expect(dialog.locator(".status")).toContainText("Converted 2 wildcards into");
       expect(fs.existsSync(file(`${pack}.yaml`))).toBe(true);
       expect(fs.existsSync(file(pack, "sitting.txt"))).toBe(false);
-      await folder.locator("button.more").click(); // ⋯ opens the same menu.
-      await expect(menu.locator("button", { hasText: /^→/ })).toHaveText(["→ txt"]); // The same names, now from the yaml file.
+      await expect(folder).toHaveCount(0); // The yaml file, whole: a row of its own, not a folder.
+      await yamlRow.locator("button.more").click(); // ⋯ opens its menu.
+      await expect(menu.locator("button", { hasText: /^→/ })).toHaveText(["→ txt files"]); // The same names, now from the yaml file.
       await page.keyboard.press("Escape"); // Closes the menu only.
       await expect(menu).toHaveCount(0);
       await expect(dialog).toHaveCount(1);
       await dialog.locator("button.mode").click(); // Cards: a picture for a card.
-      await folder.locator(".name").click();
+      await yamlRow.locator(".name").click();
       const sitting = dialog.locator(".card", { hasText: "sitting" });
       const chooser = page.waitForEvent("filechooser");
       await sitting.locator("button.picture").click();
@@ -431,8 +432,8 @@ for (const vue of [true, false]) {
       await expect(sitting.locator("img")).toHaveCount(0);
       expect(fs.existsSync(file(pack, "sitting.png"))).toBe(false);
       await dialog.locator("button.mode").click(); // Back to lines, and back to txt files.
-      await folder.click({ button: "right" });
-      await menu.locator("button", { hasText: "→ txt" }).click();
+      await yamlRow.click({ button: "right" });
+      await menu.locator("button", { hasText: "→ txt files" }).click();
       await expect(dialog.locator(".status")).toContainText(`${pack}.yaml into 2 txt files`);
       expect(fs.readFileSync(file(pack, "standing.txt"), "utf8")).toBe("standing\nstanding, arms crossed\n");
       expect(fs.existsSync(file(`${pack}.yaml`))).toBe(false);
@@ -555,9 +556,206 @@ for (const vue of [true, false]) {
       await expect(page.locator(".dfwc .row", { hasText: `crud_${tag}` })).toHaveCount(0);
       await expect(page.locator(".dfwc button.delete")).toBeDisabled();
       await page.locator(".dfwc button.open-all").click(); // The yaml wildcards are in closed folders.
-      await page.locator(".dfwc .row", { hasText: "outfit" }).filter({ hasText: "yaml" }).first().locator(".name").click(); // yaml: read-only.
+      await page.locator('.dfwc .row[data-name="pack.yaml"] .name').click(); // A yaml file opens whole; its keys are renamed in its text.
+      await expect(page.locator(".dfwc .edit textarea")).toHaveValue(/^characters:/);
       await expect(page.locator(".dfwc button.rename")).toBeDisabled();
-      await expect(page.locator(".dfwc button.delete")).toBeDisabled();
+      await expect(page.locator(".dfwc button.delete")).toBeEnabled();
+    });
+
+    test("Wildcard Browser shows a yaml file whole: one row in its folder, its text as written, + on a line, saved with its comments, deleted and back", async ({ page }) => {
+      const pack = `YFILE_${vue ? "vue" : "classic"}`, file = basePath("models", "wildcards", "packs", `${pack}.yaml`);
+      const text = `# my poses\n${pack}:\n  sitting: [sitting, on a chair]\n  standing: standing,`;
+      writeFile(`models/wildcards/packs/${pack}.yaml`, `${text}\n`);
+      const [id] = await addNodes(page, [{ type: "DiceForgeCLIPDualTextEncode", pos: [300, 60], widgets: { positive: "1girl" } }]);
+      page.on("dialog", (dialog) => (dialog.type() === "prompt" ? dialog.accept(`packs/${pack}/lying`) : dialog.accept()));
+      await clickMenu(page, id, "DiceForge.Wildcards", "Wildcard Browser");
+      const dialog = page.locator(".dfwc"), editor = dialog.locator(".edit textarea"), status = dialog.locator(".status");
+      if (await dialog.locator("button.mode").textContent() === "📄 Lines") await dialog.locator("button.mode").click(); // Lines.
+      await dialog.locator("button.open-all").click();
+      const row = dialog.locator(`.row[data-name="packs/${pack}.yaml"]`);
+      await expect(row).toContainText(`📜 ${pack}.yaml`);
+      await expect(row).toContainText("yaml · 2 wildcards");
+      await expect(dialog.locator(`.row[data-name="packs/${pack}/sitting"]`)).toHaveCount(0); // Its wildcards are in it, not rows of their own,
+      await expect(dialog.locator(`.folder[data-path="packs/${pack}"]`)).toHaveCount(0); // nor folders.
+      await row.locator(".name").click();
+      await expect(editor).toHaveValue(text);
+      await expect(dialog.locator("button.rename")).toBeDisabled(); // Its keys are renamed in its text.
+      const code = dialog.locator(".code"), box = await code.boundingBox();
+      await page.mouse.move(box.x + 60, box.y + 6 + 20 * 3 + 10); // + on "standing: standing,": the option, not the key.
+      await code.locator("button.line-add").click();
+      await expect.poll(() => widgetValue(page, id, "positive")).toBe("1girl, standing,");
+      for (const line of [1, 2]) { // The key of keys, and a [list] on one line: nothing to add.
+        await page.mouse.move(box.x + 60, box.y + 6 + 20 * line + 10);
+        await expect(code.locator("button.line-add")).toBeHidden();
+      }
+      await editor.fill(`${text}\n  # kneeling, new\n  kneeling: kneeling,`);
+      await editor.press("Control+s");
+      await expect(status).toContainText(`Saved packs/${pack}.yaml.`);
+      expect(fs.readFileSync(file, "utf8")).toBe(`${text}\n  # kneeling, new\n  kneeling: kneeling,\n`); // As written, comments and all.
+      await expect(row).toContainText("yaml · 3 wildcards");
+      await editor.fill(`${pack}:\n  broken: [x`); // Not yaml: not saved.
+      await editor.press("Control+s");
+      await expect(status).toContainText("not valid yaml");
+      expect(fs.readFileSync(file, "utf8")).toContain("kneeling: kneeling,");
+      await row.click({ button: "right" });
+      await page.locator(".df-menu button", { hasText: "Delete the file" }).click();
+      await expect(status).toContainText(`Deleted packs/${pack}.yaml.`);
+      expect(fs.existsSync(file)).toBe(false);
+      await status.locator("button.undo").click();
+      await expect(status).toContainText(`packs/${pack}.yaml is back.`);
+      await expect(editor).toHaveValue(`${text}\n  # kneeling, new\n  kneeling: kneeling,`);
+      await row.click({ button: "right" }); // A new wildcard in it: the file opens on its line.
+      await page.locator(".df-menu button", { hasText: "New wildcard in it" }).click();
+      await expect(status).toContainText(`Added __packs/${pack}/lying__ to ${pack}.yaml.`);
+      await expect(editor).toHaveValue(/ {2}lying: \[\]$/);
+      await page.keyboard.press("Escape");
+    });
+
+    test("Wildcard Browser cards: the tree shows a yaml file whole, its row shows its cards; a folder shows all of its files' cards", async ({ page }) => {
+      const pack = `YTREE_${vue ? "vue" : "classic"}`;
+      writeFile(`models/wildcards/${pack}/poses.yaml`, `POSES:\n  sitting: sitting,\n  standing: standing,\n`);
+      writeFile(`models/wildcards/${pack}/colors.txt`, "red\nblue\n");
+      const [id] = await addNodes(page, [{ type: "DiceForgeCLIPDualTextEncode", pos: [300, 60], widgets: { positive: "1girl" } }]);
+      await clickMenu(page, id, "DiceForge.Wildcards", "Wildcard Browser");
+      const dialog = page.locator(".dfwc");
+      if (await dialog.locator("button.mode").textContent() === "🃏 Cards") await dialog.locator("button.mode").click(); // Cards.
+      await dialog.locator(".top input").first().fill(pack);
+      await expect(dialog.locator(`.folder[data-path="${pack}/POSES"]`)).toHaveCount(0); // No folder of its keys.
+      const row = dialog.locator(`.row[data-name="${pack}/poses.yaml"]`);
+      await row.locator(".name").click();
+      await expect(row).toHaveClass(/sel/);
+      await expect(dialog.locator(".cards-head b")).toHaveText(`📜 ${pack}/poses.yaml`);
+      await expect(dialog.locator(".card .title")).toHaveText(["sitting", "standing"]);
+      await dialog.locator(".cards-head button.random").click(); // The cards' own folder: __pack/POSES/*__.
+      await expect.poll(() => widgetValue(page, id, "positive")).toBe(`1girl, __${pack}/POSES/*__`);
+      await dialog.locator(`.folder[data-path="${pack}"] > .row .name`).click(); // The folder: the yaml file's cards and the txt file's.
+      await expect(dialog.locator(".cards-head b")).toHaveText(`📁 ${pack}`);
+      await expect(dialog.locator(".card .title")).toHaveText(["colors", "sitting", "standing"]);
+      await page.keyboard.press("Escape");
+    });
+
+    test("Wildcard Browser asks before another file takes the place of unsaved changes", async ({ page }) => {
+      const top = `wdrop_${vue ? "vue" : "classic"}`;
+      writeFile(`models/wildcards/${top}/a.txt`, "a\n");
+      writeFile(`models/wildcards/${top}/b.txt`, "b\n");
+      const [id] = await addNodes(page, [{ type: "DiceForgeCLIPDualTextEncode", pos: [300, 60] }]);
+      const answers = [false, true];
+      page.on("dialog", (dialog) => (answers.shift() ? dialog.accept() : dialog.dismiss()));
+      await clickMenu(page, id, "DiceForge.Wildcards", "Wildcard Browser");
+      const dialog = page.locator(".dfwc"), editor = dialog.locator(".edit textarea");
+      if (await dialog.locator("button.mode").textContent() === "📄 Lines") await dialog.locator("button.mode").click(); // Lines.
+      await dialog.locator(".top input").first().fill(top);
+      await dialog.locator(`.row[data-name="${top}/a"] .name`).click();
+      await expect(editor).toHaveValue("a");
+      await editor.fill("a\nunsaved");
+      await dialog.locator(`.row[data-name="${top}/b"] .name`).click(); // Asked: no, and a stays open with its changes;
+      await expect(editor).toHaveValue("a\nunsaved");
+      await dialog.locator(`.row[data-name="${top}/b"] .name`).click(); // yes, and b opens.
+      await expect(editor).toHaveValue("b");
+      expect(answers).toEqual([]);
+      expect(fs.readFileSync(basePath("models", "wildcards", top, "a.txt"), "utf8")).toBe("a\n");
+      await page.keyboard.press("Escape");
+    });
+
+    test("Wildcard Browser cards: a card isn't changed while its yaml file has unsaved changes in the lines view, which then shows the change", async ({ page }) => {
+      const pack = `YBUSY_${vue ? "vue" : "classic"}`, text = `${pack}:\n  a: a,\n  b: b,`;
+      writeFile(`models/wildcards/${pack}.yaml`, `${text}\n`);
+      const [id] = await addNodes(page, [{ type: "DiceForgeCLIPDualTextEncode", pos: [300, 60] }]);
+      await clickMenu(page, id, "DiceForge.Wildcards", "Wildcard Browser");
+      const dialog = page.locator(".dfwc"), editor = dialog.locator(".edit textarea"), mode = dialog.locator("button.mode");
+      const row = dialog.locator(`.row[data-name="${pack}.yaml"]`), card = dialog.locator(`.card[data-name="${pack}/a"]`);
+      if (await mode.textContent() === "📄 Lines") await mode.click(); // Lines.
+      await dialog.locator(".top input").first().fill(pack);
+      await row.locator(".name").click();
+      await expect(editor).toHaveValue(text);
+      await editor.fill(`${text}\n  c: c,`); // Unsaved there,
+      await mode.click();
+      await row.locator(".name").click();
+      await card.locator("button.edit-card").click(); // so the card isn't edited:
+      await expect(dialog.locator(".status")).toContainText(`${pack}.yaml is open in the lines view with unsaved changes`);
+      await expect(dialog.locator(".card-edit")).toHaveCount(0);
+      await mode.click();
+      await editor.fill(text); // Undone there,
+      await mode.click();
+      await card.locator("button.edit-card").click(); // so the card is edited,
+      await card.locator(".card-edit textarea").fill("a, changed");
+      await card.locator("button.save-card").click();
+      await expect(dialog.locator(".status")).toContainText(`Saved __${pack}/a__ in ${pack}.yaml.`);
+      await mode.click();
+      await expect(editor).toHaveValue(`${pack}:\n  a: a, changed\n  b: b,`); // and the lines view shows it.
+      await expect(dialog.locator("button.save")).toHaveText("Save");
+      await page.keyboard.press("Escape");
+    });
+
+    test("Wildcard Browser cards: 🖊 edits a card's lines on the card, ＋ New card goes into the folder's yaml file, ⋯ renames and deletes a card", async ({ page }) => {
+      const pack = `CCRUD_${vue ? "vue" : "classic"}`, file = basePath("models", "wildcards", `${pack}.yaml`);
+      writeFile(`models/wildcards/${pack}.yaml`, `${pack}:\n  sitting: sitting,\n`);
+      writeFile(`models/wildcards/${pack}/sitting.png`, png(30, 40, [200, 80, 80]));
+      const [id] = await addNodes(page, [{ type: "DiceForgeCLIPDualTextEncode", pos: [300, 60] }]);
+      const answers = [`${pack}/kneeling`, `${pack}/seated`]; // The prompts in order: the new card, the rename.
+      page.on("dialog", (dialog) => (dialog.type() === "confirm" ? dialog.accept() : dialog.accept(answers.shift())));
+      await clickMenu(page, id, "DiceForge.Wildcards", "Wildcard Browser");
+      const dialog = page.locator(".dfwc"), status = dialog.locator(".status");
+      if (await dialog.locator("button.mode").textContent() === "🃏 Cards") await dialog.locator("button.mode").click(); // Cards.
+      await dialog.locator(`.row[data-name="${pack}.yaml"] .name`).click(); // The yaml file's cards.
+      const card = (name) => dialog.locator(`.card[data-name="${pack}/${name}"]`);
+      await card("sitting").locator("button.edit-card").click();
+      const lines = card("sitting").locator(".card-edit textarea");
+      await expect(lines).toHaveValue("sitting,");
+      await lines.fill("sitting,\non a chair");
+      await lines.press("Control+s");
+      await expect(status).toContainText(`Saved __${pack}/sitting__ in ${pack}.yaml`);
+      await expect(card("sitting")).toHaveCount(2); // Two lines now: a card for each (🂠 Card per line),
+      await dialog.locator(".cards-head button.line-cards").click();
+      await expect(card("sitting")).toHaveCount(1); // or one for the key.
+      await expect(card("sitting").locator(".line")).toHaveText("2 lines: sitting, · on a chair");
+      await dialog.locator(".cards-head button.new-card").click();
+      await expect(status).toContainText(`Added __${pack}/kneeling__ to ${pack}.yaml`);
+      const fresh = card("kneeling").locator(".card-edit textarea");
+      await expect(fresh).toBeFocused(); // Its lines next.
+      await fresh.fill("kneeling,");
+      await card("kneeling").locator("button.save-card").click();
+      await expect.poll(() => fs.readFileSync(file, "utf8")).toContain("  kneeling: kneeling,\n"); // One line: key: text.
+      await card("sitting").locator(".title-row button.more").click();
+      await page.locator(".df-menu button", { hasText: "Rename" }).click();
+      await expect(status).toContainText(`Renamed ${pack}/sitting to ${pack}/seated`);
+      await expect(card("seated").locator("img")).toHaveJSProperty("naturalWidth", 30); // Its picture went along.
+      expect(fs.existsSync(basePath("models", "wildcards", pack, "seated.png"))).toBe(true);
+      await card("seated").click({ button: "right" });
+      await page.locator(".df-menu button", { hasText: "Delete" }).click();
+      await expect(status).toContainText(`Deleted __${pack}/seated__ from ${pack}.yaml`);
+      await expect(card("seated")).toHaveCount(0);
+      await status.locator("button.undo").click();
+      await expect(card("seated").locator("img")).toHaveJSProperty("naturalWidth", 30); // Back, with its picture.
+      await page.keyboard.press("Escape");
+    });
+
+    test("Wildcard Browser cards: 🂠 a card per line of a yaml card, each with its own picture, + Add puts in the line", async ({ page }) => {
+      const pack = `LINES_${vue ? "vue" : "classic"}`;
+      writeFile(`models/wildcards/${pack}.yaml`, `${pack}:\n  standing: [standing, "2::hands on hips", arms crossed]\n  sitting: sitting,\n`);
+      writeFile(`models/wildcards/cards/${pack}/standing/[0].png`, png(30, 40, [80, 80, 200])); // Where the A1111 Wildcard Gallery's packs keep it.
+      const [id] = await addNodes(page, [{ type: "DiceForgeCLIPDualTextEncode", pos: [300, 60], widgets: { positive: "1girl" } }]);
+      page.on("dialog", (dialog) => dialog.accept());
+      await clickMenu(page, id, "DiceForge.Wildcards", "Wildcard Browser");
+      const dialog = page.locator(".dfwc");
+      if (await dialog.locator("button.mode").textContent() === "🃏 Cards") await dialog.locator("button.mode").click(); // Cards.
+      await dialog.locator(`.row[data-name="${pack}.yaml"] .name`).click(); // The yaml file's cards.
+      const lines = dialog.locator(`.card.line-card[data-name="${pack}/standing"]`);
+      await expect(lines.locator(".title")).toHaveText(["standing · 1/3", "standing · 2/3", "standing · 3/3"]);
+      await expect(lines.nth(0).locator("img")).toHaveJSProperty("naturalWidth", 30);
+      await expect(dialog.locator(`.card[data-name="${pack}/sitting"]:not(.line-card)`)).toHaveCount(1); // One line: the card itself.
+      const chooser = page.waitForEvent("filechooser");
+      await lines.nth(2).locator("button.picture").click();
+      await (await chooser).setFiles({ name: "crossed.png", mimeType: "image/png", buffer: png(20, 30, [200, 50, 50]) });
+      await expect(lines.nth(2).locator("img")).toHaveJSProperty("naturalWidth", 20);
+      expect(fs.existsSync(basePath("models", "wildcards", pack, "standing", "[2].png"))).toBe(true); // Next to the yaml file.
+      await lines.nth(1).locator("button.add").click();
+      await expect.poll(() => widgetValue(page, id, "positive")).toBe("1girl, hands on hips"); // The line, without its weight.
+      await lines.nth(2).locator("button.no-picture").click();
+      await expect(lines.nth(2).locator("img")).toHaveCount(0);
+      await dialog.locator(".cards-head button.line-cards").click(); // One card for the key again.
+      await expect(dialog.locator(`.card[data-name="${pack}/standing"]`)).toHaveCount(1);
+      await page.keyboard.press("Escape");
     });
 
     test("Wildcards to Text has the prompt tools in its text field: highlighting, the menu's browsers and guide", async ({ page }) => {
@@ -585,8 +783,8 @@ for (const vue of [true, false]) {
       if (await dialog.locator("button.mode").textContent() === "📄 Lines") await dialog.locator("button.mode").click(); // Start in lines.
       await expect(dialog.locator("button.mode")).toHaveText("🃏 Cards");
       await dialog.locator("button.mode").click();
-      await dialog.locator(".folder > .row .name", { hasText: pack }).click(); // The folder's cards.
-      await expect(dialog.locator(".cards-head b")).toHaveText(`📁 ${pack}`);
+      await dialog.locator(`.row[data-name="${pack}.yaml"] .name`).click(); // The yaml file's cards.
+      await expect(dialog.locator(".cards-head b")).toHaveText(`📜 ${pack}.yaml`);
       const cards = dialog.locator(".card");
       await expect(cards).toHaveCount(3);
       await expect(cards.filter({ hasText: "sitting" }).locator("img")).toHaveJSProperty("naturalWidth", 30); // Its picture, POSES/sitting.png-style.
