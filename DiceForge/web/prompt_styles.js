@@ -1,6 +1,6 @@
 import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
-import { background } from "./dom.js";
+import { askConfirm, askText, background } from "./dom.js";
 import { modelSource, fetchBases, baseOf } from "./lora_stack.js";
 import { presetNameFor } from "./sampler_presets.js";
 import { setField, PROMPT_NODE_TYPE } from "./wildcards.js";
@@ -86,9 +86,9 @@ async function applyAuto(node) {
   else toast("info", "Prompt styles", `${style.name} is already in the prompts.`);
 }
 async function saveCurrent(node) {
-  const name = prompt("Name of the new style (the current positive and negative prompts):")?.trim();
+  const name = (await askText("Name of the new style (the current positive and negative prompts):"))?.trim();
   if (!name) return;
-  if (styles.user.some((item) => item.name.toLowerCase() === name.toLowerCase()) && !confirm(`A style named "${name}" already exists. Replace it?`)) return;
+  if (styles.user.some((item) => item.name.toLowerCase() === name.toLowerCase()) && !(await askConfirm(`A style named "${name}" already exists. Replace it?`))) return;
   try {
     await request("/diceforge/styles", { method: "POST", body: JSON.stringify({ name, prompt: fieldText(node, "positive"), negative_prompt: fieldText(node, "negative") }) });
     toast("success", "Prompt styles", `Saved ${name}.`);
@@ -98,7 +98,7 @@ async function saveCurrent(node) {
   await loadStyles();
 }
 async function deleteStyle(name) {
-  if (!confirm(`Delete the style "${name}"?`)) return;
+  if (!(await askConfirm(`Delete the style "${name}"?`))) return;
   try {
     await request(`/diceforge/styles?${new URLSearchParams({ name })}`, { method: "DELETE" });
     toast("success", "Prompt styles", `Deleted ${name}.`);

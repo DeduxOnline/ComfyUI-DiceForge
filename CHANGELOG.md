@@ -72,6 +72,8 @@ nodes and features, a patch for fixes. Each version is a [release on GitHub](htt
   section on updating from it).
 
 ### Fixed
+- The questions of DiceForge's windows (a name, a confirmation) are ComfyUI's own dialogs instead of the browser's: they work in ComfyUI
+  Desktop (which has no prompt()) and in browsers that don't show the browser's own, where → yaml, delete, rename and new file did nothing.
 - Wildcard Browser: opening another file asks before the open file's unsaved changes are dropped.
 - README: the inputs and outputs it didn't name yet (Wildcards to Text's `seed`, XY Plot's axes, Variation Seed's `variation_seed`, Danbooru
   Tag Enhancer's `include_general` and `position`, the utility nodes' inputs and outputs).

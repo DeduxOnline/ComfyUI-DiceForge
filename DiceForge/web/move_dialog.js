@@ -1,4 +1,4 @@
-import { addStyleOnce, element } from "./dom.js";
+import { addStyleOnce, asking, element } from "./dom.js";
 
 // The folder picker of "⇄ Move" in the model browsers and the Wildcard Browser: the existing folders (the current one marked), the top folder, and a
 // field for a new folder (made by the move, a / for subfolders). Resolves with the folder ("" for the top folder), or null when cancelled.
@@ -23,7 +23,7 @@ export function pickFolder({ title, folders, current = "" }) {
       resolve(value);
     };
     const onKey = (event) => {
-      if (event.key !== "Escape") return;
+      if (asking() || event.key !== "Escape") return;
       event.stopPropagation(); // Only the picker closes, not the browser under it.
       done(null);
     };

@@ -1,6 +1,6 @@
 import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
-import { addStyleOnce, background, element, fitToContent } from "./dom.js";
+import { addStyleOnce, asking, background, element, fitToContent } from "./dom.js";
 import { fitNodeHeight } from "./node_size.js";
 import { setField } from "./wildcards.js";
 
@@ -106,7 +106,7 @@ export function openHistory(node) {
   addStyleOnce("dfpp-style", STYLE);
   const list = element("div", { class: "list" });
   const back = element("div", { class: "dfph-back" });
-  const onKey = (event) => { if (event.key === "Escape") { event.stopPropagation(); close(); } };
+  const onKey = (event) => { if (asking()) return; if (event.key === "Escape") { event.stopPropagation(); close(); } };
   let shown;
   const timer = setInterval(() => { if (node.properties?.dice_forge_history !== shown) draw(); }, 400); // New runs and images show up.
   function close() {

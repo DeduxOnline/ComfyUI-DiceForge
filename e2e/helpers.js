@@ -115,4 +115,18 @@ async function queueFromPage(page, request) {
 // The element of a node in the page: its Nodes 2.0 element, or null in the classic design.
 const nodeElement = (page, id) => page.locator(`[data-node-id="${id}"]`);
 
-module.exports = { test, expect, runPrompt, shown, basePath, writeFile, openComfy, addNodes, connect, widgetValue, setWidget, menuItems, clickMenu, queueFromPage, nodeElement };
+// The DiceForge questions (ComfyUI's dialogs titled DiceForge) answered as they show: answer({ prompt, text }) gives true to confirm, false to
+// cancel, or the text to type in a prompt (true keeps its proposed text). times: how many to answer (all by default).
+async function answerQuestions(page, answer = () => true, times) {
+  const question = page.locator('[role="dialog"]').filter({ has: page.locator("h2", { hasText: /^DiceForge$/ }) });
+  await page.addLocatorHandler(question, async (dialog) => {
+    const field = dialog.locator("input");
+    const prompt = (await field.count()) > 0;
+    const reply = await answer({ prompt, text: await dialog.innerText() });
+    if (reply === false || reply == null) return dialog.getByRole("button", { name: prompt ? "Close" : "Cancel" }).click();
+    if (typeof reply === "string") await field.fill(reply);
+    await dialog.getByRole("button", { name: "Confirm" }).click();
+  }, times ? { times } : undefined);
+}
+
+module.exports = { test, expect, runPrompt, shown, basePath, writeFile, openComfy, addNodes, connect, widgetValue, setWidget, menuItems, clickMenu, queueFromPage, nodeElement, answerQuestions };

@@ -1,6 +1,6 @@
 import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
-import { background } from "./dom.js";
+import { askConfirm, askText, background } from "./dom.js";
 import { onWildcardList, toast, wildcardList } from "./wildcards.js";
 
 // Wildcard Note: a note (like ComfyUI's Note, it is not run with the workflow) to collect wildcard lines while you work, with the prompt fields'
@@ -35,7 +35,7 @@ async function plannedSave(name, lines, mode) {
   }
   const current = await file.json();
   if (mode === REPLACE) {
-    if (!confirm(`Replace the lines of __${name}__ with the note's ${linesWord(lines.length)}?`)) return null;
+    if (!(await askConfirm(`Replace the lines of __${name}__ with the note's ${linesWord(lines.length)}?`))) return null;
     return { text: lines.join("\n"), done: `Replaced the lines of __${name}__ with the note's ${linesWord(lines.length)}` };
   }
   const known = new Set(current.text.split("\n").map((line) => line.trim()));
@@ -53,7 +53,7 @@ async function saveToWildcard(node) {
   if (!lines.length) return toast("warn", "The note is empty: write the wildcard's lines in it first, one per line.");
   const files = widgetOf(node, "wildcard");
   const name = files?.value && files.value !== NEW_FILE ? files.value
-    : prompt("A new wildcard file for the note's lines: its name (folders with /, for example outfit/dress):")?.trim();
+    : (await askText("A new wildcard file for the note's lines: its name (folders with /, for example outfit/dress):"))?.trim();
   if (!name) return;
   const plan = await plannedSave(name, lines, widgetOf(node, "mode")?.value);
   if (!plan) return;

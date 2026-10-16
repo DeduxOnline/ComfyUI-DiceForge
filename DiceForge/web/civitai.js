@@ -1,6 +1,6 @@
 import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
-import { addStyleOnce, background, element } from "./dom.js";
+import { addStyleOnce, asking, askText, background, element } from "./dom.js";
 import { blurSwitch, civitaiMedia } from "./media.js";
 
 // "Find on Civitai" in the LoRA, Checkpoint and Diffusion Model Browsers (the Create of their files): search Civitai, pick a version, download it
@@ -60,7 +60,7 @@ export async function openCivitaiSearch({ kind = "loras", title = "LoRA", plural
   const back = element("div", { class: "dfcv-back" });
   let items = [], next = null, searchRun = 0, polling = null, knownDone = new Set();
   const say = (text) => { status.textContent = text; };
-  const onKey = (event) => { if (event.key === "Escape") { event.stopPropagation(); close(); } };
+  const onKey = (event) => { if (asking()) return; if (event.key === "Escape") { event.stopPropagation(); close(); } };
   const blurToggle = blurSwitch(() => drawGrid());
   function close() {
     clearTimeout(polling);
@@ -81,7 +81,7 @@ export async function openCivitaiSearch({ kind = "loras", title = "LoRA", plural
   }
   keyButton.addEventListener("click", async () => {
     if (keyButton.dataset.source === "environment") return say("The API key comes from CIVITAI_API_KEY in ComfyUI's environment: change it there.");
-    const key = prompt("Your Civitai API key (Civitai → Account settings → API keys). It is kept in the ComfyUI user folder and only sent to Civitai. Empty removes it:", "");
+    const key = (await askText("Your Civitai API key (Civitai → Account settings → API keys). It is kept in the ComfyUI user folder and only sent to Civitai. Empty removes it:", ""));
     if (key === null) return;
     try {
       const result = await call("/diceforge/civitai/key", { method: "POST", body: JSON.stringify({ key: key.trim() }) });

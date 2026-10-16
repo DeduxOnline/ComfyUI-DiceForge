@@ -1,6 +1,6 @@
 import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
-import { background } from "./dom.js";
+import { askConfirm, askText, background } from "./dom.js";
 import { modelSource, fetchBases, baseOf } from "./lora_stack.js";
 
 // Sampler presets in the right-click menu of KSampler, KSampler Advanced and any node with steps, cfg, sampler_name and scheduler: the settings
@@ -75,9 +75,9 @@ async function applyAuto(node) {
   else toast("warn", "Sampler presets", `No preset for ${source.file.split(/[\\/]/).pop()}${base ? ` (${base})` : ""}: Anima, Illustrious and NoobAI are known.`);
 }
 async function saveCurrent(node) {
-  const name = prompt("Name of the new sampler preset:")?.trim();
+  const name = (await askText("Name of the new sampler preset:"))?.trim();
   if (!name) return;
-  if (presets.user.some((item) => item.name.toLowerCase() === name.toLowerCase()) && !confirm(`A preset named "${name}" already exists. Replace it?`)) return;
+  if (presets.user.some((item) => item.name.toLowerCase() === name.toLowerCase()) && !(await askConfirm(`A preset named "${name}" already exists. Replace it?`))) return;
   const widgets = widgetsOf(node);
   const body = { name, ...Object.fromEntries(FIELDS.map((field) => [field, widgets[field].value])) };
   try {
@@ -89,7 +89,7 @@ async function saveCurrent(node) {
   await loadPresets();
 }
 async function deletePreset(name) {
-  if (!confirm(`Delete the sampler preset "${name}"?`)) return;
+  if (!(await askConfirm(`Delete the sampler preset "${name}"?`))) return;
   try {
     await request(`/diceforge/sampler-presets?${new URLSearchParams({ name })}`, { method: "DELETE" });
     toast("success", "Sampler presets", `Deleted ${name}.`);

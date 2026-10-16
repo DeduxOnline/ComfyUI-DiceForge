@@ -1,6 +1,6 @@
 import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
-import { addStyleOnce, background, element } from "./dom.js";
+import { addStyleOnce, askConfirm, asking, askText, background, element } from "./dom.js";
 import { dragSource, dropTarget, pickFolder } from "./move_dialog.js";
 import { addHighlightStyle, highlightEnabled, highlightWildcardFile } from "./prompt_highlight.js";
 import { keepSize, recall, remember, scrollBack } from "./window_memory.js";
@@ -445,7 +445,7 @@ async function openBrowser(node) {
     document.removeEventListener("selectionchange", onSelection);
   };
   const onKey = (event) => {
-    if (document.querySelector(".dfmv-back")) return; // The folder picker has the keys (and closes first).
+    if (asking() || document.querySelector(".dfmv-back")) return; // The folder picker has the keys (and closes first).
     if (event.key === "Escape") {
       event.stopPropagation();
       if (menuOpen()) closeMenu(); // Then a right-click menu, then the browser.
@@ -500,7 +500,7 @@ async function openBrowser(node) {
   // changes are not dropped without asking (keepEdits: the caller puts them back, as a rename does).
   async function open(name, keepEdits = false) {
     const yamlFile = /\.ya?ml$/i.test(name) ? name : (listCache?.files ?? []).find((file) => file.name === name)?.yaml_file;
-    if (!keepEdits && selected && selected !== (yamlFile ?? name) && editor.value !== saved && !confirm(`Drop the unsaved changes of ${selected}?`)) return;
+    if (!keepEdits && selected && selected !== (yamlFile ?? name) && editor.value !== saved && !(await askConfirm(`Drop the unsaved changes of ${selected}?`))) return;
     const response = await api.fetchApi(yamlFile ? `/diceforge/wildcards/yaml?file=${encodeURIComponent(yamlFile)}` : `/diceforge/wildcards/file?name=${encodeURIComponent(name)}`);
     if (!response.ok) return say(await response.text());
     const file = await response.json();
@@ -575,7 +575,7 @@ async function openBrowser(node) {
       ["🔁 Update the wildcard files that use it", () => openReplace(`__${result.renamed}__`, `__${result.to}__`)]);
   }
   async function renameFile(name) {
-    const to = prompt("New name (folders with /, for example hair/color):", name)?.trim();
+    const to = (await askText("New name (folders with /, for example hair/color):", name))?.trim();
     if (to && to !== name) await renameTo(name, to, false);
   }
   rename.addEventListener("click", () => { if (selected) background(renameFile(selected)); });
@@ -606,7 +606,7 @@ async function openBrowser(node) {
     if (whole) [what, done] = [`${name} and its ${keys} wildcard${keys === 1 ? "" : "s"}`, `Deleted ${name}.`];
     else if (yamlFile) [what, done] = [`__${name}__ from ${yamlFile}`, `Deleted __${name}__ from ${yamlFile}.`];
     if (!whole && yamlBusy(name)) return;
-    if (!confirm(`Delete ${what}? (↶ Undo brings it back.)`)) return;
+    if (!(await askConfirm(`Delete ${what}? (↶ Undo brings it back.)`))) return;
     const reread = whole ? null : openYamlOf(name);
     const response = await api.fetchApi(whole ? `/diceforge/wildcards/yaml?file=${encodeURIComponent(name)}` : `/diceforge/wildcards/file?name=${encodeURIComponent(name)}`, { method: "DELETE" });
     if (!response.ok) return say(await response.text());
@@ -641,7 +641,7 @@ async function openBrowser(node) {
     const yamlOf = (listCache?.files ?? []).find((file) => file.name === name)?.yaml_file;
     if (selected && editor.value !== saved && (selected === name || selected.startsWith(`${name}/`) || selected === yamlOf)) return say("Save (or undo) your changes first.");
     const what = to === "yaml" ? `the txt wildcards ${name} into ${name.split("/").pop()}.yaml` : `the yaml file of ${name} into txt files, one per key`;
-    if (!confirm(`Convert ${what}? The wildcard names stay the same.`)) return;
+    if (!(await askConfirm(`Convert ${what}? The wildcard names stay the same.`))) return;
     const response = await api.fetchApi("/diceforge/wildcards/convert", { method: "POST", body: JSON.stringify({ name, to }) });
     if (!response.ok) return say(await response.text());
     const result = await response.json();
@@ -675,7 +675,7 @@ async function openBrowser(node) {
   async function createFile(suggested, nextTo) {
     const yamlFile = nextTo && (listCache?.files ?? []).find((file) => file.name === nextTo)?.yaml;
     if (yamlFile && yamlBusy(nextTo)) return null;
-    const name = prompt(yamlFile ? `New wildcard in ${yamlFile} (its name, folders with /):` : "New wildcard file name (folders with /, for example hair/color):", suggested)?.trim();
+    const name = (await askText(yamlFile ? `New wildcard in ${yamlFile} (its name, folders with /):` : "New wildcard file name (folders with /, for example hair/color):", suggested))?.trim();
     if (!name) return null;
     const reread = yamlFile ? openYamlOf(nextTo) : null;
     const response = await api.fetchApi("/diceforge/wildcards/file", { method: "POST", body: JSON.stringify({ name, text: "", create: true, ...(yamlFile ? { next_to: nextTo } : {}) }) });
@@ -752,7 +752,7 @@ async function openBrowser(node) {
     draw();
   }
   async function removePicture(name, line) {
-    if (!confirm(`Remove the picture of ${whose(name, line)}?`)) return;
+    if (!(await askConfirm(`Remove the picture of ${whose(name, line)}?`))) return;
     const response = await api.fetchApi(`/diceforge/wildcards/picture?${pictureQuery(name, line)}`, { method: "DELETE" });
     if (!response.ok) return say(await response.text());
     await wildcardList(true);
@@ -1054,7 +1054,7 @@ async function openBrowser(node) {
   }
   async function applyReplace(fileCount) {
     if (selected && editor.value !== saved) return say("Save (or undo) the open file's changes first: the replace would change it under you.");
-    if (!confirm(`Replace “${findInput.value}” with “${replaceInput.value}” in ${fileCount} file${fileCount === 1 ? "" : "s"}?`)) return;
+    if (!(await askConfirm(`Replace “${findInput.value}” with “${replaceInput.value}” in ${fileCount} file${fileCount === 1 ? "" : "s"}?`))) return;
     const result = await replaceCall(true);
     if (!result) return;
     await wildcardList(true);
@@ -1289,12 +1289,13 @@ async function selectionToWildcard(node) {
   if (!cursor || !picked.trim()) return toast("warn", "Select a part of a prompt first: it becomes the new wildcard's first line, and __name__ takes its place.");
   const line = picked.replace(/\s*\n\s*/g, " ").trim();
   const suggested = line.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "_").replace(/^_+|_+$/g, "").split("_").slice(0, 3).join("_") || "new";
-  const name = prompt(`A wildcard from “${line.length > 60 ? `${line.slice(0, 60)}…` : line}”: its name (folders with /, for example outfit/dress):`, suggested)?.trim();
+  const quoted = line.length > 60 ? `${line.slice(0, 60)}…` : line;
+  const name = (await askText(`A wildcard from “${quoted}”: its name (folders with /, for example outfit/dress):`, suggested))?.trim();
   if (!name) return;
   const save = (body) => api.fetchApi("/diceforge/wildcards/file", { method: "POST", body: JSON.stringify(body) });
   let response = await save({ name, text: line, create: true }), what = "Made";
   if (response.status === 409) { // Taken: one more line of it?
-    if (!confirm(`__${name}__ already exists. Add “${line}” to it as a new line?`)) return;
+    if (!(await askConfirm(`__${name}__ already exists. Add “${line}” to it as a new line?`))) return;
     const file = await api.fetchApi(`/diceforge/wildcards/file?name=${encodeURIComponent(name)}`);
     if (!file.ok) return toast("error", await file.text());
     const current = await file.json();

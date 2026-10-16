@@ -378,7 +378,7 @@ test.describe("@api workflows and routes", () => {
     expect(fs.readFileSync(file("e2e_crud_moved", "fruits.txt"), "utf8")).toBe("apple\npear\n");
     expect(["apple", "pear"]).toContain(shown(await runPrompt(request, clip("__e2e_crud_moved/fruits__")), "2")); // The node finds the new name.
     expect((await request.post("/diceforge/wildcards/rename", { data: { name: "e2e_crud_moved/fruits", to: "color" } })).status()).toBe(409);
-    expect((await request.post("/diceforge/wildcards/rename", { data: { name: "characters/alice/outfit", to: "x" } })).status()).toBe(400); // yaml
+    expect((await request.post("/diceforge/wildcards/rename", { data: { name: "characters/alice/outfit", to: "color" } })).status()).toBe(409); // A yaml key can't take a txt file's name.
     expect((await request.delete("/diceforge/wildcards/file?name=e2e_crud_moved/fruits")).ok()).toBe(true);
     expect(fs.existsSync(file("e2e_crud_moved"))).toBe(false);
     expect((await request.get("/diceforge/wildcards/file?name=e2e_crud_moved/fruits")).status()).toBe(404);

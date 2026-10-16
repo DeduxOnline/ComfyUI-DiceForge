@@ -201,7 +201,7 @@ def test_a_deleted_yaml_key_comes_back_with_its_picture_and_star(api, wildcards)
     assert read_pack(wildcards, "POSES.yaml") == {"POSES": {"group": {"two": ["a", "b"]}}}
     api("POST", "/diceforge/wildcards/file", {"name": "POSES/sitting", "text": "a new one", "create": True, "next_to": "POSES/group/two"})
     assert api("POST", "/diceforge/wildcards/restore", {"id": first})[0] == 409 # The name is taken again: not overwritten.
-    assert read_pack(wildcards, "POSES.yaml")["POSES"]["sitting"] == ["a new one"]
+    assert read_pack(wildcards, "POSES.yaml")["POSES"]["sitting"] == "a new one"
 
 
 def test_create_refuses_a_taken_name(api, wildcards):
@@ -401,9 +401,9 @@ def test_card_pictures_in_a_cards_folder_as_wildcard_gallery_packs_keep_them(api
             file.write(content)
     files = {entry["name"]: entry for entry in api("GET", "/diceforge/wildcards")[1]["files"]}
     assert files["POSES/sitting"]["picture"] is True and files["styles/ink"]["picture"] is True and "picture" not in files["POSES/standing"]
-    assert api("GET", "/diceforge/wildcards/picture?name=POSES/sitting") == (200, b"top")
-    assert api("GET", "/diceforge/wildcards/picture?name=styles/ink") == (200, b"next to it")
-    assert api("GET", "/diceforge/wildcards/picture?name=POSES/standing&line=1") == (200, b"a line")
+    assert api("GET", "/diceforge/wildcards/picture?name=POSES/sitting") == (200, "top") # Text bodies come back as text.
+    assert api("GET", "/diceforge/wildcards/picture?name=styles/ink") == (200, "next to it")
+    assert api("GET", "/diceforge/wildcards/picture?name=POSES/standing&line=1") == (200, "a line")
     assert "cards/POSES/sitting" not in files # Pictures, not wildcards.
 
 

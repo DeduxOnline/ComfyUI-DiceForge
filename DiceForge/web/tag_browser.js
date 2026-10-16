@@ -1,6 +1,6 @@
 import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
-import { addStyleOnce, background, element } from "./dom.js";
+import { addStyleOnce, asking, background, element } from "./dom.js";
 import { compact } from "./civitai_meta.js";
 import { tagText } from "./tag_autocomplete.js";
 import { cursorField, fieldsOf, insertIntoNode, isPromptNode } from "./wildcards.js";
@@ -121,6 +121,7 @@ export async function openTagBrowser(node) {
   }
   const back = element("div", { class: "dftb-back" });
   const onKey = (event) => {
+    if (asking()) return;
     if (event.key === "Escape") {
       event.stopPropagation();
       close();

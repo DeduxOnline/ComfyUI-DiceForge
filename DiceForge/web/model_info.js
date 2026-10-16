@@ -1,6 +1,6 @@
 import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
-import { addStyleOnce, element } from "./dom.js";
+import { addStyleOnce, asking, element } from "./dom.js";
 import { shouldBlur, videoPreview } from "./media.js";
 import { dateText, statsChips } from "./civitai_meta.js";
 import { applySettings, settingsOf } from "./apply_settings.js";
@@ -63,7 +63,7 @@ async function openModelInfo(kind, file) {
   addStyle();
   const panel = element("div", { class: "dfmi" }, element("h2", {}, file), element("p", { class: "muted" }, "Computing the sha256 and asking Civitai… a large model takes a few seconds the first time."));
   const back = element("div", { class: "dfmi-back", onclick: (event) => event.target === back && close() }, panel);
-  const onKey = (event) => event.key === "Escape" && close();
+  const onKey = (event) => !asking() && event.key === "Escape" && close();
   function close() {
     back.remove();
     document.removeEventListener("keydown", onKey);
@@ -131,7 +131,7 @@ function slider(images) {
   }
   const onKey = (event) => {
     if (!stage.isConnected) return document.removeEventListener("keydown", onKey, true); // Closed, or drawn again (Refresh).
-    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight" || event.target.closest?.("input, textarea")) return;
+    if (asking() || event.key !== "ArrowLeft" && event.key !== "ArrowRight" || event.target.closest?.("input, textarea")) return;
     event.preventDefault();
     show(index + (event.key === "ArrowRight" ? 1 : -1));
   };

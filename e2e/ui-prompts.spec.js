@@ -2,7 +2,7 @@
 // prompt styles, the tag autocomplete, the prompt preview and history, and Danbooru Tag Enhancer, in both node designs (Nodes 2.0 and
 // classic), against the real server. Each test builds its own graph.
 const fs = require("fs");
-const { test, expect, basePath, writeFile, openComfy, addNodes, connect, widgetValue, setWidget, menuItems, clickMenu, queueFromPage, nodeElement } = require("./helpers");
+const { test, expect, basePath, writeFile, openComfy, addNodes, connect, widgetValue, setWidget, menuItems, clickMenu, queueFromPage, nodeElement, answerQuestions } = require("./helpers");
 const { png, zip } = require("./fixtures");
 const { promptField, lookUp } = require("./ui-shared");
 
@@ -234,7 +234,7 @@ for (const vue of [true, false]) {
       writeFile(`models/wildcards/${top}/list.txt`, "b\n3::a\nC\n");
       try {
         const [id] = await addNodes(page, [{ type: "DiceForgeCLIPDualTextEncode", pos: [300, 60] }]);
-        page.on("dialog", (dialog) => (dialog.type() === "prompt" ? dialog.accept(`${top}/color`) : dialog.accept()));
+        await answerQuestions(page, ({ prompt }) => (prompt ? `${top}/color` : true));
         await clickMenu(page, id, "DiceForge.Wildcards", "Wildcard Browser");
         const dialog = page.locator(".dfwc"), status = dialog.locator(".status"), row = (name) => dialog.locator(`.row[data-name="${top}/${name}"]`);
         if (await dialog.locator("button.mode").textContent() === "📄 Lines") await dialog.locator("button.mode").click(); // Lines: the editor.
@@ -296,7 +296,7 @@ for (const vue of [true, false]) {
         await page.keyboard.up("Shift"); // A key up: the selection is remembered, as when the field loses focus.
       };
       const answers = [`${top}/dress`, `${top}/dress`];
-      page.on("dialog", (dialog) => (dialog.type() === "prompt" ? dialog.accept(answers.shift()) : dialog.accept()));
+      await answerQuestions(page, ({ prompt }) => (prompt ? answers.shift() : true));
       try {
         await clickMenu(page, id, "DiceForge.Wildcards", "Selection → new wildcard"); // Nothing selected: a message, nothing done.
         await expect.poll(() => widgetValue(page, id, "positive")).toBe("1girl, red dress, smile");
@@ -318,7 +318,7 @@ for (const vue of [true, false]) {
       const top = `note_${vue ? "vue" : "classic"}`, file = (...parts) => basePath("models", "wildcards", top, ...parts);
       writeFile(`models/wildcards/${top}/colors.txt`, "# my colors\nred\nblue\n");
       const answers = [`${top}/fresh`];
-      page.on("dialog", (dialog) => (dialog.type() === "prompt" ? dialog.accept(answers.shift()) : dialog.accept()));
+      await answerQuestions(page, ({ prompt }) => (prompt ? answers.shift() : true));
       const [id] = await addNodes(page, [{ type: "DiceForgeWildcardNote", pos: [300, 60], widgets: { text: "blue\n  green  \n\nyellow\ngreen" } }]);
       const choices = () => page.evaluate((id) => window.app.graph.getNodeById(id).widgets.find((widget) => widget.name === "wildcard").options.values, id);
       const text = (name) => (fs.existsSync(file(name)) ? fs.readFileSync(file(name), "utf8") : null);
@@ -402,7 +402,7 @@ for (const vue of [true, false]) {
       writeFile(`models/wildcards/${pack}/sitting.txt`, "sitting\n");
       writeFile(`models/wildcards/${pack}/standing.txt`, "standing\nstanding, arms crossed\n");
       const [id] = await addNodes(page, [{ type: "DiceForgeCLIPDualTextEncode", pos: [300, 60], widgets: { positive: "1girl" } }]);
-      page.on("dialog", (confirmation) => confirmation.accept());
+      await answerQuestions(page);
       await clickMenu(page, id, "DiceForge.Wildcards", "Wildcard Browser");
       const dialog = page.locator(".dfwc");
       if (await dialog.locator("button.mode").textContent() === "📄 Lines") await dialog.locator("button.mode").click(); // Start in lines.
@@ -522,7 +522,7 @@ for (const vue of [true, false]) {
       const [id] = await addNodes(page, [{ type: "DiceForgeCLIPDualTextEncode", pos: [300, 60] }]);
       await clickMenu(page, id, "DiceForge.Wildcards", "Wildcard Browser");
       const answers = [`crud_${tag}/new`, `crud_${tag}/new`, `crud_${tag}_done/renamed`]; // The prompts in order: new file, the same name again, rename.
-      page.on("dialog", (dialog) => (dialog.type() === "confirm" ? dialog.accept() : dialog.accept(answers.shift())));
+      await answerQuestions(page, ({ prompt }) => (prompt ? answers.shift() : true));
       const editor = page.locator(".dfwc .edit textarea"), save = page.locator(".dfwc button.save"), status = page.locator(".dfwc .status");
       await page.locator(".dfwc button", { hasText: "+ New file" }).click();
       await expect(page.locator(".dfwc .row.sel")).toContainText("new");
@@ -567,7 +567,7 @@ for (const vue of [true, false]) {
       const text = `# my poses\n${pack}:\n  sitting: [sitting, on a chair]\n  standing: standing,`;
       writeFile(`models/wildcards/packs/${pack}.yaml`, `${text}\n`);
       const [id] = await addNodes(page, [{ type: "DiceForgeCLIPDualTextEncode", pos: [300, 60], widgets: { positive: "1girl" } }]);
-      page.on("dialog", (dialog) => (dialog.type() === "prompt" ? dialog.accept(`packs/${pack}/lying`) : dialog.accept()));
+      await answerQuestions(page, ({ prompt }) => (prompt ? `packs/${pack}/lying` : true));
       await clickMenu(page, id, "DiceForge.Wildcards", "Wildcard Browser");
       const dialog = page.locator(".dfwc"), editor = dialog.locator(".edit textarea"), status = dialog.locator(".status");
       if (await dialog.locator("button.mode").textContent() === "📄 Lines") await dialog.locator("button.mode").click(); // Lines.
@@ -640,7 +640,7 @@ for (const vue of [true, false]) {
       writeFile(`models/wildcards/${top}/b.txt`, "b\n");
       const [id] = await addNodes(page, [{ type: "DiceForgeCLIPDualTextEncode", pos: [300, 60] }]);
       const answers = [false, true];
-      page.on("dialog", (dialog) => (answers.shift() ? dialog.accept() : dialog.dismiss()));
+      await answerQuestions(page, () => answers.shift());
       await clickMenu(page, id, "DiceForge.Wildcards", "Wildcard Browser");
       const dialog = page.locator(".dfwc"), editor = dialog.locator(".edit textarea");
       if (await dialog.locator("button.mode").textContent() === "📄 Lines") await dialog.locator("button.mode").click(); // Lines.
@@ -693,7 +693,7 @@ for (const vue of [true, false]) {
       writeFile(`models/wildcards/${pack}/sitting.png`, png(30, 40, [200, 80, 80]));
       const [id] = await addNodes(page, [{ type: "DiceForgeCLIPDualTextEncode", pos: [300, 60] }]);
       const answers = [`${pack}/kneeling`, `${pack}/seated`]; // The prompts in order: the new card, the rename.
-      page.on("dialog", (dialog) => (dialog.type() === "confirm" ? dialog.accept() : dialog.accept(answers.shift())));
+      await answerQuestions(page, ({ prompt }) => (prompt ? answers.shift() : true));
       await clickMenu(page, id, "DiceForge.Wildcards", "Wildcard Browser");
       const dialog = page.locator(".dfwc"), status = dialog.locator(".status");
       if (await dialog.locator("button.mode").textContent() === "🃏 Cards") await dialog.locator("button.mode").click(); // Cards.
@@ -735,7 +735,7 @@ for (const vue of [true, false]) {
       writeFile(`models/wildcards/${pack}.yaml`, `${pack}:\n  standing: [standing, "2::hands on hips", arms crossed]\n  sitting: sitting,\n`);
       writeFile(`models/wildcards/cards/${pack}/standing/[0].png`, png(30, 40, [80, 80, 200])); // Where the A1111 Wildcard Gallery's packs keep it.
       const [id] = await addNodes(page, [{ type: "DiceForgeCLIPDualTextEncode", pos: [300, 60], widgets: { positive: "1girl" } }]);
-      page.on("dialog", (dialog) => dialog.accept());
+      await answerQuestions(page);
       await clickMenu(page, id, "DiceForge.Wildcards", "Wildcard Browser");
       const dialog = page.locator(".dfwc");
       if (await dialog.locator("button.mode").textContent() === "🃏 Cards") await dialog.locator("button.mode").click(); // Cards.
@@ -860,7 +860,7 @@ for (const vue of [true, false]) {
       // Your own: the prompts as they are, saved under a name, then put into other prompts, then deleted.
       await setWidget(page, encode, "positive", "{prompt}, film grain");
       await setWidget(page, encode, "negative", "cartoon");
-      page.on("dialog", (dialog) => (dialog.type() === "prompt" ? dialog.accept(`E2E film ${vue}`) : dialog.accept()));
+      await answerQuestions(page, ({ prompt }) => (prompt ? `E2E film ${vue}` : true));
       await click("Save the prompts as a style");
       await expect.poll(items).toContain(`✓ E2E film ${vue}`); // Saved from these prompts: they have it.
       await setWidget(page, encode, "positive", "a cat");

@@ -1,6 +1,6 @@
 import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
-import { addStyleOnce, background, element, fitToContent } from "./dom.js";
+import { addStyleOnce, askConfirm, background, element, fitToContent } from "./dom.js";
 import { fitNodeHeight } from "./node_size.js";
 
 // The cells of Dice Grid's grid under the node, to keep the best ones: click a cell to star it (★), 💾 Save kept puts the starred ones at full size
@@ -63,7 +63,7 @@ app.registerExtension({
       }
     }
     async function openRun(cell) {
-      if (!confirm("Open the workflow of this run (its prompts and seeds), as dropping its image on ComfyUI would?")) return;
+      if (!(await askConfirm("Open the workflow of this run (its prompts and seeds), as dropping its image on ComfyUI would?"))) return;
       const response = await api.fetchApi(`/diceforge/grid/image?${query(node, { file: cell.file, full: "1" })}`);
       if (!response.ok) return say(await response.text());
       const file = new File([await response.blob()], `dice-grid-${cell.file}`, { type: "image/png" });

@@ -1,7 +1,7 @@
 // End-to-end in the browser, the nodes: adding every DiceForge node, the resolution previews, Dice Grid, XY Plot, KSampler presets,
 // Random Image and node heights, in both node designs (Nodes 2.0 and classic), against the real server. Each test builds its own graph.
 const fs = require("fs");
-const { test, expect, basePath, openComfy, addNodes, connect, widgetValue, setWidget, menuItems, queueFromPage, nodeElement } = require("./helpers");
+const { test, expect, basePath, openComfy, addNodes, connect, widgetValue, setWidget, menuItems, queueFromPage, nodeElement, answerQuestions } = require("./helpers");
 const { ALL_NODES, lookUp, submenu, clickSubmenu } = require("./ui-shared");
 const { measure, reloadTall } = require("./qa/lib");
 
@@ -82,7 +82,7 @@ for (const vue of [true, false]) {
       const saved = fs.readFileSync(basePath("output", "DiceForge", "kept", kept.sort().at(-1)));
       expect(saved.includes(Buffer.from("workflow"))).toBe(true); // The run's workflow is in the PNG.
       // ↺ opens that run's workflow, as dropping its image would: the run's two nodes, with that run's color.
-      page.once("dialog", (dialog) => dialog.accept());
+      await answerQuestions(page, undefined, 1);
       await panel.locator(".cell").nth(1).locator("button.open").click();
       // The graph already has these two nodes: wait for the opened run's color (the graph before it had the last run's, 8000000).
       const color = () => page.evaluate(() => window.app.graph.nodes.find((node) => node.comfyClass === "EmptyImage")?.widgets.find((widget) => widget.name === "color").value);
@@ -153,7 +153,7 @@ for (const vue of [true, false]) {
       // Your own: saved from the node's values, then in the menu, then deleted.
       await setWidget(page, sampler, "steps", 21);
       await setWidget(page, sampler, "scheduler", "karras");
-      page.on("dialog", (dialog) => (dialog.type() === "prompt" ? dialog.accept("E2E mine") : dialog.accept()));
+      await answerQuestions(page, ({ prompt }) => (prompt ? "E2E mine" : true));
       await clickSubmenu(page, sampler, "Save current");
       await expect.poll(async () => (await (await request.get("/diceforge/sampler-presets")).json()).user.map((item) => item.name)).toContain("E2E mine");
       await expect.poll(() => submenu(page, sampler)).toContain("★ E2E mine · 21 steps · CFG 6");

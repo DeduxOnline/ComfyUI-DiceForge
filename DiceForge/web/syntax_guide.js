@@ -1,4 +1,4 @@
-import { addStyleOnce, background, element } from "./dom.js";
+import { addStyleOnce, asking, background, element } from "./dom.js";
 import { insertIntoNode } from "./wildcards.js";
 import { keepSize, recall, remember, scrollBack } from "./window_memory.js";
 import { keysButton, keysOnQuestion, slashToSearch } from "./menu.js";
@@ -65,6 +65,7 @@ export function openSyntaxGuide(node) {
   const status = element("div", { class: "status" });
   const back = element("div", { class: "dfsg-back" });
   const onKey = (event) => {
+    if (asking()) return;
     if (event.key === "Escape") {
       event.stopPropagation();
       close();

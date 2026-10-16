@@ -3,7 +3,7 @@ import { api } from "../../scripts/api.js";
 import { openModelInfo } from "./model_info.js";
 import { openModelBrowser, BROWSERS, compareBases } from "./model_browser.js";
 import { fitNodeHeight } from "./node_size.js";
-import { addStyleOnce, background, element, fitToContent } from "./dom.js";
+import { addStyleOnce, askConfirm, asking, askText, background, element, fitToContent } from "./dom.js";
 
 // LoRA Stack (lora_stack.py): the rows of LoRAs drawn in the node, like rgthree's Power Lora Loader. The node's "loras" text input holds them as JSON;
 // it is hidden and this panel edits it. Each row: on/off, the LoRA (click to change it in the LoRA Browser), Model info, a group, a fixed strength or
@@ -115,7 +115,7 @@ async function savePreset(name, stack) {
   try {
     return await presetRequest("/diceforge/lora-presets", body(false));
   } catch (error) {
-    if (error.status !== 409 || !confirm(`A preset named "${name}" already exists. Replace it?`)) throw error;
+    if (error.status !== 409 || !(await askConfirm(`A preset named "${name}" already exists. Replace it?`))) throw error;
     return presetRequest("/diceforge/lora-presets", body(true));
   }
 }
@@ -124,7 +124,7 @@ function openPresets(apply) {
   const list = element("div", { class: "list" });
   const status = element("div", { class: "status" });
   const say = (text) => { status.textContent = text; };
-  const onKey = (event) => { if (event.key === "Escape") { event.stopPropagation(); close(); } };
+  const onKey = (event) => { if (asking()) return; if (event.key === "Escape") { event.stopPropagation(); close(); } };
   function close() { back.remove(); document.removeEventListener("keydown", onKey, true); }
   back.addEventListener("mousedown", (event) => { if (event.target === back) close(); });
   document.addEventListener("keydown", onKey, true);
@@ -146,7 +146,7 @@ function openPresets(apply) {
         setTimeout(() => URL.revokeObjectURL(link.href), 1000);
       } }, "⬇ File"),
       element("button", { title: "Delete this preset", onclick: async () => {
-        if (!confirm(`Delete the preset "${preset.name}"?`)) return;
+        if (!(await askConfirm(`Delete the preset "${preset.name}"?`))) return;
         await presetRequest(`/diceforge/lora-presets?name=${encodeURIComponent(preset.name)}`, { method: "DELETE" });
         say(`Deleted ${preset.name}.`);
         background(draw());
@@ -196,7 +196,7 @@ async function openTriggers(anchor, row, save) {
   const box = element("div", { class: "dflt" });
   const close = () => { box.remove(); document.removeEventListener("pointerdown", outside, true); document.removeEventListener("keydown", onKey, true); openList = null; };
   const outside = (event) => { if (!box.contains(event.target) && event.target !== anchor) close(); };
-  const onKey = (event) => { if (event.key === "Escape") { event.stopPropagation(); close(); } };
+  const onKey = (event) => { if (asking()) return; if (event.key === "Escape") { event.stopPropagation(); close(); } };
   const apply = (nextMode) => { mode = nextMode; save(mode, mode === "custom" ? picked : []); draw(); };
   function draw() {
     const words = [...new Set([...known.user, ...known.civitai, ...extra()])];
@@ -364,7 +364,7 @@ function setUp(node) {
         element("label", { class: "foot muted" }, separate, "Separate CLIP strength"),
         element("span", { style: "flex:1" }),
         element("button", { title: "Save the rows as a preset file, to apply in any LoRA Stack", onclick: async () => {
-          const name = prompt("Preset name:", "");
+          const name = (await askText("Preset name:", ""));
           if (!name) return;
           try { await savePreset(name.trim(), read()); note(`Saved the preset ${name.trim()}.`); } catch (error) { note(error.message); }
         } }, "💾 Save preset"),

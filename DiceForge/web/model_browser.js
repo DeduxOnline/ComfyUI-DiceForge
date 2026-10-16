@@ -4,7 +4,7 @@ import { openModelInfo } from "./model_info.js";
 import { insertIntoNode } from "./wildcards.js";
 import { openCivitaiSearch } from "./civitai.js";
 import { dragSource, dropTarget, pickFolder } from "./move_dialog.js";
-import { addStyleOnce, background, element } from "./dom.js";
+import { addStyleOnce, askConfirm, asking, askText, background, element } from "./dom.js";
 import { blurSwitch, civitaiMedia } from "./media.js";
 import { dateText, statsChips } from "./civitai_meta.js";
 import { keepSize, recall, remember, scrollBack } from "./window_memory.js";
@@ -152,7 +152,7 @@ async function openBrowser(node, spec, target = targetOf(node, spec)) {
   const lookAll = element("button", { title: `Compute the hash of every ${what} not looked up yet and ask Civitai about it, one by one` }, "Look up all on Civitai");
   const back = element("div", { class: "dflb-back" });
   const onKey = (event) => {
-    if (document.querySelector(".dfmi-back, .dfcv-back, .dfmv-back, .dfcmp-back")) return; // A window over the browser has the keys.
+    if (asking() || document.querySelector(".dfmi-back, .dfcv-back, .dfmv-back, .dfcmp-back")) return; // A window over the browser has the keys.
     if (event.key === "Escape") {
       event.stopPropagation();
       if (menuOpen()) closeMenu();
@@ -280,7 +280,7 @@ async function openBrowser(node, spec, target = targetOf(node, spec)) {
     report(`Moved to ${destination || "the top folder"}:`, result);
   }
   async function batchDelete() {
-    if (!confirm(`Delete ${picked.size} ${picked.size === 1 ? what : spec.plural}, with their previews and info? (↶ Undo brings them back until ComfyUI restarts.)`)) return;
+    if (!(await askConfirm(`Delete ${picked.size} ${picked.size === 1 ? what : spec.plural}, with their previews and info? (↶ Undo brings them back until ComfyUI restarts.)`))) return;
     const undo = [];
     const result = await eachPicked("Deleting", async (file) => {
       const deleted = await call(`/diceforge/models/file?kind=${kind}&file=${encodeURIComponent(file)}`, { method: "DELETE" });
@@ -417,7 +417,7 @@ async function openBrowser(node, spec, target = targetOf(node, spec)) {
       ["Newer version", (entry) => entry.newer?.name ?? "—"], ["Civitai", (entry) => (entry.checked ? (entry.found ? "found" : "not on Civitai") : "not looked up")]];
     const backdrop = element("div", { class: "dfcmp-back" });
     const shut = () => { backdrop.remove(); document.removeEventListener("keydown", onCompareKey, true); };
-    const onCompareKey = (event) => { if (event.key === "Escape") { event.stopPropagation(); shut(); } };
+    const onCompareKey = (event) => { if (asking()) return; if (event.key === "Escape") { event.stopPropagation(); shut(); } };
     backdrop.addEventListener("mousedown", (event) => { if (event.target === backdrop) shut(); });
     document.addEventListener("keydown", onCompareKey, true);
     backdrop.append(element("div", { class: "dfcmp" },
@@ -514,7 +514,7 @@ async function openBrowser(node, spec, target = targetOf(node, spec)) {
     say(`${moved ? "Moved" : "Renamed"} ${file} to ${result.to}. Workflows that use the old name need the new one.`, () => renameTo(result.to, file, moved));
   }
   async function renameFile(entry) {
-    const to = prompt(`New name for ${entry.file} (the extension stays; folders with /):`, entry.file.replace(/\.[^./\\]+$/, ""))?.trim();
+    const to = (await askText(`New name for ${entry.file} (the extension stays; folders with /):`, entry.file.replace(/\.[^./\\]+$/, "")))?.trim();
     if (to) await renameTo(entry.file, to, false);
   }
   function allFolders() {
@@ -529,7 +529,7 @@ async function openBrowser(node, spec, target = targetOf(node, spec)) {
     await renameTo(entry.file, `${destination ? `${destination}/` : ""}${pathParts(entry.file).pop()}`, true);
   }
   async function deleteFile(entry) {
-    if (!confirm(`Delete ${entry.file}, its preview and its info? (↶ Undo brings it back until ComfyUI restarts.)`)) return;
+    if (!(await askConfirm(`Delete ${entry.file}, its preview and its info? (↶ Undo brings it back until ComfyUI restarts.)`))) return;
     const response = await api.fetchApi(`/diceforge/models/file?kind=${kind}&file=${encodeURIComponent(entry.file)}`, { method: "DELETE" });
     if (!response.ok) return say(await response.text());
     const { undo } = await response.json();

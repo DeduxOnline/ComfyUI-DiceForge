@@ -2,7 +2,7 @@
 // downloads, moving, favorites, batch actions) and LoRA Stack, in both node designs (Nodes 2.0 and classic), against the real server.
 // Each test builds its own graph.
 const fs = require("fs");
-const { test, expect, basePath, writeFile, openComfy, addNodes, connect, widgetValue, menuItems, clickMenu } = require("./helpers");
+const { test, expect, basePath, writeFile, openComfy, addNodes, connect, widgetValue, menuItems, clickMenu, answerQuestions } = require("./helpers");
 const { DOWNLOADS } = require("./fixtures");
 const { lookUp, cardTitles } = require("./ui-shared");
 
@@ -213,7 +213,7 @@ for (const vue of [true, false]) {
         await card("batchy_a").locator(".title").click();
         await bar.locator(".pick-all").click(); // Every card shown by the search.
         await expect(bar.locator(".count")).toHaveText("3 LoRAs picked");
-        page.once("dialog", (dialog) => dialog.accept());
+        await answerQuestions(page, undefined, 1);
         await bar.locator(".batch-delete").click();
         await expect(page.locator(".dflb .status")).toContainText("Deleted 3 LoRAs.");
         expect(fs.existsSync(loras(top))).toBe(false);
@@ -229,7 +229,7 @@ for (const vue of [true, false]) {
       try {
         for (const name of ["a", "b"]) expect((await lookUp(request, "loras", `${top}/${name}.safetensors`)).ok()).toBe(true); // Hashed (not on Civitai).
         const [loader] = await addNodes(page, [{ type: "LoraLoader" }]);
-        page.on("dialog", (dialog) => (dialog.type() === "prompt" ? dialog.accept(`${top}/c2`) : dialog.accept()));
+        await answerQuestions(page, ({ prompt }) => (prompt ? `${top}/c2` : true));
         await clickMenu(page, loader, "DiceForge.ModelBrowser", "LoRA Browser");
         const browser = page.locator(".dflb"), card = (name) => browser.locator(".card").filter({ has: page.locator(".muted", { hasText: `${top}/${name}.safetensors ·` }) }), status = browser.locator(".status");
         await browser.locator(".top input").first().fill(top);
@@ -372,7 +372,7 @@ for (const vue of [true, false]) {
       await expect(card.locator("img")).toHaveJSProperty("naturalWidth", 8); // Its preview was saved with it.
       await expect.poll(() => page.evaluate((id) => window.app.graph.getNodeById(id).widgets.find((widget) => widget.name === "lora_name").options.values.join("|"), loader))
         .toContain("neon_glow_v1.safetensors"); // Load LoRA's list has it without a restart.
-      page.on("dialog", (prompt) => (prompt.type() === "confirm" ? prompt.accept() : prompt.accept(`${folder}_moved/neon`)));
+      await answerQuestions(page, ({ prompt }) => (prompt ? `${folder}_moved/neon` : true));
       await card.locator("button.rename").click();
       await expect(page.locator(".dflb .status")).toContainText(`to ${folder}_moved/neon.safetensors`);
       expect(fs.existsSync(loras(folder))).toBe(false);
@@ -418,7 +418,7 @@ for (const vue of [true, false]) {
       const card = page.locator(".dflb .card", { hasText: "Studio XL - v1" });
       await card.locator("button", { hasText: /^Use$/ }).click();
       await expect.poll(() => widgetValue(page, loader, "ckpt_name")).toMatch(new RegExp(`${folder}[\\\\/]studio_xl\\.safetensors`));
-      page.on("dialog", (prompt) => prompt.accept());
+      await answerQuestions(page);
       await card.locator("button.delete").click();
       await expect(page.locator(".dflb .status")).toContainText(`Deleted ${folder}/studio_xl.safetensors`);
       expect(fs.existsSync(checkpoints(folder))).toBe(false);
@@ -575,7 +575,7 @@ for (const vue of [true, false]) {
       expect(rows.map((row) => [row.lora.replace(/\\/g, "/"), !!row.random, row.group ?? ""])).toEqual([["style/ink.safetensors", true, ""], ["style/pony_glow.safetensors", false, "A"], ["style/flux_film.safetensors", false, "A"]]);
       expect(rows[0]).toMatchObject({ triggers: "custom", trigger_words: ["ink style"] });
       // Presets: save from this stack, apply in the other one.
-      page.once("dialog", (dialog) => dialog.accept(`e2e preset ${vue ? "vue" : "classic"}`));
+      await answerQuestions(page, () => `e2e preset ${vue ? "vue" : "classic"}`, 1);
       await panel.locator("button", { hasText: "Save preset" }).click();
       await expect(panel).toContainText("Saved the preset");
       await page.locator(".dfls").nth(1).locator("button", { hasText: "Presets" }).click();
