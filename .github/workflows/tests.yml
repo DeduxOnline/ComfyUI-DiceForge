@@ -86,9 +86,39 @@ jobs:
         if: ${{ env.SONAR_TOKEN != '' }}
         run: python .github/scripts/sonar_summary.py
 
+  # Whether the end-to-end tests have something to test: a push or pull request that changes only the docs, the unit tests or the agents
+  # leaves them out. The node pack, the e2e tests and this workflow count; the weekly, manual and release runs always have them.
+  changes:
+    name: What changed
+    runs-on: ubuntu-latest
+    outputs:
+      e2e: ${{ steps.diff.outputs.e2e }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Changes the end-to-end tests cover
+        id: diff
+        env:
+          EVENT: ${{ github.event_name }}
+          BEFORE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          # A new branch or a tag has no commit before it (all zeros): everything counts.
+          if [[ "$EVENT" != push && "$EVENT" != pull_request ]] || ! git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+            echo "e2e=true" >> "$GITHUB_OUTPUT"
+          elif git diff --name-only "$BEFORE" HEAD | grep -qE '^(DiceForge/|e2e/|\.github/workflows/tests\.yml$)'; then
+            echo "e2e=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "e2e=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::No change to DiceForge/, e2e/ or this workflow: the end-to-end tests are left out."
+          fi
+
   e2e:
     # Five jobs at once, each with its own ComfyUI server (the tests of one server share its files and memory, so they run one at a time).
     name: End-to-end tests (${{ matrix.group }})
+    needs: changes
+    if: ${{ needs.changes.outputs.e2e == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     strategy:

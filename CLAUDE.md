@@ -26,7 +26,8 @@ section describes the tests, the agents and the release.
 5. Commit to `main` with a message that says what changed for users. Keep the `Co-Authored-By` trailer Claude Code adds. Push to `main`.
 6. Check CI on GitHub (the Tests workflow), and fix it until it is green.
    - **Unit tests and SonarQube Cloud:** a failed Quality Gate fails the run.
-   - **Five end-to-end jobs.**
+   - **Five end-to-end jobs,** left out when a push changes nothing in `DiceForge/`, `e2e/` or `tests.yml` (the `changes` job).
+   - The repository is public (since 2026-10-18), so Actions minutes are free; it was private before and ran out of them.
 
 ## Checks
 
@@ -106,7 +107,7 @@ Development → Agents).
 - **Git keeps each file's line endings as they are** in this repository (`git config core.autocrlf false`): Git for Windows would otherwise
   convert them and show files as changed. In Git Bash, `sed -i` turns a CRLF file into LF: edit with a Python script that reads and
   writes with `newline=""`.
-- **CI from here:** the repository is private, and `gh` may not be on the PATH: `"C:\Program Files\GitHub CLI\gh.exe" run list`,
+- **CI from here:** `gh` may not be on the PATH: `"C:\Program Files\GitHub CLI\gh.exe" run list`,
   `run view <id> --log-failed`, `run view --job <id> --log`.
 
 ## Where the work stands (October 2026)
