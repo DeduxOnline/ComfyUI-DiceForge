@@ -57,6 +57,10 @@ async def json_body(request):
     if not isinstance(body, dict):
         raise web.HTTPBadRequest(text="DiceForge: the request body must be a JSON object.")
     return body
+# A route's work with files (reading, writing, listing folders), in a thread: on ComfyUI's event loop it would hold up every other request and
+# the progress of a run meanwhile (Sonar S7493). The handler reads what the request sends; the rest goes through here.
+async def in_thread(function, *args):
+    return await asyncio.get_running_loop().run_in_executor(None, function, *args)
 def write_info(kind, name, info):
     path = info_file(kind, name)
     os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -149,7 +153,8 @@ async def civitai_lookup(sha256):
     except Exception as error:
         logging.warning(f"[DiceForge] Model info: Civitai lookup failed: {error}")
         return {"found": False, "error": str(error), "checked": time.time()}
-async def model_info(kind, name, refresh=False):
+# The model file and what is known about it; a new or changed file starts over (its hash and Civitai data), yours stays.
+def stored_info(kind, name):
     if kind not in KINDS:
         raise web.HTTPBadRequest(text=f"Model info: unknown kind {kind}.")
     path = folder_paths.get_full_path(kind, name)
@@ -157,11 +162,14 @@ async def model_info(kind, name, refresh=False):
         raise web.HTTPNotFound(text=f"Model info: {name} is not in the {kind} folders.")
     stat = os.stat(path)
     info = read_info(kind, name)
-    if info.get("size") != stat.st_size or info.get("mtime") != stat.st_mtime: # A new or changed file: its hash and Civitai data start over.
-        info = {"user": info.get("user", {}), "favorite": info.get("favorite") is True, "size": stat.st_size, "mtime": stat.st_mtime} # Yours stays.
+    if info.get("size") != stat.st_size or info.get("mtime") != stat.st_mtime:
+        info = {"user": info.get("user", {}), "favorite": info.get("favorite") is True, "size": stat.st_size, "mtime": stat.st_mtime}
+    return path, info
+async def model_info(kind, name, refresh=False):
+    path, info = await in_thread(stored_info, kind, name)
     if not info.get("sha256"):
         started = time.time()
-        info["sha256"] = await asyncio.get_running_loop().run_in_executor(None, sha256_of, path) # Off the event loop: big files take a while.
+        info["sha256"] = await in_thread(sha256_of, path) # Big files take a while.
         logging.info(f"[DiceForge] Model info: sha256 of {name} in {time.time() - started:.1f}s")
     civitai = info.get("civitai") or {}
     if refresh or not civitai or civitai.get("error"):
@@ -169,8 +177,18 @@ async def model_info(kind, name, refresh=False):
     elif civitai.get("found") and not civitai.get("details_checked"): # The model's details (tags, stats) failed last time: only those again.
         async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=30), trust_env=True) as session:
             info["civitai"] = {**civitai, **await civitai_model_details(session, civitai.get("model_id"))}
-    write_info(kind, name, info)
+    await in_thread(write_info, kind, name, info)
     return {"kind": kind, "file": name, **info}
+def local_preview_of(kind, name):
+    path = folder_paths.get_full_path(kind, name) if kind in KINDS else None
+    return path and local_preview(path, set(os.listdir(os.path.dirname(path))))
+# A model's own fields saved into its info file (the favorite flag, your notes): its name checked against the model folders first.
+def update_info(kind, name, change):
+    if kind not in KINDS or not isinstance(name, str) or not name or not folder_paths.get_full_path(kind, name):
+        raise web.HTTPNotFound(text="Model info: unknown model.")
+    info = read_info(kind, name)
+    change(info)
+    write_info(kind, name, info)
 # Model browser (web/model_browser.js): every file of a model kind with what is already known about it, without hashing anything; the dialog looks
 # files up one by one with /diceforge/model-info. A local preview next to the file (name.preview.png, name.png... as Civitai Helper and LoRA Manager
 # save them) is shown first, else the first Civitai image.
@@ -242,13 +260,11 @@ def register_routes():
     @routes.get("/diceforge/model-browser")
     async def get_model_list(request):
         kind = request.rel_url.query.get("kind", "")
-        return web.json_response(await asyncio.get_running_loop().run_in_executor(None, model_list, kind))
+        return web.json_response(await in_thread(model_list, kind))
     @routes.get("/diceforge/model-preview")
     async def get_model_preview(request):
         query = request.rel_url.query
-        kind, name = query.get("kind", ""), query.get("file", "")
-        path = folder_paths.get_full_path(kind, name) if kind in KINDS else None
-        preview = path and local_preview(path, set(os.listdir(os.path.dirname(path))))
+        preview = await in_thread(local_preview_of, query.get("kind", ""), query.get("file", ""))
         if not preview:
             raise web.HTTPNotFound(text="Model browser: no local preview.")
         return web.FileResponse(preview, headers={"Cache-Control": "max-age=300"})
@@ -257,24 +273,17 @@ def register_routes():
     async def save_model_favorite(request):
         body = await json_body(request)
         kind, name, favorite = body.get("kind", ""), body.get("file", ""), body.get("favorite")
-        if kind not in KINDS or not isinstance(name, str) or not name or not folder_paths.get_full_path(kind, name):
-            raise web.HTTPNotFound(text="Model info: unknown model.")
         if not isinstance(favorite, bool):
             raise web.HTTPBadRequest(text="Model info: favorite must be true or false.")
-        info = read_info(kind, name)
-        info["favorite"] = favorite
-        write_info(kind, name, info)
+        await in_thread(update_info, kind, name, lambda info: info.update(favorite=favorite))
         return web.json_response({"file": name, "favorite": favorite})
     @routes.post("/diceforge/model-info")
     async def save_model_info(request):
         body = await json_body(request)
         kind, name, user = body.get("kind", ""), body.get("file", ""), body.get("user") or {}
-        if kind not in KINDS or not isinstance(name, str) or not folder_paths.get_full_path(kind, name):
-            raise web.HTTPNotFound(text="Model info: unknown model.")
         if not isinstance(user, dict):
             raise web.HTTPBadRequest(text="Model info: user must be an object of fields.")
-        info = read_info(kind, name)
-        info["user"] = {key: str(value)[:10000] for key, value in user.items() if key in USER_FIELDS}
-        write_info(kind, name, info)
+        fields = {key: str(value)[:10000] for key, value in user.items() if key in USER_FIELDS}
+        await in_thread(update_info, kind, name, lambda info: info.update(user=fields))
         return web.json_response({"saved": True})
 register_routes()

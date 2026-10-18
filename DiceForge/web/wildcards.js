@@ -392,15 +392,6 @@ async function openBrowser(node) {
   // + next to a line's number puts that line in the prompt (without its 3:: weight), where the cursor was in the node's fields.
   const lineAdd = element("button", { class: "line-add", hidden: true, title: "Add this line to the prompt" }, "+");
   code.append(lineAdd);
-  // A line's option: in a yaml file, the text after "key:" or "- ", without its quotes (a key of keys, or a [list] on one line, has none).
-  function yamlOption(line) {
-    const text = line.trim(), colon = text.indexOf(":");
-    let value = "";
-    if (/^-\s/.test(text)) value = text.slice(1).trim();
-    else if (!text.startsWith("#") && colon > 0 && /\s/.test(text[colon + 1] ?? "")) value = text.slice(colon + 1).trim();
-    if (/^[[{]/.test(value)) return "";
-    return /^(["']).*\1$/.test(value) ? value.slice(1, -1) : value;
-  }
   const lineText = (index) => {
     const line = editor.value.split("\n")[index] ?? "";
     return (selectedYaml ? yamlOption(line) : line).trim().replace(/^\d+(?:\.\d+)?::/, "").trim();
@@ -1016,7 +1007,7 @@ async function openBrowser(node) {
     if (!line) return say(`The ${field} prompt is empty: nothing to add.`);
     const lines = editor.value.split("\n");
     if (lines.some((item) => item.trim() === line)) return say(`${name} already has the ${field} prompt as a line.`);
-    editor.value = editor.value.trim() ? `${editor.value.trimEnd()}\n${line}` : line;
+    editor.value = editor.value.trim() ? `${withoutTrailingNewlines(editor.value)}\n${line}` : line;
     numberLines();
     showDirty();
     editor.scrollTop = editor.scrollHeight;
@@ -1276,9 +1267,30 @@ export function cleanLines(text, sort) {
   return { text: [...head, ...body].join("\n"), duplicates, empty };
 }
 
-// A text as one line: its lines trimmed and joined with a space, empty ones left out (no regular expression that could backtrack).
-function oneLine(text) {
+// Text helpers of the Wildcard Browser and ✂ Selection → new wildcard, without regular expressions that could backtrack on a long text
+// (tests/test_frontend_text.py checks them against the expressions they replace).
+// A text as one line: its lines trimmed and joined with a space, empty ones left out.
+export function oneLine(text) {
   return text.split("\n").map((line) => line.trim()).filter(Boolean).join(" ");
+}
+// A text without the line breaks at its end (the spaces of its last line stay).
+export function withoutTrailingNewlines(text) {
+  let end = text.length;
+  while (end > 0 && text[end - 1] === "\n") end--;
+  return text.slice(0, end);
+}
+// A line's option in a yaml file: the text after "key:" or "- ", without its quotes (a key of keys, or a [list] on one line, has none).
+export function yamlOption(line) {
+  const text = line.trim(), colon = text.indexOf(":");
+  let value = "";
+  if (/^-\s/.test(text)) value = text.slice(1).trim();
+  else if (!text.startsWith("#") && colon > 0 && /\s/.test(text[colon + 1] ?? "")) value = text.slice(colon + 1).trim();
+  if (/^[[{]/.test(value)) return "";
+  return /^(["']).*\1$/.test(value) ? value.slice(1, -1) : value;
+}
+// The name ✂ Selection → new wildcard proposes: the first three words of the selection, joined with _.
+export function suggestedName(line) {
+  return line.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean).slice(0, 3).join("_") || "new";
 }
 // A message in ComfyUI's corner (a dialog where there is none, for what went wrong).
 export function toast(severity, detail) {
@@ -1295,7 +1307,7 @@ async function selectionToWildcard(node) {
   const start = cursor?.start ?? 0, end = cursor?.end ?? 0, picked = text.slice(start, end);
   if (!cursor || !picked.trim()) return toast("warn", "Select a part of a prompt first: it becomes the new wildcard's first line, and __name__ takes its place.");
   const line = oneLine(picked);
-  const suggested = line.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean).slice(0, 3).join("_") || "new";
+  const suggested = suggestedName(line);
   const quoted = line.length > 60 ? `${line.slice(0, 60)}…` : line;
   const name = (await askText(`A wildcard from “${quoted}”: its name (folders with /, for example outfit/dress):`, suggested))?.trim();
   if (!name) return;

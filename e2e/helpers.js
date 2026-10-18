@@ -4,13 +4,14 @@ const path = require("path");
 const { test: base, expect } = require("@playwright/test");
 const { BASE } = require("./settings");
 
-// Every test fails on an uncaught error in the page (a broken frontend extension).
+// Every test fails on an uncaught error in the page (a broken frontend extension), and on a DiceForge question it failed to answer.
 const test = base.extend({
   pageErrors: [async ({ page }, use) => {
     const errors = [];
     page.on("pageerror", (error) => errors.push(error.message));
     await use(errors);
     expect(errors, "errors in the page").toEqual([]);
+    expect(watchers.get(page)?.failures ?? [], "DiceForge questions not answered").toEqual([]);
   }, { auto: true }],
 });
 
@@ -118,26 +119,41 @@ const nodeElement = (page, id) => page.locator(`[data-node-id="${id}"]`);
 // The DiceForge questions (ComfyUI's dialogs titled DiceForge) answered as they show: answer({ prompt, text }) gives true to confirm, false to
 // cancel, or the text to type in a prompt (true keeps its proposed text). times: how many to answer (all by default). It watches in the
 // background, not as a locator handler: a handler only runs before a locator action or assertion, so a question raised by a node menu's
-// callback and followed by expect.poll would never be answered. It stops when the page closes.
+// callback and followed by expect.poll would never be answered. One watcher per page: a later call gives it new answers and a new count, so
+// two can't race for the same question. An answer that fails (a button renamed, an answer function that throws) is logged at once and fails
+// the test at its end (pageErrors), instead of leaving the question open without a word. It stops when the page closes.
+const watchers = new WeakMap(); // page -> { answer, left, failures }
 async function answerQuestions(page, answer = () => true, times = Infinity) {
+  const known = watchers.get(page);
+  if (known && !known.stopped) return void Object.assign(known, { answer, left: times });
+  const state = { answer, left: times, failures: known?.failures ?? [], stopped: false };
+  watchers.set(page, state);
   const question = page.locator('[role="dialog"]').filter({ has: page.locator("h2", { hasText: /^DiceForge$/ }) }).first();
   const reply = async (dialog) => {
     const field = dialog.locator("input");
     const prompt = (await field.count()) > 0;
-    const given = await answer({ prompt, text: await dialog.innerText() });
+    const given = await state.answer({ prompt, text: await dialog.innerText() });
     if (given === false || given == null) return dialog.getByRole("button", { name: prompt ? "Close" : "Cancel" }).click();
     if (typeof given === "string") await field.fill(given);
     await dialog.getByRole("button", { name: "Confirm" }).click();
   };
   const watch = async () => {
-    for (let left = times; left > 0; left--) {
+    for (;;) {
       await question.waitFor({ state: "visible", timeout: 0 });
       const shown = await question.elementHandle();
-      await reply(question);
+      if (state.left > 0) { // Past its count, a question is left to the test.
+        state.left--;
+        await reply(question);
+      }
       await shown?.waitForElementState("hidden"); // Gone (or hidden) before the next question is looked for.
     }
   };
-  watch().catch(() => {}); // The page closed at the end of the test.
+  watch().catch((error) => {
+    state.stopped = true; // The next call starts a new watcher.
+    if (page.isClosed()) return; // The end of the test.
+    state.failures.push(error.message);
+    console.error(`[e2e] A DiceForge question was not answered: ${error.message}`);
+  });
 }
 
 module.exports = { test, expect, runPrompt, shown, basePath, writeFile, openComfy, addNodes, connect, widgetValue, setWidget, menuItems, clickMenu, queueFromPage, nodeElement, answerQuestions };

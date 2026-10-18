@@ -39,12 +39,16 @@ section describes the tests, the agents and the release.
   - `random` outside the seeded places listed in `sonar-project.properties` (S2245): use `secrets`;
   - template literals nested in `${...}` (S4624);
   - functions harder to follow than about 15 (S3776);
-  - a blocking `open()` in an `async` route handler (S7493, counted as a bug: it fails the reliability condition): read and write files
-    through `run_in_executor`, as the other routes do;
+  - a blocking `open()` in an `async` route handler (S7493, counted as a bug: it fails the reliability condition). Every route does its
+    file work (reading, writing, listing, `wildcard_index`) through `in_thread` (`model_info.py`), also when it is a call away, which
+    Sonar misses; `tests/test_event_loop.py` fails on a file touched on the event loop;
   - regular expressions that can backtrack (S8786).
-- **The end-to-end tests answer DiceForge's questions with `answerQuestions`** (`e2e/helpers.js`), a Playwright locator handler. It only runs
-  before a locator action or a locator assertion: a question raised by a `page.evaluate` (a menu callback) and followed only by
-  `expect.poll` is never answered, and the test times out.
+- **The end-to-end tests answer DiceForge's questions with `answerQuestions`** (`e2e/helpers.js`): call it before the question is asked.
+  It watches the page in the background (one watcher per page; a later call gives it new answers), because a Playwright locator handler
+  only runs before a locator action, and a question from a node menu followed by `expect.poll` was never answered. An answer that fails
+  fails the test at its end.
+- **Wait for a state, never read it once:** `locator.textContent()` returns what is there now (an empty label while a window still loads);
+  `expect(...).toHaveText` waits. `wildcardMode` (`e2e/ui-shared.js`) switches the Wildcard Browser's mode that way.
 
 ## Code
 
@@ -58,7 +62,7 @@ section describes the tests, the agents and the release.
   - `window_memory.js`: what windows remember, their size;
   - `node_size.js`: node heights;
   - `move_dialog.js`: the folder picker and drag and drop onto a tree; `media.js`: Civitai pictures and videos, Blur NSFW;
-  - `http_read.py`, `model_lists.py`; `model_info.json_body` for every POST body.
+  - `http_read.py`, `model_lists.py`; `model_info.json_body` for every POST body, `model_info.in_thread` for a route's file work.
 - **Where things are:**
   - `seed_modes.py`: the pickers every random node uses, and the seed memory (SQLite in `user/DiceForge`). Every mode gives the same result
     for the same seed.
@@ -116,12 +120,7 @@ Update this section as the steps get done, and remove it when they all are.
 
 - **Done:** every node and window; unit and end-to-end tests in both designs, the ComfyUI contract and the old-workflow tests; the agents;
   every node id starting with `DiceForge` (`tests/test_node_ids.py` keeps it so).
-- **CI is red on `main` since 2026-10-16.** The last run (`28cd3dd`, the questions in ComfyUI's dialogs) fails on these; fix them first:
-  - 10 end-to-end tests whose question comes from a node menu, not a window: ✂ Selection → new wildcard, Wildcard Note's save, Prompt
-    styles and KSampler presets (saving), Dice Grid (↺ a cell's run). Their `answerQuestions` never runs (see Checks).
-  - Sonar's Quality Gate: S7493 in `read_yaml_file` (`wildcards_api.py`, `GET /diceforge/wildcards/yaml`); and seven S8786 regular
-    expressions in `wildcards.js`.
-  - The README's *On GitHub* says four end-to-end jobs; there are five.
+- **CI is green on `main` again since 2026-10-18** (`8e1f7c7`), after being red from 2026-10-16.
 - **Next, in this order:**
   1. **A full pass of the agents:** `tester`, `security`, `perf` (also `--scale 3`), `docs`, `comfy-watcher` against ComfyUI master. Then fix
      what they find. Known already: adding 100 nodes takes about 3 s in Nodes 2.0 and 0.6 s in the classic canvas.

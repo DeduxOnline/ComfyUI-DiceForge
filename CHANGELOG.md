@@ -63,6 +63,8 @@ nodes and features, a patch for fixes. Each version is a [release on GitHub](htt
   a node with a text field, which grows with it, keeps a height the user gave it.
 - Wildcard Browser: the tree takes a third of the window, the editor (or the cards) two thirds.
 - Tag Browser: ↗ opens the tag's wiki page instead of its posts: on e621 for the tags of an e621 list, on Danbooru otherwise.
+- CI: the end-to-end tests run when a change can affect them (the node pack, the end-to-end tests or the test workflow); a change to the
+  docs, the unit tests or the agents runs the unit tests alone. The weekly, manual and release runs always have them.
 
 ### Removed
 - The repairs of workflows and files of earlier versions, while DiceForge has no users but its author: SDXL Resolution List's old scale
@@ -72,6 +74,10 @@ nodes and features, a patch for fixes. Each version is a [release on GitHub](htt
   section on updating from it).
 
 ### Fixed
+- ComfyUI keeps answering while DiceForge's windows read and write files: the Wildcard Browser (its list, files, yaml files, pictures,
+  renames, deletes), Model info, the model browsers' previews and favorites, LoRA Stack presets, Dice Grid's cells and the Civitai key do
+  their file work beside the server instead of in it, so a big wildcard collection no longer holds up other requests and the progress of a
+  run.
 - The questions of DiceForge's windows (a name, a confirmation) are ComfyUI's own dialogs instead of the browser's: they work in ComfyUI
   Desktop (which has no prompt()) and in browsers that don't show the browser's own, where → yaml, delete, rename and new file did nothing.
 - Wildcard Browser: opening another file asks before the open file's unsaved changes are dropped.

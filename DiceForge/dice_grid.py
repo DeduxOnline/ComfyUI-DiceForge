@@ -13,7 +13,7 @@ from PIL import Image, ImageDraw, ImageFont
 from PIL.PngImagePlugin import PngInfo
 from typing_extensions import override
 from comfy_api.latest import ComfyExtension, io, ui
-from .model_info import json_body
+from .model_info import in_thread, json_body
 # Dice Grid collects one image per run (the runs of a DiceForge series) and lays them out in a labeled grid. The cells are kept as small PNG files
 # in the ComfyUI user folder between runs, not in RAM, so a grid survives a restart. Finished grids are saved to the output folder.
 GRID_FOLDER = os.path.join(folder_paths.get_user_directory(), "DiceForge", "grids")
@@ -292,6 +292,28 @@ def save_kept(store):
         shutil.copyfile(source, os.path.join(folder, file)) # The PNG as made: its workflow and prompt stay in it.
         saved.append(f"{subfolder}/{file}" if subfolder else file)
     return saved
+# What the routes below do with a grid's files, in a thread (in_thread).
+def grid_listing(query):
+    store = store_of(query)
+    cells = [{**cell, "full": os.path.isfile(os.path.join(store.folder, full_name(cell["file"])))} for cell in store.state["cells"]]
+    return {"cells": cells, "done": store.state["done"]}
+def cell_image(query):
+    store, file = store_of(query), query.get("file", "")
+    if not CELL_FILE.fullmatch(file) or store.cell(file) is None:
+        raise web.HTTPNotFound(text="Dice Grid: no such cell.")
+    path = os.path.join(store.folder, full_name(file) if query.get("full") == "1" else file)
+    if not os.path.isfile(path):
+        raise web.HTTPNotFound(text="Dice Grid: that image is gone.")
+    return path
+def keep_cells(body):
+    store, kept = store_of(body), body.get("kept")
+    files = body.get("files") if isinstance(body.get("files"), list) else [body.get("file")]
+    if not isinstance(kept, bool) or not files or not all(isinstance(file, str) and store.cell(file) for file in files):
+        raise web.HTTPBadRequest(text="Dice Grid: keep needs the cells (file or files) and kept true or false.")
+    for file in files:
+        store.cell(file)["kept"] = kept
+    store.save()
+    return {"kept": [cell["file"] for cell in store.state["cells"] if cell["kept"]]}
 def register_routes():
     try:
         from server import PromptServer
@@ -300,35 +322,18 @@ def register_routes():
         return
     @routes.get("/diceforge/grid")
     async def grid_cells(request):
-        store = store_of(request.rel_url.query)
-        cells = [{**cell, "full": os.path.isfile(os.path.join(store.folder, full_name(cell["file"])))} for cell in store.state["cells"]]
-        return web.json_response({"cells": cells, "done": store.state["done"]})
+        return web.json_response(await in_thread(grid_listing, dict(request.rel_url.query)))
     @routes.get("/diceforge/grid/image")
     async def grid_image(request):
-        query = request.rel_url.query
-        store, file = store_of(query), query.get("file", "")
-        if not CELL_FILE.fullmatch(file) or store.cell(file) is None:
-            raise web.HTTPNotFound(text="Dice Grid: no such cell.")
-        path = os.path.join(store.folder, full_name(file) if query.get("full") == "1" else file)
-        if not os.path.isfile(path):
-            raise web.HTTPNotFound(text="Dice Grid: that image is gone.")
-        return web.FileResponse(path, headers={"Cache-Control": "no-cache"})
+        return web.FileResponse(await in_thread(cell_image, dict(request.rel_url.query)), headers={"Cache-Control": "no-cache"})
     @routes.post("/diceforge/grid/keep")
     async def grid_keep(request):
-        body = await json_body(request)
-        store, kept = store_of(body), body.get("kept")
-        files = body.get("files") if isinstance(body.get("files"), list) else [body.get("file")]
-        if not isinstance(kept, bool) or not files or not all(isinstance(file, str) and store.cell(file) for file in files):
-            raise web.HTTPBadRequest(text="Dice Grid: keep needs the cells (file or files) and kept true or false.")
-        for file in files:
-            store.cell(file)["kept"] = kept
-        store.save()
-        return web.json_response({"kept": [cell["file"] for cell in store.state["cells"] if cell["kept"]]})
+        return web.json_response(await in_thread(keep_cells, await json_body(request)))
     @routes.post("/diceforge/grid/save")
     async def grid_save(request):
-        store = store_of(await json_body(request))
+        body = await json_body(request)
         try:
-            saved = save_kept(store)
+            saved = await in_thread(lambda: save_kept(store_of(body)))
         except OSError as error:
             raise web.HTTPBadRequest(text=f"Dice Grid: can't save the kept images: {error.strerror or error}.") from None
         if not saved:

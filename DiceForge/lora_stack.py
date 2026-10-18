@@ -1,4 +1,3 @@
-import asyncio
 import itertools
 import json
 import logging
@@ -11,7 +10,7 @@ import folder_paths
 from aiohttp import web
 from typing_extensions import override
 from comfy_api.latest import ComfyExtension, io
-from .model_info import KINDS, json_body, read_info, info_file
+from .model_info import KINDS, in_thread, json_body, read_info, info_file
 from .seed_modes import MEMORY, SEED_MODES, make_picker, pick_index, seed_mode_tooltip
 # LoRA Stack: several LoRAs in one node, like rgthree's Power Lora Loader, with the DiceForge seed modes. The rows live in the "loras" input as JSON,
 # edited by the frontend (web/lora_stack.js):
@@ -211,6 +210,9 @@ def write_preset(path, stack):
     os.makedirs(PRESET_FOLDER, exist_ok=True)
     with open(path, "w", encoding="utf-8") as handle:
         json.dump({"type": "DiceForge LoRA Stack preset", "version": 1, "stack": stack}, handle, ensure_ascii=False, indent=1)
+def remove_preset(path):
+    if os.path.isfile(path):
+        os.remove(path)
 def register_routes():
     try:
         from server import PromptServer
@@ -219,14 +221,14 @@ def register_routes():
         return
     @routes.get("/diceforge/lora-presets")
     async def get_presets(request):
-        return web.json_response({"folder": PRESET_FOLDER, "presets": list_presets()})
+        return web.json_response({"folder": PRESET_FOLDER, "presets": await in_thread(list_presets)})
     @routes.get("/diceforge/lora-presets/file")
     async def get_preset(request):
         name, path = preset_path(request.rel_url.query.get("name"))
-        if not os.path.isfile(path):
-            raise web.HTTPNotFound(text=f"LoRA Stack: no preset {name}.")
         try:
-            data = await asyncio.get_running_loop().run_in_executor(None, read_json, path) # Off the event loop: the server keeps answering.
+            data = await in_thread(read_json, path)
+        except OSError: # Not there (or not a file).
+            raise web.HTTPNotFound(text=f"LoRA Stack: no preset {name}.") from None
         except ValueError as error:
             raise web.HTTPBadRequest(text=f"LoRA Stack: preset {name} is damaged, it is not valid JSON ({error}).") from None
         return web.json_response({"name": name, "stack": preset_stack(data)})
@@ -235,31 +237,30 @@ def register_routes():
         body = await json_body(request)
         name, path = preset_path(body.get("name"))
         stack = preset_stack(body.get("stack")) # Checked before anything is written.
-        if os.path.isfile(path) and not body.get("overwrite"):
+        if await in_thread(os.path.isfile, path) and not body.get("overwrite"):
             raise web.HTTPConflict(text=f"LoRA Stack: a preset named {name} already exists.")
         try:
-            await asyncio.get_running_loop().run_in_executor(None, write_preset, path, stack)
+            await in_thread(write_preset, path, stack)
         except OSError as error:
             raise web.HTTPBadRequest(text=f"LoRA Stack: can't save the preset {name}: {error.strerror or error}.") from None
         return web.json_response({"saved": name})
     @routes.delete("/diceforge/lora-presets")
     async def delete_preset(request):
         name, path = preset_path(request.rel_url.query.get("name"))
-        if os.path.isfile(path):
-            os.remove(path)
+        await in_thread(remove_preset, path)
         return web.json_response({"deleted": name})
     @routes.post("/diceforge/lora-triggers")
     async def lora_triggers(request):
         names = (await json_body(request)).get("loras")
         names = names[:500] if isinstance(names, list) else [] # Answers in the same order: an entry that isn't a file name gets no words.
-        found = await asyncio.get_running_loop().run_in_executor(None, lambda: [known_triggers(name) if isinstance(name, str) else ([], []) for name in names])
+        found = await in_thread(lambda: [known_triggers(name) if isinstance(name, str) else ([], []) for name in names])
         return web.json_response({"triggers": [{"user": user, "civitai": civitai} for user, civitai in found]})
     @routes.post("/diceforge/model-bases")
     async def model_bases(request):
         items = (await json_body(request)).get("items")
         items = items[:500] if isinstance(items, list) else []
-        found = await asyncio.get_running_loop().run_in_executor(None, lambda: [cached_base(item.get("kind"), item.get("file"))
-                                                                                if isinstance(item, dict) and isinstance(item.get("file"), str) else None for item in items])
+        found = await in_thread(lambda: [cached_base(item.get("kind"), item.get("file"))
+                                          if isinstance(item, dict) and isinstance(item.get("file"), str) else None for item in items])
         return web.json_response({"bases": found})
 register_routes()
 # Extension entry point for ComfyUI V3 node registration.

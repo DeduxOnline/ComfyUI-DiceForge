@@ -12,7 +12,7 @@ import aiohttp
 import folder_paths
 from aiohttp import web
 from .http_read import read_up_to
-from .model_info import PREVIEW_ENDINGS, civitai_details, civitai_summary, info_file, json_body, local_preview, read_info, thumbnail, write_info
+from .model_info import PREVIEW_ENDINGS, civitai_details, civitai_summary, in_thread, info_file, json_body, local_preview, read_info, thumbnail, write_info
 # Managing the model files of the LoRA, Checkpoint and Diffusion Model Browsers (web/model_browser.js, web/civitai.js): Create is finding a model on
 # Civitai and downloading it (with its Civitai data and a preview, so the browser shows it at once), Read is the browser and Model info, Update is
 # renaming or moving a file (its preview and info go with it) and Delete is removing it. MANAGED_KINDS lists the kinds the routes accept.
@@ -239,8 +239,9 @@ def session(**timeouts):
     return aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(**(timeouts or {"total": 30})), trust_env=True) # trust_env: the system's proxy settings.
 async def civitai_json(path, params=()):
     url = CIVITAI_API.rstrip("/") + path
+    headers = await in_thread(auth_headers, url) # The key is read from its file.
     try:
-        async with session() as client, client.get(url, params=list(params), headers=auth_headers(url)) as response:
+        async with session() as client, client.get(url, params=list(params), headers=headers) as response:
             if response.status == 404:
                 raise web.HTTPNotFound(text="Civitai: not found.")
             if response.status in (401, 403):
@@ -353,9 +354,10 @@ async def run_download(job, version, file, url):
     path, part = job["path"], job["path"] + ".part"
     loop = asyncio.get_running_loop()
     try:
-        os.makedirs(os.path.dirname(path), exist_ok=True)
+        await in_thread(lambda: os.makedirs(os.path.dirname(path), exist_ok=True))
         digest = hashlib.sha256()
-        async with session(total=None, sock_connect=30, sock_read=120) as client, client.get(url, headers=auth_headers(url)) as response:
+        headers = await in_thread(auth_headers, url)
+        async with session(total=None, sock_connect=30, sock_read=120) as client, client.get(url, headers=headers) as response:
             if response.status in (401, 403):
                 raise DownloadError("Civitai wants an API key for this download: add yours with 🔑 API key (Civitai → Account settings → API keys).")
             response.raise_for_status()
@@ -374,12 +376,8 @@ async def run_download(job, version, file, url):
         expected = str((file.get("hashes") or {}).get("SHA256") or "").lower()
         if expected and expected != sha256:
             raise DownloadError("The download is damaged (its sha256 is not Civitai's): try again.")
-        if os.path.exists(path):
-            raise DownloadError(f"{job['file']} appeared meanwhile: the download was not saved over it.")
-        os.replace(part, path)
-        stat = os.stat(path)
-        write_info(job["kind"], job["file"], {"user": {}, "size": stat.st_size, "mtime": stat.st_mtime, "sha256": sha256,
-                                              "civitai": {**civitai_summary(version), **await model_details(version.get("modelId")), "checked": time.time()}})
+        details = await model_details(version.get("modelId"))
+        stat = await in_thread(keep_download, job, part, sha256, {**civitai_summary(version), **details, "checked": time.time()})
         await save_preview(version, path)
         drop_list_cache(job["kind"])
         job.update(status="done", done=stat.st_size, total=stat.st_size)
@@ -393,7 +391,14 @@ async def run_download(job, version, file, url):
         if job["status"] != "done" and os.path.exists(part):
             os.remove(part)
         TASKS.pop(job["id"], None)
-# The first image of the version (not a video), resized by Civitai, as name.preview.<png|jpg|webp> when the model has no preview yet.
+# A whole, checked download gets its name, and its Civitai data and hash for Model info. Returns the file's stat.
+def keep_download(job, part, sha256, civitai):
+    if os.path.exists(job["path"]):
+        raise DownloadError(f"{job['file']} appeared meanwhile: the download was not saved over it.")
+    os.replace(part, job["path"])
+    stat = os.stat(job["path"])
+    write_info(job["kind"], job["file"], {"user": {}, "size": stat.st_size, "mtime": stat.st_mtime, "sha256": sha256, "civitai": civitai})
+    return stat
 # The tags, stats and versions of the downloaded model's page (Model info asks again later when this fails).
 async def model_details(model_id):
     if not isinstance(model_id, int) or isinstance(model_id, bool):
@@ -403,9 +408,10 @@ async def model_details(model_id):
     except web.HTTPException as error:
         logging.warning(f"[DiceForge] Civitai: no model details for {model_id}: {error.text}")
         return {}
+# The first image of the version (not a video), resized by Civitai, as name.preview.<png|jpg|webp> when the model has no preview yet.
 async def save_preview(version, path):
     image = next((image for image in images_of(version, 12) if image["type"] != "video"), None)
-    if not image or local_preview(path, set(os.listdir(os.path.dirname(path)))):
+    if not image or await in_thread(lambda: local_preview(path, set(os.listdir(os.path.dirname(path))))):
         return
     try:
         async with session() as client, client.get(image["url"]) as response:
@@ -414,7 +420,7 @@ async def save_preview(version, path):
             data = await read_up_to(response, PREVIEW_BYTES)
         if len(data) > PREVIEW_BYTES:
             raise ValueError(f"the image is over {PREVIEW_BYTES // (1024 * 1024)} MB")
-        await asyncio.get_running_loop().run_in_executor(None, write_bytes, os.path.splitext(path)[0] + ".preview" + extension, data)
+        await in_thread(write_bytes, os.path.splitext(path)[0] + ".preview" + extension, data)
     except Exception as error: # The model is there; only its preview is missing (the browser shows Civitai's image instead).
         logging.warning(f"[DiceForge] Civitai preview of {os.path.basename(path)} not saved: {error}")
 def cancel_download(job_id):
@@ -455,7 +461,7 @@ def register_routes():
         return web.json_response(cancel_download(request.rel_url.query.get("id", "")))
     @routes.get("/diceforge/civitai/key")
     async def civitai_key(request):
-        _key, source = api_key()
+        _key, source = await in_thread(api_key)
         return web.json_response({"set": source is not None, "source": source})
     @routes.post("/diceforge/civitai/key")
     async def civitai_save_key(request):
@@ -466,7 +472,7 @@ def register_routes():
             await asyncio.get_running_loop().run_in_executor(None, save_key, key.strip())
         except OSError as error:
             raise web.HTTPBadRequest(text=f"Civitai: the key could not be saved: {error.strerror or error}.") from None
-        _key, source = api_key()
+        _key, source = await in_thread(api_key)
         return web.json_response({"set": source is not None, "source": source})
     @routes.post("/diceforge/models/rename")
     async def models_rename(request):

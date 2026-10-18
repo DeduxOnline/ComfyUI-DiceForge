@@ -1,4 +1,3 @@
-import asyncio
 import fnmatch
 import io
 import json
@@ -14,7 +13,7 @@ import yaml
 from aiohttp import web
 from .clip_text_encode_pos_neg import WILDCARD_PATTERN, TextLoader, entry_lines, fill_in, find_wildcard, read_text_lines, wildcard_index, yaml_wildcards
 from .http_read import read_up_to
-from .model_info import json_body
+from .model_info import in_thread, json_body
 # Server side of the Wildcard Browser and the __ autocomplete (web/wildcards.js): the list of wildcards, and creating, reading, saving, renaming and
 # deleting a wildcard (a txt file, or a key of a yaml file, changed in that file), converting txt files to a yaml file and back, and the cards'
 # pictures. A deleted wildcard goes to a trash folder first, so the Wildcard Browser can undo the delete; a folder (or all of them) can be
@@ -707,6 +706,181 @@ def write_lines(path, text):
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8", newline="\n") as file:
         file.write(text.replace("\r\n", "\n").rstrip("\n") + "\n")
+# What the routes below do with the wildcard files, run in a thread (in_thread): indexing reads and stats every wildcard file, which on ComfyUI's
+# event loop would hold up every other request meanwhile.
+def wildcard_listing():
+    files, favorites, index = [], read_favorites(), wildcard_index(refresh=True)
+    names = list(index)
+    lowered = {name.lower() for name in names}
+    for name, entry in sorted(index.items(), key=lambda item: item[0].lower()):
+        try:
+            options, error = entry_lines(entry), {}
+        except ValueError as problem: # One unreadable file doesn't hide the others: it is listed with its error.
+            options, error = [], {"error": str(problem)}
+        broken = broken_references(options, names, lowered)
+        files.append({"name": name, "lines": len(options), "preview": options[:3], "favorite": name in favorites, **({"broken": broken} if broken else {}),
+                      **({"yaml": os.path.basename(entry["path"]), "yaml_file": yaml_name(entry["path"])} if "lines" in entry else {}), **({"picture": True} if card_picture(entry) else {}), **error})
+    return {"folders": folder_paths.get_folder_paths("wildcards"), "files": files}
+def no_picture(name, line):
+    return web.HTTPNotFound(text=f"Wildcards: no picture for {name}{'' if line is None else f' line {line}'}.")
+def picture_of(name, line):
+    path = card_picture(wildcard_index().get(name) or wildcard_index(refresh=True).get(name), line)
+    if path is None:
+        raise no_picture(name, line)
+    return path
+# Where a card's (or a line's) new picture goes, checked before the picture is read.
+def picture_place(name, line):
+    entry = wildcard_index(refresh=True).get(name)
+    base = picture_base(entry, line)
+    if base is None:
+        raise web.HTTPBadRequest(text=f"Wildcards: {name} is not a yaml card: pictures are for the wildcards of a yaml file.")
+    if line is not None and line >= len(entry["lines"]):
+        raise web.HTTPBadRequest(text=f"Wildcards: {name} has no line {line} (its lines are counted from 0).")
+    return base
+def remove_picture(name, line):
+    path = card_picture(wildcard_index(refresh=True).get(name), line)
+    if path is None:
+        raise no_picture(name, line)
+    try:
+        os.remove(path)
+    except OSError as error:
+        raise web.HTTPBadRequest(text=f"Wildcards: can't remove the picture: {error.strerror or error}.") from None
+    return {"name": name, "removed": path}
+def yaml_text(file):
+    name, path = yaml_file(file)
+    try:
+        text = read_whole(path)
+    except (OSError, UnicodeDecodeError) as error:
+        raise web.HTTPBadRequest(text=f"Wildcards: can't read {path}: {error}") from None
+    return {"file": name, "path": path, "text": text.rstrip("\n")}
+def save_yaml(file, text):
+    name, path = yaml_file(file)
+    try:
+        save_yaml_text(path, text)
+    except OSError as error:
+        raise web.HTTPBadRequest(text=f"Wildcards: can't save {name}: {error.strerror or error}.") from None
+    wildcard_index(refresh=True)
+    return {"saved": name, "path": path}
+# A whole yaml file to the trash (↶ Undo with /diceforge/wildcards/restore), its wildcards' stars dropped.
+def delete_yaml(file):
+    name, path = yaml_file(file)
+    keys = [key for key, entry in wildcard_index().items() if entry.get("path") == path]
+    try:
+        trash_id = trash_file(path, name, False)
+    except OSError as error:
+        raise web.HTTPBadRequest(text=f"Wildcards: can't delete {name}: {error.strerror or error}.") from None
+    wildcard_index(refresh=True)
+    for key in keys:
+        rename_favorite(key, None)
+    return {"deleted": name, "path": path, "undo": trash_id}
+def convert(name, to):
+    try:
+        if to == "yaml":
+            path, names = to_yaml(name)
+            result = {"converted": name, "to": "yaml", "path": path, "names": names}
+        else:
+            paths, names = to_txt(name)
+            result = {"converted": name, "to": "txt", "removed": paths, "names": names}
+    except OSError as error:
+        raise web.HTTPBadRequest(text=f"Wildcards: can't convert {name}: {error.strerror or error}.") from None
+    wildcard_index(refresh=True)
+    return result
+def wildcard_text(name):
+    entry = wildcard_index(refresh=True).get(name)
+    if entry is None:
+        raise web.HTTPNotFound(text=f"Wildcards: no wildcard {name}.")
+    if "lines" in entry:
+        return {"name": name, "path": entry["path"], "text": "\n".join(entry["lines"]), "yaml": os.path.basename(entry["path"])}
+    try:
+        lines = read_text_lines(entry["path"])
+    except ValueError as error:
+        raise web.HTTPBadRequest(text=f"Wildcards: {error}") from None
+    return {"name": name, "path": entry["path"], "text": "\n".join(lines)}
+# Create (refused when the name is taken) or save: an existing wildcard is saved in place (a yaml key in its yaml file), a new one goes to the
+# first wildcards folder as a txt file, or next to a yaml wildcard (next_to), into that wildcard's yaml file.
+def save_wildcard(name, text, next_to, create):
+    entry = wildcard_index(refresh=True).get(name)
+    if create and entry is not None:
+        raise web.HTTPConflict(text=f"Wildcards: {name} already exists ({entry['path']}).")
+    try:
+        if entry is not None and "lines" in entry:
+            save_yaml_key(entry, text)
+            path = entry["path"]
+        elif entry is None and next_to is not None:
+            path = add_yaml_key(name, checked_name(next_to), text)
+        else:
+            path = find_wildcard(name) or new_path(name)
+            write_lines(path, text)
+    except OSError as error: # A name too long for the file system, a read-only folder...: a message, not a server error.
+        raise web.HTTPBadRequest(text=f"Wildcards: can't save {name}: {error.strerror or error}.") from None
+    wildcard_index(refresh=True)
+    return {"saved": name, "path": path, **({"yaml": os.path.basename(path)} if path.lower().endswith((".yaml", ".yml")) else {})}
+# Rename or move (a / in the new name puts it in a folder): a file stays in its wildcards folder, a yaml key among its yaml file's keys, and a
+# name already taken is refused.
+def rename_wildcard(name, to):
+    entry = existing_entry(name)
+    path = entry["path"]
+    taken = wildcard_index().get(to)
+    if "lines" in entry:
+        if to == name:
+            return {"renamed": name, "to": to, "path": path}
+        if taken is not None:
+            raise web.HTTPConflict(text=f"Wildcards: {to} already exists ({taken['path']}).")
+        move, target = (rename_yaml_key, name, to, entry), path
+    else:
+        target = new_path(to, root_of(path))
+        if taken is not None and os.path.normcase(os.path.abspath(taken["path"])) != os.path.normcase(os.path.abspath(path)): # Only a change of case is the same file.
+            raise web.HTTPConflict(text=f"Wildcards: {to} already exists ({taken['path']}).")
+        if os.path.exists(target) and os.path.normcase(target) != os.path.normcase(os.path.abspath(path)):
+            raise web.HTTPConflict(text=f"Wildcards: {target} already exists.")
+        move = (move_file, path, target)
+    try:
+        move[0](*move[1:])
+    except OSError as error:
+        raise web.HTTPBadRequest(text=f"Wildcards: can't rename {name} to {to}: {error.strerror or error}.") from None
+    wildcard_index(refresh=True)
+    rename_favorite(name, to)
+    return {"renamed": name, "to": to, "path": target}
+def delete_wildcard(name):
+    entry = existing_entry(name)
+    path = entry["path"]
+    trash = (trash_yaml_key, entry) if "lines" in entry else (trash_file, path)
+    try:
+        trash_id = trash[0](*trash[1:], name, name in read_favorites())
+    except OSError as error:
+        raise web.HTTPBadRequest(text=f"Wildcards: can't delete {name}: {error.strerror or error}.") from None
+    wildcard_index(refresh=True)
+    rename_favorite(name, None)
+    return {"deleted": name, "path": path, "undo": trash_id}
+# Undo a delete: the id is the delete's "undo".
+def restore_wildcard(trash_id):
+    try:
+        name, path, favorite = restore_file(trash_id)
+    except OSError as error:
+        raise web.HTTPBadRequest(text=f"Wildcards: can't bring the file back: {error.strerror or error}.") from None
+    wildcard_index(refresh=True)
+    if favorite:
+        try:
+            write_favorites(read_favorites() | {name})
+        except OSError: # Back without its star.
+            pass
+    return {"restored": name, "path": path}
+def import_into(data, folder):
+    try:
+        imported, skipped, left_out = import_zip(data, folder)
+    except OSError as error:
+        raise web.HTTPBadRequest(text=f"Wildcards: can't import the zip: {error.strerror or error}.") from None
+    wildcard_index(refresh=True)
+    return {"imported": imported, "skipped": skipped, "left_out": left_out}
+def set_favorite(name, favorite):
+    if favorite and name not in wildcard_index(refresh=True):
+        raise web.HTTPNotFound(text=f"Wildcards: no wildcard {name}.")
+    names = read_favorites()
+    try:
+        write_favorites(names | {name} if favorite else names - {name})
+    except OSError as error:
+        raise web.HTTPBadRequest(text=f"Wildcards: the favorites could not be saved: {error.strerror or error}.") from None
+    return {"name": name, "favorite": favorite}
 def register_routes():
     try:
         from server import PromptServer
@@ -715,35 +889,16 @@ def register_routes():
         return
     @routes.get("/diceforge/wildcards")
     async def list_wildcards(request):
-        files, favorites, index = [], read_favorites(), wildcard_index(refresh=True)
-        names = list(index)
-        lowered = {name.lower() for name in names}
-        for name, entry in sorted(index.items(), key=lambda item: item[0].lower()):
-            try:
-                options, error = entry_lines(entry), {}
-            except ValueError as problem: # One unreadable file doesn't hide the others: it is listed with its error.
-                options, error = [], {"error": str(problem)}
-            broken = broken_references(options, names, lowered)
-            files.append({"name": name, "lines": len(options), "preview": options[:3], "favorite": name in favorites, **({"broken": broken} if broken else {}),
-                          **({"yaml": os.path.basename(entry["path"]), "yaml_file": yaml_name(entry["path"])} if "lines" in entry else {}), **({"picture": True} if card_picture(entry) else {}), **error})
-        return web.json_response({"folders": folder_paths.get_folder_paths("wildcards"), "files": files})
+        return web.json_response(await in_thread(wildcard_listing))
     # A card's picture, or with line=N the picture of its line N (counted from 0, as in the yaml list).
     @routes.get("/diceforge/wildcards/picture")
     async def wildcard_picture(request):
         name, line = checked_name(request.rel_url.query.get("name")), picture_line(request.rel_url.query)
-        path = card_picture(wildcard_index().get(name) or wildcard_index(refresh=True).get(name), line)
-        if path is None:
-            raise web.HTTPNotFound(text=f"Wildcards: no picture for {name}{'' if line is None else f' line {line}'}.")
-        return web.FileResponse(path, headers={"Cache-Control": "max-age=300"})
+        return web.FileResponse(await in_thread(picture_of, name, line), headers={"Cache-Control": "max-age=300"})
     @routes.post("/diceforge/wildcards/picture")
     async def set_wildcard_picture(request):
         name, line = checked_name(request.rel_url.query.get("name")), picture_line(request.rel_url.query)
-        entry = wildcard_index(refresh=True).get(name)
-        base = picture_base(entry, line)
-        if base is None:
-            raise web.HTTPBadRequest(text=f"Wildcards: {name} is not a yaml card: pictures are for the wildcards of a yaml file.")
-        if line is not None and line >= len(entry["lines"]):
-            raise web.HTTPBadRequest(text=f"Wildcards: {name} has no line {line} (its lines are counted from 0).")
+        base = await in_thread(picture_place, name, line)
         data = await read_up_to(request, PICTURE_BYTES) # The whole body (content.read(n) gives only what has come so far).
         if len(data) > PICTURE_BYTES:
             raise web.HTTPRequestEntityTooLarge(max_size=PICTURE_BYTES, actual_size=len(data), text="Wildcards: the picture is over 20 MB.")
@@ -751,59 +906,31 @@ def register_routes():
         if ending is None:
             raise web.HTTPBadRequest(text="Wildcards: send a PNG, JPEG, WebP or GIF picture.")
         try:
-            path = await asyncio.get_running_loop().run_in_executor(None, save_picture, base, data, ending)
+            path = await in_thread(save_picture, base, data, ending)
         except OSError as error:
             raise web.HTTPBadRequest(text=f"Wildcards: can't save the picture: {error.strerror or error}.") from None
         return web.json_response({"name": name, "picture": path})
     @routes.delete("/diceforge/wildcards/picture")
     async def remove_wildcard_picture(request):
         name, line = checked_name(request.rel_url.query.get("name")), picture_line(request.rel_url.query)
-        path = card_picture(wildcard_index(refresh=True).get(name), line)
-        if path is None:
-            raise web.HTTPNotFound(text=f"Wildcards: no picture for {name}{'' if line is None else f' line {line}'}.")
-        try:
-            os.remove(path)
-        except OSError as error:
-            raise web.HTTPBadRequest(text=f"Wildcards: can't remove the picture: {error.strerror or error}.") from None
-        return web.json_response({"name": name, "removed": path})
+        return web.json_response(await in_thread(remove_picture, name, line))
     @routes.get("/diceforge/wildcards/yaml")
     async def read_yaml_file(request):
-        name, path = yaml_file(request.rel_url.query.get("file"))
-        try:
-            text = await asyncio.get_running_loop().run_in_executor(None, read_whole, path) # Off the event loop, like the saves.
-        except (OSError, UnicodeDecodeError) as error:
-            raise web.HTTPBadRequest(text=f"Wildcards: can't read {path}: {error}") from None
-        return web.json_response({"file": name, "path": path, "text": text.rstrip("\n")})
+        return web.json_response(await in_thread(yaml_text, request.rel_url.query.get("file")))
     @routes.post("/diceforge/wildcards/yaml")
     async def save_yaml_file(request):
         body = await json_body(request)
-        name, path = yaml_file(body.get("file"))
-        try:
-            await asyncio.get_running_loop().run_in_executor(None, save_yaml_text, path, str(body.get("text", "")))
-        except OSError as error:
-            raise web.HTTPBadRequest(text=f"Wildcards: can't save {name}: {error.strerror or error}.") from None
-        wildcard_index(refresh=True)
-        return web.json_response({"saved": name, "path": path})
-    # A whole yaml file to the trash (↶ Undo with /diceforge/wildcards/restore), its wildcards' stars dropped.
+        return web.json_response(await in_thread(save_yaml, body.get("file"), str(body.get("text", ""))))
     @routes.delete("/diceforge/wildcards/yaml")
     async def delete_yaml_file(request):
-        name, path = yaml_file(request.rel_url.query.get("file"))
-        keys = [key for key, entry in wildcard_index().items() if entry.get("path") == path]
-        try:
-            trash_id = await asyncio.get_running_loop().run_in_executor(None, trash_file, path, name, False)
-        except OSError as error:
-            raise web.HTTPBadRequest(text=f"Wildcards: can't delete {name}: {error.strerror or error}.") from None
-        wildcard_index(refresh=True)
-        for key in keys:
-            rename_favorite(key, None)
-        return web.json_response({"deleted": name, "path": path, "undo": trash_id})
+        return web.json_response(await in_thread(delete_yaml, request.rel_url.query.get("file")))
     # The yaml cards of a folder (all of them without one) with their lines, for the cards mode's card per line: each line's index in its key's
     # list, and the lines that have a picture.
     @routes.get("/diceforge/wildcards/cards")
     async def wildcard_cards(request):
         folder = request.rel_url.query.get("folder", "").strip()
         folder = checked_name(folder) if folder else ""
-        return web.json_response({"cards": await asyncio.get_running_loop().run_in_executor(None, folder_cards, folder)})
+        return web.json_response({"cards": await in_thread(folder_cards, folder)})
     # Convert a txt wildcard or folder to one yaml file ("to": "yaml"), or the yaml file(s) of a wildcard or folder to txt files ("to": "txt").
     @routes.post("/diceforge/wildcards/convert")
     async def convert_wildcards(request):
@@ -811,110 +938,24 @@ def register_routes():
         name, to = checked_name(body.get("name")), body.get("to")
         if to not in ("yaml", "txt"):
             raise web.HTTPBadRequest(text='Wildcards: "to" must be "yaml" or "txt".')
-        try:
-            if to == "yaml":
-                path, names = await asyncio.get_running_loop().run_in_executor(None, to_yaml, name)
-                result = {"converted": name, "to": "yaml", "path": path, "names": names}
-            else:
-                paths, names = await asyncio.get_running_loop().run_in_executor(None, to_txt, name)
-                result = {"converted": name, "to": "txt", "removed": paths, "names": names}
-        except OSError as error:
-            raise web.HTTPBadRequest(text=f"Wildcards: can't convert {name}: {error.strerror or error}.") from None
-        wildcard_index(refresh=True)
-        return web.json_response(result)
+        return web.json_response(await in_thread(convert, name, to))
     @routes.get("/diceforge/wildcards/file")
     async def read_wildcard_file(request):
-        name = checked_name(request.rel_url.query.get("name"))
-        entry = wildcard_index(refresh=True).get(name)
-        if entry is None:
-            raise web.HTTPNotFound(text=f"Wildcards: no wildcard {name}.")
-        if "lines" in entry:
-            return web.json_response({"name": name, "path": entry["path"], "text": "\n".join(entry["lines"]), "yaml": os.path.basename(entry["path"])})
-        try:
-            lines = read_text_lines(entry["path"])
-        except ValueError as error:
-            raise web.HTTPBadRequest(text=f"Wildcards: {error}") from None
-        return web.json_response({"name": name, "path": entry["path"], "text": "\n".join(lines)})
-    # Create ("create": true, refused when the name is taken) or save: an existing wildcard is saved in place (a yaml key in its yaml file), a new
-    # one goes to the first wildcards folder as a txt file, or with "next_to": a yaml wildcard, into that wildcard's yaml file.
+        return web.json_response(await in_thread(wildcard_text, checked_name(request.rel_url.query.get("name"))))
     @routes.post("/diceforge/wildcards/file")
     async def save_wildcard_file(request):
         body = await json_body(request)
-        name, text, next_to = checked_name(body.get("name")), str(body.get("text", "")), body.get("next_to")
-        entry = wildcard_index(refresh=True).get(name)
-        if body.get("create") is True and entry is not None:
-            raise web.HTTPConflict(text=f"Wildcards: {name} already exists ({entry['path']}).")
-        run = asyncio.get_running_loop().run_in_executor # Off the event loop.
-        try:
-            if entry is not None and "lines" in entry:
-                await run(None, save_yaml_key, entry, text)
-                path = entry["path"]
-            elif entry is None and next_to is not None:
-                path = await run(None, add_yaml_key, name, checked_name(next_to), text)
-            else:
-                path = find_wildcard(name) or new_path(name)
-                await run(None, write_lines, path, text)
-        except OSError as error: # A name too long for the file system, a read-only folder...: a message, not a server error.
-            raise web.HTTPBadRequest(text=f"Wildcards: can't save {name}: {error.strerror or error}.") from None
-        wildcard_index(refresh=True)
-        return web.json_response({"saved": name, "path": path, **({"yaml": os.path.basename(path)} if path.lower().endswith((".yaml", ".yml")) else {})})
-    # Rename or move (a / in the new name puts it in a folder): a file stays in its wildcards folder, a yaml key among its yaml file's keys, and
-    # a name already taken is refused.
+        return web.json_response(await in_thread(save_wildcard, checked_name(body.get("name")), str(body.get("text", "")), body.get("next_to"), body.get("create") is True))
     @routes.post("/diceforge/wildcards/rename")
     async def rename_wildcard_file(request):
         body = await json_body(request)
-        name, to = checked_name(body.get("name")), checked_name(body.get("to"))
-        entry = existing_entry(name)
-        path = entry["path"]
-        taken = wildcard_index().get(to)
-        if "lines" in entry:
-            if to == name:
-                return web.json_response({"renamed": name, "to": to, "path": path})
-            if taken is not None:
-                raise web.HTTPConflict(text=f"Wildcards: {to} already exists ({taken['path']}).")
-            move, target = (rename_yaml_key, name, to, entry), path
-        else:
-            target = new_path(to, root_of(path))
-            if taken is not None and os.path.normcase(os.path.abspath(taken["path"])) != os.path.normcase(os.path.abspath(path)): # Only a change of case is the same file.
-                raise web.HTTPConflict(text=f"Wildcards: {to} already exists ({taken['path']}).")
-            if os.path.exists(target) and os.path.normcase(target) != os.path.normcase(os.path.abspath(path)):
-                raise web.HTTPConflict(text=f"Wildcards: {target} already exists.")
-            move = (move_file, path, target)
-        try:
-            await asyncio.get_running_loop().run_in_executor(None, *move)
-        except OSError as error:
-            raise web.HTTPBadRequest(text=f"Wildcards: can't rename {name} to {to}: {error.strerror or error}.") from None
-        wildcard_index(refresh=True)
-        rename_favorite(name, to)
-        return web.json_response({"renamed": name, "to": to, "path": target})
+        return web.json_response(await in_thread(rename_wildcard, checked_name(body.get("name")), checked_name(body.get("to"))))
     @routes.delete("/diceforge/wildcards/file")
     async def delete_wildcard_file(request):
-        name = checked_name(request.rel_url.query.get("name"))
-        entry = existing_entry(name)
-        path = entry["path"]
-        trash = (trash_yaml_key, entry) if "lines" in entry else (trash_file, path)
-        try:
-            trash_id = await asyncio.get_running_loop().run_in_executor(None, *trash, name, name in read_favorites())
-        except OSError as error:
-            raise web.HTTPBadRequest(text=f"Wildcards: can't delete {name}: {error.strerror or error}.") from None
-        wildcard_index(refresh=True)
-        rename_favorite(name, None)
-        return web.json_response({"deleted": name, "path": path, "undo": trash_id})
-    # Undo a delete: {"id": the delete's "undo"}.
+        return web.json_response(await in_thread(delete_wildcard, checked_name(request.rel_url.query.get("name"))))
     @routes.post("/diceforge/wildcards/restore")
     async def restore_wildcard_file(request):
-        body = await json_body(request)
-        try:
-            name, path, favorite = await asyncio.get_running_loop().run_in_executor(None, restore_file, body.get("id"))
-        except OSError as error:
-            raise web.HTTPBadRequest(text=f"Wildcards: can't bring the file back: {error.strerror or error}.") from None
-        wildcard_index(refresh=True)
-        if favorite:
-            try:
-                write_favorites(read_favorites() | {name})
-            except OSError: # Back without its star.
-                pass
-        return web.json_response({"restored": name, "path": path})
+        return web.json_response(await in_thread(restore_wildcard, (await json_body(request)).get("id")))
     @routes.get("/diceforge/wildcards/preview")
     async def preview_wildcard(request):
         query = request.rel_url.query
@@ -926,7 +967,7 @@ def register_routes():
         if not 1 <= count <= PREVIEW_MOST:
             raise web.HTTPBadRequest(text=f"Wildcards: count must be 1 to {PREVIEW_MOST}.")
         folder = query.get("folder") in ("1", "true")
-        return web.json_response(await asyncio.get_running_loop().run_in_executor(None, preview_picks, name, folder, count))
+        return web.json_response(await in_thread(preview_picks, name, folder, count))
     @routes.post("/diceforge/wildcards/replace")
     async def replace_wildcards(request):
         body = await json_body(request)
@@ -936,14 +977,14 @@ def register_routes():
         if any(mark in find + replacement for mark in "\r\n") or not isinstance(apply, bool):
             raise web.HTTPBadRequest(text="Wildcards: find and replace work within a line (no line breaks); apply is true or false.")
         try:
-            return web.json_response(await asyncio.get_running_loop().run_in_executor(None, replace_in_wildcards, find, replacement, apply))
+            return web.json_response(await in_thread(replace_in_wildcards, find, replacement, apply))
         except OSError as error:
             raise web.HTTPBadRequest(text=f"Wildcards: can't replace: {error.strerror or error}.") from None
     @routes.get("/diceforge/wildcards/export")
     async def export_wildcards(request):
         folder = request.rel_url.query.get("folder", "").strip()
         folder = checked_name(folder) if folder else ""
-        data = await asyncio.get_running_loop().run_in_executor(None, export_zip, folder)
+        data = await in_thread(export_zip, folder)
         filename = f"wildcards-{folder.replace('/', '-')}.zip" if folder else "wildcards.zip"
         return web.Response(body=data, content_type="application/zip", headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(filename)}"})
     @routes.post("/diceforge/wildcards/import")
@@ -953,30 +994,18 @@ def register_routes():
         data = await read_up_to(request, ZIP_BYTES)
         if len(data) > ZIP_BYTES:
             raise web.HTTPRequestEntityTooLarge(max_size=ZIP_BYTES, actual_size=len(data), text="Wildcards: the zip is over 512 MB.")
-        try:
-            imported, skipped, left_out = await asyncio.get_running_loop().run_in_executor(None, import_zip, data, folder)
-        except OSError as error:
-            raise web.HTTPBadRequest(text=f"Wildcards: can't import the zip: {error.strerror or error}.") from None
-        wildcard_index(refresh=True)
-        return web.json_response({"imported": imported, "skipped": skipped, "left_out": left_out})
+        return web.json_response(await in_thread(import_into, data, folder))
     @routes.get("/diceforge/wildcards/search")
     async def search_wildcard_lines(request):
         text = request.rel_url.query.get("q", "").strip().lower()
         if len(text) < 2:
             raise web.HTTPBadRequest(text="Wildcards: search for at least 2 characters.")
-        return web.json_response({"found": await asyncio.get_running_loop().run_in_executor(None, search_lines, text)})
+        return web.json_response({"found": await in_thread(search_lines, text)})
     @routes.post("/diceforge/wildcards/favorite")
     async def favorite_wildcard(request):
         body = await json_body(request)
         name, favorite = checked_name(body.get("name")), body.get("favorite")
         if not isinstance(favorite, bool):
             raise web.HTTPBadRequest(text="Wildcards: favorite must be true or false.")
-        if favorite and name not in wildcard_index(refresh=True):
-            raise web.HTTPNotFound(text=f"Wildcards: no wildcard {name}.")
-        names = read_favorites()
-        try:
-            write_favorites(names | {name} if favorite else names - {name})
-        except OSError as error:
-            raise web.HTTPBadRequest(text=f"Wildcards: the favorites could not be saved: {error.strerror or error}.") from None
-        return web.json_response({"name": name, "favorite": favorite})
+        return web.json_response(await in_thread(set_favorite, name, favorite))
 register_routes()
