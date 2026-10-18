@@ -75,9 +75,13 @@ nodes and features, a patch for fixes. Each version is a [release on GitHub](htt
 
 ### Fixed
 - ComfyUI keeps answering while DiceForge's windows read and write files: the Wildcard Browser (its list, files, yaml files, pictures,
-  renames, deletes), Model info, the model browsers' previews and favorites, LoRA Stack presets, Dice Grid's cells and the Civitai key do
-  their file work beside the server instead of in it, so a big wildcard collection no longer holds up other requests and the progress of a
-  run.
+  renames, deletes), Model info, the model browsers' previews and favorites, LoRA Stack presets, Dice Grid's cells, XY Plot's preview of a
+  LoRA axis and the Civitai key do their file work beside the server instead of in it, so a big wildcard collection no longer holds up other
+  requests and the progress of a run.
+- Wildcard Browser: stars clicked on several files in a row are all kept, and changes to the wildcard files made at the same moment no
+  longer undo each other.
+- Model info: a star or notes saved while the model is being looked up on Civitai are kept when the lookup finishes.
+- LoRA Stack: a preset file that can't be read says why, instead of saying there is no such preset.
 - The questions of DiceForge's windows (a name, a confirmation) are ComfyUI's own dialogs instead of the browser's: they work in ComfyUI
   Desktop (which has no prompt()) and in browsers that don't show the browser's own, where → yaml, delete, rename and new file did nothing.
 - Wildcard Browser: opening another file asks before the open file's unsaved changes are dropped.

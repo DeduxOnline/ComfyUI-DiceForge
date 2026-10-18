@@ -11,6 +11,7 @@ from typing_extensions import override
 from comfy_api.latest import ComfyExtension, io
 from . import tag_autocomplete
 from .clip_text_encode_pos_neg import fill_in, wildcards_signature
+from .model_info import in_thread
 from .tag_autocomplete import INDEX, parse_tags, tag_key
 # Danbooru Tag Enhancer: more tags for a prompt, from real posts that have the tags already there, on Danbooru (anime) or e621 (furry). The site
 # picks random posts with the most telling two of the prompt's tags (the rarest it knows: a character before "1girl") and the rating; their tags
@@ -464,10 +465,9 @@ class DanbooruTagEnhancer(io.ComfyNode):
             raise ValueError(f"Danbooru Tag Enhancer: unknown rating {rating!r} (one of {', '.join(RATING_CHOICES)}).")
         fixed = mode == "fixed"
         seed = wildcard_seed if fixed else secrets.randbelow(0x100000000) # A new wildcard seed each random run.
-        loop = asyncio.get_running_loop()
-        (tags,), _note = await loop.run_in_executor(None, fill_in, (tags or "",), seed, "random") # Wildcards, choices, comments.
+        (tags,), _note = await in_thread(fill_in, (tags or "",), seed, "random") # Wildcards, choices, comments.
         have = prompt_tags(tags)
-        known = await loop.run_in_executor(None, site_tags, site.key)
+        known = await in_thread(site_tags, site.key)
         if fixed:
             ids = parse_post_ids(post_ids)
             if not ids:

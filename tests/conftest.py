@@ -88,6 +88,7 @@ def offline_civitai(monkeypatch, tmp_path):
     from DiceForge import model_info, model_manager
     monkeypatch.setattr(model_manager, "CIVITAI_API", "http://127.0.0.1:9/api/v1")
     monkeypatch.setattr(model_info, "CIVITAI_MODEL", "http://127.0.0.1:9/api/v1/models/{}")
+    monkeypatch.setattr(model_info, "CIVITAI_BY_HASH", "http://127.0.0.1:9/api/v1/model-versions/by-hash/{}") # Model info's lookup too.
     monkeypatch.setattr(model_manager, "KEY_FILE", str(tmp_path / "civitai.json"))
     for variable in ("CIVITAI_API_KEY", "DICEFORGE_CIVITAI_KEY"):
         monkeypatch.delenv(variable, raising=False)

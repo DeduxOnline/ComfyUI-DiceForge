@@ -5,7 +5,7 @@ import nodes
 from aiohttp import web
 from typing_extensions import override
 from comfy_api.latest import ComfyExtension, io
-from .model_info import json_body
+from .model_info import in_thread, json_body
 from .model_lists import matching_files
 from .random_sampler import SAMPLERS, SCHEDULERS, options_output, parse_names
 from .variation_seed import with_variation
@@ -216,7 +216,7 @@ def register_routes():
         body = await json_body(request)
         x_type, x_values, y_type, y_values = (body.get(key) if isinstance(body.get(key), str) else "" for key in ("x_type", "x_values", "y_type", "y_values"))
         try:
-            layout = plan(x_type or "none", x_values, y_type or "none", y_values)
+            layout = await in_thread(plan, x_type or "none", x_values, y_type or "none", y_values) # A lora axis lists the LoRA files.
         except ValueError as error:
             raise web.HTTPBadRequest(text=str(error)) from None
         return web.json_response({"x_type": layout["x_type"], "y_type": layout["y_type"], "count": layout["count"],

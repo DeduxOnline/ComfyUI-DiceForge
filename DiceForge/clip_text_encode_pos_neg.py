@@ -6,6 +6,7 @@ import math
 import os
 import random
 import re
+import threading
 import folder_paths
 import nodes
 import yaml
@@ -60,26 +61,28 @@ class TextLoader(yaml.SafeLoader):
 # earlier folder hides the same name in a later one, and a .txt file hides a yaml key of the same name. Rebuilt when a file changes; the node checks
 # that once per run, and a name that is not found checks again.
 index_cache = {"signature": None, "entries": {}}
+index_lock = threading.Lock() # One rebuild at a time: routes and runs refresh it from several threads, and a slower one mustn't store an older index.
 def wildcard_index(refresh=False):
     if refresh or index_cache["signature"] is None:
-        signature = wildcards_signature()
-        if signature != index_cache["signature"]:
-            files = list(wildcard_files())
-            entries = {}
-            for prefix, name, path in files:
-                if name.lower().endswith(".txt"):
-                    entries.setdefault(prefix + name[:-4], {"path": path})
-            for prefix, name, path in files:
-                if not name.lower().endswith(".txt"):
-                    try:
-                        with open(path, encoding="utf-8-sig") as file:
-                            data = yaml.load(file, Loader=TextLoader)
-                    except (OSError, UnicodeDecodeError, yaml.YAMLError) as error:
-                        logging.warning(f"[DiceForge] Wildcards: skipping {path}, it is not valid UTF-8 YAML: {error}")
-                        continue
-                    for key, lines in yaml_wildcards(data, prefix.rstrip("/")):
-                        entries.setdefault(key, {"path": path, "lines": lines, "inner": key[len(prefix):]}) # inner: the key's path in its file
-            index_cache.update(signature=signature, entries=entries)
+        with index_lock:
+            signature = wildcards_signature()
+            if signature != index_cache["signature"]:
+                files = list(wildcard_files())
+                entries = {}
+                for prefix, name, path in files:
+                    if name.lower().endswith(".txt"):
+                        entries.setdefault(prefix + name[:-4], {"path": path})
+                for prefix, name, path in files:
+                    if not name.lower().endswith(".txt"):
+                        try:
+                            with open(path, encoding="utf-8-sig") as file:
+                                data = yaml.load(file, Loader=TextLoader)
+                        except (OSError, UnicodeDecodeError, yaml.YAMLError) as error:
+                            logging.warning(f"[DiceForge] Wildcards: skipping {path}, it is not valid UTF-8 YAML: {error}")
+                            continue
+                        for key, lines in yaml_wildcards(data, prefix.rstrip("/")):
+                            entries.setdefault(key, {"path": path, "lines": lines, "inner": key[len(prefix):]}) # inner: the key's path in its file
+                index_cache.update(signature=signature, entries=entries)
     return index_cache["entries"]
 # Every wildcard name, sorted.
 def wildcard_names(refresh=False):

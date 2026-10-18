@@ -1,10 +1,9 @@
-import asyncio
 import json
 import os
 import comfy.samplers
 import folder_paths
 from aiohttp import web
-from .model_info import json_body
+from .model_info import in_thread, json_body
 # KSampler presets (web/sampler_presets.js, node menu of KSampler and KSampler Advanced): steps, CFG, sampler and scheduler for a model family, from
 # the models' own recommendations, and your own presets, saved in the ComfyUI user folder. "Auto" in the menu picks the built-in one by the base
 # model of the connected checkpoint (Civitai's base model names in BASES).
@@ -77,20 +76,20 @@ def register_routes():
         return
     @routes.get("/diceforge/sampler-presets")
     async def list_presets(request):
-        presets = await asyncio.get_running_loop().run_in_executor(None, read_presets)
+        presets = await in_thread(read_presets)
         return web.json_response({"builtin": BUILTIN, "user": presets})
     @routes.post("/diceforge/sampler-presets")
     async def post_preset(request):
         body = await json_body(request)
         try:
-            return web.json_response(await asyncio.get_running_loop().run_in_executor(None, save_preset, body))
+            return web.json_response(await in_thread(save_preset, body))
         except OSError as error:
             raise web.HTTPBadRequest(text=f"Sampler presets: can't save: {error.strerror or error}.") from None
     @routes.delete("/diceforge/sampler-presets")
     async def remove_preset(request):
         name = request.rel_url.query.get("name", "")
         try:
-            await asyncio.get_running_loop().run_in_executor(None, delete_preset, name)
+            await in_thread(delete_preset, name)
         except OSError as error:
             raise web.HTTPBadRequest(text=f"Sampler presets: can't delete: {error.strerror or error}.") from None
         return web.json_response({"deleted": name})

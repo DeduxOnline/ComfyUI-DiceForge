@@ -298,7 +298,7 @@ async def search(kind, query="", base="", sort="", nsfw=False, cursor=""):
     params += [("types", civitai_type) for civitai_type in civitai_types(kind)]
     params += [(key, value[:200]) for key, value in (("query", query.strip()), ("baseModels", base.strip()), ("cursor", cursor)) if value]
     data = await civitai_json("/models", params)
-    index = await asyncio.get_running_loop().run_in_executor(None, local_index, kind)
+    index = await in_thread(local_index, kind)
     items = [search_item(item, index) for item in data.get("items") or [] if isinstance(item, dict)]
     metadata = data.get("metadata") if isinstance(data.get("metadata"), dict) else {}
     return {"items": items, "next": metadata.get("nextCursor")}
@@ -352,7 +352,6 @@ async def start_download(kind, version_id, folder=""):
     return public(job)
 async def run_download(job, version, file, url):
     path, part = job["path"], job["path"] + ".part"
-    loop = asyncio.get_running_loop()
     try:
         await in_thread(lambda: os.makedirs(os.path.dirname(path), exist_ok=True))
         digest = hashlib.sha256()
@@ -364,14 +363,14 @@ async def run_download(job, version, file, url):
             if response.content_type.startswith("text/html"):
                 raise DownloadError("Civitai answered with a web page instead of the file: the download may need an API key or early access.")
             job["total"] = response.content_length or job["total"]
-            out = await loop.run_in_executor(None, open_for_writing, part) # The file is opened, written and closed off the event loop:
-            try:                                                               # a slow disk doesn't stall ComfyUI.
+            out = await in_thread(open_for_writing, part) # Opened, written and closed off the event loop: a slow disk doesn't stall ComfyUI.
+            try:
                 async for chunk in response.content.iter_any(): # As it arrives, so the progress moves on a slow line too.
-                    await loop.run_in_executor(None, out.write, chunk)
+                    await in_thread(out.write, chunk)
                     digest.update(chunk)
                     job["done"] += len(chunk)
             finally:
-                await loop.run_in_executor(None, out.close)
+                await in_thread(out.close)
         sha256 = digest.hexdigest()
         expected = str((file.get("hashes") or {}).get("SHA256") or "").lower()
         if expected and expected != sha256:
@@ -469,7 +468,7 @@ def register_routes():
         if not isinstance(key, str) or (key.strip() and not re.fullmatch(r"[\w-]{8,200}", key.strip())):
             raise web.HTTPBadRequest(text="Civitai: that is not an API key (letters and digits, from Civitai → Account settings → API keys).")
         try:
-            await asyncio.get_running_loop().run_in_executor(None, save_key, key.strip())
+            await in_thread(save_key, key.strip())
         except OSError as error:
             raise web.HTTPBadRequest(text=f"Civitai: the key could not be saved: {error.strerror or error}.") from None
         _key, source = await in_thread(api_key)
@@ -478,21 +477,21 @@ def register_routes():
     async def models_rename(request):
         body = await json_body(request)
         try:
-            return web.json_response(await asyncio.get_running_loop().run_in_executor(None, rename_model, body.get("kind", ""), body.get("file"), body.get("to")))
+            return web.json_response(await in_thread(rename_model, body.get("kind", ""), body.get("file"), body.get("to")))
         except OSError as error:
             raise web.HTTPBadRequest(text=f"Models: can't rename: {error.strerror or error}.") from None
     @routes.delete("/diceforge/models/file")
     async def models_delete(request):
         query = request.rel_url.query
         try:
-            return web.json_response(await asyncio.get_running_loop().run_in_executor(None, delete_model, query.get("kind", ""), query.get("file")))
+            return web.json_response(await in_thread(delete_model, query.get("kind", ""), query.get("file")))
         except OSError as error:
             raise web.HTTPBadRequest(text=f"Models: can't delete: {error.strerror or error}.") from None
     @routes.post("/diceforge/models/restore")
     async def models_restore(request):
         body = await json_body(request)
         try:
-            return web.json_response(await asyncio.get_running_loop().run_in_executor(None, restore_model, body.get("kind", ""), body.get("id")))
+            return web.json_response(await in_thread(restore_model, body.get("kind", ""), body.get("id")))
         except OSError as error:
             raise web.HTTPBadRequest(text=f"Models: can't bring the model back: {error.strerror or error}.") from None
 register_routes()

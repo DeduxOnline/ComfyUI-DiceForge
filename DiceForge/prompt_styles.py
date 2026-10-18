@@ -1,10 +1,9 @@
-import asyncio
 import csv
 import io
 import os
 import folder_paths
 from aiohttp import web
-from .model_info import json_body
+from .model_info import in_thread, json_body
 # Prompt styles (web/prompt_styles.js, node menu of CLIP Dual Text Encode): named pieces of positive and negative prompt, put into the prompts with
 # one click, as A1111's styles. Built in: the quality tags each model family is made for; yours: a styles.csv in A1111's format (name, prompt,
 # negative_prompt) in the ComfyUI user folder, so an A1111 styles.csv can simply be copied there. {prompt} in a style's text is where the prompt
@@ -85,20 +84,20 @@ def register_routes():
         return
     @routes.get("/diceforge/styles")
     async def list_styles(request):
-        styles = await asyncio.get_running_loop().run_in_executor(None, read_styles)
+        styles = await in_thread(read_styles)
         return web.json_response({"builtin": BUILTIN, "user": styles})
     @routes.post("/diceforge/styles")
     async def post_style(request):
         body = await json_body(request)
         try:
-            return web.json_response(await asyncio.get_running_loop().run_in_executor(None, save_style, body))
+            return web.json_response(await in_thread(save_style, body))
         except OSError as error:
             raise web.HTTPBadRequest(text=f"Prompt styles: can't save: {error.strerror or error}.") from None
     @routes.delete("/diceforge/styles")
     async def remove_style(request):
         name = request.rel_url.query.get("name", "")
         try:
-            await asyncio.get_running_loop().run_in_executor(None, delete_style, name)
+            await in_thread(delete_style, name)
         except OSError as error:
             raise web.HTTPBadRequest(text=f"Prompt styles: can't delete: {error.strerror or error}.") from None
         return web.json_response({"deleted": name})

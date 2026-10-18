@@ -12,7 +12,7 @@ import aiohttp
 import folder_paths
 from aiohttp import web
 from .http_read import read_up_to
-from .model_info import json_body
+from .model_info import in_thread, json_body
 # Tag autocomplete for the prompt fields (web/tag_autocomplete.js): Danbooru and e621 tags, the way anime models (Illustrious, NoobAI, Anima) were
 # trained on them, with how often each is used and its aliases. The lists are CSV files in the format of a1111-sd-webui-tagcomplete
 # (tag,type,count,"alias,alias"), kept in the ComfyUI user folder: downloaded from that project with one click, or put there by hand. Every list
@@ -175,7 +175,7 @@ async def download(name):
         with open(path + ".part", "wb") as file:
             file.write(data)
         os.replace(path + ".part", path)
-    await asyncio.get_running_loop().run_in_executor(None, save)
+    await in_thread(save)
     return {"list": name, "tags": len(tags)}
 
 
@@ -215,7 +215,7 @@ def register_routes():
     async def search_tags(request):
         query = request.rel_url.query
         limit = number_query(query, "limit", 12, 1, 50)
-        index = await asyncio.get_running_loop().run_in_executor(None, INDEX.load)
+        index = await in_thread(INDEX.load)
         return web.json_response({"tags": index.search(query.get("q", "")[:100], limit), "ready": bool(index.tags)})
     @routes.get("/diceforge/tags/browse")
     async def browse_tags(request):
@@ -225,10 +225,9 @@ def register_routes():
             raise web.HTTPBadRequest(text=f"Tag Browser: no tag type {kind!r} (there are {', '.join(TYPE_NUMBERS)} and favorites).")
         if sort not in SORTS:
             raise web.HTTPBadRequest(text=f"Tag Browser: sort by {' or '.join(SORTS)}.")
-        loop = asyncio.get_running_loop()
-        index = await loop.run_in_executor(None, INDEX.load)
-        favorites = frozenset(await loop.run_in_executor(None, read_favorites))
-        page = await loop.run_in_executor(None, lambda: index.browse(query.get("q", "")[:100], kind, sort, number_query(query, "offset", 0, 0, 10 ** 7),
+        index = await in_thread(INDEX.load)
+        favorites = frozenset(await in_thread(read_favorites))
+        page = await in_thread(lambda: index.browse(query.get("q", "")[:100], kind, sort, number_query(query, "offset", 0, 0, 10 ** 7),
                                                                      number_query(query, "limit", 100, 1, 500), favorites))
         return web.json_response({**page, "ready": bool(index.tags)})
     @routes.post("/diceforge/tags/favorite")
@@ -238,7 +237,7 @@ def register_routes():
         if not isinstance(tag, str) or not tag.strip() or len(tag) > 200 or not isinstance(favorite, bool):
             raise web.HTTPBadRequest(text="Tag Browser: a favorite needs the tag and favorite true or false.")
         try:
-            names = await asyncio.get_running_loop().run_in_executor(None, set_favorite, tag.strip(), favorite)
+            names = await in_thread(set_favorite, tag.strip(), favorite)
         except OSError as error:
             raise web.HTTPBadRequest(text=f"Tag Browser: can't save the favorites: {error.strerror or error}.") from None
         return web.json_response({"favorites": len(names)})
@@ -253,7 +252,7 @@ def register_routes():
             raise web.HTTPBadGateway(text=str(error).replace("Danbooru Tag Enhancer", "Tag Browser")) from None
     @routes.get("/diceforge/tags/lists")
     async def tag_lists(request):
-        files = await asyncio.get_running_loop().run_in_executor(None, INDEX.files)
+        files = await in_thread(INDEX.files)
         return web.json_response({"files": files, "lists": [{"name": name, "title": title, "here": f"{name}.csv" in files} for name, title in LISTS.items()]})
     @routes.post("/diceforge/tags/download")
     async def download_tags(request):

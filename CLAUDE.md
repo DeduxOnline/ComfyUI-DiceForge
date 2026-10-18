@@ -41,7 +41,9 @@ section describes the tests, the agents and the release.
   - functions harder to follow than about 15 (S3776);
   - a blocking `open()` in an `async` route handler (S7493, counted as a bug: it fails the reliability condition). Every route does its
     file work (reading, writing, listing, `wildcard_index`) through `in_thread` (`model_info.py`), also when it is a call away, which
-    Sonar misses; `tests/test_event_loop.py` fails on a file touched on the event loop;
+    Sonar misses; `tests/test_event_loop.py` fails on a file touched on the event loop. In threads two requests run at once, so a
+    read-modify-write of a shared file holds its module's lock (`wildcards_api.one_at_a_time`, `model_info.INFO_CHANGES`, and
+    `index_lock` for the wildcard index);
   - regular expressions that can backtrack (S8786).
 - **The end-to-end tests answer DiceForge's questions with `answerQuestions`** (`e2e/helpers.js`): call it before the question is asked.
   It watches the page in the background (one watcher per page; a later call gives it new answers), because a Playwright locator handler

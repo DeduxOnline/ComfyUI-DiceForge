@@ -1,10 +1,12 @@
 import fnmatch
+import functools
 import io
 import json
 import os
 import re
 import secrets
 import shutil
+import threading
 import time
 import zipfile
 from urllib.parse import quote
@@ -706,6 +708,15 @@ def write_lines(path, text):
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8", newline="\n") as file:
         file.write(text.replace("\r\n", "\n").rstrip("\n") + "\n")
+# A route runs in a thread (in_thread), so two requests can change the same file at once: a favorites file or a yaml file that both read,
+# change and write would keep only one of the changes (a star clicked on two files in a row). The changes to the wildcard files go one at a time.
+CHANGES = threading.Lock()
+def one_at_a_time(function):
+    @functools.wraps(function)
+    def run(*args):
+        with CHANGES:
+            return function(*args)
+    return run
 # What the routes below do with the wildcard files, run in a thread (in_thread): indexing reads and stats every wildcard file, which on ComfyUI's
 # event loop would hold up every other request meanwhile.
 def wildcard_listing():
@@ -737,6 +748,7 @@ def picture_place(name, line):
     if line is not None and line >= len(entry["lines"]):
         raise web.HTTPBadRequest(text=f"Wildcards: {name} has no line {line} (its lines are counted from 0).")
     return base
+@one_at_a_time
 def remove_picture(name, line):
     path = card_picture(wildcard_index(refresh=True).get(name), line)
     if path is None:
@@ -753,6 +765,7 @@ def yaml_text(file):
     except (OSError, UnicodeDecodeError) as error:
         raise web.HTTPBadRequest(text=f"Wildcards: can't read {path}: {error}") from None
     return {"file": name, "path": path, "text": text.rstrip("\n")}
+@one_at_a_time
 def save_yaml(file, text):
     name, path = yaml_file(file)
     try:
@@ -762,6 +775,7 @@ def save_yaml(file, text):
     wildcard_index(refresh=True)
     return {"saved": name, "path": path}
 # A whole yaml file to the trash (↶ Undo with /diceforge/wildcards/restore), its wildcards' stars dropped.
+@one_at_a_time
 def delete_yaml(file):
     name, path = yaml_file(file)
     keys = [key for key, entry in wildcard_index().items() if entry.get("path") == path]
@@ -773,6 +787,7 @@ def delete_yaml(file):
     for key in keys:
         rename_favorite(key, None)
     return {"deleted": name, "path": path, "undo": trash_id}
+@one_at_a_time
 def convert(name, to):
     try:
         if to == "yaml":
@@ -798,6 +813,7 @@ def wildcard_text(name):
     return {"name": name, "path": entry["path"], "text": "\n".join(lines)}
 # Create (refused when the name is taken) or save: an existing wildcard is saved in place (a yaml key in its yaml file), a new one goes to the
 # first wildcards folder as a txt file, or next to a yaml wildcard (next_to), into that wildcard's yaml file.
+@one_at_a_time
 def save_wildcard(name, text, next_to, create):
     entry = wildcard_index(refresh=True).get(name)
     if create and entry is not None:
@@ -817,6 +833,7 @@ def save_wildcard(name, text, next_to, create):
     return {"saved": name, "path": path, **({"yaml": os.path.basename(path)} if path.lower().endswith((".yaml", ".yml")) else {})}
 # Rename or move (a / in the new name puts it in a folder): a file stays in its wildcards folder, a yaml key among its yaml file's keys, and a
 # name already taken is refused.
+@one_at_a_time
 def rename_wildcard(name, to):
     entry = existing_entry(name)
     path = entry["path"]
@@ -841,6 +858,7 @@ def rename_wildcard(name, to):
     wildcard_index(refresh=True)
     rename_favorite(name, to)
     return {"renamed": name, "to": to, "path": target}
+@one_at_a_time
 def delete_wildcard(name):
     entry = existing_entry(name)
     path = entry["path"]
@@ -853,6 +871,7 @@ def delete_wildcard(name):
     rename_favorite(name, None)
     return {"deleted": name, "path": path, "undo": trash_id}
 # Undo a delete: the id is the delete's "undo".
+@one_at_a_time
 def restore_wildcard(trash_id):
     try:
         name, path, favorite = restore_file(trash_id)
@@ -865,6 +884,7 @@ def restore_wildcard(trash_id):
         except OSError: # Back without its star.
             pass
     return {"restored": name, "path": path}
+@one_at_a_time
 def import_into(data, folder):
     try:
         imported, skipped, left_out = import_zip(data, folder)
@@ -872,6 +892,7 @@ def import_into(data, folder):
         raise web.HTTPBadRequest(text=f"Wildcards: can't import the zip: {error.strerror or error}.") from None
     wildcard_index(refresh=True)
     return {"imported": imported, "skipped": skipped, "left_out": left_out}
+@one_at_a_time
 def set_favorite(name, favorite):
     if favorite and name not in wildcard_index(refresh=True):
         raise web.HTTPNotFound(text=f"Wildcards: no wildcard {name}.")
@@ -906,7 +927,7 @@ def register_routes():
         if ending is None:
             raise web.HTTPBadRequest(text="Wildcards: send a PNG, JPEG, WebP or GIF picture.")
         try:
-            path = await in_thread(save_picture, base, data, ending)
+            path = await in_thread(one_at_a_time(save_picture), base, data, ending)
         except OSError as error:
             raise web.HTTPBadRequest(text=f"Wildcards: can't save the picture: {error.strerror or error}.") from None
         return web.json_response({"name": name, "picture": path})
@@ -977,7 +998,7 @@ def register_routes():
         if any(mark in find + replacement for mark in "\r\n") or not isinstance(apply, bool):
             raise web.HTTPBadRequest(text="Wildcards: find and replace work within a line (no line breaks); apply is true or false.")
         try:
-            return web.json_response(await in_thread(replace_in_wildcards, find, replacement, apply))
+            return web.json_response(await in_thread(one_at_a_time(replace_in_wildcards), find, replacement, apply))
         except OSError as error:
             raise web.HTTPBadRequest(text=f"Wildcards: can't replace: {error.strerror or error}.") from None
     @routes.get("/diceforge/wildcards/export")

@@ -210,6 +210,10 @@ def write_preset(path, stack):
     os.makedirs(PRESET_FOLDER, exist_ok=True)
     with open(path, "w", encoding="utf-8") as handle:
         json.dump({"type": "DiceForge LoRA Stack preset", "version": 1, "stack": stack}, handle, ensure_ascii=False, indent=1)
+def read_preset(name, path):
+    if not os.path.isfile(path):
+        raise web.HTTPNotFound(text=f"LoRA Stack: no preset {name}.")
+    return read_json(path)
 def remove_preset(path):
     if os.path.isfile(path):
         os.remove(path)
@@ -226,9 +230,9 @@ def register_routes():
     async def get_preset(request):
         name, path = preset_path(request.rel_url.query.get("name"))
         try:
-            data = await in_thread(read_json, path)
-        except OSError: # Not there (or not a file).
-            raise web.HTTPNotFound(text=f"LoRA Stack: no preset {name}.") from None
+            data = await in_thread(read_preset, name, path)
+        except OSError as error:
+            raise web.HTTPBadRequest(text=f"LoRA Stack: can't read the preset {name}: {error.strerror or error}.") from None
         except ValueError as error:
             raise web.HTTPBadRequest(text=f"LoRA Stack: preset {name} is damaged, it is not valid JSON ({error}).") from None
         return web.json_response({"name": name, "stack": preset_stack(data)})

@@ -141,7 +141,9 @@ async function answerQuestions(page, answer = () => true, times = Infinity) {
     for (;;) {
       await question.waitFor({ state: "visible", timeout: 0 });
       const shown = await question.elementHandle();
-      if (state.left > 0) { // Past its count, a question is left to the test.
+      // Past its count, a question is left to the test, until it closes or a later call gives answers for it.
+      while (state.left <= 0 && await shown?.isVisible()) await page.waitForTimeout(100);
+      if (state.left > 0 && await shown?.isVisible()) {
         state.left--;
         await reply(question);
       }

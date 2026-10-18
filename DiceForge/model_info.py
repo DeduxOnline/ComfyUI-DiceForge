@@ -4,6 +4,7 @@ import json
 import logging
 import os
 import re
+import threading
 import time
 import aiohttp
 import folder_paths
@@ -177,18 +178,28 @@ async def model_info(kind, name, refresh=False):
     elif civitai.get("found") and not civitai.get("details_checked"): # The model's details (tags, stats) failed last time: only those again.
         async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=30), trust_env=True) as session:
             info["civitai"] = {**civitai, **await civitai_model_details(session, civitai.get("model_id"))}
-    await in_thread(write_info, kind, name, info)
+    info = await in_thread(store_lookup, kind, name, info)
     return {"kind": kind, "file": name, **info}
 def local_preview_of(kind, name):
     path = folder_paths.get_full_path(kind, name) if kind in KINDS else None
     return path and local_preview(path, set(os.listdir(os.path.dirname(path))))
+# The changes to an info file go one at a time (the routes run in threads, two at once can change the same file), and a lookup, which takes
+# seconds, keeps what was saved meanwhile: the favorite and your fields as the file has them now.
+INFO_CHANGES = threading.Lock()
+def store_lookup(kind, name, info):
+    with INFO_CHANGES:
+        now = read_info(kind, name)
+        info = {**info, "favorite": now.get("favorite") is True if now else info.get("favorite") is True, "user": now.get("user", info.get("user", {}))}
+        write_info(kind, name, info)
+    return info
 # A model's own fields saved into its info file (the favorite flag, your notes): its name checked against the model folders first.
 def update_info(kind, name, change):
     if kind not in KINDS or not isinstance(name, str) or not name or not folder_paths.get_full_path(kind, name):
         raise web.HTTPNotFound(text="Model info: unknown model.")
-    info = read_info(kind, name)
-    change(info)
-    write_info(kind, name, info)
+    with INFO_CHANGES:
+        info = read_info(kind, name)
+        change(info)
+        write_info(kind, name, info)
 # Model browser (web/model_browser.js): every file of a model kind with what is already known about it, without hashing anything; the dialog looks
 # files up one by one with /diceforge/model-info. A local preview next to the file (name.preview.png, name.png... as Civitai Helper and LoRA Manager
 # save them) is shown first, else the first Civitai image.
