@@ -673,6 +673,9 @@ def yaml_file(name):
     if path is None:
         raise web.HTTPNotFound(text=f"Wildcards: no yaml file {name} with wildcards.")
     return name, path
+def read_whole(path):
+    with open(path, encoding="utf-8-sig") as file:
+        return file.read()
 def save_yaml_text(path, text):
     text = text.replace("\r\n", "\n").rstrip("\n") + "\n"
     try:
@@ -767,8 +770,7 @@ def register_routes():
     async def read_yaml_file(request):
         name, path = yaml_file(request.rel_url.query.get("file"))
         try:
-            with open(path, encoding="utf-8-sig") as file:
-                text = file.read()
+            text = await asyncio.get_running_loop().run_in_executor(None, read_whole, path) # Off the event loop, like the saves.
         except (OSError, UnicodeDecodeError) as error:
             raise web.HTTPBadRequest(text=f"Wildcards: can't read {path}: {error}") from None
         return web.json_response({"file": name, "path": path, "text": text.rstrip("\n")})

@@ -116,17 +116,28 @@ async function queueFromPage(page, request) {
 const nodeElement = (page, id) => page.locator(`[data-node-id="${id}"]`);
 
 // The DiceForge questions (ComfyUI's dialogs titled DiceForge) answered as they show: answer({ prompt, text }) gives true to confirm, false to
-// cancel, or the text to type in a prompt (true keeps its proposed text). times: how many to answer (all by default).
-async function answerQuestions(page, answer = () => true, times) {
-  const question = page.locator('[role="dialog"]').filter({ has: page.locator("h2", { hasText: /^DiceForge$/ }) });
-  await page.addLocatorHandler(question, async (dialog) => {
+// cancel, or the text to type in a prompt (true keeps its proposed text). times: how many to answer (all by default). It watches in the
+// background, not as a locator handler: a handler only runs before a locator action or assertion, so a question raised by a node menu's
+// callback and followed by expect.poll would never be answered. It stops when the page closes.
+async function answerQuestions(page, answer = () => true, times = Infinity) {
+  const question = page.locator('[role="dialog"]').filter({ has: page.locator("h2", { hasText: /^DiceForge$/ }) }).first();
+  const reply = async (dialog) => {
     const field = dialog.locator("input");
     const prompt = (await field.count()) > 0;
-    const reply = await answer({ prompt, text: await dialog.innerText() });
-    if (reply === false || reply == null) return dialog.getByRole("button", { name: prompt ? "Close" : "Cancel" }).click();
-    if (typeof reply === "string") await field.fill(reply);
+    const given = await answer({ prompt, text: await dialog.innerText() });
+    if (given === false || given == null) return dialog.getByRole("button", { name: prompt ? "Close" : "Cancel" }).click();
+    if (typeof given === "string") await field.fill(given);
     await dialog.getByRole("button", { name: "Confirm" }).click();
-  }, times ? { times } : undefined);
+  };
+  const watch = async () => {
+    for (let left = times; left > 0; left--) {
+      await question.waitFor({ state: "visible", timeout: 0 });
+      const shown = await question.elementHandle();
+      await reply(question);
+      await shown?.waitForElementState("hidden"); // Gone (or hidden) before the next question is looked for.
+    }
+  };
+  watch().catch(() => {}); // The page closed at the end of the test.
 }
 
 module.exports = { test, expect, runPrompt, shown, basePath, writeFile, openComfy, addNodes, connect, widgetValue, setWidget, menuItems, clickMenu, queueFromPage, nodeElement, answerQuestions };

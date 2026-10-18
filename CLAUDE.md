@@ -20,7 +20,9 @@ section describes the tests, the agents and the release.
 3. Update `README.md` (what users see and do) and `CHANGELOG.md` (under `[Unreleased]`: Added, Changed, Fixed or Removed), in the voice of
    the text around.
 4. Before committing: `python .github/scripts/review_checks.py origin/main` (line endings, syntax, unsafe code, routes, missing tests or
-   docs), or ask the `reviewer` agent.
+   docs), or ask the `reviewer` agent. On the author's computer `python` is the
+   Microsoft Store stub: `..\..\..\python_embeded\python.exe -X utf8 .github/scripts/review_checks.py origin/main` (without `-X utf8` it
+   stops on a cp1251 decode error).
 5. Commit to `main` with a message that says what changed for users. Keep the `Co-Authored-By` trailer Claude Code adds. Push to `main`.
 6. Check CI on GitHub (the Tests workflow), and fix it until it is green.
    - **Unit tests and SonarQube Cloud:** a failed Quality Gate fails the run.
@@ -35,7 +37,13 @@ section describes the tests, the agents and the release.
     allowlist check does not satisfy it;
   - `random` outside the seeded places listed in `sonar-project.properties` (S2245): use `secrets`;
   - template literals nested in `${...}` (S4624);
-  - functions harder to follow than about 15 (S3776).
+  - functions harder to follow than about 15 (S3776);
+  - a blocking `open()` in an `async` route handler (S7493, counted as a bug: it fails the reliability condition): read and write files
+    through `run_in_executor`, as the other routes do;
+  - regular expressions that can backtrack (S8786).
+- **The end-to-end tests answer DiceForge's questions with `answerQuestions`** (`e2e/helpers.js`), a Playwright locator handler. It only runs
+  before a locator action or a locator assertion: a question raised by a `page.evaluate` (a menu callback) and followed only by
+  `expect.poll` is never answered, and the test times out.
 
 ## Code
 
@@ -43,11 +51,25 @@ section describes the tests, the agents and the release.
   file's own. Editing with a script that turns CRLF into LF changes every line; `review_checks.py` catches it.
 - **Read like the code around it:** whole plain sentences in comments, saying why, at the same density.
 - **Reuse the helpers:**
-  - `dom.js`: `element`, `addStyleOnce`, `background` for promises not awaited, `fitToContent` for panels in nodes;
+  - `dom.js`: `element`, `addStyleOnce`, `background` for promises not awaited, `fitToContent` for panels in nodes, `askConfirm` and
+    `askText` for questions (ComfyUI's dialogs; never the browser's `confirm()` or `prompt()`), `asking()` before a window's own keys;
   - `menu.js`: right-click menus, keys;
   - `window_memory.js`: what windows remember, their size;
   - `node_size.js`: node heights;
-  - `http_read.py`, `model_lists.py`.
+  - `move_dialog.js`: the folder picker and drag and drop onto a tree; `media.js`: Civitai pictures and videos, Blur NSFW;
+  - `http_read.py`, `model_lists.py`; `model_info.json_body` for every POST body.
+- **Where things are:**
+  - `seed_modes.py`: the pickers every random node uses, and the seed memory (SQLite in `user/DiceForge`). Every mode gives the same result
+    for the same seed.
+  - `clip_text_encode_pos_neg.py`: the prompt syntax (choices, wildcards, variables, `<lora:>`) and `fill_in`, also used by Wildcards to
+    Text, Danbooru Tag Enhancer and the Wildcard Browser's previews. `wildcards_api.py`: the Wildcard Browser's routes, yaml edits that keep
+    comments, the trash.
+  - Nodes are V3 (`io.ComfyNode`), registered in `DiceForge/__init__.py`. Modules with routes have `register_routes()`, run at import.
+  - A node's preview gets its run's data from `ui={"dice_forge_…": [...]}`; the frontend keeps it in `node.properties`, so it travels with
+    the workflow.
+  - The prompt tools work on the text fields of `PROMPT_NODES` (`wildcards.js`). Wildcard Note is a frontend-only node
+    (`wildcard_note.js`).
+- `ComfyUI/AGENTS.md`, which Claude Code shows when files of ComfyUI are read, holds the rules of ComfyUI's own code, not DiceForge's.
 - **Text is shown as text** (`element()`), never as HTML. Links to new tabs open with `noopener`. `.github/scripts/security_scan.py`, run by
   the unit tests, fails CI otherwise.
 - **No release yet** (no `v*` tag): DiceForge has no users but its author, so breaking changes are fine. Don't add repairs for workflows or
@@ -82,14 +104,23 @@ Development → Agents).
   - its Python is `..\..\..\python_embeded\python.exe` from the repository (`-m pip install pytest hypothesis` once, then `-m pytest tests`);
   - the end-to-end tests: in `e2e`, `npm ci`, `npx playwright install chromium`, then `$env:COMFYUI_PATH="..\..\.."; npx playwright test`.
 - **Git keeps each file's line endings as they are** in this repository (`git config core.autocrlf false`): Git for Windows would otherwise
-  convert them and show files as changed.
+  convert them and show files as changed. In Git Bash, `sed -i` turns a CRLF file into LF: edit with a Python script that reads and
+  writes with `newline=""`.
+- **CI from here:** the repository is private, and `gh` may not be on the PATH: `"C:\Program Files\GitHub CLI\gh.exe" run list`,
+  `run view <id> --log-failed`, `run view --job <id> --log`.
 
 ## Where the work stands (October 2026)
 
 Update this section as the steps get done, and remove it when they all are.
 
 - **Done:** every node and window; unit and end-to-end tests in both designs, the ComfyUI contract and the old-workflow tests; the agents;
-  every node id starting with `DiceForge` (`tests/test_node_ids.py` keeps it so); CI green on `main`.
+  every node id starting with `DiceForge` (`tests/test_node_ids.py` keeps it so).
+- **CI is red on `main` since 2026-10-16.** The last run (`28cd3dd`, the questions in ComfyUI's dialogs) fails on these; fix them first:
+  - 10 end-to-end tests whose question comes from a node menu, not a window: ✂ Selection → new wildcard, Wildcard Note's save, Prompt
+    styles and KSampler presets (saving), Dice Grid (↺ a cell's run). Their `answerQuestions` never runs (see Checks).
+  - Sonar's Quality Gate: S7493 in `read_yaml_file` (`wildcards_api.py`, `GET /diceforge/wildcards/yaml`); and seven S8786 regular
+    expressions in `wildcards.js`.
+  - The README's *On GitHub* says four end-to-end jobs; there are five.
 - **Next, in this order:**
   1. **A full pass of the agents:** `tester`, `security`, `perf` (also `--scale 3`), `docs`, `comfy-watcher` against ComfyUI master. Then fix
      what they find. Known already: adding 100 nodes takes about 3 s in Nodes 2.0 and 0.6 s in the classic canvas.

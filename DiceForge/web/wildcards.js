@@ -394,7 +394,10 @@ async function openBrowser(node) {
   code.append(lineAdd);
   // A line's option: in a yaml file, the text after "key:" or "- ", without its quotes (a key of keys, or a [list] on one line, has none).
   function yamlOption(line) {
-    const value = (/^\s*-\s+(.+)$/.exec(line) ?? /^\s*[^#:\s][^:]*:\s+(\S.*)$/.exec(line))?.[1].trim() ?? "";
+    const text = line.trim(), colon = text.indexOf(":");
+    let value = "";
+    if (/^-\s/.test(text)) value = text.slice(1).trim();
+    else if (!text.startsWith("#") && colon > 0 && /\s/.test(text[colon + 1] ?? "")) value = text.slice(colon + 1).trim();
     if (/^[[{]/.test(value)) return "";
     return /^(["']).*\1$/.test(value) ? value.slice(1, -1) : value;
   }
@@ -1009,11 +1012,11 @@ async function openBrowser(node) {
     if (selected !== name) await open(name);
     if (selected !== name) return;
     const field = cursorField(node);
-    const line = String(node.widgets?.find((widget) => widget.name === field)?.value ?? "").replace(/\s*\n\s*/g, " ").trim();
+    const line = oneLine(String(node.widgets?.find((widget) => widget.name === field)?.value ?? ""));
     if (!line) return say(`The ${field} prompt is empty: nothing to add.`);
     const lines = editor.value.split("\n");
     if (lines.some((item) => item.trim() === line)) return say(`${name} already has the ${field} prompt as a line.`);
-    editor.value = editor.value.trim() ? `${editor.value.replace(/\n+$/, "")}\n${line}` : line;
+    editor.value = editor.value.trim() ? `${editor.value.trimEnd()}\n${line}` : line;
     numberLines();
     showDirty();
     editor.scrollTop = editor.scrollHeight;
@@ -1255,7 +1258,7 @@ app.registerExtension({
 // A wildcard file without duplicate and empty lines (sorted A→Z by the text, a line's N:: weight left aside, when sort): the comment lines at its
 // top stay there. Also how many lines went.
 export function cleanLines(text, sort) {
-  const lines = text.split("\n").map((line) => line.replace(/\s+$/, ""));
+  const lines = text.split("\n").map((line) => line.trimEnd());
   let start = 0;
   while (start < lines.length && (!lines[start].trim() || lines[start].trim().startsWith("#"))) start++;
   const head = lines.slice(0, start).filter((line) => line.trim()), seen = new Set(), body = [];
@@ -1273,6 +1276,10 @@ export function cleanLines(text, sort) {
   return { text: [...head, ...body].join("\n"), duplicates, empty };
 }
 
+// A text as one line: its lines trimmed and joined with a space, empty ones left out (no regular expression that could backtrack).
+function oneLine(text) {
+  return text.split("\n").map((line) => line.trim()).filter(Boolean).join(" ");
+}
 // A message in ComfyUI's corner (a dialog where there is none, for what went wrong).
 export function toast(severity, detail) {
   const toaster = app.extensionManager?.toast;
@@ -1287,8 +1294,8 @@ async function selectionToWildcard(node) {
   const text = String(node.widgets?.find((widget) => widget.name === cursor?.name)?.value ?? "");
   const start = cursor?.start ?? 0, end = cursor?.end ?? 0, picked = text.slice(start, end);
   if (!cursor || !picked.trim()) return toast("warn", "Select a part of a prompt first: it becomes the new wildcard's first line, and __name__ takes its place.");
-  const line = picked.replace(/\s*\n\s*/g, " ").trim();
-  const suggested = line.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "_").replace(/^_+|_+$/g, "").split("_").slice(0, 3).join("_") || "new";
+  const line = oneLine(picked);
+  const suggested = line.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean).slice(0, 3).join("_") || "new";
   const quoted = line.length > 60 ? `${line.slice(0, 60)}…` : line;
   const name = (await askText(`A wildcard from “${quoted}”: its name (folders with /, for example outfit/dress):`, suggested))?.trim();
   if (!name) return;
@@ -1305,7 +1312,7 @@ async function selectionToWildcard(node) {
   }
   if (!response.ok) return toast("error", await response.text());
   const token = `__${(await response.json()).saved}__`;
-  const lead = picked.match(/^\s*/)[0], trail = picked.match(/\s*$/)[0]; // The selection's spaces stay around the wildcard.
+  const lead = picked.slice(0, picked.length - picked.trimStart().length), trail = picked.slice(picked.trimEnd().length); // The selection's spaces stay around the wildcard.
   const caret = start + lead.length + token.length;
   setField(node, cursor.name, text.slice(0, start) + lead + token + trail + text.slice(end), caret);
   lastCursor.set(node, { name: cursor.name, start: caret, end: caret });
