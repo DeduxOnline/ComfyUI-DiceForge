@@ -4,7 +4,7 @@
 const fs = require("fs");
 const { test, expect, basePath, writeFile, openComfy, addNodes, connect, widgetValue, setWidget, menuItems, clickMenu, queueFromPage, nodeElement, answerQuestions } = require("./helpers");
 const { png, zip } = require("./fixtures");
-const { promptField, lookUp } = require("./ui-shared");
+const { promptField, lookUp, wildcardMode } = require("./ui-shared");
 
 for (const vue of [true, false]) {
   test.describe(vue ? "Nodes 2.0" : "classic nodes", () => {
@@ -237,7 +237,7 @@ for (const vue of [true, false]) {
         await answerQuestions(page, ({ prompt }) => (prompt ? `${top}/color` : true));
         await clickMenu(page, id, "DiceForge.Wildcards", "Wildcard Browser");
         const dialog = page.locator(".dfwc"), status = dialog.locator(".status"), row = (name) => dialog.locator(`.row[data-name="${top}/${name}"]`);
-        if (await dialog.locator("button.mode").textContent() === "📄 Lines") await dialog.locator("button.mode").click(); // Lines: the editor.
+        await wildcardMode(dialog, "lines"); // Lines: the editor.
         await dialog.locator("button.open-all").click();
         await row("colour").click({ button: "right" }); // Renamed: look.txt now uses a name no file has.
         await page.locator(".df-menu button", { hasText: "✎ Rename…" }).click();
@@ -405,7 +405,7 @@ for (const vue of [true, false]) {
       await answerQuestions(page);
       await clickMenu(page, id, "DiceForge.Wildcards", "Wildcard Browser");
       const dialog = page.locator(".dfwc");
-      if (await dialog.locator("button.mode").textContent() === "📄 Lines") await dialog.locator("button.mode").click(); // Start in lines.
+      await wildcardMode(dialog, "lines"); // Start in lines.
       const folder = dialog.locator(`.folder[data-path="${pack}"] > .row`), yamlRow = dialog.locator(`.row[data-name="${pack}.yaml"]`);
       const menu = page.locator(".df-menu");
       await folder.click({ button: "right" }); // Right-click: the folder's menu.
@@ -446,7 +446,7 @@ for (const vue of [true, false]) {
       const [id] = await addNodes(page, [{ type: "DiceForgeCLIPDualTextEncode", pos: [300, 60] }]);
       await clickMenu(page, id, "DiceForge.Wildcards", "Wildcard Browser");
       const dialog = page.locator(".dfwc");
-      if (await dialog.locator("button.mode").textContent() === "📄 Lines") await dialog.locator("button.mode").click(); // Lines: the editor.
+      await wildcardMode(dialog, "lines"); // Lines: the editor.
       await dialog.locator(".row", { hasText: file }).locator(".name").click();
       const editor = dialog.locator(".edit textarea");
       await expect(editor).toHaveValue("one");
@@ -473,7 +473,7 @@ for (const vue of [true, false]) {
       const [id] = await addNodes(page, [{ type: "DiceForgeCLIPDualTextEncode", pos: [300, 60], widgets: { positive: "1girl" } }]);
       await clickMenu(page, id, "DiceForge.Wildcards", "Wildcard Browser");
       const dialog = page.locator(".dfwc");
-      if (await dialog.locator("button.mode").textContent() === "📄 Lines") await dialog.locator("button.mode").click(); // Lines: the editor.
+      await wildcardMode(dialog, "lines"); // Lines: the editor.
       const chooser = page.waitForEvent("filechooser");
       await dialog.locator("button.import").click();
       await (await chooser).setFiles({ name: `${pack}.zip`, mimeType: "application/zip", buffer: zip({
@@ -570,7 +570,7 @@ for (const vue of [true, false]) {
       await answerQuestions(page, ({ prompt }) => (prompt ? `packs/${pack}/lying` : true));
       await clickMenu(page, id, "DiceForge.Wildcards", "Wildcard Browser");
       const dialog = page.locator(".dfwc"), editor = dialog.locator(".edit textarea"), status = dialog.locator(".status");
-      if (await dialog.locator("button.mode").textContent() === "📄 Lines") await dialog.locator("button.mode").click(); // Lines.
+      await wildcardMode(dialog, "lines"); // Lines.
       await dialog.locator("button.open-all").click();
       const row = dialog.locator(`.row[data-name="packs/${pack}.yaml"]`);
       await expect(row).toContainText(`📜 ${pack}.yaml`);
@@ -618,7 +618,7 @@ for (const vue of [true, false]) {
       const [id] = await addNodes(page, [{ type: "DiceForgeCLIPDualTextEncode", pos: [300, 60], widgets: { positive: "1girl" } }]);
       await clickMenu(page, id, "DiceForge.Wildcards", "Wildcard Browser");
       const dialog = page.locator(".dfwc");
-      if (await dialog.locator("button.mode").textContent() === "🃏 Cards") await dialog.locator("button.mode").click(); // Cards.
+      await wildcardMode(dialog, "cards"); // Cards.
       await dialog.locator(".top input").first().fill(pack);
       await expect(dialog.locator(`.folder[data-path="${pack}/POSES"]`)).toHaveCount(0); // No folder of its keys.
       const row = dialog.locator(`.row[data-name="${pack}/poses.yaml"]`);
@@ -643,7 +643,7 @@ for (const vue of [true, false]) {
       await answerQuestions(page, () => answers.shift());
       await clickMenu(page, id, "DiceForge.Wildcards", "Wildcard Browser");
       const dialog = page.locator(".dfwc"), editor = dialog.locator(".edit textarea");
-      if (await dialog.locator("button.mode").textContent() === "📄 Lines") await dialog.locator("button.mode").click(); // Lines.
+      await wildcardMode(dialog, "lines"); // Lines.
       await dialog.locator(".top input").first().fill(top);
       await dialog.locator(`.row[data-name="${top}/a"] .name`).click();
       await expect(editor).toHaveValue("a");
@@ -696,7 +696,7 @@ for (const vue of [true, false]) {
       await answerQuestions(page, ({ prompt }) => (prompt ? answers.shift() : true));
       await clickMenu(page, id, "DiceForge.Wildcards", "Wildcard Browser");
       const dialog = page.locator(".dfwc"), status = dialog.locator(".status");
-      if (await dialog.locator("button.mode").textContent() === "🃏 Cards") await dialog.locator("button.mode").click(); // Cards.
+      await wildcardMode(dialog, "cards"); // Cards.
       await dialog.locator(`.row[data-name="${pack}.yaml"] .name`).click(); // The yaml file's cards.
       const card = (name) => dialog.locator(`.card[data-name="${pack}/${name}"]`);
       await card("sitting").locator("button.edit-card").click();
@@ -738,7 +738,7 @@ for (const vue of [true, false]) {
       await answerQuestions(page);
       await clickMenu(page, id, "DiceForge.Wildcards", "Wildcard Browser");
       const dialog = page.locator(".dfwc");
-      if (await dialog.locator("button.mode").textContent() === "🃏 Cards") await dialog.locator("button.mode").click(); // Cards.
+      await wildcardMode(dialog, "cards"); // Cards.
       await dialog.locator(`.row[data-name="${pack}.yaml"] .name`).click(); // The yaml file's cards.
       const lines = dialog.locator(`.card.line-card[data-name="${pack}/standing"]`);
       await expect(lines.locator(".title")).toHaveText(["standing · 1/3", "standing · 2/3", "standing · 3/3"]);
@@ -780,7 +780,7 @@ for (const vue of [true, false]) {
       const [id] = await addNodes(page, [{ type: "DiceForgeCLIPDualTextEncode", pos: [300, 60], widgets: { positive: "1girl" } }]);
       await clickMenu(page, id, "DiceForge.Wildcards", "Wildcard Browser");
       const dialog = page.locator(".dfwc");
-      if (await dialog.locator("button.mode").textContent() === "📄 Lines") await dialog.locator("button.mode").click(); // Start in lines.
+      await wildcardMode(dialog, "lines"); // Start in lines.
       await expect(dialog.locator("button.mode")).toHaveText("🃏 Cards");
       await dialog.locator("button.mode").click();
       await dialog.locator(`.row[data-name="${pack}.yaml"] .name`).click(); // The yaml file's cards.

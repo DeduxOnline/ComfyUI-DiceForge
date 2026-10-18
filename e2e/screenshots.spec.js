@@ -3,6 +3,7 @@
 const path = require("path");
 const fs = require("fs");
 const { test, expect, openComfy, addNodes, connect, setWidget, clickMenu, queueFromPage, nodeElement, writeFile } = require("./helpers");
+const { wildcardMode } = require("./ui-shared");
 const { png } = require("./fixtures");
 
 const OUT = path.join(__dirname, "..", "docs", "images");
@@ -223,7 +224,7 @@ test.describe("README screenshots (Nodes 2.0)", () => {
     const [id] = await addNodes(page, [{ type: "DiceForgeCLIPDualTextEncode", pos: [400, 220], widgets: { positive: "1girl" } }]);
     await clickMenu(page, id, "DiceForge.Wildcards", "Wildcard Browser");
     const dialog = page.locator(".dfwc");
-    if (await dialog.locator("button.mode").textContent() === "🃏 Cards") await dialog.locator("button.mode").click();
+    await wildcardMode(dialog, "cards");
     await dialog.locator('.row[data-name="POSES.yaml"] .name').click();
     await expect(dialog.locator(".card")).toHaveCount(4);
     await page.waitForTimeout(800);

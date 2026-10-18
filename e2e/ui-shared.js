@@ -1,6 +1,8 @@
 // What the browser tests (ui-*.spec.js) share: the DiceForge node types, and ways to reach a prompt field, a model's info, the LoRA Browser's
 // cards and the Sampler presets submenu in either node design.
 
+const { expect } = require("@playwright/test");
+
 const ALL_NODES = ["DiceForgeSDXLResolutionList", "DiceForgeResolutionSelector", "DiceForgeCLIPDualTextEncode", "DiceForgeWildcardsToText", "DiceForgeRandomInt", "DiceForgeRandomFloat",
   "DiceForgeRandomLora", "DiceForgeRandomCheckpoint", "DiceForgeRandomDiffusionModel", "DiceForgeRandomImage", "DiceForgeGrid", "DiceForgeRandomSampler",
   "DiceForgeRandomVAE", "DiceForgeLoadVAEDecodeSave", "DiceForgeVAEDecodeSave", "DiceForgeLoadDiffusionModelCLIP", "DiceForgeLoraStack", "DiceForgeXYPlot", "DiceForgeVariationSeed", "DiceForgeAnimaNAG", "DiceForgeHiresUpscale", "DiceForgeDanbooruEnhancer", "DiceForgeWildcardNote"];
@@ -24,4 +26,13 @@ const submenu = (page, id) => page.evaluate((id) => window.app.extensions.find((
 const clickSubmenu = (page, id, content) => page.evaluate(([id, content]) => window.app.extensions.find((item) => item.name === "DiceForge.SamplerPresets")
   .getNodeMenuItems(window.app.graph.getNodeById(id))[0].submenu.options.find((item) => item?.content.includes(content)).callback(), [id, content]);
 
-module.exports = { ALL_NODES, promptField, lookUp, cardTitles, submenu, clickSubmenu };
+// The Wildcard Browser in its cards or lines mode (it opens in the one used last). Its mode button gets its label once the list is drawn, so
+// that is waited for first: a browser still loading is not taken for the other mode.
+async function wildcardMode(dialog, mode) {
+  const button = dialog.locator("button.mode");
+  await expect(button).toHaveText(/Cards|Lines/);
+  if ((await button.textContent()) === (mode === "cards" ? "🃏 Cards" : "📄 Lines")) await button.click();
+  await expect(button).toHaveText(mode === "cards" ? "📄 Lines" : "🃏 Cards");
+}
+
+module.exports = { ALL_NODES, promptField, lookUp, cardTitles, submenu, clickSubmenu, wildcardMode };
