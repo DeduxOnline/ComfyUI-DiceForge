@@ -23,9 +23,13 @@ def test_the_version_is_the_same_everywhere():
 
 def test_the_registry_has_what_it_needs():
     project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-    assert project["project"]["name"] == "comfyui-diceforge" and project["project"]["dependencies"] == []
+    assert project["project"]["name"] == "comfyui-diceforge" and project["project"]["dependencies"] == ["comfyui-frontend-package>=1.53.6"]
     assert (ROOT / project["project"]["license"]["file"]).is_file() and project["tool"]["comfy"]["PublisherId"]
     assert project["project"]["urls"]["Repository"].startswith("https://github.com/")
+    comfy = project["tool"]["comfy"]
+    assert comfy["Icon"].endswith("/main/docs/icon.png") and (ROOT / "docs" / "icon.png").is_file()
+    # The README says the same minimums.
+    assert f"ComfyUI {comfy['requires-comfyui'].removeprefix('>=')}" in (ROOT / "README.md").read_text(encoding="utf-8")
 
 
 def test_a_wrong_tag_stops_the_release():

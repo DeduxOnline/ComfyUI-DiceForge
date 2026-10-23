@@ -136,9 +136,9 @@ Update this section as the steps get done, and remove it when they all are.
 - **CI is green on `main` again since 2026-10-18** (`8e1f7c7`), after being red from 2026-10-16.
 - **Next, in this order:**
   1. **What ComfyUI offers node packs and DiceForge doesn't use yet** (docs.comfy.org → Custom Nodes and Registry, read 2026-10-10):
-     - `pyproject.toml`: `requires-comfyui` and a minimum `comfyui-frontend-package` in `dependencies`, since DiceForge needs the V3
-       schema's DynamicCombo and the Nodes 2.0 design (find the first versions that have what it uses); `Icon` is empty, and `Banner`
-       is missing. Without the minimums the Registry offers DiceForge to an old ComfyUI it doesn't work in.
+     - Done: `pyproject.toml` asks for ComfyUI 0.38.0 and frontend 1.53.6 (the first that pass a manual Tests run; 0.36.0 fails on the
+       resolution preview), and has an `Icon` (`docs/icon.png`). A newer minimum: check it the same way, with `comfyui_ref`. `Banner`
+       (21:9) is still missing.
      - `example_workflows/` at the repository root: workflow JSON files, each with a `.jpg` of the same name, that ComfyUI's template
        browser shows as a DiceForge section (an Anima text-to-image like the author's `Anima_DiceForge`, an SDXL one, an XY Plot).
      - Node help: `DiceForge/web/docs/<node id>.md` (and `<node id>/<locale>.md`), Markdown with pictures and video shown in ComfyUI's

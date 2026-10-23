@@ -72,6 +72,8 @@ nodes and features, a patch for fixes. Each version is a [release on GitHub](htt
   from the minimap, and give Dice Grid pure colors (the Nodes 2.0 color picker rounds others).
 - CI: the tests run against ComfyUI of 2026-10-23 (`bc5f880`, frontend 1.57) instead of 2026-09-25, and with Playwright 1.64. Chromium
   and the Ubuntu packages it needs are kept between runs, so a slow Ubuntu mirror no longer adds ten minutes to an end-to-end job.
+- DiceForge asks for ComfyUI 0.38.0 or newer with its frontend 1.53.6 or newer (the first that pass every test), so ComfyUI Manager and
+  the Registry don't offer it to an older ComfyUI, and it has an icon there.
 - CI: a manual run can test a ComfyUI from before 2026-09-21 too (it installs torchaudio for CPU). The frontend's pure functions (the
   prompt highlight, sampler names from a picture, styles, presets for a model, tags, Clean up) have fast unit tests, and four end-to-end
   tests wait for what they check instead of a fixed time.

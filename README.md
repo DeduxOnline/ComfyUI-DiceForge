@@ -55,7 +55,7 @@ The nodes and the frontend are in the `DiceForge` subfolder; the repository's ow
 
 Every version is listed in [CHANGELOG.md](CHANGELOG.md) and released on [GitHub](https://github.com/DeduxOnline/ComfyUI-DiceForge/releases) and the [ComfyUI Registry](https://registry.comfy.org); ComfyUI Manager shows when an update is out.
 
-**Requirements:** a recent ComfyUI that includes `comfy_api.latest` (the V3 node API). *Resolution Selector (Random)* also needs the resolution preview widget, which ships with the core *Resolution Selector* node. Older ComfyUI versions will not load these nodes.
+**Requirements:** ComfyUI 0.38.0 or newer, with its frontend 1.53.6 or newer (the V3 node API and the resolution preview widget). ComfyUI Manager and the Registry don't offer DiceForge to an older ComfyUI.
 
 ## Nodes
 
