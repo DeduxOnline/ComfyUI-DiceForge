@@ -11,8 +11,7 @@ from aiohttp import web
 from comfy.cli_args import args
 from PIL import Image, ImageDraw, ImageFont
 from PIL.PngImagePlugin import PngInfo
-from typing_extensions import override
-from comfy_api.latest import ComfyExtension, io, ui
+from comfy_api.latest import io, ui
 from .model_info import in_thread, json_body
 # Dice Grid collects one image per run (the runs of a DiceForge series) and lays them out in a labeled grid. The cells are kept as small PNG files
 # in the ComfyUI user folder between runs, not in RAM, so a grid survives a restart. Finished grids are saved to the output folder.
@@ -340,10 +339,3 @@ def register_routes():
             raise web.HTTPBadRequest(text="Dice Grid: no kept cells to save (★ a cell first).")
         return web.json_response({"saved": saved})
 register_routes()
-# Extension entry point for ComfyUI V3 node registration.
-class DiceGridExtension(ComfyExtension):
-    @override
-    async def get_node_list(self):
-        return [DiceGrid]
-async def comfy_entrypoint():
-    return DiceGridExtension()

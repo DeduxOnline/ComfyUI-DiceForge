@@ -2,8 +2,7 @@ import functools
 import logging
 import torch
 import comfy.ldm.cosmos.predict2
-from typing_extensions import override
-from comfy_api.latest import ComfyExtension, io
+from comfy_api.latest import io
 # Normalized Attention Guidance (NAG, arxiv.org/abs/2505.21179) for Anima: the negative prompt also steers every cross-attention, so it works at
 # CFG 1 (Turbo LoRAs, distilled models), where the negative prompt otherwise does nothing, and adds to it at a higher CFG.
 # ComfyUI's own NAG node patches the self-attention output, a hook Anima's attention doesn't call. Here each block's cross-attention runs once more
@@ -81,11 +80,3 @@ class AnimaNAG(io.ComfyNode):
     def execute(cls, model, nag_scale=5.0, nag_alpha=0.5, nag_tau=1.5):
         logging.info(f"[DiceForge] Anima NAG | scale {nag_scale:g} | alpha {nag_alpha:g} | tau {nag_tau:g}")
         return io.NodeOutput(with_nag(model, nag_scale, nag_tau, nag_alpha))
-
-
-class AnimaNAGExtension(ComfyExtension):
-    @override
-    async def get_node_list(self):
-        return [AnimaNAG]
-async def comfy_entrypoint():
-    return AnimaNAGExtension()

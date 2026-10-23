@@ -71,8 +71,11 @@ nodes and features, a patch for fixes. Each version is a [release on GitHub](htt
   before looking for its panel (the classic canvas now adds a node's panel to the page once the node has been on screen), click the
   canvas away from the minimap (a click on it moves the view), and give Dice Grid's runs pure colors (the Nodes 2.0 color picker rounds
   others, 4000000 to 3999744).
+- CI: the tests run against ComfyUI of 2026-10-23 (`bc5f880`, frontend 1.55) instead of 2026-09-25, and with Playwright 1.64. Chromium
+  and the Ubuntu packages it needs are kept between runs, so a slow Ubuntu mirror no longer adds ten minutes to an end-to-end job.
 
 ### Removed
+- Each node module's own ComfyUI entry point: ComfyUI only loads the package's, and a test checks that it lists every node.
 - The repairs of workflows and files of earlier versions, while DiceForge has no users but its author: SDXL Resolution List's old scale
   number and resolution list, Resolution Selector without rescale, unknown seed modes and the old vae_alignment input on loading; CLIP Dual
   Text Encode's links of workflows saved when model was its last output; Danbooru Tag Enhancer's results saved before several posts; Model

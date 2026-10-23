@@ -1,7 +1,6 @@
 import logging
 import nodes
-from typing_extensions import override
-from comfy_api.latest import ComfyExtension, io
+from comfy_api.latest import io
 from .model_lists import folder_fingerprint, folder_input, pick_model_file, seed_inputs
 # Node schema (V3 / Nodes 2.0): like Load Checkpoint, but the checkpoint is picked from a folder with the DiceForge seed modes, so a series can go
 # through every checkpoint before repeating one.
@@ -36,10 +35,3 @@ class RandomCheckpointLoader(io.ComfyNode):
         logging.info(f"[DiceForge] Random Checkpoint | {name} | Seed: {seed} ({seed_mode})")
         model, clip, vae = nodes.CheckpointLoaderSimple().load_checkpoint(name)
         return io.NodeOutput(model, clip, vae, name)
-# Extension entry point for ComfyUI V3 node registration.
-class RandomCheckpointLoaderExtension(ComfyExtension):
-    @override
-    async def get_node_list(self):
-        return [RandomCheckpointLoader]
-async def comfy_entrypoint():
-    return RandomCheckpointLoaderExtension()

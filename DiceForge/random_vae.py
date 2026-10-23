@@ -1,7 +1,6 @@
 import logging
 import nodes
-from typing_extensions import override
-from comfy_api.latest import ComfyExtension, io
+from comfy_api.latest import io
 from .model_lists import folder_fingerprint, folder_input, pick_model_file, seed_inputs
 # Node schema (V3 / Nodes 2.0): like Load VAE, but the VAE is picked from a folder with the DiceForge seed modes, so a series can go
 # through every VAE before repeating one.
@@ -33,10 +32,3 @@ class RandomVAELoader(io.ComfyNode):
         name = pick_model_file("vae", folder, seed, seed_mode, "VAE")
         logging.info(f"[DiceForge] Random VAE | {name} | Seed: {seed} ({seed_mode})")
         return io.NodeOutput(nodes.VAELoader().load_vae(name)[0], name)
-# Extension entry point for ComfyUI V3 node registration.
-class RandomVAELoaderExtension(ComfyExtension):
-    @override
-    async def get_node_list(self):
-        return [RandomVAELoader]
-async def comfy_entrypoint():
-    return RandomVAELoaderExtension()

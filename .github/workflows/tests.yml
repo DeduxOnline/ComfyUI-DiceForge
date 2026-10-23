@@ -14,12 +14,12 @@ on:
       comfyui_ref:
         description: ComfyUI commit, branch or tag to test with
         type: string
-        default: 79be670e2d9be63e238785af307369d2b9039ed1
+        default: bc5f880dbdd43e426077f42ccec53bb577ffee9f
   workflow_dispatch:
     inputs:
       comfyui_ref:
         description: ComfyUI commit, branch or tag to test with
-        default: 79be670e2d9be63e238785af307369d2b9039ed1
+        default: bc5f880dbdd43e426077f42ccec53bb577ffee9f
 
 concurrency:
   group: tests-${{ github.ref }}
@@ -29,7 +29,7 @@ permissions:
   contents: read
 
 env:
-  COMFYUI_REF: ${{ github.event_name == 'schedule' && 'master' || inputs.comfyui_ref || '79be670e2d9be63e238785af307369d2b9039ed1' }}
+  COMFYUI_REF: ${{ github.event_name == 'schedule' && 'master' || inputs.comfyui_ref || 'bc5f880dbdd43e426077f42ccec53bb577ffee9f' }}
   COMFYUI_PATH: ${{ github.workspace }}/ComfyUI
   PYTHON_VERSION: "3.11"
 
@@ -163,11 +163,23 @@ jobs:
           cache: npm
           cache-dependency-path: e2e/package-lock.json
 
+      # Chromium and the Ubuntu packages it needs are kept between runs: Ubuntu's mirror is sometimes slow (once 11 minutes for 25 MB).
+      - name: Keep Chromium and its system packages
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cache/ms-playwright
+            ~/apt-cache
+          key: playwright-ubuntu-24.04-${{ hashFiles('e2e/package-lock.json') }}
+
       - name: Install Playwright and Chromium
         working-directory: e2e
         run: |
           npm ci
+          mkdir -p ~/apt-cache/partial
+          echo "Dir::Cache::Archives \"$HOME/apt-cache\"; APT::Keep-Downloaded-Packages \"true\";" | sudo tee /etc/apt/apt.conf.d/99diceforge-cache
           npx playwright install --with-deps chromium
+          sudo chown -R "$USER" ~/apt-cache # apt wrote it as root; the cache is saved as the runner's user.
 
       - name: Run the end-to-end tests
         working-directory: e2e

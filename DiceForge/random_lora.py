@@ -1,7 +1,6 @@
 import logging
 import nodes
-from typing_extensions import override
-from comfy_api.latest import ComfyExtension, io
+from comfy_api.latest import io
 from .model_lists import folder_fingerprint, folder_input, pick_model_file, seed_inputs
 NO_LORA = "(no LoRA)" # With include_none: one more option that leaves the model and CLIP unchanged.
 # Node schema (V3 / Nodes 2.0): like Load LoRA, but the LoRA is picked from a folder with the DiceForge seed modes, so a series can go through every
@@ -49,10 +48,3 @@ class RandomLoraLoader(io.ComfyNode):
             return io.NodeOutput(model, clip, "")
         model, lora_clip = cls.loader.load_lora(model, clip, name, strength_model, strength_clip if clip is not None else 0)
         return io.NodeOutput(model, lora_clip if clip is not None else None, name)
-# Extension entry point for ComfyUI V3 node registration.
-class RandomLoraLoaderExtension(ComfyExtension):
-    @override
-    async def get_node_list(self):
-        return [RandomLoraLoader]
-async def comfy_entrypoint():
-    return RandomLoraLoaderExtension()

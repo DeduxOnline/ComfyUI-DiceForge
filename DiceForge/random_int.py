@@ -1,6 +1,5 @@
 import logging
-from typing_extensions import override
-from comfy_api.latest import ComfyExtension, io
+from comfy_api.latest import io
 from .seed_modes import MEMORY, SEED_MODES, make_picker, pick_index
 SEED_MODE_TOOLTIP = ("How the value changes from run to run.\n"
     "random: every pick is independent, so the same value can come up again soon.\n"
@@ -72,10 +71,3 @@ class RandomIntSeedModes(io.ComfyNode):
         MEMORY.save()
         logging.info(f"[DiceForge] Random Int | Value: {value} | Range: {low} to {high}, step {step} | Seed: {seed} ({seed_mode})")
         return io.NodeOutput(value)
-# Extension entry point for ComfyUI V3 node registration.
-class RandomIntSeedModesExtension(ComfyExtension):
-    @override
-    async def get_node_list(self):
-        return [RandomIntSeedModes]
-async def comfy_entrypoint():
-    return RandomIntSeedModesExtension()

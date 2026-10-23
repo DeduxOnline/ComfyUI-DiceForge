@@ -7,8 +7,7 @@ import re
 import secrets
 import time
 import aiohttp
-from typing_extensions import override
-from comfy_api.latest import ComfyExtension, io
+from comfy_api.latest import io
 from . import tag_autocomplete
 from .clip_text_encode_pos_neg import fill_in, wildcards_signature
 from .model_info import in_thread
@@ -495,11 +494,3 @@ class DanbooruTagEnhancer(io.ComfyNode):
                             "preview": post["preview"]} for post in found]}
         urls = "\n".join(site.link(post["id"]) for post in found)
         return io.NodeOutput(combined, extra, urls, found[0]["id"], ui={"dice_forge_danbooru": [shown]})
-
-
-class DanbooruTagEnhancerExtension(ComfyExtension):
-    @override
-    async def get_node_list(self):
-        return [DanbooruTagEnhancer]
-async def comfy_entrypoint():
-    return DanbooruTagEnhancerExtension()

@@ -1,6 +1,5 @@
 import nodes
-from typing_extensions import override
-from comfy_api.latest import ComfyExtension, io, ui
+from comfy_api.latest import io, ui
 # Last loaded VAE, kept between runs: the latent changes on every run, so without this cache the VAE file would be loaded again each time.
 _vae_cache = {"name": None, "vae": None}
 # What happens to the decoded images, as in Easy-Use's samplers: Hide (only passed on), Preview (shown on the node, not saved), Save (saved and
@@ -103,10 +102,3 @@ class VAEDecodeSave(io.ComfyNode):
     @classmethod
     def execute(cls, samples, vae, filename_prefix="ComfyUI", image_output="Save"):
         return decode_and_save(cls, vae, samples, filename_prefix, image_output)
-# Extension entry point for ComfyUI V3 node registration.
-class VAEDecodeSaveExtension(ComfyExtension):
-    @override
-    async def get_node_list(self):
-        return [LoadVAEDecodeSave, VAEDecodeSave]
-async def comfy_entrypoint():
-    return VAEDecodeSaveExtension()

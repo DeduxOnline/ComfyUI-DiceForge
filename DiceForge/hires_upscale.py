@@ -2,8 +2,7 @@ import logging
 import comfy.utils
 import folder_paths
 import nodes
-from typing_extensions import override
-from comfy_api.latest import ComfyExtension, io
+from comfy_api.latest import io
 from .load_vae_decode_save import FILENAME_PREFIX_TOOLTIP, LoadVAEDecodeSave, check_image_output, show_or_save, vae_output
 from .sdxl_resolution_list_latent import BY_PERCENTAGE, TO_LONGEST_SIDE, TO_WIDTH_HEIGHT, rescaled
 # HiresFix (Load VAE), like Easy-Use's HiresFix but with the VAE picked from a list instead of a vae input: the image made bigger with an upscale
@@ -98,11 +97,3 @@ class HiresUpscale(io.ComfyNode):
         latent = nodes.VAEEncode().encode(vae, images)[0]
         logging.info(f"[DiceForge] HiresFix (Load VAE) | {width}x{height} -> {model_name} {model_width}x{model_height} -> {new_width}x{new_height} ({rescale_method}) | VAE: {vae_name}")
         return io.NodeOutput(images, latent, vae, ui=show_or_save(cls, images, filename_prefix, image_output))
-
-
-class HiresUpscaleExtension(ComfyExtension):
-    @override
-    async def get_node_list(self):
-        return [HiresUpscale]
-async def comfy_entrypoint():
-    return HiresUpscaleExtension()

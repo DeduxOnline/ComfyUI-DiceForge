@@ -1,7 +1,6 @@
 import folder_paths
 import nodes
-from typing_extensions import override
-from comfy_api.latest import ComfyExtension, io
+from comfy_api.latest import io
 # Value of clip_name2 that loads a single text encoder.
 NONE = "None"
 # Types of the core Load CLIP (one file) and DualCLIPLoader (two files) nodes, read from those nodes so new types show up here automatically.
@@ -62,10 +61,3 @@ class LoadDiffusionModelCLIP(io.ComfyNode):
         else:
             clip = nodes.DualCLIPLoader().load_clip(clip_name1, clip_name2, type, device)[0]
         return io.NodeOutput(model, clip)
-# Extension entry point for ComfyUI V3 node registration.
-class LoadDiffusionModelCLIPExtension(ComfyExtension):
-    @override
-    async def get_node_list(self):
-        return [LoadDiffusionModelCLIP]
-async def comfy_entrypoint():
-    return LoadDiffusionModelCLIPExtension()

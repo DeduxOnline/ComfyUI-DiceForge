@@ -2,8 +2,7 @@ import logging
 import torch
 import comfy.patcher_extension
 import comfy.sample
-from typing_extensions import override
-from comfy_api.latest import ComfyExtension, io
+from comfy_api.latest import io
 # Variation seeds, as in A1111 (subseed and variation strength): the same picture with small differences. The noise KSampler starts from (made from
 # its seed) is blended with the noise of a second seed, the variation seed: at strength 0 the picture is the seed's own, at 0.1 the same composition
 # with other details (folds, strands of hair, the background), at 1 the variation seed's own picture. The blend is spherical (slerp), so the noise
@@ -71,11 +70,3 @@ class VariationSeed(io.ComfyNode):
     def execute(cls, model, variation_seed=0, variation_strength=0.1):
         logging.info(f"[DiceForge] Variation Seed | variation seed {variation_seed} | strength {variation_strength:g}")
         return io.NodeOutput(with_variation(model, variation_seed, variation_strength), f"variation {variation_seed} @ {variation_strength:g}")
-
-
-class VariationSeedExtension(ComfyExtension):
-    @override
-    async def get_node_list(self):
-        return [VariationSeed]
-async def comfy_entrypoint():
-    return VariationSeedExtension()

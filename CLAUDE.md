@@ -30,6 +30,8 @@ section describes the tests, the agents and the release.
    - The repository is public (since 2026-10-18), so Actions minutes are free; it was private before and ran out of them.
    - The jobs run on `ubuntu-24.04`, not `ubuntu-latest`: a move to a newer Ubuntu is a commit of its own. Keep each action at one version
      in both workflows: Dependabot updates them as one group and fails ("No files changed!") when they differ.
+   - The tested ComfyUI is a pinned commit (`COMFYUI_REF` in `tests.yml`, three places). Move it to a master commit the weekly or a manual
+     run has passed with.
 
 ## Checks
 
@@ -73,7 +75,7 @@ section describes the tests, the agents and the release.
   - `clip_text_encode_pos_neg.py`: the prompt syntax (choices, wildcards, variables, `<lora:>`) and `fill_in`, also used by Wildcards to
     Text, Danbooru Tag Enhancer and the Wildcard Browser's previews. `wildcards_api.py`: the Wildcard Browser's routes, yaml edits that keep
     comments, the trash.
-  - Nodes are V3 (`io.ComfyNode`), registered in `DiceForge/__init__.py`. Modules with routes have `register_routes()`, run at import.
+  - Nodes are V3 (`io.ComfyNode`), registered in `DiceForge/__init__.py` alone (`tests/test_node_ids.py` checks it lists every node). Modules with routes have `register_routes()`, run at import.
   - A node's preview gets its run's data from `ui={"dice_forge_…": [...]}`; the frontend keeps it in `node.properties`, so it travels with
     the workflow.
   - The prompt tools work on the text fields of `PROMPT_NODES` (`wildcards.js`). Wildcard Note is a frontend-only node

@@ -1,8 +1,7 @@
 import logging
 import math
 import nodes
-from typing_extensions import override
-from comfy_api.latest import ComfyExtension, io
+from comfy_api.latest import io
 from .seed_modes import MEMORY, SEED_MODES, SEED_MODE_TOOLTIP, make_picker, pick_label, pick_in_range
 from .sdxl_resolution_list_latent import describe_rescale, keep_orientation, rescale_input, rescale_settings, rescaled
 # Aspect ratios for the canvas, in the "W:H (Name)" form the frontend resolution preview reads.
@@ -155,10 +154,3 @@ class ResolutionSelectorRandomLatent(io.ComfyNode):
         last_size = {"width": width, "height": height, "aspect_ratio": aspect_ratio, "megapixels": megapixels, "multiple": multiple, "max_aspect": max_aspect,
                      **rescale_settings(rescale)}
         return io.NodeOutput(latent, width, height, seed, ui={"dice_forge_last_size": [last_size]})
-# Extension entry point for ComfyUI V3 node registration.
-class ResolutionSelectorRandomLatentExtension(ComfyExtension):
-    @override
-    async def get_node_list(self):
-        return [ResolutionSelectorRandomLatent]
-async def comfy_entrypoint():
-    return ResolutionSelectorRandomLatentExtension()

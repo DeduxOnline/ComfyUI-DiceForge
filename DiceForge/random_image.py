@@ -6,8 +6,7 @@ import comfy.model_management
 import folder_paths
 import node_helpers
 from PIL import Image, ImageOps, ImageSequence
-from typing_extensions import override
-from comfy_api.latest import ComfyExtension, InputImpl, io, ui
+from comfy_api.latest import InputImpl, io, ui
 from .model_lists import ALL_FOLDERS, image_folders, images_in_folder
 from .seed_modes import MEMORY, SEED_MODES, make_picker, pick_label, seed_mode_tooltip
 # Image loading with the same steps as Load Image (which only opens files inside ComfyUI's input folder): first the video reader (animated GIFs and
@@ -125,10 +124,3 @@ class RandomImageLoader(io.ComfyNode):
         shown = {"file": name, "folder": root if path.strip() else "input" + ("" if folder == ALL_FOLDERS else f"/{folder}"), "width": int(image.shape[2]),
                  "height": int(image.shape[1]), "frames": int(image.shape[0]), "seed": seed, "seed_mode": seed_mode, "view": view}
         return io.NodeOutput(image, mask, name, ui={"dice_forge_image": [shown]})
-# Extension entry point for ComfyUI V3 node registration.
-class RandomImageLoaderExtension(ComfyExtension):
-    @override
-    async def get_node_list(self):
-        return [RandomImageLoader]
-async def comfy_entrypoint():
-    return RandomImageLoaderExtension()

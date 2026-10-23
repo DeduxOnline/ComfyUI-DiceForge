@@ -1,7 +1,6 @@
 import logging
 import nodes
-from typing_extensions import override
-from comfy_api.latest import ComfyExtension, io
+from comfy_api.latest import io
 from .model_lists import folder_fingerprint, folder_input, pick_model_file, seed_inputs
 # Node schema (V3 / Nodes 2.0): like Load Diffusion Model, but the model is picked from a folder with the DiceForge seed modes, so a series can go
 # through every model before repeating one.
@@ -40,10 +39,3 @@ class RandomDiffusionModelLoader(io.ComfyNode):
         name = pick_model_file("diffusion_models", folder, seed, seed_mode, "diffusion model")
         logging.info(f"[DiceForge] Random Diffusion Model | {name} | Seed: {seed} ({seed_mode})")
         return io.NodeOutput(nodes.UNETLoader().load_unet(name, weight_dtype)[0], name)
-# Extension entry point for ComfyUI V3 node registration.
-class RandomDiffusionModelLoaderExtension(ComfyExtension):
-    @override
-    async def get_node_list(self):
-        return [RandomDiffusionModelLoader]
-async def comfy_entrypoint():
-    return RandomDiffusionModelLoaderExtension()

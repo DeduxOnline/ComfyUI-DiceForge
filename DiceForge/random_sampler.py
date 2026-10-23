@@ -1,8 +1,7 @@
 import logging
 import re
 import comfy.samplers
-from typing_extensions import override
-from comfy_api.latest import ComfyExtension, io
+from comfy_api.latest import io
 from .seed_modes import MEMORY, SEED_MODES, make_picker, pick_label, seed_mode_tooltip
 SAMPLERS, SCHEDULERS = comfy.samplers.KSampler.SAMPLERS, comfy.samplers.KSampler.SCHEDULERS
 # A list typed in a text field: names separated by commas or new lines, duplicates dropped; "*" (or "all") is every known name.
@@ -81,10 +80,3 @@ class RandomSampler(io.ComfyNode):
         sampler, scheduler = label.split(" / ")
         logging.info(f"[DiceForge] Random Sampler | {label} | Seed: {seed} ({seed_mode})")
         return io.NodeOutput(sampler, scheduler, label, sampler, scheduler)
-# Extension entry point for ComfyUI V3 node registration.
-class RandomSamplerExtension(ComfyExtension):
-    @override
-    async def get_node_list(self):
-        return [RandomSampler]
-async def comfy_entrypoint():
-    return RandomSamplerExtension()

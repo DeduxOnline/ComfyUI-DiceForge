@@ -10,8 +10,7 @@ import threading
 import folder_paths
 import nodes
 import yaml
-from typing_extensions import override
-from comfy_api.latest import ComfyExtension, io
+from comfy_api.latest import io
 from .model_lists import matching_files
 from .seed_modes import MEMORY, Picker, RandomPicker, DeckPicker, ShufflePicker, BalancedPicker, recall, stable_seed
 # Wildcards: __name__ in a prompt is replaced by a random line of name.txt from the wildcards folders (ComfyUI/models/wildcards by default, more can be added in extra_model_paths.yaml).
@@ -619,12 +618,3 @@ class WildcardsToText(io.ComfyNode):
         if filled != text:
             logging.info(f"[DiceForge] Wildcards to Text | Seed: {seed} ({seed_mode}{note}) | {filled}")
         return io.NodeOutput(filled, ui={"text": [filled]})
-
-
-# Extension entry point for ComfyUI V3 node registration.
-class CLIPTextEncodePositiveNegativeExtension(ComfyExtension):
-    @override
-    async def get_node_list(self):
-        return [CLIPTextEncodePositiveNegative, WildcardsToText]
-async def comfy_entrypoint():
-    return CLIPTextEncodePositiveNegativeExtension()

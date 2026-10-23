@@ -1,8 +1,7 @@
 import logging
 import math
 import nodes
-from typing_extensions import override
-from comfy_api.latest import ComfyExtension, io
+from comfy_api.latest import io
 from .seed_modes import MEMORY, SEED_MODES, SEED_MODE_TOOLTIP, make_picker, pick_label, pick_in_range
 # Resolution groups for the nested list: fixed SDXL sizes, high-res sizes, random picks from those lists, and random chaos sizes.
 STANDARD = {
@@ -220,10 +219,3 @@ class SDXLResolutionListLatent(io.ComfyNode):
         last_size = {"width": width, "height": height, "group": group, "size": size, "max_aspect": resolution.get("max_aspect"), "multiple": multiple,
                      **rescale_settings(rescale)}
         return io.NodeOutput(latent, width, height, seed, ui={"dice_forge_last_size": [last_size]})
-# Extension entry point for ComfyUI V3 node registration.
-class SDXLResolutionListLatentExtension(ComfyExtension):
-    @override
-    async def get_node_list(self):
-        return [SDXLResolutionListLatent]
-async def comfy_entrypoint():
-    return SDXLResolutionListLatentExtension()

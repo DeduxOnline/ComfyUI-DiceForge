@@ -3,8 +3,7 @@ import re
 import folder_paths
 import nodes
 from aiohttp import web
-from typing_extensions import override
-from comfy_api.latest import ComfyExtension, io
+from comfy_api.latest import io
 from .model_info import in_thread, json_body
 from .model_lists import matching_files
 from .random_sampler import SAMPLERS, SCHEDULERS, options_output, parse_names
@@ -222,11 +221,3 @@ def register_routes():
         return web.json_response({"x_type": layout["x_type"], "y_type": layout["y_type"], "count": layout["count"],
                                   "x": [label(layout["x_type"], value) for value in layout["xs"]], "y": [label(layout["y_type"], value) for value in layout["ys"]]})
 register_routes()
-
-
-class XYPlotExtension(ComfyExtension):
-    @override
-    async def get_node_list(self):
-        return [XYPlot]
-async def comfy_entrypoint():
-    return XYPlotExtension()

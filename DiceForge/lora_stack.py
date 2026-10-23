@@ -8,8 +8,7 @@ import comfy.sd
 import comfy.utils
 import folder_paths
 from aiohttp import web
-from typing_extensions import override
-from comfy_api.latest import ComfyExtension, io
+from comfy_api.latest import io
 from .model_info import KINDS, in_thread, json_body, read_info, info_file
 from .seed_modes import MEMORY, SEED_MODES, make_picker, pick_index, seed_mode_tooltip
 # LoRA Stack: several LoRAs in one node, like rgthree's Power Lora Loader, with the DiceForge seed modes. The rows live in the "loras" input as JSON,
@@ -267,10 +266,3 @@ def register_routes():
                                           if isinstance(item, dict) and isinstance(item.get("file"), str) else None for item in items])
         return web.json_response({"bases": found})
 register_routes()
-# Extension entry point for ComfyUI V3 node registration.
-class LoraStackExtension(ComfyExtension):
-    @override
-    async def get_node_list(self):
-        return [LoraStack]
-async def comfy_entrypoint():
-    return LoraStackExtension()
