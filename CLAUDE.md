@@ -98,7 +98,8 @@ section describes the tests, the agents and the release.
 - **`perf`:** speed with a lot of data.
 
 They report and don't change the code, except `docs`, which edits the docs when asked to. Their tools work without them too (README →
-Development → Agents).
+Development → Agents). The author's computer has no Node.js: run `e2e/qa` there through the *QA tools* workflow (`qa.yml`,
+`gh workflow run qa.yml -f comfyui_ref=master`) and read its `qa-out` artifact (`gh run download <id>`).
 
 ## Secrets
 

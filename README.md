@@ -1000,6 +1000,8 @@ python .github/scripts/security_scan.py --inventory   # never-allowed code, and 
 
 GitHub Actions (`.github/workflows/tests.yml`) checks the workflow files with [actionlint](https://github.com/rhysd/actionlint) and runs both suites on every push to `main` and every pull request (the end-to-end tests in five jobs at once, each with its own ComfyUI: API and nodes, prompts, models, robustness, the ComfyUI contract and old workflows), on Linux and the CPU, with the ComfyUI version the tests were written with (pinned in the workflow). A push or pull request that changes nothing in `DiceForge`, `e2e` or the workflow itself (only the docs or the unit tests, say) runs the unit tests alone. A weekly run tests against ComfyUI's latest `master`, to see early when a ComfyUI update breaks something, and *Run workflow* on the Actions page can test any ComfyUI commit, branch or tag. When end-to-end tests fail, the run keeps the Playwright report (screenshots and traces) as a `playwright-report-<job>` artifact.
 
+The QA tools of `e2e/qa` run there too, for a machine without Node.js: *Run workflow* on the *QA tools* workflow (`.github/workflows/qa.yml`) runs `internals.js`, `nodes.js` and `perf.js` (at the scales asked for, 1 and 3 by default) on a ComfyUI commit, branch or tag (`master` by default), keeps what they make as the `qa-out` artifact, and its summary says which tool found problems.
+
 Dependabot (`.github/dependabot.yml`) opens a weekly pull request when a GitHub Action of the workflows or an end-to-end test tool has a new version; the tests run on it like on any pull request.
 
 #### Code analysis (SonarQube Cloud)

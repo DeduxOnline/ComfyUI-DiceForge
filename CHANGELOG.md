@@ -8,6 +8,8 @@ nodes and features, a patch for fixes. Each version is a [release on GitHub](htt
 ## [Unreleased]
 
 ### Added
+- CI: a QA tools workflow, run by hand, for a machine without Node.js: the frontend internals, the pictures and size checks of every
+  node in both designs, and the times with a lot of data, on any ComfyUI commit (master by default), kept as the `qa-out` artifact.
 - Wildcard Browser: yaml wildcards are edited, no longer read-only. A yaml file is one row of the tree, opened whole in the lines view and
   saved as written (comments too); in the cards view its row shows its cards, which are edited on the card (🖊), renamed, moved, deleted with
   ↶ Undo and added (＋ New card) in their yaml file, keeping its comments and layout. 🔁 Replace changes yaml wildcards too.
