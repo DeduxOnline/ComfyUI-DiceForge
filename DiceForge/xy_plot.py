@@ -22,7 +22,12 @@ NUMBER_AXES = {"seed": (int, 0, 0xFFFFFFFFFFFFFFFF), "steps": (int, 1, 10000), "
 def short(value):
     return f"{value:g}" if isinstance(value, float) else str(value)
 def number(text): # Whole numbers stay exact (seeds go past what a float holds).
-    return int(text) if re.fullmatch(r"-?\d+", text) else float(text)
+    if re.fullmatch(r"-?\d+", text):
+        return int(text)
+    value = float(text)
+    if not math.isfinite(value): # 1e999 is inf; nan is no number either.
+        raise ValueError(f"XY Plot: {text} is not a usable number.")
+    return value
 # Numbers typed in a field: separated by commas or new lines, each a number or a range (start-end, with :step; the step is 1 unless given).
 def parse_numbers(text, axis):
     kind, low, high = NUMBER_AXES[axis]
@@ -36,9 +41,12 @@ def parse_numbers(text, axis):
             step = abs(number(match.group(3))) if match.group(3) else 1
             if step == 0:
                 raise ValueError(f"XY Plot: the step of {item} is 0.")
-            count = math.floor(abs(end - start) / step + 1e-9) + 1
-            if count > MAX_VALUES:
-                raise ValueError(f"XY Plot: {item} has {count} values, more than {MAX_VALUES}.")
+            try:
+                count = math.floor(abs(end - start) / step + 1e-9) + 1
+            except OverflowError: # A range past what a float holds.
+                count = None
+            if count is None or count > MAX_VALUES:
+                raise ValueError(f"XY Plot: {item} has {count or 'too many'} values, more than {MAX_VALUES}.")
             direction = 1 if end >= start else -1
             exact = all(isinstance(part, int) for part in (start, end, step))
             values += [start + index * step * direction if exact else round(start + index * step * direction, 6) for index in range(count)]

@@ -475,6 +475,25 @@ def test_a_zip_card_pack_is_imported_with_its_paths(api, wildcards):
     assert api("POST", "/diceforge/wildcards/import?folder=../x", data=data)[0] == 400
 
 
+def test_a_damaged_zip_member_or_a_name_windows_changes_is_left_out_whole(api, wildcards):
+    data = bytearray(zip_of({"good.txt": "a\n", "liar.txt": "x" * 1000, "a/ /b.txt": "y\n", "dots./c.txt": "z\n"}))
+    at = data.index(b"x" * 1000)
+    data[at:at + 3] = b"yyy" # The member's bytes no longer match its CRC.
+    status, body = api("POST", "/diceforge/wildcards/import?folder=pack", data=bytes(data))
+    assert status == 200 and body["imported"] == ["good.txt"]
+    assert sorted(body["left_out"]) == ["a/ /b.txt", "dots./c.txt", "liar.txt"]
+    assert sorted(os.listdir(os.path.join(wildcards.folder, "pack"))) == ["good.txt"] # No half-written liar.txt.
+
+
+def test_a_new_wildcard_never_writes_over_one_named_in_other_case(api, wildcards):
+    wildcards("color.txt", "red\n")
+    status, _ = api("POST", "/diceforge/wildcards/file", {"name": "Color", "text": "OVERWRITTEN", "create": True})
+    # 409 where file names ignore case (Windows, macOS); a file of its own where they don't (Linux). Never color's lines replaced.
+    assert status in (200, 409)
+    with open(os.path.join(wildcards.folder, "color.txt"), encoding="utf-8") as file:
+        assert file.read() == "red\n"
+
+
 def test_search_finds_wildcards_by_their_lines(api, wildcards):
     wildcards("color.txt", "# red in a comment\ncrimson red\nblue\n")
     wildcards("pack.yaml", "outfit: [Red dress, suit]\n")

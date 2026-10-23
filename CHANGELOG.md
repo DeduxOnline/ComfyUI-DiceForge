@@ -85,6 +85,15 @@ nodes and features, a patch for fixes. Each version is a [release on GitHub](htt
   section on updating from it).
 
 ### Fixed
+- Wildcard Browser: + New file named like an existing one in other upper and lower case (`Color` next to `color.txt`) no longer writes
+  over its lines on Windows and macOS: it is refused as taken.
+- Wildcard Browser: ⇪ Import zip leaves out a damaged file of the zip (and one whose folder name ends in a space or dot) instead of
+  stopping half-way with part of the zip unpacked.
+- Model info, the model browsers' previews and LoRA Stack's base model check answer "not found" for a name ComfyUI can't look up (a path
+  on another drive, a network path, `con`), instead of a server error; LoRA Stack presets and model renames refuse Windows device names
+  (`con`, `nul`, `com1`), which wrote to the device instead of a file.
+- XY Plot: a number too big for a float (`1e999`) or a range too long to count says so, instead of a server error.
+- Danbooru Tag Enhancer and the Civitai lookups read at most 16 MB of a site's answer.
 - Links and pictures from outside data (Civitai's and Danbooru's answers, the Danbooru posts a shared workflow carries) open only web
   addresses: a `javascript:` link in a workflow from someone else could run a script in ComfyUI's page when clicked.
 - Wildcards: a yaml file nested very deep no longer breaks every wildcard (the Wildcard Browser, the autocomplete and every run with a

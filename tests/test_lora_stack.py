@@ -157,6 +157,8 @@ def test_preset_routes(api):
     assert api("POST", "/diceforge/lora-presets", body)[0] == 409 # Exists: asks first.
     assert api("POST", "/diceforge/lora-presets", {**body, "overwrite": True})[0] == 200
     assert api("POST", "/diceforge/lora-presets", {"name": "broken", "stack": {"hello": 1}})[0] == 400
+    for device in ("con", "NUL", "com1.backup"): # Windows device names: the "file" would be the device, so nothing is saved.
+        assert api("POST", "/diceforge/lora-presets", {"name": device, "stack": body["stack"]})[0] == 400
     assert not os.path.exists(preset_path("broken")[1]) # Nothing written for a refused preset.
     assert api("POST", "/diceforge/lora-presets", {"name": "../evil", "stack": {"rows": []}})[0] == 400
     assert api("DELETE", "/diceforge/lora-presets?name=my%20set")[0] == 200

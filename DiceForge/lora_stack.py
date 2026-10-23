@@ -9,7 +9,7 @@ import comfy.utils
 import folder_paths
 from aiohttp import web
 from comfy_api.latest import io
-from .model_info import KINDS, in_thread, json_body, read_info, info_file
+from .model_info import KINDS, WINDOWS_DEVICE, in_thread, json_body, model_path, read_info, info_file
 from .seed_modes import MEMORY, SEED_MODES, make_picker, pick_index, seed_mode_tooltip
 # LoRA Stack: several LoRAs in one node, like rgthree's Power Lora Loader, with the DiceForge seed modes. The rows live in the "loras" input as JSON,
 # edited by the frontend (web/lora_stack.js):
@@ -173,7 +173,7 @@ PRESET_FOLDER = os.path.join(folder_paths.get_user_directory(), "DiceForge", "lo
 PRESET_NAME = re.compile(r"[\w\-. ()]+")
 def preset_path(name):
     name = (name if isinstance(name, str) else "").strip().removesuffix(".json")
-    if not PRESET_NAME.fullmatch(name) or name.startswith("."):
+    if not PRESET_NAME.fullmatch(name) or name.startswith(".") or WINDOWS_DEVICE.fullmatch(name):
         raise web.HTTPBadRequest(text=f"LoRA Stack: {name!r} is not a usable preset name (letters, digits, space, - _ . ( )).")
     return name, os.path.join(PRESET_FOLDER, name + ".json")
 def preset_stack(data):
@@ -195,7 +195,7 @@ def list_presets():
     return presets
 # Base models for the mismatch warning: what Model info already knows about each file (nothing is hashed or asked here).
 def cached_base(kind, name):
-    path = folder_paths.get_full_path(kind, name) if kind in KINDS else None
+    path = model_path(kind, name) if kind in KINDS else None
     if not path:
         return None
     info, stat = read_info(kind, name), os.stat(path)

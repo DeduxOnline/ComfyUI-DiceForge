@@ -7,6 +7,7 @@ import re
 import secrets
 import time
 import aiohttp
+from .http_read import read_text
 from comfy_api.latest import io
 from . import tag_autocomplete
 from .clip_text_encode_pos_neg import fill_in, wildcards_signature
@@ -183,12 +184,14 @@ class Site:
             if response.status == 401:
                 raise ValueError(f"Danbooru Tag Enhancer: {self.unauthorized}")
             if response.status == 422:
-                raise ValueError(f"Danbooru Tag Enhancer: {self.name} refused the search {query!r}: {(await response.text())[:200]}")
-            if response.status in BUSY or (response.status == 403 and "challenge" in (await response.text())[:3000].lower()):
-                text = (await response.text())[:3000].lower()
+                raise ValueError(f"Danbooru Tag Enhancer: {self.name} refused the search {query!r}: {(await read_text(response, 3000, cut=True))[:200]}")
+            if response.status in BUSY or response.status == 403:
+                text = (await read_text(response, 3000, cut=True)).lower()
+                if response.status == 403 and "challenge" not in text:
+                    response.raise_for_status()
                 raise DanbooruBusy(f"{response.status} {response.reason}" + (" (a Cloudflare check)" if "cloudflare" in text or "just a moment" in text else ""))
             response.raise_for_status()
-            text = await response.text()
+            text = await read_text(response)
             if raw:
                 return text
             if not text.strip(): # Nothing found (Safebooru answers an empty search so).

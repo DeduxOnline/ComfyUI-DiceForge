@@ -6,7 +6,7 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import aiohttp
 import pytest
-from DiceForge.http_read import read_up_to
+from DiceForge.http_read import read_text, read_up_to
 
 
 @pytest.fixture
@@ -51,6 +51,17 @@ def test_reading_stops_one_byte_past_the_limit(slow_server):
     body = read(slow_server, 5000)
     assert body == b"A" * 3000 + b"B" * 2001 # limit + 1: the caller knows it was too big.
     assert len(read(slow_server, 30000)) == 30000 # Exactly the limit: all of it, nothing more to read.
+
+
+def test_an_answer_too_big_is_an_error_unless_its_start_is_enough(slow_server):
+    async def get(**options):
+        async with aiohttp.ClientSession() as session:
+            async with session.get(f"http://127.0.0.1:{slow_server.server_port}/") as response:
+                return await read_text(response, **options)
+    with pytest.raises(ValueError, match="127.0.0.1 answered more than"):
+        asyncio.run(get(limit=5000))
+    assert asyncio.run(get(limit=5000, cut=True)) == "A" * 3000 + "B" * 2000
+    assert len(asyncio.run(get())) == 30000
 
 
 def test_an_empty_body(slow_server):

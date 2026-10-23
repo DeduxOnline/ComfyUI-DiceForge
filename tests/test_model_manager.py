@@ -232,7 +232,8 @@ def test_rename_moves_the_file_with_its_preview_and_info(api, models):
     ({"file": "a.safetensors", "to": "b"}, 409), ({"file": "a.safetensors", "to": "b.ckpt"}, 400), ({"file": "a.safetensors", "to": "../b"}, 400),
     ({"file": "a.safetensors", "to": ""}, 400), ({"file": "a.safetensors", "to": None}, 400), ({"file": "a.safetensors", "to": "c:d"}, 400),
     ({"file": "nope.safetensors", "to": "c"}, 404), ({"file": "../a.safetensors", "to": "c"}, 400), ({"file": 5, "to": "c"}, 400),
-    ({"file": "a.safetensors", "to": "c", "kind": "embeddings"}, 400)])
+    ({"file": "a.safetensors", "to": "c", "kind": "embeddings"}, 400), ({"file": "a.safetensors", "to": "con"}, 400),
+    ({"file": "con", "to": "c"}, 400), ({"file": "C:/Windows/win.ini", "to": "c"}, 400)])
 def test_rename_refusals(body, status, api, models):
     models("loras", "a.safetensors", b"a")
     models("loras", "b.safetensors", b"b")

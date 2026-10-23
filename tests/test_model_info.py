@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 import pytest
+from urllib.parse import quote
 from aiohttp import web
 from DiceForge import model_info
 from DiceForge.model_info import browser_entry, civitai_summary, info_file, local_preview, read_info, sha256_of, thumbnail, write_info
@@ -89,6 +90,13 @@ def test_card_data_uses_only_fresh_info(models):
     write_info("loras", "ink.safetensors", {**read_info("loras", "ink.safetensors"), "size": stat.st_size + 1}) # The file changed since the lookup.
     stale = browser_entry("loras", "ink.safetensors", path, {"ink.png"})
     assert not stale["checked"] and stale["base_model"] == "" and stale["preview"] is True and stale["trigger_words"] == ["mine", "also mine"]
+
+
+@pytest.mark.parametrize("name", ["con", "nul.safetensors", "C:\\Windows\\win.ini", "D:/other drive.safetensors", "\\\\server\\share\\x.safetensors"])
+def test_names_comfyui_cant_look_up_are_not_found(api, models, name):
+    # ComfyUI's lookup raises on these (another drive, a UNC path, a device name): a 404, not a server error.
+    for path in ("/diceforge/model-info", "/diceforge/model-preview"):
+        assert api("GET", f"{path}?kind=loras&file={quote(name)}")[0] == 404
 
 
 def test_model_info_route_hashes_once_and_keeps_your_notes(api, models, civitai):

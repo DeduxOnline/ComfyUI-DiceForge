@@ -9,6 +9,7 @@ import time
 import aiohttp
 import folder_paths
 from aiohttp import web
+from .http_read import read_text
 # Model info for the "Model info" dialog of the frontend (web/model_info.js), like rgthree's LoRA info but for every model kind: the file's sha256,
 # what Civitai knows about it (looked up by that hash), and the user's own notes. Everything is kept in the ComfyUI user folder, one JSON per file,
 # so model folders stay untouched; the hash is only computed again when the file's size or date changes.
@@ -122,7 +123,7 @@ async def civitai_model_details(session, model_id):
             if response.status == 404: # The model's page is gone (deleted, or hidden): nothing to add, and no need to ask again.
                 return {"details_checked": time.time()}
             response.raise_for_status()
-            return {**civitai_details(await response.json()), "details_checked": time.time()}
+            return {**civitai_details(json.loads(await read_text(response))), "details_checked": time.time()}
     except Exception as error: # The version is known all the same; the details are asked again on the next lookup.
         logging.warning(f"[DiceForge] Model info: Civitai model details failed: {error}")
         return {}
@@ -149,16 +150,25 @@ async def civitai_lookup(sha256):
                 if response.status == 404:
                     return {"found": False, "checked": time.time()}
                 response.raise_for_status()
-                summary = civitai_summary(await response.json())
+                summary = civitai_summary(json.loads(await read_text(response)))
             return {**summary, **await civitai_model_details(session, summary["model_id"]), "checked": time.time()}
     except Exception as error:
         logging.warning(f"[DiceForge] Model info: Civitai lookup failed: {error}")
         return {"found": False, "error": str(error), "checked": time.time()}
 # The model file and what is known about it; a new or changed file starts over (its hash and Civitai data), yours stays.
+# A model file by a name from a request. ComfyUI's lookup raises on a name it can't join to a folder (an absolute path on another drive, a UNC
+# path, a Windows device name like con): such a name is no model file.
+def model_path(kind, name):
+    try:
+        return folder_paths.get_full_path(kind, name)
+    except (ValueError, TypeError):
+        return None
+# Windows device names (con, nul, com1...), with any extension: a file by that name is the device itself, not a file.
+WINDOWS_DEVICE = re.compile(r"(?:con|prn|aux|nul|com[0-9]|lpt[0-9])(?:\..*)?", re.IGNORECASE | re.DOTALL)
 def stored_info(kind, name):
     if kind not in KINDS:
         raise web.HTTPBadRequest(text=f"Model info: unknown kind {kind}.")
-    path = folder_paths.get_full_path(kind, name)
+    path = model_path(kind, name)
     if not path:
         raise web.HTTPNotFound(text=f"Model info: {name} is not in the {kind} folders.")
     stat = os.stat(path)
@@ -181,7 +191,7 @@ async def model_info(kind, name, refresh=False):
     info = await in_thread(store_lookup, kind, name, info)
     return {"kind": kind, "file": name, **info}
 def local_preview_of(kind, name):
-    path = folder_paths.get_full_path(kind, name) if kind in KINDS else None
+    path = model_path(kind, name) if kind in KINDS else None
     return path and local_preview(path, set(os.listdir(os.path.dirname(path))))
 # The changes to an info file go one at a time (the routes run in threads, two at once can change the same file), and a lookup, which takes
 # seconds, keeps what was saved meanwhile: the favorite and your fields as the file has them now.

@@ -9,6 +9,7 @@ import shutil
 import threading
 import time
 import zipfile
+import zlib
 from urllib.parse import quote
 import folder_paths
 import yaml
@@ -452,7 +453,9 @@ def import_zip(data, folder=""):
     imported, skipped, left_out = [], [], []
     for member in members:
         parts = [part for part in member.filename.replace("\\", "/").split("/") if part not in ("", ".")]
-        if not parts or ".." in parts or parts[0] == "__MACOSX" or any(part.startswith(".") for part in parts) or not parts[-1].lower().endswith(IMPORTED):
+        # Windows drops spaces and dots at the end of a name: "a /b.txt" would land in another folder than the zip says, or fail half-way.
+        if (not parts or ".." in parts or parts[0] == "__MACOSX" or any(part.startswith(".") or part != part.rstrip(" .") for part in parts)
+                or not parts[-1].lower().endswith(IMPORTED)):
             left_out.append(member.filename)
             continue
         target = os.path.abspath(os.path.join(base, *parts))
@@ -461,9 +464,15 @@ def import_zip(data, folder=""):
         elif os.path.exists(target):
             skipped.append("/".join(parts))
         else:
-            os.makedirs(os.path.dirname(target), exist_ok=True)
-            with archive.open(member) as source, open(target, "wb") as file:
-                file.write(source.read(ZIP_UNPACKED))
+            try:
+                os.makedirs(os.path.dirname(target), exist_ok=True)
+                with archive.open(member) as source, open(target, "wb") as file:
+                    file.write(source.read(ZIP_UNPACKED))
+            except (zipfile.BadZipFile, zlib.error, EOFError, OSError): # A damaged member (a wrong CRC, a size that lies) or a name the disk refuses.
+                if os.path.isfile(target):
+                    os.remove(target) # Not a half-written file: it was not there before.
+                left_out.append(member.filename)
+                continue
             imported.append("/".join(parts))
     return imported, skipped, left_out
 # Export a folder of wildcards (all of them without one) as a zip that Import zip takes back: its txt, yaml and picture files, with their paths
@@ -489,7 +498,7 @@ def export_zip(folder=""):
             found = found or bool(packs) or os.path.isdir(base)
             for pack in packs:
                 add(pack, root)
-            for current, folders, files in os.walk(base): # Links to folders are not followed: nothing outside the wildcards folder.
+            for current, folders, files in os.walk(base): # Symbolic links to folders are not followed; a Windows junction (made by the user) is.
                 folders[:] = sorted(name for name in folders if not name.startswith("."))
                 for name in sorted(files):
                     add(os.path.join(current, name), root)
@@ -818,6 +827,10 @@ def save_wildcard(name, text, next_to, create):
     entry = wildcard_index(refresh=True).get(name)
     if create and entry is not None:
         raise web.HTTPConflict(text=f"Wildcards: {name} already exists ({entry['path']}).")
+    # On Windows (and macOS) Color.txt is color.txt: a new Color would write over color's lines.
+    existing = create and entry is None and next_to is None and find_wildcard(name)
+    if existing:
+        raise web.HTTPConflict(text=f"Wildcards: {name} already exists as {existing} (file names don't tell upper and lower case apart here).")
     try:
         if entry is not None and "lines" in entry:
             save_yaml_key(entry, text)

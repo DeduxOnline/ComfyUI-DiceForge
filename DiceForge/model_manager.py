@@ -11,8 +11,9 @@ from urllib.parse import urlsplit
 import aiohttp
 import folder_paths
 from aiohttp import web
-from .http_read import read_up_to
-from .model_info import PREVIEW_ENDINGS, civitai_details, civitai_summary, in_thread, info_file, json_body, local_preview, read_info, thumbnail, write_info
+from .http_read import read_text, read_up_to
+from .model_info import (PREVIEW_ENDINGS, WINDOWS_DEVICE, civitai_details, civitai_summary, in_thread, info_file, json_body, local_preview, model_path,
+                         read_info, thumbnail, write_info)
 # Managing the model files of the LoRA, Checkpoint and Diffusion Model Browsers (web/model_browser.js, web/civitai.js): Create is finding a model on
 # Civitai and downloading it (with its Civitai data and a preview, so the browser shows it at once), Read is the browser and Model info, Update is
 # renaming or moving a file (its preview and info go with it) and Delete is removing it. MANAGED_KINDS lists the kinds the routes accept.
@@ -48,8 +49,9 @@ def managed_kind(kind):
 def checked_relative(name, what="name"):
     name = (name if isinstance(name, str) else "").strip().replace("\\", "/")
     parts = name.split("/")
-    if not name or len(name) > 1000 or FORBIDDEN.search(name) or any(part in ("", ".", "..") or part != part.strip() or part.endswith(".") for part in parts):
-        raise web.HTTPBadRequest(text=f"Models: {name!r} is not a usable {what} (no .., no empty folder names, none of < > : \" | ? *).")
+    if (not name or len(name) > 1000 or FORBIDDEN.search(name)
+            or any(part in ("", ".", "..") or part != part.strip() or part.endswith(".") or WINDOWS_DEVICE.fullmatch(part) for part in parts)):
+        raise web.HTTPBadRequest(text=f"Models: {name!r} is not a usable {what} (no .., no empty folder names, none of < > : \" | ? *, no con or nul).")
     return name
 def extensions():
     return {extension.lower() for extension in folder_paths.supported_pt_extensions}
@@ -68,7 +70,7 @@ def relative_name(root, path):
 # The model file of a name from the browser, with the model folder it is in.
 def existing(kind, name):
     name = checked_relative(name, "file name") # Before ComfyUI's lookup, which would read "../x" as "x": another file than the one named.
-    path = folder_paths.get_full_path(managed_kind(kind), name)
+    path = model_path(managed_kind(kind), name)
     if not path or not os.path.isfile(path):
         raise web.HTTPNotFound(text=f"Models: no {kind} file {name!r}.")
     return path, root_of(kind, path)
@@ -247,9 +249,9 @@ async def civitai_json(path, params=()):
             if response.status in (401, 403):
                 raise web.HTTPForbidden(text="Civitai refused the request: check the API key (🔑).")
             if response.status == 400: # A filter Civitai doesn't know (a base model name...): its message says which.
-                raise web.HTTPBadRequest(text=f"Civitai refused the search: {(await response.text())[:300]}")
+                raise web.HTTPBadRequest(text=f"Civitai refused the search: {(await read_text(response, 3000, cut=True))[:300]}")
             response.raise_for_status()
-            data = await response.json(content_type=None)
+            data = json.loads(await read_text(response))
     except web.HTTPException:
         raise
     except Exception as error: # Offline, a timeout, Civitai down or answering something else than JSON.
@@ -309,7 +311,7 @@ async def search(kind, query="", base="", sort="", nsfw=False, cursor=""):
 def public(job):
     return {key: value for key, value in job.items() if key != "path"}
 def safe_file_name(name):
-    name = FORBIDDEN.sub("_", os.path.basename(str(name).replace("\\", "/"))).strip().strip(".") or "model.safetensors"
+    name = FORBIDDEN.sub("_", os.path.basename(str(name).replace("\\", "/"))).strip().strip(".").strip() or "model.safetensors"
     return name
 # Where downloads go: the model folder named like the kind (models/diffusion_models, not the older models/unet ComfyUI lists first), else the first.
 def download_root(kind):
