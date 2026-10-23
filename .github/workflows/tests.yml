@@ -36,23 +36,23 @@ env:
 jobs:
   unit:
     name: Unit tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }} # Here, not on the step: a step's condition can't see the step's own env (and not secrets).
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0 # The whole history: SonarQube Cloud tells new code from old by it.
 
       - name: Check out ComfyUI (${{ env.COMFYUI_REF }})
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           repository: comfyanonymous/ComfyUI
           ref: ${{ env.COMFYUI_REF }}
           path: ComfyUI
 
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
@@ -90,11 +90,11 @@ jobs:
   # leaves them out. The node pack, the e2e tests and this workflow count; the weekly, manual and release runs always have them.
   changes:
     name: What changed
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       e2e: ${{ steps.diff.outputs.e2e }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -119,7 +119,7 @@ jobs:
     name: End-to-end tests (${{ matrix.group }})
     needs: changes
     if: ${{ needs.changes.outputs.e2e == 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     strategy:
       fail-fast: false
@@ -136,16 +136,16 @@ jobs:
           - group: ComfyUI contract and old workflows
             files: contract.spec.js compat.spec.js
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Check out ComfyUI (${{ env.COMFYUI_REF }})
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           repository: comfyanonymous/ComfyUI
           ref: ${{ env.COMFYUI_REF }}
           path: ComfyUI
 
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
@@ -157,7 +157,7 @@ jobs:
           pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
           pip install -r ComfyUI/requirements.txt
 
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -177,7 +177,7 @@ jobs:
 
       - name: Keep the Playwright report (screenshots and traces of failures)
         if: ${{ failure() }}
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-report-${{ strategy.job-index }}
           path: |

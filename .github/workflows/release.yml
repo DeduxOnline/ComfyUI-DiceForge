@@ -15,7 +15,7 @@ permissions:
 jobs:
   check:
     name: Check the version
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
@@ -33,7 +33,7 @@ jobs:
   release:
     name: Release on GitHub and the ComfyUI Registry
     needs: tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: write # To make the GitHub release.
     env:

@@ -65,6 +65,8 @@ nodes and features, a patch for fixes. Each version is a [release on GitHub](htt
 - Tag Browser: ↗ opens the tag's wiki page instead of its posts: on e621 for the tags of an e621 list, on Danbooru otherwise.
 - CI: the end-to-end tests run when a change can affect them (the node pack, the end-to-end tests or the test workflow); a change to the
   docs, the unit tests or the agents runs the unit tests alone. The weekly, manual and release runs always have them.
+- CI: the workflows run on Ubuntu 24.04 instead of the newest Ubuntu, so a new runner image doesn't change the tests' system without a
+  commit; both workflows use the same versions of the GitHub actions, so Dependabot can update them again.
 
 ### Removed
 - The repairs of workflows and files of earlier versions, while DiceForge has no users but its author: SDXL Resolution List's old scale

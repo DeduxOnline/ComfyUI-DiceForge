@@ -28,6 +28,8 @@ section describes the tests, the agents and the release.
    - **Unit tests and SonarQube Cloud:** a failed Quality Gate fails the run.
    - **Five end-to-end jobs,** left out when a push changes nothing in `DiceForge/`, `e2e/` or `tests.yml` (the `changes` job).
    - The repository is public (since 2026-10-18), so Actions minutes are free; it was private before and ran out of them.
+   - The jobs run on `ubuntu-24.04`, not `ubuntu-latest`: a move to a newer Ubuntu is a commit of its own. Keep each action at one version
+     in both workflows: Dependabot updates them as one group and fails ("No files changed!") when they differ.
 
 ## Checks
 
