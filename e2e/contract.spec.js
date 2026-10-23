@@ -99,17 +99,17 @@ for (const vue of [true, false]) {
     });
 
     test("a panel sized by computeSize gets exactly that height", async ({ page }) => {
-      const [clip] = await addNodes(page, [{ type: "DiceForgeCLIPDualTextEncode" }]);
+      const [image] = await addNodes(page, [{ type: "DiceForgeRandomImage" }]);
       await page.evaluate(() => new Promise((resolve) => {
         window.app.canvas.draw(true, true);
         requestAnimationFrame(() => requestAnimationFrame(resolve)); // The DOM widgets' boxes follow a frame later.
       }));
       const sizes = await page.evaluate((id) => {
-        const widget = window.app.graph.getNodeById(id).widgets.find((item) => item.name === "prompt_preview");
+        const widget = window.app.graph.getNodeById(id).widgets.find((item) => item.name === "image_preview");
         const row = widget.element.closest('[data-testid="node-widget"]');
         return { wanted: widget.computeSize()[1], computed: widget.computedHeight, box: widget.element.parentElement?.style.height, row: !!row,
           body: !!document.querySelector(`[data-node-id="${id}"] [data-testid^="node-body"]`) };
-      }, clip);
+      }, image);
       if (vue) {
         expect(sizes.row && sizes.body, changed("the data-testid of a node's body and widget rows in Nodes 2.0", "e2e/qa/lib.js measure")).toBe(true);
       } else {
@@ -148,7 +148,7 @@ for (const vue of [true, false]) {
         const [clip] = await addNodes(page, [{ type: "DiceForgeCLIPDualTextEncode" }]);
         await page.locator(`[data-node-id="${clip}"]`).getByText(/Show advanced inputs/).click();
         await expect.poll(() => page.evaluate((id) => window.app.graph.getNodeById(id).showAdvanced, clip),
-          changed("node.showAdvanced (Show advanced inputs in Nodes 2.0)", "prompt_preview.js")).toBe(true);
+          changed("node.showAdvanced (Show advanced inputs in Nodes 2.0)", "the e2e tests and screenshots")).toBe(true);
       });
     }
   });

@@ -988,8 +988,8 @@ for (const vue of [true, false]) {
       expect(text).toMatch(/^a (red|blue|green|white) car, [a-z ]+, [a-z ]+$/);
       // No panel of the last run under the inputs: the prompts as encoded go to the prompt history, with the seed they came from.
       expect(await page.evaluate((id) => window.app.graph.getNodeById(id).widgets.map((widget) => widget.name), encode)).not.toContain("prompt_preview");
-      const history = () => page.evaluate((id) => window.app.graph.getNodeById(id).properties.dice_forge_history, encode);
-      expect((await history())[0]).toMatchObject({ positive: text, seed: 3, seed_mode: "random" });
+      const kept = () => page.evaluate((id) => window.app.graph.getNodeById(id).properties.dice_forge_history, encode);
+      expect((await kept())[0]).toMatchObject({ positive: text, seed: 3, seed_mode: "random" });
       await page.evaluate((id) => window.app.graph.getNodeById(id).onExecuted({ dice_forge_prompts: [{ positive: "a car", negative: "", seed: 1,
         seed_mode: "combinations", note: "combination 2 of 8" }] }), encode); // What the run notes (combination N of M, the LoRAs of tags) shows with its seed.
       await clickMenu(page, encode, "DiceForge.PromptPreview", "Prompt history");
