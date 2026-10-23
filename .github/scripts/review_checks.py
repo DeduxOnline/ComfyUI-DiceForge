@@ -43,7 +43,7 @@ RANDOM = re.compile(r"\bimport random\b|\bfrom random import\b|\brandom\.(random
 
 
 def git(*args):
-    return subprocess.run(["git", *args], cwd=ROOT, capture_output=True, text=True, check=False).stdout
+    return subprocess.run(["git", *args], cwd=ROOT, capture_output=True, encoding="utf-8", errors="replace", check=False).stdout # Not the system's code page: diffs hold emoji.
 
 
 # A file as it was at a commit, its bytes as they are (CRLF too), or None when it wasn't there.
