@@ -49,6 +49,37 @@ def test_wildcards_that_include_each_other_stop_with_an_error(wildcards):
         resolve("__loop_a__")
 
 
+def test_wildcards_that_use_another_one_twice_stop_at_the_budget(wildcards):
+    # Each level uses the next one twice: 30 levels would be a billion fill-ins, under the depth limit.
+    wildcards("chain.yaml", "".join(f"a{n}: '__a{n + 1}__ __a{n + 1}__'\n" for n in range(30)) + "a30: [x]\n")
+    started = time.time()
+    with pytest.raises(ValueError, match="more than 100000 choices, wildcards and variables"):
+        resolve("__a0__")
+    assert time.time() - started < 20
+    assert resolve("__a5__")[0] == " ".join(["x"] * 32) # A few levels are fine.
+
+
+def test_variables_that_use_another_one_twice_stop_at_the_length_limit():
+    chain = "".join("${v%d=${v%d} ${v%d}}" % (n + 1, n, n) for n in range(40))
+    started = time.time()
+    with pytest.raises(ValueError, match="longer than 1000000 characters"):
+        resolve("${v0=x}" + chain + "${v40}")
+    assert time.time() - started < 5
+    assert resolve("${v0=x}" + chain[:chain.index("${v4=")] + "${v3}")[0] == " ".join(["x"] * 8)
+
+
+def test_yaml_aliases_and_deep_nesting_skip_the_file_not_every_wildcard(wildcards):
+    # An alias bomb (a few hundred bytes for a million keys) and nesting deep enough to break PyYAML's recursion: each file is skipped with a
+    # warning, and the other wildcards keep working.
+    wildcards("color.txt", "red\n")
+    wildcards("bomb.yaml", "l0: &l0 [x]\n" + "".join(f"l{n}: &l{n} {{" + ", ".join(f"k{i}: *l{n - 1}" for i in range(10)) + "}\n" for n in range(1, 7)))
+    wildcards("deep.yaml", "x: " + "[" * 5000 + "]" * 5000 + "\n")
+    wildcards("nested.yaml", "".join("  " * level + f"k{level}:\n" for level in range(60)) + "  " * 60 + "- end\n")
+    names = prompts.wildcard_names(refresh=True)
+    assert names == ["color"]
+    assert results("__color__") == {"red"}
+
+
 def test_globs_join_the_lines_of_every_matching_file(wildcards):
     wildcards("hair/color.txt", "blonde hair\nred hair\n")
     wildcards("hair/style.txt", "bob cut\n")

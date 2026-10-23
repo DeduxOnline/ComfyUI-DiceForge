@@ -21,6 +21,24 @@ NAME_PART = r"(?:[\w\-./*?]|\$\{\w+\}|\x00\w+\x00)+?"
 WILDCARD_PATTERN = re.compile(rf"__({NAME_PART}(?: {NAME_PART})*?)__")
 NAME_VARIABLE = re.compile(r"\$\{(\w+)\}|\x00(\w+)\x00")
 MAX_DEPTH = 50 # Nesting limit for wildcards and {a|b} choices, to stop wildcards that include each other forever.
+# The depth limit doesn't stop a wildcard that uses another one twice, which uses another one twice...: 30 levels are a billion fill-ins. A run's
+# prompts may fill in EXPANSION_LIMIT choices, wildcards and variables, and come out at most TEXT_LIMIT characters long.
+EXPANSION_LIMIT = 100000
+TEXT_LIMIT = 1000000
+class Budget:
+    def __init__(self):
+        self.left = EXPANSION_LIMIT
+    def spend(self):
+        self.left -= 1
+        if self.left < 0:
+            raise ValueError(f"The prompts fill in more than {EXPANSION_LIMIT} choices, wildcards and variables: check for wildcard files or variables "
+                             "that use another one several times, nested deep.")
+    @staticmethod
+    def checked(text):
+        if len(text) > TEXT_LIMIT:
+            raise ValueError(f"The filled-in prompt is longer than {TEXT_LIMIT} characters: check for wildcard files or variables that use another one "
+                             "several times, nested deep.")
+        return text
 WILDCARD_FILES = (".txt", ".yaml", ".yml")
 # Wildcard .txt file lookup: name may contain subfolders (__colors/warm__ -> colors/warm.txt), and must stay inside a wildcards folder.
 def find_wildcard(name):
@@ -53,9 +71,24 @@ def yaml_wildcards(data, name):
         yield name, [str(item).strip() for item in items if item is not None and not isinstance(item, (dict, list))]
 # YAML lines are text as written: "yes", "no", "12:30" or "0123" stay as they are instead of becoming True, False, 750 or 83 (YAML 1.1 rules);
 # only null (~, null, an empty item) means no line.
+# No aliases (*name): a few hundred bytes of aliases to aliases stand for millions of wildcards. And no nesting deeper than YAML_DEPTH: deeper
+# only comes from a broken file, and PyYAML's recursion would fail on it with an error every wildcard route and run would get.
+YAML_DEPTH = 50
 class TextLoader(yaml.SafeLoader):
     yaml_implicit_resolvers = {first: [(tag, pattern) for tag, pattern in resolvers if tag == "tag:yaml.org,2002:null"]
                                for first, resolvers in yaml.SafeLoader.yaml_implicit_resolvers.items()}
+    depth = 0
+    def compose_node(self, parent, index):
+        event = self.peek_event()
+        if isinstance(event, yaml.AliasEvent):
+            raise yaml.composer.ComposerError(None, None, "aliases (*name) are not supported in wildcard files: write the lines out", event.start_mark)
+        if self.depth >= YAML_DEPTH:
+            raise yaml.composer.ComposerError(None, None, f"keys and lists are nested deeper than {YAML_DEPTH} levels", event.start_mark)
+        self.depth += 1
+        try:
+            return super().compose_node(parent, index)
+        finally:
+            self.depth -= 1
 # Wildcard index: every wildcard name ("hair/color") and where it comes from ({"path"} for a .txt file, {"path", "lines"} for a yaml key). A name in an
 # earlier folder hides the same name in a later one, and a .txt file hides a yaml key of the same name. Rebuilt when a file changes; the node checks
 # that once per run, and a name that is not found checks again.
@@ -213,14 +246,19 @@ def parse_variable(text, i):
     options, end = parse_choice(text, i + 1)
     found = VARIABLE.match("|".join(options))
     return (found.group(1), found.group(2) and found.group(2).strip(), end) if found else None
-def fill_variables(text, variables, depth=0):
+# Each variable's value is filled in once (filled): ${b=${a} ${a}}, ${c=${b} ${b}}... would otherwise take twice as long with every variable.
+def fill_variables(text, variables, depth=0, filled=None):
     if depth > MAX_DEPTH:
         raise ValueError("Variables are nested too deep: check for variables that include each other.")
+    filled = {} if filled is None else filled
     def value(match):
-        if match.group(1) not in variables:
-            raise ValueError(f"Variable ${{{match.group(1)}}} is used but never set: add ${{{match.group(1)}=...}} to a prompt or a wildcard file.")
-        return fill_variables(variables[match.group(1)], variables, depth + 1)
-    return VARIABLE_USE.sub(value, text)
+        name = match.group(1)
+        if name not in variables:
+            raise ValueError(f"Variable ${{{name}}} is used but never set: add ${{{name}=...}} to a prompt or a wildcard file.")
+        if name not in filled:
+            filled[name] = fill_variables(variables[name], variables, depth + 1, filled)
+        return filled[name]
+    return Budget.checked(VARIABLE_USE.sub(value, text))
 # Seed modes: how choices and wildcards are picked from one run to the next (shared pickers in seed_modes.py, plus combinations and mutate below).
 SEED_MODES = ["random", "deck", "shuffle", "balanced", "combinations", "mutate"]
 # combinations: the seed numbers every combination of the options in both prompts (nested choices and wildcards included), so seeds 0, 1, 2... go
@@ -413,9 +451,10 @@ def trim_spaces(text):
     return text.strip()
 # Prompt expansion: picks {a|b} choices and sets ${name=value} variables, then replaces __name__ wildcards, expanding the picked text again so choices
 # and wildcards can nest.
-def expand(text, picker, depth, variables):
+def expand(text, picker, depth, variables, budget):
     if depth > MAX_DEPTH:
         raise ValueError("Wildcards are nested too deep: check for wildcard files that include each other.")
+    budget.spend()
     result, i = "", 0
     while i < len(text):
         char = text[i]
@@ -426,27 +465,27 @@ def expand(text, picker, depth, variables):
         elif char == "{":
             options, i = parse_choice(text, i)
             picked, separator = pick_choices(options, picker, variables)
-            result += separator.join(expand(option, child, depth + 1, variables) for option, child in picked)
+            result += separator.join(expand(option, child, depth + 1, variables, budget) for option, child in picked)
         elif char == "$" and text.startswith("{", i) and (variable := parse_variable(text, i)):
             name, value, i = variable
             if value is None:
                 result += f"\x00{name}\x00"
             else:
-                variables[name] = expand(value, picker.sub(value), depth + 1, variables)
+                variables[name] = expand(value, picker.sub(value), depth + 1, variables, budget)
         else:
             result += char
     def wildcard(match):
         weighted = weighted_lines(wildcard_name(match.group(1), variables))
-        return expand(*picker.pick(weighted, 1, all(weight == 1.0 for weight, _ in weighted))[0], depth + 1, variables) # NOSONAR: as above.
-    return WILDCARD_PATTERN.sub(wildcard, result)
+        return expand(*picker.pick(weighted, 1, all(weight == 1.0 for weight, _ in weighted))[0], depth + 1, variables, budget) # NOSONAR: as above.
+    return Budget.checked(WILDCARD_PATTERN.sub(wildcard, Budget.checked(result)))
 # Full prompt processing: strips // and /* */ comments like the frontend, expands choices and wildcards, fills in variables (shared by both prompts),
 # unescapes \{ \} \| \!, then tidies commas. Wildcard names are kept whole: the /* of __hair/*__ does not start a comment.
 def strip_comments(text):
     return re.sub(r"(" + WILDCARD_PATTERN.pattern + r")|/\*[\s\S]*?\*/|//.*", lambda match: match.group(1) or "", text)
 def resolve_prompts(prompts, picker):
-    variables = {}
-    expanded = [expand(strip_comments(text), picker, 0, variables) for text in prompts]
-    return [tidy_commas(re.sub(r"\\([{}|!])", r"\1", fill_variables(text, variables))) for text in expanded]
+    variables, budget, filled = {}, Budget(), {}
+    expanded = [expand(strip_comments(text), picker, 0, variables, budget) for text in prompts]
+    return [tidy_commas(re.sub(r"\\([{}|!])", r"\1", fill_variables(text, variables, filled=filled))) for text in expanded]
 # The prompts with their choices, wildcards and variables filled in by the seed mode, as both prompt nodes do it (the same seed gives the same text
 # in either): returns the texts and a note for the log and preview (combination N of M). mutate remembers what it picked, unless the seed came before.
 def fill_in(prompts, seed, seed_mode):

@@ -85,6 +85,11 @@ nodes and features, a patch for fixes. Each version is a [release on GitHub](htt
   section on updating from it).
 
 ### Fixed
+- Wildcards: a yaml file nested very deep no longer breaks every wildcard (the Wildcard Browser, the autocomplete and every run with a
+  wildcard failed): it is skipped with a warning, like an invalid one. Yaml aliases (`*name`) are not read, since a few hundred bytes of
+  them stand for millions of wildcards; a file with them is skipped too.
+- Wildcards and variables that use another one twice, nested deep, stop with an error after 100,000 fill-ins or a million characters,
+  instead of a run that never ends; each variable is filled in once.
 - XY Plot: every cell of ▶ Queue gets the same seed. The frontend gave the node's `seed` a *control after generate* (randomize), which
   changed it after each cell; it has none now.
 - README: what Load Diffusion Model + CLIP has under its advanced inputs, how many downloads run at once, which test files there are, and
