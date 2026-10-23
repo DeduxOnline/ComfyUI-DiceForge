@@ -3,7 +3,7 @@ import os
 import comfy.samplers
 import folder_paths
 from aiohttp import web
-from .model_info import in_thread, json_body
+from .routes import in_thread, json_body
 # KSampler presets (web/sampler_presets.js, node menu of KSampler and KSampler Advanced): steps, CFG, sampler and scheduler for a model family, from
 # the models' own recommendations, and your own presets, saved in the ComfyUI user folder. "Auto" in the menu picks the built-in one by the base
 # model of the connected checkpoint (Civitai's base model names in BASES).

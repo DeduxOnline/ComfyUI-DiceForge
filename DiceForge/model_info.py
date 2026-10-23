@@ -1,4 +1,3 @@
-import asyncio
 import hashlib
 import json
 import logging
@@ -10,6 +9,7 @@ import aiohttp
 import folder_paths
 from aiohttp import web
 from .http_read import read_text
+from .routes import in_thread, json_body
 # Model info for the "Model info" dialog of the frontend (web/model_info.js), like rgthree's LoRA info but for every model kind: the file's sha256,
 # what Civitai knows about it (looked up by that hash), and the user's own notes. Everything is kept in the ComfyUI user folder, one JSON per file,
 # so model folders stay untouched; the hash is only computed again when the file's size or date changes.
@@ -50,19 +50,6 @@ def clean_info(info):
                 civitai[key] = str(civitai[key])
         info["civitai"] = civitai
     return info
-# The JSON object a POST request sends; anything else (no JSON, a list, a number) is a 400 with a message instead of a server error.
-async def json_body(request):
-    try:
-        body = await request.json()
-    except ValueError:
-        raise web.HTTPBadRequest(text="DiceForge: the request body is not valid JSON.") from None
-    if not isinstance(body, dict):
-        raise web.HTTPBadRequest(text="DiceForge: the request body must be a JSON object.")
-    return body
-# A route's work with files (reading, writing, listing folders), in a thread: on ComfyUI's event loop it would hold up every other request and
-# the progress of a run meanwhile (Sonar S7493). The handler reads what the request sends; the rest goes through here.
-async def in_thread(function, *args):
-    return await asyncio.get_running_loop().run_in_executor(None, function, *args)
 def write_info(kind, name, info):
     path = info_file(kind, name)
     os.makedirs(os.path.dirname(path), exist_ok=True)

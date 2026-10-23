@@ -12,8 +12,9 @@ import aiohttp
 import folder_paths
 from aiohttp import web
 from .http_read import read_text, read_up_to
-from .model_info import (PREVIEW_ENDINGS, WINDOWS_DEVICE, civitai_details, civitai_summary, in_thread, info_file, json_body, local_preview, model_path,
+from .model_info import (PREVIEW_ENDINGS, WINDOWS_DEVICE, civitai_details, civitai_summary, info_file, local_preview, model_path,
                          read_info, thumbnail, write_info)
+from .routes import in_thread, json_body
 # Managing the model files of the LoRA, Checkpoint and Diffusion Model Browsers (web/model_browser.js, web/civitai.js): Create is finding a model on
 # Civitai and downloading it (with its Civitai data and a preview, so the browser shows it at once), Read is the browser and Model info, Update is
 # renaming or moving a file (its preview and info go with it) and Delete is removing it. MANAGED_KINDS lists the kinds the routes accept.

@@ -1,11 +1,11 @@
 import { app } from "../../scripts/app.js";
-import { api } from "../../scripts/api.js";
 import { addStyleOnce, asking, background, element } from "./dom.js";
 import { compact } from "./civitai_meta.js";
 import { tagText } from "./tag_autocomplete.js";
 import { cursorField, fieldsOf, insertIntoNode, isPromptNode } from "./wildcards.js";
 import { keysButton, keysOnQuestion, moveCursor, slashToSearch, typingIn } from "./menu.js";
 import { keepSize, recall, remember, scrollBack } from "./window_memory.js";
+import { request } from "./comfy.js";
 
 // Tag Browser (CLIP Dual Text Encode's menu): the Danbooru / e621 tags of the downloaded lists (tag_autocomplete.py), searched by name or alias,
 // by type (characters, artists, series, general, meta) or your ★ favorites, most used first or by name. + Add puts a tag where the cursor was in
@@ -42,11 +42,6 @@ const STYLE = `
 const TYPES = [["", "All"], ["general", "General"], ["character", "👤 Characters"], ["copyright", "©️ Series"], ["artist", "🎨 Artists"], ["meta", "⚙️ Meta"], ["favorites", "★ Favorites"]];
 const KIND_NAMES = { general: "general", character: "👤 character", copyright: "©️ series", artist: "🎨 artist", meta: "⚙️ meta" };
 const PAGE = 100;
-async function request(path, options) {
-  const response = await api.fetchApi(path, options);
-  if (!response.ok) throw new Error(await response.text());
-  return response.json();
-}
 
 // The tags a prompt has, in lower case as written (spaces, escaped parentheses), a weight like (smile:1.2) left aside.
 export function promptTags(text) {

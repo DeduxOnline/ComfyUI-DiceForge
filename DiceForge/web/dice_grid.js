@@ -2,6 +2,7 @@ import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
 import { addStyleOnce, askConfirm, background, element, fitToContent } from "./dom.js";
 import { fitNodeHeight } from "./node_size.js";
+import { request } from "./comfy.js";
 
 // The cells of Dice Grid's grid under the node, to keep the best ones: click a cell to star it (★), 💾 Save kept puts the starred ones at full size
 // in the output folder (DiceForge/kept), each with the workflow of its run in it like Save Image, and ↺ opens a cell's run (its workflow, seeds
@@ -21,11 +22,6 @@ const STYLE = `
 `;
 const widgetValue = (node, name, fallback) => node.widgets?.find((widget) => widget.name === name)?.value ?? fallback;
 const query = (node, extra = {}) => new URLSearchParams({ node: String(node.id), name: widgetValue(node, "name", "grid"), ...extra });
-async function request(path, options) {
-  const response = await api.fetchApi(path, options);
-  if (!response.ok) throw new Error(await response.text());
-  return response.json();
-}
 
 app.registerExtension({
   name: "DiceForge.DiceGridCells",

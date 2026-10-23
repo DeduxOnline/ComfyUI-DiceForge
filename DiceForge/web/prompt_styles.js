@@ -1,27 +1,17 @@
 import { app } from "../../scripts/app.js";
-import { api } from "../../scripts/api.js";
 import { askConfirm, askText, background } from "./dom.js";
 import { modelSource, fetchBases, baseOf } from "./lora_stack.js";
 import { presetNameFor } from "./sampler_presets.js";
 import { setField, PROMPT_NODE_TYPE } from "./wildcards.js";
+import { request, toast } from "./comfy.js";
 
 // Prompt styles in the right-click menu of CLIP Dual Text Encode (prompt_styles.py): the quality tags each model family is made for, and your own
 // styles (A1111's styles.csv). A style goes into both prompts: around the prompt where its text has {prompt}, after it otherwise. A style already in
 // the prompts (✓ in the menu) is taken out again by a second click. Auto picks the family's style for the model connected to the node.
 let styles = { builtin: [], user: [] };
-async function request(path, options) {
-  const response = await api.fetchApi(path, options);
-  if (!response.ok) throw new Error(await response.text());
-  return response.json();
-}
 async function loadStyles() {
   try { styles = await request("/diceforge/styles"); } catch { /* No answer: the menu offers what it had. */ }
   return styles;
-}
-function toast(severity, summary, detail) {
-  const toaster = app.extensionManager?.toast;
-  if (toaster?.add) toaster.add({ severity, summary, detail, life: 4000 });
-  else if (severity === "error") alert(`${summary}: ${detail}`);
 }
 
 // The pieces of a style's text around {prompt} (or after the prompt), without the commas that join them.

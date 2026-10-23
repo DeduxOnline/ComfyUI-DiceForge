@@ -16,7 +16,7 @@ const KIND_BY_WIDGET = [
   [/vae/i, "vae"],
   [/clip|text_encoder/i, "text_encoders"],
 ];
-const MODEL_FILE = /\.(safetensors|ckpt|pt|pth|bin|gguf|sft)$/i;
+export const MODEL_FILE = /\.(safetensors|ckpt|pt|pth|bin|gguf|sft)$/i;
 function modelWidgets(node) {
   const found = [];
   for (const widget of node.widgets ?? []) {

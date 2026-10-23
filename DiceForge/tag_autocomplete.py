@@ -12,7 +12,7 @@ import aiohttp
 import folder_paths
 from aiohttp import web
 from .http_read import read_up_to
-from .model_info import in_thread, json_body
+from .routes import in_thread, json_body
 # Tag autocomplete for the prompt fields (web/tag_autocomplete.js): Danbooru and e621 tags, the way anime models (Illustrious, NoobAI, Anima) were
 # trained on them, with how often each is used and its aliases. The lists are CSV files in the format of a1111-sd-webui-tagcomplete
 # (tag,type,count,"alias,alias"), kept in the ComfyUI user folder: downloaded from that project with one click, or put there by hand. Every list

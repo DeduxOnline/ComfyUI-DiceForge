@@ -4,7 +4,7 @@ import folder_paths
 import nodes
 from aiohttp import web
 from comfy_api.latest import io
-from .model_info import in_thread, json_body
+from .routes import in_thread, json_body
 from .model_lists import matching_files
 from .random_sampler import SAMPLERS, SCHEDULERS, options_output, parse_names
 from .variation_seed import with_variation

@@ -9,7 +9,8 @@ import comfy.utils
 import folder_paths
 from aiohttp import web
 from comfy_api.latest import io
-from .model_info import KINDS, WINDOWS_DEVICE, in_thread, json_body, model_path, read_info, info_file
+from .model_info import KINDS, WINDOWS_DEVICE, model_path, read_info, info_file
+from .routes import in_thread, json_body
 from .seed_modes import MEMORY, SEED_MODES, make_picker, pick_index, seed_mode_tooltip
 # LoRA Stack: several LoRAs in one node, like rgthree's Power Lora Loader, with the DiceForge seed modes. The rows live in the "loras" input as JSON,
 # edited by the frontend (web/lora_stack.js):

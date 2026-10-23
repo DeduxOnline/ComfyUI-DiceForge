@@ -11,7 +11,7 @@ from .http_read import read_text
 from comfy_api.latest import io
 from . import tag_autocomplete
 from .clip_text_encode_pos_neg import fill_in, wildcards_signature
-from .model_info import in_thread
+from .routes import in_thread
 from .tag_autocomplete import INDEX, parse_tags, tag_key
 # Danbooru Tag Enhancer: more tags for a prompt, from real posts that have the tags already there, on Danbooru (anime) or e621 (furry). The site
 # picks random posts with the most telling two of the prompt's tags (the rarest it knows: a character before "1girl") and the rating; their tags

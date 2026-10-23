@@ -1,7 +1,8 @@
 import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
 import { askConfirm, askText, background } from "./dom.js";
-import { onWildcardList, toast, wildcardList } from "./wildcards.js";
+import { onWildcardList, wildcardList } from "./wildcards.js";
+import { toast } from "./comfy.js";
 
 // Wildcard Note: a note (like ComfyUI's Note, it is not run with the workflow) to collect wildcard lines while you work, with the prompt fields'
 // tools (the __ autocomplete, highlighting, the Wildcard Browser). 💾 Save to WildCard puts its lines into the wildcard file picked in its list:
@@ -30,7 +31,7 @@ async function plannedSave(name, lines, mode) {
   const file = await api.fetchApi(`/diceforge/wildcards/file?name=${encodeURIComponent(name)}`);
   if (file.status === 404) return { text: lines.join("\n"), create: true, done: `Made __${name}__ with the note's ${linesWord(lines.length)}` };
   if (!file.ok) {
-    toast("error", await file.text());
+    toast("error", "Wildcards", await file.text());
     return null;
   }
   const current = await file.json();
@@ -41,7 +42,7 @@ async function plannedSave(name, lines, mode) {
   const known = new Set(current.text.split("\n").map((line) => line.trim()));
   const added = lines.filter((line) => !known.has(line));
   if (!added.length) {
-    toast("info", `__${name}__ already has every line of the note.`);
+    toast("info", "Wildcards", `__${name}__ already has every line of the note.`);
     return null;
   }
   const already = lines.length > added.length ? ` (${lines.length - added.length} already there)` : "";
@@ -50,7 +51,7 @@ async function plannedSave(name, lines, mode) {
 
 async function saveToWildcard(node) {
   const lines = noteLines(node);
-  if (!lines.length) return toast("warn", "The note is empty: write the wildcard's lines in it first, one per line.");
+  if (!lines.length) return toast("warn", "Wildcards", "The note is empty: write the wildcard's lines in it first, one per line.");
   const files = widgetOf(node, "wildcard");
   const name = files?.value && files.value !== NEW_FILE ? files.value
     : (await askText("A new wildcard file for the note's lines: its name (folders with /, for example outfit/dress):"))?.trim();
@@ -58,11 +59,11 @@ async function saveToWildcard(node) {
   const plan = await plannedSave(name, lines, widgetOf(node, "mode")?.value);
   if (!plan) return;
   const response = await api.fetchApi("/diceforge/wildcards/file", { method: "POST", body: JSON.stringify({ name, text: plan.text, create: plan.create === true }) });
-  if (!response.ok) return toast("error", await response.text());
+  if (!response.ok) return toast("error", "Wildcards", await response.text());
   files.value = (await response.json()).saved; // The file the next save goes to (a new file's name, as the server wrote it).
   showChoices(node, await wildcardList(true));
   node.setDirtyCanvas?.(true, true);
-  toast("success", `${plan.done}.`);
+  toast("success", "Wildcards", `${plan.done}.`);
 }
 
 app.registerExtension({

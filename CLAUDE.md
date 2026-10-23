@@ -44,7 +44,7 @@ section describes the tests, the agents and the release.
   - template literals nested in `${...}` (S4624);
   - functions harder to follow than about 15 (S3776);
   - a blocking `open()` in an `async` route handler (S7493, counted as a bug: it fails the reliability condition). Every route does its
-    file work (reading, writing, listing, `wildcard_index`) through `in_thread` (`model_info.py`), also when it is a call away, which
+    file work (reading, writing, listing, `wildcard_index`) through `in_thread` (`routes.py`), also when it is a call away, which
     Sonar misses; `tests/test_event_loop.py` fails on a file touched on the event loop. In threads two requests run at once, so a
     read-modify-write of a shared file holds its module's lock (`wildcards_api.one_at_a_time`, `model_info.INFO_CHANGES`, and
     `index_lock` for the wildcard index);
@@ -68,11 +68,15 @@ section describes the tests, the agents and the release.
 - **Reuse the helpers:**
   - `dom.js`: `element`, `addStyleOnce`, `background` for promises not awaited, `fitToContent` for panels in nodes, `askConfirm` and
     `askText` for questions (ComfyUI's dialogs; never the browser's `confirm()` or `prompt()`), `asking()` before a window's own keys;
+  - `comfy.js`: `request` for a DiceForge route's JSON (its text as the error), `toast(severity, summary, detail)`;
   - `menu.js`: right-click menus, keys;
   - `window_memory.js`: what windows remember, their size;
   - `node_size.js`: node heights;
   - `move_dialog.js`: the folder picker and drag and drop onto a tree; `media.js`: Civitai pictures and videos, Blur NSFW;
-  - `http_read.py`, `model_lists.py`; `model_info.json_body` for every POST body, `model_info.in_thread` for a route's file work.
+  - `http_read.py`, `model_lists.py`; `routes.py`: `json_body` for every POST body, `in_thread` for a route's file work.
+- **The timers in nodes stay** (a node's preview watching its `properties`, the prompt highlight's scan): each compares a kept key and
+  draws only on a change, and they see a change from anywhere (a loaded workflow, a test, another extension), which hooks would miss.
+  Measured slowness with hundreds of nodes is the frontend's (the `perf` agent, 2026-10-23).
 - **Where things are:**
   - `seed_modes.py`: the pickers every random node uses, and the seed memory (SQLite in `user/DiceForge`). Every mode gives the same result
     for the same seed.

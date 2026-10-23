@@ -3,6 +3,7 @@ import { api } from "../../scripts/api.js";
 import { background } from "./dom.js";
 import { compact } from "./civitai_meta.js";
 import { addCompletionSource, isPromptNode } from "./wildcards.js";
+import { toast } from "./comfy.js";
 
 // Danbooru and e621 tag autocomplete in the prompt fields (tag_autocomplete.py): while a word is typed, the most used tags that start with it (or an
 // alias of them), with how often each is used. Accepting one puts it in as the models learned it: spaces for underscores (except in emoticons like
@@ -46,11 +47,6 @@ addCompletionSource((before) => {
 let lists = [];
 async function loadLists() {
   try { lists = (await (await api.fetchApi("/diceforge/tags/lists")).json()).lists; } catch { /* No answer: the menu offers what it had. */ }
-}
-function toast(severity, summary, detail) {
-  const toaster = app.extensionManager?.toast;
-  if (toaster?.add) toaster.add({ severity, summary, detail, life: 5000 });
-  else if (severity === "error") alert(`${summary}: ${detail}`);
 }
 async function download(list) {
   toast("info", "Tag autocomplete", `Downloading the ${list.name} tags…`);

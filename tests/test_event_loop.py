@@ -1,4 +1,4 @@
-# The routes leave their work with files to a thread (model_info.in_thread): a file opened, a folder listed or walked on the event loop holds
+# The routes leave their work with files to a thread (routes.in_thread): a file opened, a folder listed or walked on the event loop holds
 # up every other request of ComfyUI and the progress of a run meanwhile. Sonar (S7493) only sees an open() written in the handler itself, so
 # this test calls every DiceForge route, with real files where it needs them, and records each file of the test's folders opened, listed or
 # walked on the loop's own thread. In threads, two requests can change the same file at once: the changes that read, change and write a

@@ -1,6 +1,6 @@
 import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
-import { openModelInfo } from "./model_info.js";
+import { MODEL_FILE, openModelInfo } from "./model_info.js";
 import { openModelBrowser, BROWSERS, compareBases } from "./model_browser.js";
 import { fitNodeHeight } from "./node_size.js";
 import { addStyleOnce, askConfirm, asking, askText, background, element, fitToContent } from "./dom.js";
@@ -73,7 +73,6 @@ async function loraList() {
 // Pony, Illustrious, NoobAI) a LoRA often works on another base's model, but not as well. Unknown bases give no warning. The comparison itself
 // (family, compareBases) is in model_browser.js, which also uses it for the "Fits the model" filter.
 const MODEL_WIDGETS = [[/ckpt|checkpoint/i, "checkpoints"], [/unet|diffusion/i, "diffusion_models"]];
-const MODEL_FILE = /\.(safetensors|ckpt|pt|pth|bin|gguf|sft)$/i;
 function modelSource(node) {
   const seen = new Set();
   for (let current = node; current && !seen.has(current.id);) {

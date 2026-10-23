@@ -5,6 +5,7 @@ import { dragSource, dropTarget, pickFolder } from "./move_dialog.js";
 import { addHighlightStyle, highlightEnabled, highlightWildcardFile } from "./prompt_highlight.js";
 import { keepSize, recall, remember, scrollBack } from "./window_memory.js";
 import { closeMenu, keysButton, keysOnQuestion, menuAt, menuButton, menuOpen, moveCursor, slashToSearch, typingIn, withMenu } from "./menu.js";
+import { toast } from "./comfy.js";
 
 // Wildcards in CLIP Dual Text Encode: autocomplete after "__" in the prompt fields, and the Wildcard Browser (node menu) with a folder tree,
 // "+ Add" buttons that insert __name__ (or __folder/*__) where the cursor was, and an editor for the files.
@@ -1292,12 +1293,6 @@ export function yamlOption(line) {
 export function suggestedName(line) {
   return line.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean).slice(0, 3).join("_") || "new";
 }
-// A message in ComfyUI's corner (a dialog where there is none, for what went wrong).
-export function toast(severity, detail) {
-  const toaster = app.extensionManager?.toast;
-  if (toaster?.add) toaster.add({ severity, summary: "Wildcards", detail, life: 5000 });
-  else if (severity !== "success") alert(detail);
-}
 // ✂ Selection → new wildcard: the part of a prompt selected (the last selection in the node's prompt fields) becomes a wildcard file's first
 // line, and __name__ takes its place in the prompt: a prompt split into wildcards, one choice at a time. A name already taken: the selection
 // is added to that file as one more line (asked first).
@@ -1305,7 +1300,7 @@ async function selectionToWildcard(node) {
   const cursor = lastCursor.get(node);
   const text = String(node.widgets?.find((widget) => widget.name === cursor?.name)?.value ?? "");
   const start = cursor?.start ?? 0, end = cursor?.end ?? 0, picked = text.slice(start, end);
-  if (!cursor || !picked.trim()) return toast("warn", "Select a part of a prompt first: it becomes the new wildcard's first line, and __name__ takes its place.");
+  if (!cursor || !picked.trim()) return toast("warn", "Wildcards", "Select a part of a prompt first: it becomes the new wildcard's first line, and __name__ takes its place.");
   const line = oneLine(picked);
   const suggested = suggestedName(line);
   const quoted = line.length > 60 ? `${line.slice(0, 60)}…` : line;
@@ -1316,20 +1311,20 @@ async function selectionToWildcard(node) {
   if (response.status === 409) { // Taken: one more line of it?
     if (!(await askConfirm(`__${name}__ already exists. Add “${line}” to it as a new line?`))) return;
     const file = await api.fetchApi(`/diceforge/wildcards/file?name=${encodeURIComponent(name)}`);
-    if (!file.ok) return toast("error", await file.text());
+    if (!file.ok) return toast("error", "Wildcards", await file.text());
     const current = await file.json();
     const known = current.text.split("\n").some((item) => item.trim() === line);
     response = known ? new Response(JSON.stringify({ saved: name })) : await save({ name, text: current.text.trim() ? `${current.text}\n${line}` : line });
     what = known ? "Used" : "Added a line to";
   }
-  if (!response.ok) return toast("error", await response.text());
+  if (!response.ok) return toast("error", "Wildcards", await response.text());
   const token = `__${(await response.json()).saved}__`;
   const lead = picked.slice(0, picked.length - picked.trimStart().length), trail = picked.slice(picked.trimEnd().length); // The selection's spaces stay around the wildcard.
   const caret = start + lead.length + token.length;
   setField(node, cursor.name, text.slice(0, start) + lead + token + trail + text.slice(end), caret);
   lastCursor.set(node, { name: cursor.name, start: caret, end: caret });
   await wildcardList(true);
-  toast("success", `${what} ${token}: it now stands for “${line}” in the ${cursor.name} prompt.`);
+  toast("success", "Wildcards", `${what} ${token}: it now stands for “${line}” in the ${cursor.name} prompt.`);
 }
 
 // For the prompt syntax highlighting (prompt_highlight.js): the prompt fields of a node, and the wildcard names as last listed.

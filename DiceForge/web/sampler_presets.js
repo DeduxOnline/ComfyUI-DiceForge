@@ -1,26 +1,16 @@
 import { app } from "../../scripts/app.js";
-import { api } from "../../scripts/api.js";
 import { askConfirm, askText, background } from "./dom.js";
 import { modelSource, fetchBases, baseOf } from "./lora_stack.js";
+import { request, toast } from "./comfy.js";
 
 // Sampler presets in the right-click menu of KSampler, KSampler Advanced and any node with steps, cfg, sampler_name and scheduler: the settings
 // recommended for Anima, Anima Turbo, Illustrious and NoobAI (eps and v-pred), Auto (the one for the base model of the connected checkpoint, from
 // Model info, or else from its file name), and your own presets (sampler_presets.py keeps them in the ComfyUI user folder).
 const FIELDS = ["steps", "cfg", "sampler_name", "scheduler"];
 let presets = { builtin: [], user: [] };
-async function request(path, options) {
-  const response = await api.fetchApi(path, options);
-  if (!response.ok) throw new Error(await response.text());
-  return response.json();
-}
 async function loadPresets() {
   try { presets = await request("/diceforge/sampler-presets"); } catch { /* No answer: the menu offers what it had. */ }
   return presets;
-}
-function toast(severity, summary, detail) {
-  const toaster = app.extensionManager?.toast;
-  if (toaster?.add) toaster.add({ severity, summary, detail, life: 4000 });
-  else if (severity === "error") alert(`${summary}: ${detail}`);
 }
 const widgetsOf = (node) => Object.fromEntries(FIELDS.map((name) => [name, node.widgets?.find((widget) => widget.name === name)]));
 const isSampler = (node) => Object.values(widgetsOf(node)).every(Boolean);

@@ -1,6 +1,6 @@
 import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
-import { openModelInfo } from "./model_info.js";
+import { MODEL_FILE, openModelInfo } from "./model_info.js";
 import { insertIntoNode } from "./wildcards.js";
 import { openCivitaiSearch } from "./civitai.js";
 import { dragSource, dropTarget, pickFolder } from "./move_dialog.js";
@@ -29,7 +29,6 @@ const BROWSERS = [
     manage: true, civitai: false },
   { kind: "vae", icon: "🎨", title: "VAE", one: "VAE", plural: "VAEs", widget: /vae/i, random: "DiceForgeRandomVAE", randomName: "Random VAE", triggers: false, manage: true },
 ];
-const MODEL_FILE = /\.(safetensors|ckpt|pt|pth|bin|gguf|sft)$/i;
 
 // The choices of a list widget, as names. The frontend keeps them as an array, but also takes a function or an object (its keys), and other
 // extensions put objects in the array ({ content }); the Asset API's model widgets have no list at all (null).
