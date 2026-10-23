@@ -48,6 +48,9 @@ function writeFile(relative, text) {
 }
 
 // Opens ComfyUI in the Nodes 2.0 (vue) or classic design, with an empty graph.
+// The page has drawn twice since now: the canvas, and the fields and panels it places on it, show what was just changed.
+const drawn = (page) => page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+
 async function openComfy(page, { vue = true } = {}) {
   const ready = () => page.waitForFunction(() => window.app?.graph && window.LiteGraph && window.app.extensionManager?.setting, null, { timeout: 60_000 });
   await page.goto("/");
@@ -59,7 +62,7 @@ async function openComfy(page, { vue = true } = {}) {
   }
   // Ready when DiceForge's extensions are registered and the page has drawn twice (instead of a fixed second for every test).
   await page.waitForFunction(() => window.app.extensions?.some((extension) => extension.name === "DiceForge.Wildcards"), null, { timeout: 60_000 });
-  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  await drawn(page);
   await page.keyboard.press("Escape");
   await page.evaluate(() => {
     window.app.graph.clear();
@@ -158,4 +161,4 @@ async function answerQuestions(page, answer = () => true, times = Infinity) {
   });
 }
 
-module.exports = { test, expect, runPrompt, shown, basePath, writeFile, openComfy, addNodes, connect, widgetValue, setWidget, menuItems, clickMenu, queueFromPage, nodeElement, answerQuestions };
+module.exports = { test, expect, runPrompt, shown, basePath, writeFile, openComfy, drawn, addNodes, connect, widgetValue, setWidget, menuItems, clickMenu, queueFromPage, nodeElement, answerQuestions };

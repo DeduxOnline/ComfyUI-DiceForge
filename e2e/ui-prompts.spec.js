@@ -2,7 +2,7 @@
 // prompt styles, the tag autocomplete, the prompt preview and history, and Danbooru Tag Enhancer, in both node designs (Nodes 2.0 and
 // classic), against the real server. Each test builds its own graph.
 const fs = require("fs");
-const { test, expect, basePath, writeFile, openComfy, addNodes, connect, widgetValue, setWidget, menuItems, clickMenu, queueFromPage, nodeElement, answerQuestions } = require("./helpers");
+const { test, expect, basePath, writeFile, openComfy, drawn, addNodes, connect, widgetValue, setWidget, menuItems, clickMenu, queueFromPage, nodeElement, answerQuestions } = require("./helpers");
 const { png, zip } = require("./fixtures");
 const { promptField, lookUp, wildcardMode } = require("./ui-shared");
 
@@ -38,7 +38,7 @@ for (const vue of [true, false]) {
       const [id] = await addNodes(page, [{ type: "DiceForgeCLIPDualTextEncode", pos: [100, 60], widgets: {
         positive: "masterpiece, best quality, 1girl, __color__ hair, multiple views, dynamic pose, from above, standing, looking at viewer, long hair" } }]);
       await page.evaluate(() => { window.app.canvas.ds.scale = 1.5; window.app.canvas.setDirty(true, true); });
-      await page.waitForTimeout(500);
+      await drawn(page); // The field is placed for the new zoom.
       const positive = await promptField(page, id, "positive");
       await positive.click();
       await page.keyboard.press("Control+End");
@@ -54,17 +54,18 @@ for (const vue of [true, false]) {
     });
 
     test("autocomplete follows the text as typed while the wildcard list loads slowly", async ({ page }) => {
-      let requests = 0;
+      let requests = 0, answered = 0;
       await page.route("**/diceforge/wildcards", async (route) => {
         const delay = [900, 300, 50][Math.min(requests++, 2)]; // Later requests answer sooner: answers come back out of order.
         await new Promise((resolve) => setTimeout(resolve, delay));
         await route.continue();
+        answered++;
       });
       const [id] = await addNodes(page, [{ type: "DiceForgeCLIPDualTextEncode", pos: [300, 60] }]);
       const positive = await promptField(page, id, "positive");
       await positive.click();
       await page.keyboard.type("__hair/st");
-      await page.waitForTimeout(1500); // Every answer is in.
+      await expect.poll(() => answered).toBe(requests); // Every answer is in.
       await expect(page.locator(".dfwc-pop div").first()).toContainText("__hair/style__");
       await page.keyboard.press("Enter");
       await expect.poll(() => widgetValue(page, id, "positive")).toBe("__hair/style__");

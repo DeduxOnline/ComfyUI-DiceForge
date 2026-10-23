@@ -97,8 +97,9 @@ for (const vue of [true, false]) {
         window.app.canvas.graph_mouse = [100, 700];
         window.app.canvas.pasteFromClipboard();
       }, [stack, encode]);
-      await page.waitForTimeout(500);
-      const copies = await page.evaluate(([stack, encode]) => window.app.graph.nodes.filter((node) => ![stack, encode].includes(node.id)).map((node) => [node.id, node.comfyClass]), [stack, encode]);
+      const copied = () => page.evaluate(([stack, encode]) => window.app.graph.nodes.filter((node) => ![stack, encode].includes(node.id)).map((node) => [node.id, node.comfyClass]), [stack, encode]);
+      await expect.poll(async () => (await copied()).length).toBe(2);
+      const copies = await copied();
       expect(copies.map(([, type]) => type).sort()).toEqual(["DiceForgeCLIPDualTextEncode", "DiceForgeLoraStack"]);
       const stackCopy = copies.find(([, type]) => type === "DiceForgeLoraStack")[0];
       const encodeCopy = copies.find(([, type]) => type === "DiceForgeCLIPDualTextEncode")[0];
@@ -150,7 +151,7 @@ for (const vue of [true, false]) {
     test("the autocomplete works with the mouse, in the negative prompt, and closes when the field loses focus", async ({ page }) => {
       const [id] = await addNodes(page, [{ type: "DiceForgeCLIPDualTextEncode", pos: [300, 60] }]);
       await page.evaluate((id) => { const node = window.app.graph.getNodeById(id); node.showAdvanced = true; node.setDirtyCanvas(true, true); }, id);
-      await page.waitForTimeout(500);
+      if (vue) await expect(page.locator(`[data-node-id="${id}"] textarea`).nth(1)).toBeAttached(); // The negative prompt, an advanced input.
       await page.evaluate(([id]) => {
         const node = window.app.graph.getNodeById(id);
         const vue = document.querySelectorAll(`[data-node-id="${id}"] textarea`);

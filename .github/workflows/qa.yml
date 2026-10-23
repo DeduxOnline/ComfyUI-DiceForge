@@ -51,7 +51,7 @@ jobs:
       - name: Install ComfyUI's Python packages (CPU PyTorch)
         run: |
           python -m pip install --upgrade pip
-          pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+          pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu # torchaudio: ComfyUI before 2026-09-21 asks for it, and PyPI's build needs CUDA
           pip install -r ComfyUI/requirements.txt
 
       - uses: actions/setup-node@v7

@@ -70,8 +70,11 @@ nodes and features, a patch for fixes. Each version is a [release on GitHub](htt
   commit; both workflows use the same versions of the GitHub actions, so Dependabot can update them again.
 - CI: the end-to-end tests pass with ComfyUI's frontend 1.55 too: they show a node before looking for its panel, click the canvas away
   from the minimap, and give Dice Grid pure colors (the Nodes 2.0 color picker rounds others).
-- CI: the tests run against ComfyUI of 2026-10-23 (`bc5f880`, frontend 1.55) instead of 2026-09-25, and with Playwright 1.64. Chromium
+- CI: the tests run against ComfyUI of 2026-10-23 (`bc5f880`, frontend 1.57) instead of 2026-09-25, and with Playwright 1.64. Chromium
   and the Ubuntu packages it needs are kept between runs, so a slow Ubuntu mirror no longer adds ten minutes to an end-to-end job.
+- CI: a manual run can test a ComfyUI from before 2026-09-21 too (it installs torchaudio for CPU). The frontend's pure functions (the
+  prompt highlight, sampler names from a picture, styles, presets for a model, tags, Clean up) have fast unit tests, and four end-to-end
+  tests wait for what they check instead of a fixed time.
 
 ### Removed
 - Each node module's own ComfyUI entry point: ComfyUI only loads the package's, and a test checks that it lists every node.

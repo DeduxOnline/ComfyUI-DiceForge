@@ -54,7 +54,11 @@ section describes the tests, the agents and the release.
   only runs before a locator action, and a question from a node menu followed by `expect.poll` was never answered. An answer that fails
   fails the test at its end.
 - **Wait for a state, never read it once:** `locator.textContent()` returns what is there now (an empty label while a window still loads);
-  `expect(...).toHaveText` waits. `wildcardMode` (`e2e/ui-shared.js`) switches the Wildcard Browser's mode that way.
+  `expect(...).toHaveText` waits. `wildcardMode` (`e2e/ui-shared.js`) switches the Wildcard Browser's mode that way. After a change the
+  canvas has to draw, `drawn(page)` (`e2e/helpers.js`). A fixed `waitForTimeout` only where nothing can be waited for: a check that
+  nothing happens (a value kept, no file written), a loop that polls, a picture settling before a screenshot.
+- **A pure frontend function gets a unit test** in `tests/test_frontend_functions.py`: `js_source` takes its definition (and the
+  constants it uses) from `web/` and runs it in Node.js, which CI has. Locally the test is skipped without Node.js.
 
 ## Code
 

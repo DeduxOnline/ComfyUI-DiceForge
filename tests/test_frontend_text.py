@@ -3,12 +3,11 @@
 # characters long, and longer texts like real ones, through both the old expression and the new helper.
 import itertools
 import json
-import os
 import shutil
 import subprocess
 import pytest
+from test_frontend_functions import js_source
 
-JS_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "DiceForge", "web", "wildcards.js")
 # The expressions the helpers replaced, as they were.
 OLD = r"""
 const old = {
@@ -24,13 +23,6 @@ const old = {
 """
 
 
-# A module-level function of the file, as written (from "function name(" to its closing brace at the start of a line).
-def js_function(name):
-    source = open(JS_FILE, encoding="utf-8").read()
-    start = source.index(f"\nexport function {name}(") + len("\nexport ")
-    return source[start:source.index("\n}\n", start) + 2]
-
-
 # Every text of up to four of these characters (line breaks, spaces and tabs, the yaml marks, quotes, letters of two scripts), and texts like
 # a prompt, a wildcard file and a yaml file.
 ALPHABET = ["\n", " ", "\t", "-", ":", "#", "\"", "[", "_", "a", "é", "Я", "1"]
@@ -43,7 +35,7 @@ TEXTS = ["".join(chars) for size in range(5) for chars in itertools.product(ALPH
 @pytest.mark.parametrize("name", ["oneLine", "withoutTrailingNewlines", "yamlOption", "suggestedName"])
 def test_the_helper_gives_what_the_old_expression_gave(name):
     texts = [text for text in TEXTS if "\n" not in text] if name == "yamlOption" else TEXTS # yamlOption gets one line of a file.
-    script = js_function(name) + OLD + f"\nconst texts = {json.dumps(texts)};" + \
+    script = js_source("wildcards.js", name) + OLD + f"\nconst texts = {json.dumps(texts)};" + \
         f"\nconsole.log(JSON.stringify(texts.map((text) => [text, {name}(text), old.{name}(text)]).filter(([, now, before]) => now !== before).slice(0, 10)));"
     # The script on standard input: as an argument, a list this long is over the size the system allows one.
     output = subprocess.run(["node", "-"], input=script, capture_output=True, text=True, check=True, encoding="utf-8").stdout
