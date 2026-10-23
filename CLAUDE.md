@@ -62,6 +62,24 @@ section describes the tests, the agents and the release.
 - **A pure frontend function gets a unit test** in `tests/test_frontend_functions.py`: `js_source` takes its definition (and the
   constants it uses) from `web/` and runs it in Node.js, which CI has. Locally the test is skipped without Node.js.
 
+## Node design
+
+DiceForge nodes should feel like ComfyUI's own (https://docs.comfy.org/basic-concepts/nodes); the author asks to stay inside that design.
+
+- **A node is a function:** typed inputs and widgets, its work, typed outputs. Its body holds inputs and parameters. Before adding a panel
+  in a node (a DOM widget), see whether a menu entry, a window, an output or a tooltip does the job: the last run's prompts under CLIP
+  Dual Text Encode were removed for that (2026-10-23; they are in 🕘 Prompt history). The panels there now (Random Image, Danbooru Tag
+  Enhancer, LoRA Stack, Dice Grid, XY Plot) are the node's own work; change them only when the author asks.
+- **Core types on the links** (`MODEL`, `CLIP`, `VAE`, `CONDITIONING`, `LATENT`, `IMAGE`, `MASK`, `INT`, `FLOAT`, `STRING`), so the
+  colors and connections are the ones users know. No look-alike types of our own.
+- **The user owns the look:** title, color and size. A node's height is fitted only as `node_size.js` does (never smaller than the user
+  made it while a field can take the height).
+- **Menus:** extra tools go in the node's right-click menu (`getNodeMenuItems`) or a window it opens, after the core items (color, title,
+  clone, mode). Nothing duplicates the selection toolbox (color, bypass, lock, delete).
+- **Modes:** a node runs when its inputs change, so a random node says when it must run again (`fingerprint_inputs`). Bypass passes
+  inputs to outputs of the same type: loader-like nodes (LoRA Stack: `model`, `clip`) stay usable bypassed. No test covers Bypass yet.
+- **Workflows people get** (templates, examples) use only core and DiceForge nodes, so nothing shows as missing.
+
 ## Code
 
 - **Line endings:** several files are CRLF (`README.md`, `.github/workflows/tests.yml`, some `DiceForge/web` and `e2e` files). Keep each
