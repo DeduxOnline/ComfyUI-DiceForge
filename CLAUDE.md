@@ -72,8 +72,8 @@ DiceForge nodes should feel like ComfyUI's own (https://docs.comfy.org/basic-con
   Enhancer, LoRA Stack, Dice Grid, XY Plot) are the node's own work; change them only when the author asks.
 - **Core types on the links** (`MODEL`, `CLIP`, `VAE`, `CONDITIONING`, `LATENT`, `IMAGE`, `MASK`, `INT`, `FLOAT`, `STRING`), so the
   colors and connections are the ones users know. No look-alike types of our own.
-- **The user owns the look:** title, color and size. A node's height is fitted only as `node_size.js` does (never smaller than the user
-  made it while a field can take the height).
+- **The user owns the look:** title, color and size. A node's height is fitted only by `node_size.js`, which keeps a height the user
+  dragged (it records the height it set in `properties.dice_forge_height`; another one is the user's).
 - **Menus:** extra tools go in the node's right-click menu (`getNodeMenuItems`) or a window it opens, after the core items (color, title,
   clone, mode). Nothing duplicates the selection toolbox (color, bypass, lock, delete).
 - **Modes:** a node runs when its inputs change, so a random node says when it must run again (`fingerprint_inputs`). Bypass passes

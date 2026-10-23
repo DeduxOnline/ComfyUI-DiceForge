@@ -1,7 +1,7 @@
 // End-to-end in the browser, the nodes: adding every DiceForge node, the resolution previews, Dice Grid, XY Plot, KSampler presets,
 // Random Image and node heights, in both node designs (Nodes 2.0 and classic), against the real server. Each test builds its own graph.
 const fs = require("fs");
-const { test, expect, basePath, openComfy, addNodes, connect, widgetValue, setWidget, menuItems, queueFromPage, nodeElement, answerQuestions } = require("./helpers");
+const { test, expect, basePath, openComfy, drawn, addNodes, connect, widgetValue, setWidget, menuItems, queueFromPage, nodeElement, answerQuestions } = require("./helpers");
 const { ALL_NODES, lookUp, submenu, clickSubmenu } = require("./ui-shared");
 const { measure, reloadTall } = require("./qa/lib");
 
@@ -196,13 +196,34 @@ for (const vue of [true, false]) {
       const [plain, sampler, image, clip] = await addNodes(page, [{ type: "DiceForgeRandomInt" }, { type: "DiceForgeRandomSampler", pos: [400, 40] },
         { type: "DiceForgeRandomImage", pos: [800, 40] }, { type: "DiceForgeCLIPDualTextEncode", pos: [1200, 40] }]);
       const workflow = await page.evaluate(() => window.app.graph.serialize());
-      for (const node of workflow.nodes) node.size = [node.size[0], 900]; // As a workflow saved with an empty gap under the inputs.
+      for (const node of workflow.nodes) { // As a workflow saved with an empty gap under the inputs, before the fitted height was kept.
+        node.size = [node.size[0], 900];
+        delete node.properties.dice_forge_height;
+      }
       await page.evaluate(async (data) => { window.app.graph.clear(); await window.app.loadGraphData(data); }, workflow);
       const stored = (id) => page.evaluate((id) => window.app.graph.getNodeById(id).size[1], id);
       await expect.poll(() => stored(plain)).toBeLessThan(300); // Nothing takes the extra height: it goes.
       await expect.poll(() => stored(image)).toBeLessThan(400); // Its preview is as tall as what it shows, not as the node was.
       expect(await stored(sampler)).toBe(900); // Its samplers and schedulers fields grow with it: the user's height stays.
       expect(await stored(clip)).toBe(900); // Its prompt fields take the extra height.
+    });
+
+    test("a node the user made taller keeps its height, also after a reload and when its panel is fitted", async ({ page }) => { // NOSONAR: expect.poll(...) below.
+      const [plain, image, fitted] = await addNodes(page, [{ type: "DiceForgeRandomInt" }, { type: "DiceForgeRandomImage", pos: [400, 40] },
+        { type: "DiceForgeRandomInt", pos: [800, 40] }]);
+      const stored = (id) => page.evaluate((id) => window.app.graph.getNodeById(id).size[1], id);
+      await expect.poll(() => page.evaluate((id) => window.app.graph.getNodeById(id).properties.dice_forge_height, plain)).toBeGreaterThan(0);
+      await page.evaluate((ids) => { // As a drag of the corner: the frontend sets the size.
+        for (const id of ids) { const node = window.app.graph.getNodeById(id); node.setSize([node.size[0], 700]); }
+      }, [plain, image]);
+      await page.evaluate((id) => window.app.graph.getNodeById(id).onExecuted({ dice_forge_image: [{ seed: 1, seed_mode: "random" }] }), image);
+      const workflow = await page.evaluate(() => window.app.graph.serialize());
+      await page.evaluate(async (data) => { window.app.graph.clear(); await window.app.loadGraphData(data); }, workflow);
+      await drawn(page);
+      await expect.poll(() => stored(fitted)).toBeLessThan(300); // Not resized: fitted as before.
+      expect(await stored(plain)).toBe(700);
+      expect(await stored(image)).toBe(700); // Its preview asked for its own height: the user's stays.
+      if (vue) await expect.poll(async () => (await nodeElement(page, plain).boundingBox()).height).toBeGreaterThan(500); // Drawn that tall too.
     });
 
     if (vue) {

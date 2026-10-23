@@ -93,6 +93,8 @@ nodes and features, a patch for fixes. Each version is a [release on GitHub](htt
   section on updating from it).
 
 ### Fixed
+- A DiceForge node the user made taller by dragging its corner keeps that height after a reload, and when its preview or list
+  changes; before, it was fitted back to its content (in Nodes 2.0, to its inputs).
 - Wildcard Note: its badge and the node library name DiceForge as its source instead of frontend_only, and it has a description.
 - Wildcard Browser: + New file named like an existing one in other upper and lower case (`Color` next to `color.txt`) no longer writes
   over its lines on Windows and macOS: it is refused as taken.

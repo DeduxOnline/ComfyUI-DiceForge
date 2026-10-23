@@ -138,10 +138,14 @@ function measurePanels([id, gap]) {
   return { panels, problems };
 }
 
-// The graph saved and loaded again with every node `height` tall (a workflow saved so): the ids stay.
+// The graph saved and loaded again with every node `height` tall (a workflow saved so, without the fitted height node_size.js keeps, which
+// would make it the user's height): the ids stay.
 async function reloadTall(page, height = 900) {
   const workflow = await page.evaluate(() => window.app.graph.serialize());
-  for (const node of workflow.nodes) node.size = [node.size[0], height];
+  for (const node of workflow.nodes) {
+    node.size = [node.size[0], height];
+    delete node.properties?.dice_forge_height;
+  }
   await page.evaluate(async (data) => {
     window.app.graph.clear();
     await window.app.loadGraphData(data);
