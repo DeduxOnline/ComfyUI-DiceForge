@@ -69,6 +69,13 @@ def test_each_run_is_one_cell_row_by_row():
     assert run(6) == cells[0] # Past the end: round again.
 
 
+def test_seed_has_no_control_after_generate():
+    # ▶ Queue queues the cells one by one: a control after generate (the frontend's default for an input named seed) would give each cell
+    # another seed.
+    seed = next(item for item in XYPlot.define_schema().inputs if item.id == "seed")
+    assert seed.as_dict()["control_after_generate"] is False
+
+
 def test_labels_of_each_axis():
     assert run(1, x_type="seed", x_values="10, 11", y_type="none")["x_label"] == "seed 11"
     assert run(0, x_type="steps", x_values="30", y_type="denoise", y_values="0.5")["x_label"] == "30 steps"

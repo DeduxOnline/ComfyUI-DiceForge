@@ -93,7 +93,7 @@ for (const vue of [true, false]) {
 
     test("XY Plot shows the plot under its fields and queues every cell into Dice Grid", async ({ page, request }) => {
       const [xy, image, grid] = await addNodes(page, [
-        { type: "DiceForgeXYPlot", widgets: { x_type: "steps", x_values: "10, 20", y_type: "scheduler", y_values: "normal, karras" } },
+        { type: "DiceForgeXYPlot", widgets: { x_type: "steps", x_values: "10, 20", y_type: "scheduler", y_values: "normal, karras", seed: 123 } },
         { type: "EmptyImage", pos: [460, 40], widgets: { width: 64, height: 64 } },
         { type: "DiceForgeGrid", pos: [860, 40], widgets: { count: 4, cell_width: 64, name: `xy-ui-${vue}`, filename_prefix: `e2e/xyui${vue ? "v" : "c"}` } },
       ]);
@@ -111,6 +111,7 @@ for (const vue of [true, false]) {
       await panel.locator("button", { hasText: "▶ Queue 4 images" }).click();
       await expect(panel.locator("button")).toHaveText("▶ Queue 4 images", { timeout: 30_000 }); // All queued.
       expect(await widgetValue(page, xy, "index")).toBe(0);
+      expect(await widgetValue(page, xy, "seed")).toBe(123); // The same seed for every cell: XY Plot's seed has no control after generate.
       const folder = basePath("output", "e2e");
       await expect.poll(() => fs.existsSync(folder) && fs.readdirSync(folder).some((name) => name.startsWith(`xyui${vue ? "v" : "c"}_`)), { timeout: 60_000 }).toBe(true);
       const queue = async () => { const body = await (await request.get("/queue")).json(); return body.queue_running.length + body.queue_pending.length; };

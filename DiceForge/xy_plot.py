@@ -136,7 +136,10 @@ class XYPlot(io.ComfyNode):
                 io.Combo.Input("y_type", options=list(AXES), default="sampler", tooltip="What changes from row to row (none: one row)."),
                 io.String.Input("y_values", multiline=True, default="euler, euler_ancestral, dpmpp_2m", tooltip=axis_tip),
                 io.Int.Input("index", default=0, min=0, max=MAX_CELLS - 1, tooltip="The cell of this run, row by row (▶ Queue sets it for each run)."),
-                io.Int.Input("seed", default=0, min=0, max=0xFFFFFFFFFFFFFFFF, tooltip="Seed of every cell, unless an axis is seed."),
+                # No control after generate: ▶ Queue queues the cells one by one, and the frontend's (randomize by default for an input named seed)
+                # would give each cell another seed.
+                io.Int.Input("seed", default=0, min=0, max=0xFFFFFFFFFFFFFFFF, control_after_generate=False,
+                             tooltip="Seed of every cell, unless an axis is seed. It stays the same from cell to cell."),
                 io.Int.Input("steps", default=28, min=1, max=10000, tooltip="Steps of every cell, unless an axis is steps."),
                 io.Float.Input("cfg", default=6.0, min=0.0, max=100.0, step=0.1, round=0.01, tooltip="CFG of every cell, unless an axis is cfg."),
                 io.Combo.Input("sampler_name", options=list(SAMPLERS), default="euler_ancestral" if "euler_ancestral" in SAMPLERS else SAMPLERS[0],

@@ -85,6 +85,10 @@ nodes and features, a patch for fixes. Each version is a [release on GitHub](htt
   section on updating from it).
 
 ### Fixed
+- XY Plot: every cell of ▶ Queue gets the same seed. The frontend gave the node's `seed` a *control after generate* (randomize), which
+  changed it after each cell; it has none now.
+- README: what Load Diffusion Model + CLIP has under its advanced inputs, how many downloads run at once, which test files there are, and
+  sentences about repairs of earlier versions that are gone.
 - ComfyUI keeps answering while DiceForge's windows read and write files: the Wildcard Browser (its list, files, yaml files, pictures,
   renames, deletes), Model info, the model browsers' previews and favorites, LoRA Stack presets, Dice Grid's cells, XY Plot's preview of a
   LoRA axis and the Civitai key do their file work beside the server instead of in it, so a big wildcard collection no longer holds up other
