@@ -19,8 +19,8 @@ const MARKERS = [
   ["Nodes 2.0 widget row", /"node-widget"|`node-widget`/g, "e2e/qa/lib.js measure"],
   ["Nodes 2.0 advanced inputs button", /advanced-inputs-button/g, "the e2e tests"],
   ["Show advanced inputs", /Show advanced inputs/g, "the e2e tests"],
-  ["node.showAdvanced", /showAdvanced/g, "prompt_preview.js"],
-  ["Nodes 2.0 setting", /Comfy\.VueNodes\.Enabled/g, "node_size.js, prompt_preview.js"],
+  ["node.showAdvanced", /showAdvanced/g, "the e2e tests and screenshots"],
+  ["Nodes 2.0 setting", /Comfy\.VueNodes\.Enabled/g, "node_size.js"],
   ["getNodeMenuItems hook", /getNodeMenuItems/g, "the node menus of DiceForge"],
   ["execution_cached event", /execution_cached/g, "dice_grid.js, prompt_preview.js"],
 ];

@@ -83,6 +83,8 @@ nodes and features, a patch for fixes. Each version is a [release on GitHub](htt
   tests wait for what they check instead of a fixed time.
 
 ### Removed
+- CLIP Dual Text Encode: the preview of the last run's prompts under the inputs. The prompts as encoded are in 🕘 Prompt history, whose
+  entries now also show what the run noted next to the seed (combination N of M, the LoRAs of `<lora:...>` tags).
 - Each node module's own ComfyUI entry point: ComfyUI only loads the package's, and a test checks that it lists every node.
 - The repairs of workflows and files of earlier versions, while DiceForge has no users but its author: SDXL Resolution List's old scale
   number and resolution list, Resolution Selector without rescale, unknown seed modes and the old vae_alignment input on loading; CLIP Dual

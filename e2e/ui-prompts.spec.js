@@ -986,28 +986,15 @@ for (const vue of [true, false]) {
       const history = Object.values(await (await request.get("/history?max_items=1")).json())[0];
       const text = history.outputs[String(preview)].text[0];
       expect(text).toMatch(/^a (red|blue|green|white) car, [a-z ]+, [a-z ]+$/);
-      // The node shows the prompts as encoded, with the seed they came from.
-      const shown = page.locator(".dfpp").first();
-      await expect(shown.locator(".box").first()).toHaveText(`positive${text}`);
-      if (vue) { // The negative shows with the advanced inputs, where its field is.
-        await expect(shown.locator(".box")).toHaveCount(1);
-        await page.evaluate((id) => { const node = window.app.graph.getNodeById(id); node.showAdvanced = true; node.setDirtyCanvas(true, true); }, encode);
-      }
-      await expect(shown.locator(".box").nth(1)).toContainText("(empty)");
-      if (vue) { // And hides with them again.
-        await page.evaluate((id) => { const node = window.app.graph.getNodeById(id); node.showAdvanced = false; node.setDirtyCanvas(true, true); }, encode);
-        await expect(shown.locator(".box")).toHaveCount(1);
-      }
-      await expect(shown.locator(".head")).toContainText("seed 3 (random)");
-      await expect(shown).not.toHaveClass(/stale/);
-      await setWidget(page, encode, "positive", "a __color__ bike"); // Changed since the run: dimmed until the next one.
-      await expect(shown).toHaveClass(/stale/);
-      await expect(shown.locator(".changed")).toHaveText("prompt changed since");
-      // Kept with the workflow: a reload of it shows them again.
-      const workflow = await page.evaluate(() => window.app.graph.serialize());
-      expect(workflow.nodes.find((node) => String(node.id) === String(encode)).properties.dice_forge_prompts.positive).toBe(text);
-      await page.evaluate(async (data) => { window.app.graph.clear(); await window.app.loadGraphData(data); }, workflow);
-      await expect(page.locator(".dfpp").first().locator(".box").first()).toHaveText(`positive${text}`);
+      // No panel of the last run under the inputs: the prompts as encoded go to the prompt history, with the seed they came from.
+      expect(await page.evaluate((id) => window.app.graph.getNodeById(id).widgets.map((widget) => widget.name), encode)).not.toContain("prompt_preview");
+      const history = () => page.evaluate((id) => window.app.graph.getNodeById(id).properties.dice_forge_history, encode);
+      expect((await history())[0]).toMatchObject({ positive: text, seed: 3, seed_mode: "random" });
+      await page.evaluate((id) => window.app.graph.getNodeById(id).onExecuted({ dice_forge_prompts: [{ positive: "a car", negative: "", seed: 1,
+        seed_mode: "combinations", note: "combination 2 of 8" }] }), encode); // What the run notes (combination N of M, the LoRAs of tags) shows with its seed.
+      await clickMenu(page, encode, "DiceForge.PromptPreview", "Prompt history");
+      await expect(page.locator(".dfph .entry .when").first()).toContainText("seed 1 (combinations, combination 2 of 8)");
+      await page.keyboard.press("Escape");
     });
 
     test("the prompt history keeps the last runs with their images: put back a seed, use a text, pin, remove", async ({ page, request }) => {
@@ -1023,10 +1010,8 @@ for (const vue of [true, false]) {
         await setWidget(page, image, "color", run * 1000); // Another image each run.
         await queueFromPage(page, request); // Seeds 1, 2, 3.
       }
-      const panel = page.locator(".dfpp").first();
-      const lastRun = async () => (await panel.locator(".box").first().textContent()).replace(/^positive/, "");
+      const lastRun = () => page.evaluate((id) => window.app.graph.getNodeById(id).properties.dice_forge_history[0].positive, encode);
       const texts = (await page.evaluate((id) => window.app.graph.getNodeById(id).properties.dice_forge_history.map((item) => item.positive), encode)).reverse();
-      await expect(panel.locator(".history-link")).toHaveCount(0); // Not on the node: in its right-click menu.
       await clickMenu(page, encode, "DiceForge.PromptPreview", "Prompt history");
       const dialog = page.locator(".dfph");
       await expect(dialog.locator(".top .muted")).toHaveText("3 runs, newest first");
@@ -1046,7 +1031,7 @@ for (const vue of [true, false]) {
       expect(await widgetValue(page, encode, "seed")).toBe(1);
       expect(await widgetValue(page, encode, "control_after_generate")).toBe("fixed");
       await queueFromPage(page, request);
-      await expect(panel.locator(".head")).toContainText("seed 1 (random)");
+      await expect(entries.first().locator(".when")).toContainText("seed 1 (random)");
       expect(await lastRun()).toBe(texts[0]); // The same prompts as that run.
       await expect(entries).toHaveCount(4); // That run is the newest now.
       await entries.filter({ hasText: "seed 2 (random)" }).locator(".use-text").click();

@@ -115,18 +115,16 @@ As in A1111: `<lora:name:weight>` in either prompt puts that LoRA on the model a
 
 - Connect the loader's `model` to the node's `model` input and the node's `model` output to KSampler, and the loader's CLIP to `clip`, as usual.
 - The tags are read after choices and wildcards are filled in, so they can be random too: `{<lora:ink:0.8>|<lora:glow:0.7>|}`, or a wildcard file of LoRA tags.
-- The tags are taken out of the text (and the commas around them tidied); the preview under the node lists the LoRAs of the run.
+- The tags are taken out of the text (and the commas around them tidied); the prompt history lists the LoRAs of each run next to its seed.
 - A name with no LoRA file stops the run and says which. Typing `<lora:` in a prompt field suggests the LoRA files.
 
 #### Syntax highlighting
 
 The prompt fields color the syntax as you type: `__wildcards__` (red with a wavy line when no wildcard file has that name; hover the field to see which), the braces and `|` of `{a|b}` choices (one color per nesting level, white on red when a brace is never closed or closes nothing), counts `2$$`, weights `3::`, locks `!`, `${variables}`, `//` and `/* */` comments, `\{` escapes, `(word:1.2)` weights, `embedding:` names and `<lora:...>` tags. Only the colors change: typing, the caret, selecting and the `__` autocomplete work as before. The Wildcard Browser's editor colors its files the same way. Turn it off in ComfyUI's settings: *DiceForge → Prompts → Highlight the prompt syntax in CLIP Dual Text Encode and the Wildcard Browser*.
 
-#### Preview of the prompts as encoded
+#### Prompt history
 
-After each run the node shows, under its inputs, the **positive** prompt as it was encoded (and the **negative** one when the node's advanced inputs are shown, where its field is; always in the classic canvas): choices, wildcards and variables filled in, with the seed and seed mode they came from (and *combination N of M* in `combinations`). Click a prompt to copy it. The preview is kept with the workflow, so it is still there after a reload and in a workflow loaded from an image; when you change a prompt it is dimmed and marked *prompt changed since* until the next run. It also updates when the node comes from ComfyUI's cache.
-
-**🕘 Prompt history** in the node's right-click menu opens a window with the last 20 runs' prompts, newest first, with the time, seed and mode, and **the images each run made**: the first image of every Save Image, Preview Image, VAE Decode + Save… of the workflow in that run (up to 4; click one to open it full size). A preview image is kept by ComfyUI only until it restarts; saved ones stay. A run with the same prompts and seed as the newest one is not added again (its new images join that entry). For each entry:
+**🕘 Prompt history** in the node's right-click menu opens a window with the last 20 runs' prompts as they were encoded (choices, wildcards and variables filled in), newest first, with the time, seed and mode (and *combination N of M* in `combinations`), and **the images each run made**: the first image of every Save Image, Preview Image, VAE Decode + Save… of the workflow in that run (up to 4; click one to open it full size). A preview image is kept by ComfyUI only until it restarts; saved ones stay. A run with the same prompts and seed as the newest one is not added again (its new images join that entry). For each entry:
 
 ![The Prompt history window: the last runs with their images, seeds and prompts](images/prompt_history.png)
 

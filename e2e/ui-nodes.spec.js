@@ -202,15 +202,7 @@ for (const vue of [true, false]) {
       await expect.poll(() => stored(plain)).toBeLessThan(300); // Nothing takes the extra height: it goes.
       await expect.poll(() => stored(image)).toBeLessThan(400); // Its preview is as tall as what it shows, not as the node was.
       expect(await stored(sampler)).toBe(900); // Its samplers and schedulers fields grow with it: the user's height stays.
-      expect(await stored(clip)).toBe(900); // Its prompt fields take the extra height, not the preview under them.
-      const preview = page.locator(".dfpp").first(), height = (locator) => locator.evaluate((element) => element.offsetHeight);
-      await expect.poll(() => height(preview)).toBeLessThan(80);
-      await page.evaluate((id) => window.app.graph.getNodeById(id).onExecuted({ dice_forge_prompts: [{ seed: 6, seed_mode: "random", positive: "a dog, ".repeat(60),
-        negative: "blurry, ".repeat(30) }] }), clip); // A run with a long prompt: the preview grows for it, its parts are not squeezed.
-      const positive = preview.locator(".box").first();
-      await expect(positive).toContainText("a dog, a dog");
-      await expect.poll(() => height(positive)).toBeGreaterThan(80);
-      await expect.poll(() => height(preview)).toBeGreaterThan(110);
+      expect(await stored(clip)).toBe(900); // Its prompt fields take the extra height.
     });
 
     if (vue) {
