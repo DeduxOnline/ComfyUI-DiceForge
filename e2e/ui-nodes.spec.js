@@ -65,8 +65,9 @@ for (const vue of [true, false]) {
         { type: "DiceForgeGrid", pos: [460, 40], widgets: { count: 0, cell_width: 64, save: false, name: `cells-${vue}` } },
       ]);
       await connect(page, image, 0, grid, "image");
-      for (let run = 0; run < 3; run++) {
-        await setWidget(page, image, "color", run * 4000000);
+      // Pure colors: the Nodes 2.0 color picker (frontend 1.55) rounds others on their way through it (4000000 becomes 3999744).
+      for (const color of [0x000000, 0xff0000, 0x0000ff]) {
+        await setWidget(page, image, "color", color);
         await queueFromPage(page, request);
       }
       const panel = page.locator(".dfdg").first();
@@ -84,9 +85,9 @@ for (const vue of [true, false]) {
       // ↺ opens that run's workflow, as dropping its image would: the run's two nodes, with that run's color.
       await answerQuestions(page, undefined, 1);
       await panel.locator(".cell").nth(1).locator("button.open").click();
-      // The graph already has these two nodes: wait for the opened run's color (the graph before it had the last run's, 8000000).
+      // The graph already has these two nodes: wait for the opened run's color (the graph before it had the last run's, 0x0000ff).
       const color = () => page.evaluate(() => window.app.graph.nodes.find((node) => node.comfyClass === "EmptyImage")?.widgets.find((widget) => widget.name === "color").value);
-      await expect.poll(color).toBe(4000000);
+      await expect.poll(color).toBe(0xff0000);
       expect(await page.evaluate(() => window.app.graph.nodes.map((node) => node.comfyClass).sort().join())).toBe("DiceForgeGrid,EmptyImage");
     });
 

@@ -79,6 +79,8 @@ for (const vue of [true, false]) {
         stack.widgets_values[0] = loras;
         await reload(page, JSON.stringify(workflow));
         await expect(page.getByText("Loading aborted"), loras).toHaveCount(0);
+        // The classic canvas (frontend 1.55) puts a node's panel in the page once the node has been on screen: show the LoRA Stack first.
+        await page.evaluate(() => window.app.canvas.centerOnNode(window.app.graph.nodes.find((node) => node.comfyClass === "DiceForgeLoraStack")));
         await expect(page.locator(".dfls").first().locator("button.add"), loras).toBeAttached();
         await page.locator(".dfls").first().locator("button.add").dispatchEvent("click"); // The panel still works: the browser opens.
         await expect(page.locator(".dflb")).toBeVisible();
@@ -166,7 +168,7 @@ for (const vue of [true, false]) {
       await focusAtEnd();
       await page.keyboard.type(" __");
       await expect(page.locator(".dfwc-pop")).toBeVisible();
-      await page.mouse.click(1500, 900); // Elsewhere on the canvas.
+      await page.mouse.click(1100, 500); // Elsewhere on the canvas, away from the minimap (bottom right), where a click moves the view.
       await expect(page.locator(".dfwc-pop")).toHaveCount(0);
       await focusAtEnd();
       await page.keyboard.type("col");
