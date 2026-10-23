@@ -126,12 +126,12 @@ Development → Agents). The author's computer has no Node.js: run `e2e/qa` ther
 Update this section as the steps get done, and remove it when they all are.
 
 - **Done:** every node and window; unit and end-to-end tests in both designs, the ComfyUI contract and the old-workflow tests; the agents;
-  every node id starting with `DiceForge` (`tests/test_node_ids.py` keeps it so).
+  every node id starting with `DiceForge` (`tests/test_node_ids.py` keeps it so); the first full pass of the agents against ComfyUI
+  master (2026-10-23) and the fixes of what they found. Left from it: Nodes 2.0 is slow with hundreds of nodes (300 take about 7 s,
+  the frontend's), and POST routes still take any content type (ComfyUI's own check stops other sites' pages).
 - **CI is green on `main` again since 2026-10-18** (`8e1f7c7`), after being red from 2026-10-16.
 - **Next, in this order:**
-  1. **A full pass of the agents:** `tester`, `security`, `perf` (also `--scale 3`), `docs`, `comfy-watcher` against ComfyUI master. Then fix
-     what they find. Known already: adding 100 nodes takes about 3 s in Nodes 2.0 and 0.6 s in the classic canvas.
-  2. **What ComfyUI offers node packs and DiceForge doesn't use yet** (docs.comfy.org → Custom Nodes and Registry, read 2026-10-10):
+  1. **What ComfyUI offers node packs and DiceForge doesn't use yet** (docs.comfy.org → Custom Nodes and Registry, read 2026-10-10):
      - `pyproject.toml`: `requires-comfyui` and a minimum `comfyui-frontend-package` in `dependencies`, since DiceForge needs the V3
        schema's DynamicCombo and the Nodes 2.0 design (find the first versions that have what it uses); `Icon` is empty, and `Banner`
        is missing. Without the minimums the Registry offers DiceForge to an old ComfyUI it doesn't work in.
@@ -140,12 +140,12 @@ Update this section as the steps get done, and remove it when they all are.
      - Node help: `DiceForge/web/docs/<node id>.md` (and `<node id>/<locale>.md`), Markdown with pictures and video shown in ComfyUI's
        node help panel instead of the description; the README's node sections are most of it.
      - Optional: `subgraphs/` (blueprints in the subgraph browser), `locales/` (node, input and tooltip names in other languages).
-  3. **The first release, 1.0.0** (it was never published):
+  2. **The first release, 1.0.0** (it was never published):
      - fold `[Unreleased]` into the `[1.0.0]` section of the CHANGELOG;
      - the author adds `REGISTRY_ACCESS_TOKEN`;
      - tag `v1.0.0`;
      - save the release's workflow for the old-workflow tests (`node e2e/qa/snapshot.js --version 1.0.0`, README → Releasing).
-  4. **After it:**
+  3. **After it:**
      - a weekly `comfy-watcher` run;
      - a renamed node, or one whose inputs change, gets a Node Replacement (`io.NodeReplace` registered in the extension's `on_load`,
        docs.comfy.org/custom-nodes/backend/node-replacement): the frontend offers the upgrade when it opens an old workflow and keeps
