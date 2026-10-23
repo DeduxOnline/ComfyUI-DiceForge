@@ -1,6 +1,6 @@
 import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
-import { addStyleOnce, asking, element } from "./dom.js";
+import { addStyleOnce, asking, element, openLink, safeURL } from "./dom.js";
 import { shouldBlur, videoPreview } from "./media.js";
 import { dateText, statsChips } from "./civitai_meta.js";
 import { applySettings, settingsOf } from "./apply_settings.js";
@@ -122,9 +122,9 @@ function slider(images) {
     if (shouldBlur(image) && !revealed.has(index)) media.classList.add("blur"); // Civitai's R and up: blurred until clicked (Blur NSFW).
     media.addEventListener("click", () => {
       if (media.classList.contains("blur")) media.classList.remove("blur"), revealed.add(index);
-      else window.open(image.full || image.url, "_blank", "noopener");
+      else openLink(image.full || image.url);
     });
-    media.addEventListener("error", () => { if (media.src !== image.url) media.src = image.url; }, { once: true }); // The small copy instead.
+    media.addEventListener("error", () => { if (media.src !== image.url) media.src = safeURL(image.url); }, { once: true }); // The small copy instead.
     stage.replaceChildren(video ? video.wrapper : media, metaPanel(image));
     count.textContent = `${index + 1} / ${images.length}`;
     dots.replaceChildren(...images.map((_, dot) => element("span", { class: dot === index ? "on" : "", onclick: () => show(dot) })));

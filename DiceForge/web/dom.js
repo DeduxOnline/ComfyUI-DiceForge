@@ -4,10 +4,25 @@ export function element(tag, attributes = {}, ...children) {
   for (const [key, value] of Object.entries(attributes)) {
     if (key === "class") node.className = value;
     else if (key.startsWith("on")) node.addEventListener(key.slice(2), value);
-    else node.setAttribute(key, value);
+    else node.setAttribute(key, key === "href" || key === "src" ? safeURL(value) : value);
   }
   for (const child of children) node.append(child instanceof Node ? child : document.createTextNode(String(child ?? "")));
   return node;
+}
+// Links and pictures from outside data (Civitai's and Danbooru's answers, the previews a workflow carries in its node properties) are web
+// addresses or this server's own: any other scheme (javascript:, data:, file:) becomes empty, so a link from a shared workflow can't run a script.
+export function safeURL(url) {
+  const text = String(url ?? "");
+  try {
+    return ["http:", "https:", "blob:"].includes(new URL(text, location.href).protocol) ? text : "";
+  } catch {
+    return "";
+  }
+}
+// Opens a link from outside data in a new tab (only a web address, see safeURL).
+export function openLink(url) {
+  const safe = safeURL(url);
+  if (safe) window.open(safe, "_blank", "noopener");
 }
 // A stylesheet added to the page once, by its id.
 export function addStyleOnce(id, css) {

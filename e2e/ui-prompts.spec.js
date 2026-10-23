@@ -1105,5 +1105,21 @@ for (const vue of [true, false]) {
       await expect(panel.locator("a.thumb img")).not.toHaveClass(/blur/); // e621's safe isn't blurred.
       await expect.poll(() => widgetValue(page, id, "post_ids")).toBe("201"); // Random: this run's post, for fixed mode.
     });
+
+    test("Danbooru Tag Enhancer: the posts a shared workflow carries link only to web addresses, never to a script", async ({ page }) => {
+      const [id] = await addNodes(page, [{ type: "DiceForgeDanbooruEnhancer", widgets: { tags: "hatsune miku" } }]);
+      // As a workflow from someone else gives it: the last run's posts in the node's properties, with a javascript: link.
+      await page.evaluate((id) => {
+        window.app.graph.getNodeById(id).properties.dice_forge_danbooru = { site: "danbooru", mode: "random", search: "", added: "smile",
+          posts: [{ id: 7, url: "javascript:window.diceForgeRan = true", preview: "", rating: "g" }, { id: 8, url: "https://danbooru.donmai.us/posts/8", preview: "", rating: "g" }] };
+      }, id);
+      const links = page.locator(".dfdb").first().locator("a.thumb.plain");
+      await expect(links).toHaveText(["↗ #7", "↗ #8"]);
+      await expect(links.first()).toHaveAttribute("href", ""); // Left empty: nothing to run.
+      await expect(links.nth(1)).toHaveAttribute("href", "https://danbooru.donmai.us/posts/8");
+      await links.first().evaluate((link) => link.addEventListener("click", (event) => event.preventDefault())); // No new tab in the test.
+      await links.first().click();
+      expect(await page.evaluate(() => window.diceForgeRan ?? false)).toBe(false);
+    });
   });
 }

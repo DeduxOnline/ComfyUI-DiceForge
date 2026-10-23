@@ -4,7 +4,7 @@ import { openModelInfo } from "./model_info.js";
 import { insertIntoNode } from "./wildcards.js";
 import { openCivitaiSearch } from "./civitai.js";
 import { dragSource, dropTarget, pickFolder } from "./move_dialog.js";
-import { addStyleOnce, askConfirm, asking, askText, background, element } from "./dom.js";
+import { addStyleOnce, askConfirm, asking, askText, background, element, openLink } from "./dom.js";
 import { blurSwitch, civitaiMedia } from "./media.js";
 import { dateText, statsChips } from "./civitai_meta.js";
 import { keepSize, recall, remember, scrollBack } from "./window_memory.js";
@@ -435,7 +435,7 @@ async function openBrowser(node, spec, target = targetOf(node, spec)) {
       ...action(entry).map((go) => [go.textContent, () => go.click()]),
       ["🛈 Info", () => button(".buttons .info")?.click()],
       [entry.checked ? "↻ Look up on Civitai again" : "🔍 Look up on Civitai", () => button(".buttons .look-up")?.click()],
-      ...(entry.url ? [["Civitai ↗", () => window.open(entry.url, "_blank", "noopener")]] : []),
+      ...(entry.url ? [["Civitai ↗", () => openLink(entry.url)]] : []),
       [entry.favorite ? "☆ Remove the star" : "★ Add to favorites", () => setFavorite(entry, !entry.favorite)],
       ["📋 Copy the file name", () => { background(navigator.clipboard?.writeText(entry.file)); say(`Copied ${entry.file}.`); }],
       [picked.has(entry.file) ? "☑ Let go of it" : "☐ Pick it", () => togglePick(entry.file)],
@@ -469,7 +469,7 @@ async function openBrowser(node, spec, target = targetOf(node, spec)) {
         draw();
       }, 300);
     } }, "🛈 Info");
-    const link = entry.url ? [element("button", { onclick: () => window.open(entry.url, "_blank", "noopener") }, "Civitai ↗")] : [];
+    const link = entry.url ? [element("button", { onclick: () => openLink(entry.url) }, "Civitai ↗")] : [];
     const manage = spec.manage ? [
       element("button", { class: "rename", title: `Rename this ${what} (with its preview and info); a / puts it in a folder`, onclick: () => background(renameFile(entry)) }, "✎"),
       element("button", { class: "move", title: `Move this ${what} to another folder (or drag the card onto a folder in the tree)`, onclick: () => background(moveFile(entry)) }, "⇄"),

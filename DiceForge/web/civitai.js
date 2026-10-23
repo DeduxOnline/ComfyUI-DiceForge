@@ -1,6 +1,6 @@
 import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
-import { addStyleOnce, asking, askText, background, element } from "./dom.js";
+import { addStyleOnce, asking, askText, background, element, openLink } from "./dom.js";
 import { blurSwitch, civitaiMedia } from "./media.js";
 
 // "Find on Civitai" in the LoRA, Checkpoint and Diffusion Model Browsers (the Create of their files): search Civitai, pick a version, download it
@@ -122,7 +122,7 @@ export async function openCivitaiSearch({ kind = "loras", title = "LoRA", plural
           ...versions,
           element("div", { class: "words" }, ...(version?.trigger_words ?? []).slice(0, 6).map((word) => element("span", {}, word))),
           state,
-          element("div", { class: "buttons" }, download, element("button", { onclick: () => window.open(item.url + (version ? `?modelVersionId=${version.id}` : ""), "_blank", "noopener") }, "Civitai ↗"))));
+          element("div", { class: "buttons" }, download, element("button", { onclick: () => openLink(item.url + (version ? `?modelVersionId=${version.id}` : "")) }, "Civitai ↗"))));
     };
     box.redraw = draw;
     draw();

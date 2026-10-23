@@ -85,6 +85,8 @@ nodes and features, a patch for fixes. Each version is a [release on GitHub](htt
   section on updating from it).
 
 ### Fixed
+- Links and pictures from outside data (Civitai's and Danbooru's answers, the Danbooru posts a shared workflow carries) open only web
+  addresses: a `javascript:` link in a workflow from someone else could run a script in ComfyUI's page when clicked.
 - Wildcards: a yaml file nested very deep no longer breaks every wildcard (the Wildcard Browser, the autocomplete and every run with a
   wildcard failed): it is skipped with a warning, like an invalid one. Yaml aliases (`*name`) are not read, since a few hundred bytes of
   them stand for millions of wildcards; a file with them is skipped too.
