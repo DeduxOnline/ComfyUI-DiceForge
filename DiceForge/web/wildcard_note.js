@@ -88,6 +88,13 @@ app.registerExtension({
     }
     LiteGraph.registerNodeType(NODE_TYPE, Object.assign(WildcardNote, { title: "Wildcard Note", title_mode: LiteGraph.NORMAL_TITLE, collapsable: true }));
     WildcardNote.category = "DiceForge/utils";
+    WildcardNote.description = "A note for a wildcard's lines, with the prompt fields' tools: 💾 Save to WildCard adds them to a wildcard file, puts them in place of its lines, or makes a new file. Nothing runs it.";
+  },
+  // ComfyUI gives a node with no Python class the source "frontend_only" (its badge, the node library): DiceForge's, as its other nodes have.
+  beforeRegisterVueAppNodeDefs(defs) {
+    const note = defs.find((def) => def.name === NODE_TYPE);
+    const pack = defs.find((def) => def.name.startsWith("DiceForge") && def.name !== NODE_TYPE && def.python_module);
+    if (note && pack) note.python_module = pack.python_module;
   },
   getNodeMenuItems(node) {
     return node.comfyClass === NODE_TYPE ? [{ content: "↻ Refresh the file list", callback: () => background(wildcardList(true)) }] : [];

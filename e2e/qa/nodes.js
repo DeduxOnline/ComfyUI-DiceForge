@@ -24,7 +24,7 @@ async function lookAt(page, vue, type) {
     looks.push({ state, file: await shot(page, id, `nodes/${vue ? "vue" : "classic"}_${type}_${state}`), ...(await measure(page, id)) });
   };
   await page.evaluate(() => window.app.graph.clear());
-  const [id] = await addNodes(page, [{ type, pos: [60, 60] }]);
+  const [id] = await addNodes(page, [{ type, pos: [60, 140] }]); // Below the frontend's Graph button, which would cover the node's top.
   await look(id, "new");
   const node = page.locator(`[data-node-id="${id}"]`);
   if (vue && (await node.getByText(/Show advanced inputs/).count())) {

@@ -357,6 +357,20 @@ for (const vue of [true, false]) {
       }
     });
 
+    test("Wildcard Note has a description and DiceForge as its source (badge, node library), not frontend_only", async ({ page }) => {
+      const [id] = await addNodes(page, [{ type: "DiceForgeWildcardNote", pos: [300, 60] }]);
+      // ComfyUI's node definitions (the store its badges, node library and help read), as the frontend made them for each node.
+      const facts = await page.evaluate(() => {
+        const pinia = [...document.querySelectorAll("*")].find((element) => element.__vue_app__).__vue_app__.config.globalProperties.$pinia;
+        const defs = pinia._s.get("nodeDef").nodeDefsByName;
+        const fact = (def) => ({ source: def.nodeSource.displayText, module: def.python_module });
+        return { note: fact(defs.DiceForgeWildcardNote), other: fact(defs.DiceForgeRandomInt), description: defs.DiceForgeWildcardNote.description };
+      });
+      expect(facts.note).toEqual(facts.other);
+      expect(facts.description).toContain("Save to WildCard");
+      if (vue) await expect(nodeElement(page, id)).toContainText(facts.other.source); // The source badge under the node.
+    });
+
     test("Wildcard Note's text has the prompt tools: __ suggests wildcards, and the node menu has the Wildcard Browser", async ({ page }) => {
       const [id] = await addNodes(page, [{ type: "DiceForgeWildcardNote", pos: [300, 60] }]);
       expect(await menuItems(page, id, "DiceForge.Wildcards")).toEqual(["📖 Syntax guide", "🎲 Wildcard Browser", "✂ Selection → new wildcard…"]);
