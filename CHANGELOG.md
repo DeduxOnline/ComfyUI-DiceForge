@@ -8,6 +8,7 @@ nodes and features, a patch for fixes. Each version is a [release on GitHub](htt
 ## [Unreleased]
 
 ### Added
+- Node help: every DiceForge node's page in ComfyUI's node help panel (Node Info), with its pictures: its section of the README.
 - CI: a QA tools workflow, run by hand, for a machine without Node.js: the frontend internals, the pictures and size checks of every
   node in both designs, and the times with a lot of data, on any ComfyUI commit (master by default), kept as the `qa-out` artifact.
 - Wildcard Browser: yaml wildcards are edited, no longer read-only. A yaml file is one row of the tree, opened whole in the lines view and
@@ -74,6 +75,7 @@ nodes and features, a patch for fixes. Each version is a [release on GitHub](htt
   and the Ubuntu packages it needs are kept between runs, so a slow Ubuntu mirror no longer adds ten minutes to an end-to-end job.
 - DiceForge asks for ComfyUI 0.38.0 or newer with its frontend 1.53.6 or newer (the first that pass every test), so ComfyUI Manager and
   the Registry don't offer it to an older ComfyUI, and it has an icon there.
+- The Wildcard Browser's code is in modules of its own (the window, its editor, Find and replace), apart from the prompt fields' tools.
 - Messages of Prompt styles and Sampler presets stay as long as the others (5 s). The frontend asks the server and shows messages through
   one helper (`comfy.js`), and the server's routes share theirs (`routes.py`).
 - CI: a manual run can test a ComfyUI from before 2026-09-21 too (it installs torchaudio for CPU). The frontend's pure functions (the

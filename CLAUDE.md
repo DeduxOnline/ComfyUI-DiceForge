@@ -18,7 +18,9 @@ section describes the tests, the agents and the release.
      `e2e/ui-*.spec.js`.
    - A new route goes into `ROUTES` in `tests/test_robustness.py`.
 3. Update `README.md` (what users see and do) and `CHANGELOG.md` (under `[Unreleased]`: Added, Changed, Fixed or Removed), in the voice of
-   the text around.
+   the text around. A node's README section is its help page too (`DiceForge/web/docs/<node id>.md`): after a README change, write the
+   pages again with `DICEFORGE_WRITE_NODE_DOCS=1 python -m pytest tests/test_node_docs.py` (CI fails while they differ). Screenshots
+   are in `DiceForge/web/docs/images`, for both.
 4. Before committing: `python .github/scripts/review_checks.py origin/main` (line endings, syntax, unsafe code, routes, missing tests or
    docs), or ask the `reviewer` agent. On the author's computer `python` is the
    Microsoft Store stub: `..\..\..\python_embeded\python.exe -X utf8 .github/scripts/review_checks.py origin/main` (without `-X utf8` it
@@ -86,8 +88,9 @@ section describes the tests, the agents and the release.
   - Nodes are V3 (`io.ComfyNode`), registered in `DiceForge/__init__.py` alone (`tests/test_node_ids.py` checks it lists every node). Modules with routes have `register_routes()`, run at import.
   - A node's preview gets its run's data from `ui={"dice_forge_…": [...]}`; the frontend keeps it in `node.properties`, so it travels with
     the workflow.
-  - The prompt tools work on the text fields of `PROMPT_NODES` (`wildcards.js`). Wildcard Note is a frontend-only node
-    (`wildcard_note.js`).
+  - The prompt tools work on the text fields of `PROMPT_NODES` (`wildcards.js`, also the autocomplete and the wildcard list). Wildcard
+    Note is a frontend-only node (`wildcard_note.js`). The Wildcard Browser window is `wildcard_browser.js`, with its editor
+    (`wildcard_editor.js`) and Find and replace (`wildcard_replace.js`); its cards mode stays in the window, which shares their state.
 - `ComfyUI/AGENTS.md`, which Claude Code shows when files of ComfyUI are read, holds the rules of ComfyUI's own code, not DiceForge's.
 - **Text is shown as text** (`element()`), never as HTML. Links to new tabs open with `noopener`. `.github/scripts/security_scan.py`, run by
   the unit tests, fails CI otherwise.
@@ -145,8 +148,8 @@ Update this section as the steps get done, and remove it when they all are.
        (21:9) is still missing.
      - `example_workflows/` at the repository root: workflow JSON files, each with a `.jpg` of the same name, that ComfyUI's template
        browser shows as a DiceForge section (an Anima text-to-image like the author's `Anima_DiceForge`, an SDXL one, an XY Plot).
-     - Node help: `DiceForge/web/docs/<node id>.md` (and `<node id>/<locale>.md`), Markdown with pictures and video shown in ComfyUI's
-       node help panel instead of the description; the README's node sections are most of it.
+     - Done: node help, `DiceForge/web/docs/<node id>.md` written from the README (`tests/test_node_docs.py`). Left: pages in other
+       languages (`<node id>/<locale>.md`).
      - Optional: `subgraphs/` (blueprints in the subgraph browser), `locales/` (node, input and tooltip names in other languages).
   2. **The first release, 1.0.0** (it was never published):
      - fold `[Unreleased]` into the `[1.0.0]` section of the CHANGELOG;

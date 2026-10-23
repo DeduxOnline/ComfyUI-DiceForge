@@ -1,4 +1,4 @@
-// Screenshots of the DiceForge nodes in the Nodes 2.0 design for the README (docs/images), taken in the real ComfyUI page with the test files of
+// Screenshots of the DiceForge nodes in the Nodes 2.0 design for the README and the node help (DiceForge/web/docs/images), taken in the real ComfyUI page with the test files of
 // the end-to-end server (stand-in models, wildcards, images). Not part of the test run: DICEFORGE_SCREENSHOTS=1 npx playwright test screenshots.spec.js
 const path = require("path");
 const fs = require("fs");
@@ -6,7 +6,7 @@ const { test, expect, openComfy, addNodes, connect, setWidget, clickMenu, queueF
 const { wildcardMode } = require("./ui-shared");
 const { png } = require("./fixtures");
 
-const OUT = path.join(__dirname, "..", "docs", "images");
+const OUT = path.join(__dirname, "..", "DiceForge", "web", "docs", "images");
 test.skip(!process.env.DICEFORGE_SCREENSHOTS, "Screenshots only on request: DICEFORGE_SCREENSHOTS=1");
 test.use({ deviceScaleFactor: 2, viewport: { width: 2200, height: 1300 } });
 test.describe.configure({ timeout: 180_000 });

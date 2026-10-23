@@ -5,11 +5,17 @@
 # Prints the findings, ERROR (CI would fail, or a rule of the project is broken) and WARN (worth a look); exits with 1 when there is an ERROR.
 import ast
 import configparser
+import importlib.util
 import pathlib
 import re
 import shutil
 import subprocess
 import sys
+
+# The security scan's allowed exceptions, from its file (the portable build's Python doesn't import from the script's folder).
+_spec = importlib.util.spec_from_file_location("security_scan", pathlib.Path(__file__).with_name("security_scan.py"))
+security_scan = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(security_scan)
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 TEXT = {".py", ".js", ".md", ".yml", ".yaml", ".toml", ".json", ".sh", ".txt", ".css", ".html", ".properties"}
@@ -137,6 +143,8 @@ def added_line_findings(path, lines, allowed=frozenset()):
     rules = rules_of(path)
     found = []
     for number, line in lines:
+        if security_scan.allowed(path, line): # An exception the security scan lists with its reason (a line moved to another file, say).
+            continue
         found += [finding(level, path, number, message) for pattern, level, message in rules if pattern.search(line)]
         if path.startswith("DiceForge/web/") and CONSOLE_LOG.search(line):
             found.append(finding("WARN", path, number, "console.log left in the frontend (console.error / console.warn for what users should see)"))

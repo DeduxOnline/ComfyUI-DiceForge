@@ -1,6 +1,6 @@
 # The README follows the code (the docs agent, .claude/agents/docs.md, keeps it so): every node is in the README's node table with a link to
 # its section, and that section names each of its inputs and outputs as they are called (`name`). Every link inside the README leads to a
-# heading that exists, every file or picture it shows is there, and every picture in docs/images is shown.
+# heading that exists, every file or picture it shows is there, and every picture in DiceForge/web/docs/images is shown.
 import asyncio
 import os
 import pathlib
@@ -59,5 +59,5 @@ def test_the_files_and_pictures_it_shows_are_there():
 
 
 def test_every_picture_in_docs_images_is_shown():
-    used = set(re.findall(r"docs/images/([\w.-]+)", README))
-    assert sorted(set(os.listdir(ROOT / "docs" / "images")) - used) == []
+    used = set(re.findall(r"DiceForge/web/docs/images/([\w.-]+)", README))
+    assert sorted(set(os.listdir(ROOT / "DiceForge" / "web" / "docs" / "images")) - used) == []

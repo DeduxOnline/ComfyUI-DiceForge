@@ -109,7 +109,7 @@ The anime prompt builder *Prompt Director* lives in its own repository: [DeduxOn
 
 ### CLIP Dual Text Encode (Wildcards, LoRA)
 
-<img src="docs/images/clip_dual_text_encode.png" width="448" alt="CLIP Dual Text Encode in Nodes 2.0 with wildcards, variables and choices">
+<img src="DiceForge/web/docs/images/clip_dual_text_encode.png" width="448" alt="CLIP Dual Text Encode in Nodes 2.0 with wildcards, variables and choices">
 
 Node id: `DiceForgeCLIPDualTextEncode`.
 
@@ -117,7 +117,7 @@ Works like two core *CLIP Text Encode (Prompt)* nodes sharing one CLIP model: ea
 
 Its right-click menu has the prompt tools: **📖 Syntax guide** (every piece of the syntax below with an example; **+ Insert** puts the example where the cursor was, a click copies it), **🕘 Prompt history**, **🎲 Wildcard Browser**, **✂ Selection → new wildcard…** (the part of a prompt you selected becomes a new wildcard file's first line, and `__name__` takes its place; a name already taken gets it as one more line), **🎴 LoRA Browser** (to insert trigger words), **🏷 Tag autocomplete** (download tag lists), **🏷 Tag Browser** and **🎨 Prompt styles**. The windows open where you closed them: the Wildcard Browser with its search, ★ Favorites, the file you had open (with its unsaved changes, as long as the file didn't change meanwhile) and where it was scrolled; the Tag Browser with its search, type, order and where it was scrolled; the syntax guide with its search; the model browsers (below) with their search, tag filter, order and where they were scrolled. Kept in this browser, also after a reload. Each of these windows can be resized by dragging its bottom-right corner, and keeps its size; a double-click on its title gives back the default size. In each of them, **?** (or **⌨**) shows its keys.
 
-<img src="docs/images/syntax_guide.png" width="980" alt="The Syntax guide window: every piece of the prompt syntax with an example">
+<img src="DiceForge/web/docs/images/syntax_guide.png" width="980" alt="The Syntax guide window: every piece of the prompt syntax with an example">
 
 #### Inputs
 
@@ -237,7 +237,7 @@ After each run the node shows, under its inputs, the **positive** prompt as it w
 
 **🕘 Prompt history** in the node's right-click menu opens a window with the last 20 runs' prompts, newest first, with the time, seed and mode, and **the images each run made**: the first image of every Save Image, Preview Image, VAE Decode + Save… of the workflow in that run (up to 4; click one to open it full size). A preview image is kept by ComfyUI only until it restarts; saved ones stay. A run with the same prompts and seed as the newest one is not added again (its new images join that entry). For each entry:
 
-<img src="docs/images/prompt_history.png" width="1100" alt="The Prompt history window: the last runs with their images, seeds and prompts">
+<img src="DiceForge/web/docs/images/prompt_history.png" width="1100" alt="The Prompt history window: the last runs with their images, seeds and prompts">
 
 - **↺ Seed** puts back that run's prompts, seed and seed mode, and sets *control after generate* to *fixed*: the next run gives exactly those prompts again. In every mode a seed gives the same prompts (as long as the wildcard files are the same and, in `shuffle`, `balanced` and `mutate`, the memory file remembers the seed).
 - **Use text** puts the prompts as encoded in the fields: every choice and wildcard fixed as in that run.
@@ -247,9 +247,9 @@ The history (with the images' file names) is kept in the node, with the workflow
 
 #### Autocomplete and the Wildcard Browser
 
-<img src="docs/images/wildcard_autocomplete.png" width="467" alt="Wildcard autocomplete in the positive prompt">
+<img src="DiceForge/web/docs/images/wildcard_autocomplete.png" width="467" alt="Wildcard autocomplete in the positive prompt">
 
-<img src="docs/images/wildcard_browser.png" width="1100" alt="The Wildcard Browser editing color.txt">
+<img src="DiceForge/web/docs/images/wildcard_browser.png" width="1100" alt="The Wildcard Browser editing color.txt">
 
 - **Autocomplete:** type `__` in the positive or negative field and a list of the wildcard files (with their number of lines) and folders (`folder/*`) opens at the cursor. Keep typing to filter it; ↑/↓ to move, Enter or Tab to insert, Esc to close. The last entry, *📂 Browse wildcards…*, opens the browser.
 - **Wildcard Browser:** right-click the node → *🎲 Wildcard Browser*. It shows the wildcard folders as a tree, with the number of lines of each file and its first lines as a tooltip, and a search box. Folders start closed: click a folder's name to open or close it, or use **Expand all** and **Collapse all**. The browser remembers which folders are open; a search shows every match with its folders open, and opening a file opens its folders.
@@ -275,7 +275,7 @@ The history (with the images' file names) is kept in the node, with the workflow
   - **Yaml files** are one row each in their folder (📜 `POSES.yaml`, with its number of wildcards), not a folder of their keys. Click it to open the whole file in the editor, as written: `key: lines`, its comments too. **Save** keeps the text as written once it reads as yaml keys (otherwise nothing is saved and the message says why). **+** next to a line puts in its option (the text after `key:` or `- `). Its menu: open, **🃏 Its cards**, **＋ New wildcard in it…** (a new key; the file opens on its line), **→ txt files**, and **🗑 Delete the file** (↶ Undo). A key renamed in the text leaves its card pictures behind: rename it on its card to take them along.
   - **🃏 Cards / 📄 Lines** in the toolbar switches between two views (remembered for the next time). **Lines** is the tree with the editor, as above. **Cards** shows wildcards as cards, like the LoRA Browser: click a yaml file in the tree to see its cards, or a folder for all of its files' cards. Each card has its picture (or its first line when it has none), its name and text, ☆ and **+ Add** (inserts that card's `__name__`); **🎲 + Add random** inserts `__folder/*__`, a random card of them each run. Made for yaml card packs: a yaml file of `name: prompt` pairs with a picture for each name next to it, at the key's path (`POSES.yaml` with `POSES: {sitting: "sitting,", …}` and `POSES/sitting.jpeg`), in a folder named like the file (`poses.yaml` and `poses/POSES/sitting.png`), or in a `cards` folder, next to the yaml file or at the top of the wildcards folder (`cards/POSES/sitting.jpeg`, where the A1111 Wildcard Gallery's packs keep them); png, jpg, jpeg, webp and gif. Click a card's name to open its yaml file in the lines view, at its line.
 
-    <img src="docs/images/wildcard_cards.png" width="1100" alt="The Wildcard Browser in cards view: a yaml card pack with its pictures">
+    <img src="DiceForge/web/docs/images/wildcard_cards.png" width="1100" alt="The Wildcard Browser in cards view: a yaml card pack with its pictures">
 
   - **Pictures for the cards:** on a yaml card, **🖼** picks an example picture (PNG, JPEG, WebP or GIF), or drop a picture file on the card; **✕** removes it. The picture is saved where card packs keep theirs, next to the yaml file at the key's path (`POSES/sitting.png` for the key `sitting` of `POSES.yaml`), in place of the one it had.
   - **The cards are edited where they are:** **🖊** edits a card's lines on the card (Save or Ctrl+S, Cancel or Esc); **⋯** or a right-click renames, moves or deletes it (↶ Undo); **＋ New card** adds one to the yaml file shown (or to the folder: into its yaml file when the folder's cards come from one) and opens its lines. A yaml card is changed in its yaml file, and only its own text there: the file keeps its comments and layout, one line stays `key: text`. Renamed, moved or deleted and brought back, a card takes its pictures along, and a deleted one comes back in its place.
@@ -315,7 +315,7 @@ In YAML, put quotes around a line that starts with `{`, `[`, `!` or contains `: 
 
 ### Wildcards to Text
 
-<img src="docs/images/wildcards_to_text.png" width="873" alt="Wildcards to Text filling in a prompt, shown by Preview as Text">
+<img src="DiceForge/web/docs/images/wildcards_to_text.png" width="873" alt="Wildcards to Text filling in a prompt, shown by Preview as Text">
 
 One prompt field with the same syntax as CLIP Dual Text Encode (wildcards, `{a|b}` choices, variables, comments, the seed modes), and a `text` output: the prompt filled in, for any text encoder (Flux, SD3, video models), a text input, a file name or another prompt node. The same `text`, `seed` and `seed_mode` give the same text as CLIP Dual Text Encode's `positive_text`. Its field has the same tools: the `__` and tag autocomplete, syntax highlighting, and in its right-click menu the Syntax guide, Wildcard Browser and Tag Browser. `<lora:...>` tags stay in the text, for a node that reads them. Under the advanced inputs: `seed_mode` and `trim`.
 
@@ -369,7 +369,7 @@ Each also puts the usual negative for its family after your negative prompt (`lo
 
 ### Danbooru Tag Enhancer
 
-<img src="docs/images/danbooru_tag_enhancer.png" width="448" alt="Danbooru Tag Enhancer with its advanced inputs and the post of the last run">
+<img src="DiceForge/web/docs/images/danbooru_tag_enhancer.png" width="448" alt="Danbooru Tag Enhancer with its advanced inputs and the post of the last run">
 
 A node that makes a few tags a full prompt from a real Danbooru (or e621) post: type `1girl, hatsune miku` and get, for example, `1girl, hatsune miku, twintails, smile, thighhighs, looking at viewer, holding microphone…`, the tags of a picture that has yours, the way the anime models (Illustrious, NoobAI, Pony, Anima) learned them.
 
@@ -403,7 +403,7 @@ How it picks:
 
 ### SDXL Resolution List
 
-<img src="docs/images/sdxl_resolution_list.png" width="339" alt="SDXL Resolution List in Nodes 2.0, Advanced section open, rescaled by 150%">
+<img src="DiceForge/web/docs/images/sdxl_resolution_list.png" width="339" alt="SDXL Resolution List in Nodes 2.0, Advanced section open, rescaled by 150%">
 
 Node id: `DiceForgeSDXLResolutionList`.
 
@@ -464,7 +464,7 @@ The `size` list shows width x height; the aspect ratios are given here for refer
 
 ### Resolution Selector (Random)
 
-<img src="docs/images/resolution_selector.png" width="393" alt="Resolution Selector (Random) in Nodes 2.0, 16:9 rescaled to a longest side of 1920">
+<img src="DiceForge/web/docs/images/resolution_selector.png" width="393" alt="Resolution Selector (Random) in Nodes 2.0, 16:9 rescaled to a longest side of 1920">
 
 Node id: `DiceForgeResolutionSelector`.
 
@@ -531,7 +531,7 @@ Like the output of **Empty Latent Image**, the latent works with any model you w
 
 ### Random Int and Random Float
 
-<img src="docs/images/random_numbers_sampler.png" width="1088" alt="Random Int, Random Float and Random Sampler in Nodes 2.0">
+<img src="DiceForge/web/docs/images/random_numbers_sampler.png" width="1088" alt="Random Int, Random Float and Random Sampler in Nodes 2.0">
 
 A random number between `min` and `max`, picked from the seed with the same [seed modes](#seed-modes-for-sizes) as the resolution nodes, so values can go through the whole range instead of clustering. Connect the `value` output to any number input (converted to an input), for example KSampler's `cfg` or `steps`.
 
@@ -561,7 +561,7 @@ A random number between `min` and `max`, picked from the seed with the same [see
 
 ### Random LoRA, Random Checkpoint, Random Diffusion Model and Random VAE
 
-<img src="docs/images/random_loaders.png" width="1278" alt="Random LoRA, Random Checkpoint, Random Diffusion Model and Random VAE in Nodes 2.0">
+<img src="DiceForge/web/docs/images/random_loaders.png" width="1278" alt="Random LoRA, Random Checkpoint, Random Diffusion Model and Random VAE in Nodes 2.0">
 
 Loaders that pick the file from a folder with the [seed modes](#seed-modes-for-sizes), then load it with the core loader (**Load LoRA**, **Load Checkpoint**, **Load Diffusion Model**, **Load VAE**), so the result is the same as picking that file by hand.
 
@@ -583,7 +583,7 @@ Each loader outputs what its core loader does (`model`, `clip`, `vae`) plus the 
 
 ### Random Image
 
-<img src="docs/images/random_image_dice_grid.png" width="888" alt="Random Image in deck mode feeding Dice Grid, after four runs">
+<img src="DiceForge/web/docs/images/random_image_dice_grid.png" width="888" alt="Random Image in deck mode feeding Dice Grid, after four runs">
 
 Like **Load Image**, but the image is picked from a folder with the [seed modes](#seed-modes-for-sizes): with `deck` and *increment* an img2img or ControlNet series goes through every image once before any repeats. After each run the node shows the picked image, its file name (click to copy), size (and frames of an animated one), folder, and the seed and mode it came from; click the image to open it full size. The preview is kept with the workflow, so it is still there after a reload, and it also updates when the node comes from ComfyUI's cache. A file of the input folder is shown from there; one from `path` through a temporary copy, which ComfyUI clears on restart (the preview then says to run again).
 
@@ -628,7 +628,7 @@ To vary only the sampler, list one scheduler (and the other way round).
 
 ### KSampler presets
 
-<img src="docs/images/sampler_presets.png" width="955" alt="The Sampler presets submenu in the right-click menu of KSampler">
+<img src="DiceForge/web/docs/images/sampler_presets.png" width="955" alt="The Sampler presets submenu in the right-click menu of KSampler">
 
 Right-click **KSampler**, **KSampler (Advanced)** or any other node with `steps`, `cfg`, `sampler_name` and `scheduler`, and choose **🎲 Sampler presets**. A preset sets those four widgets at once; the seed, denoise and the rest stay as they are. A message says what was set.
 
@@ -774,7 +774,7 @@ Under the node, the cells of the grid being made (or of the last finished one, u
 
 ### LoRA Stack
 
-<img src="docs/images/lora_stack.png" width="948" alt="LoRA Stack after Load Checkpoint: a random strength, a group of two LoRAs taking turns, and base model warnings">
+<img src="DiceForge/web/docs/images/lora_stack.png" width="948" alt="LoRA Stack after Load Checkpoint: a random strength, a group of two LoRAs taking turns, and base model warnings">
 
 Node id: `DiceForgeLoraStack`. Several LoRAs in one node, like rgthree's *Power Lora Loader*, applied in order to the model and CLIP.
 
@@ -817,7 +817,7 @@ The rows are saved in the workflow (in the node's hidden `loras` input, as JSON)
 
 ### Model info
 
-<img src="docs/images/model_info.png" width="960" alt="The Model info window for a LoRA, with its Civitai data">
+<img src="DiceForge/web/docs/images/model_info.png" width="960" alt="The Model info window for a LoRA, with its Civitai data">
 
 Right-click a node with a model file picked in a list (**Load Checkpoint**, **Load Diffusion Model**, **Load LoRA**, **Load VAE**, **Load CLIP**, **Load Diffusion Model + CLIP**, and custom nodes with such lists) and choose **🛈 Model info**. A dialog like rgthree's LoRA info opens, for every model kind:
 
@@ -835,7 +835,7 @@ Right-click a node with a model list and the menu offers the browser for its kin
 
 #### LoRA Browser
 
-<img src="docs/images/lora_browser.png" width="1400" alt="The LoRA Browser with the LoRA cards of the test folder">
+<img src="DiceForge/web/docs/images/lora_browser.png" width="1400" alt="The LoRA Browser with the LoRA cards of the test folder">
 
 Right-click **Load LoRA** (or another node with a LoRA list), **Random LoRA** or **CLIP Dual Text Encode** and choose **🎴 LoRA Browser**. It shows your LoRAs as cards, with the same Civitai data as [Model info](#model-info):
 
@@ -864,7 +864,7 @@ The browser only shows what is already known, so it opens at once even with hund
 
 #### Managing model files: find on Civitai, rename, delete
 
-<img src="docs/images/civitai_search.png" width="1300" alt="Find LoRAs on Civitai: search results with versions, a finished download">
+<img src="DiceForge/web/docs/images/civitai_search.png" width="1300" alt="Find LoRAs on Civitai: search results with versions, a finished download">
 
 The LoRA, [Checkpoint](#checkpoint-browser) and [Diffusion Model](#diffusion-model-browser) Browsers also manage the files themselves:
 
@@ -907,7 +907,7 @@ The browsers are offered for every node whose list holds model files, whatever t
 
 ## Utility nodes
 
-<img src="docs/images/utility_nodes.png" width="976" alt="VAE Decode + Save, Load VAE + Decode + Save and Load Diffusion Model + CLIP in Nodes 2.0">
+<img src="DiceForge/web/docs/images/utility_nodes.png" width="976" alt="VAE Decode + Save, Load VAE + Decode + Save and Load Diffusion Model + CLIP in Nodes 2.0">
 
 - **Load VAE + Decode + Save** (`DiceForge/image`, `DiceForge/load_vae_decode_save.py`): Load VAE, VAE Decode and Save Image in one node. It decodes the latent (`samples`) with the VAE picked in `vae_name` and saves PNG files with the workflow under `filename_prefix`, like Save Image, and passes the images on (`images`). The VAE stays loaded between runs while its name stays the same. The `vae` output passes the VAE on (for VAE Encode in a hires fix or inpaint).
 - **VAE Decode + Save** (`DiceForge/image`): the same without Load VAE, with the VAE from its `vae` input (the VAE of Load Checkpoint, Load VAE, Random VAE…).
@@ -926,7 +926,7 @@ The `tests` folder has unit tests for every node and server route: seed modes, p
 
 The `test_properties_*.py` files check rules that must hold for *any* input, with [Hypothesis](https://hypothesis.readthedocs.io) generating hundreds of inputs per rule: every pick comes from its options and is reproducible from the seed; deck deals every option once per round (also within one prompt, across the end of a round); `combinations` lists every possible prompt exactly once; locks, variables, escapes, comments and the comma and space clean-up keep their promises in every seed mode; any text (fuzzed prompt syntax, any Unicode) resolves or stops with a clear error, quickly; every size is a positive multiple of `multiple` and keeps what `rescale` promises; Random Int, Float and Sampler stay in their range; any LoRA Stack data runs or is refused clearly; Dice Grid renders any labels; and no file name from a request reaches outside its folder. `test_robustness.py` damages things on purpose: a seed memory, grid manifest, model info or preset file that is broken, wildcard files in other encodings or deleted while indexed, junk requests to every route (always a 4xx answer, never a server error), many threads at once, the same picks in every Python process, and the frontend's `__` autocomplete knowing the same letters as the server.
 
-Some test files check the project itself: `test_node_ids.py` (every node id starts with DiceForge, and the package lists every node), `test_event_loop.py` (no route touches a file on the event loop, and the read-modify-write routes hold their locks), `test_frontend_text.py` (the Wildcard Browser's text helpers give what the regular expressions they replaced gave), `test_http_read.py` (a body is read to the end, and reading stops past the size limit), `test_docs.py` (every node, input and output is in this README, and every link and picture of it works), `test_security_scan.py` (what is never allowed in the code: HTML built from text, eval, unsafe yaml, a shell, pickle, TLS without certificate checks; `.github/scripts/security_scan.py`) and `test_review_checks.py` (the checks of a change before it is pushed, `.github/scripts/review_checks.py`).
+Some test files check the project itself: `test_node_ids.py` (every node id starts with DiceForge, and the package lists every node), `test_event_loop.py` (no route touches a file on the event loop, and the read-modify-write routes hold their locks), `test_frontend_text.py` (the Wildcard Browser's text helpers give what the regular expressions they replaced gave), `test_frontend_functions.py` (the frontend's pure functions, in Node.js), `test_http_read.py` (a body is read to the end, and reading stops past the size limit), `test_docs.py` (every node, input and output is in this README, and every link and picture of it works), `test_node_docs.py` (each node's help page in ComfyUI is its section of this README: write them again with `DICEFORGE_WRITE_NODE_DOCS=1 python -m pytest tests/test_node_docs.py` after a change), `test_security_scan.py` (what is never allowed in the code: HTML built from text, eval, unsafe yaml, a shell, pickle, TLS without certificate checks; `.github/scripts/security_scan.py`) and `test_review_checks.py` (the checks of a change before it is pushed, `.github/scripts/review_checks.py`).
 
 They run inside a real ComfyUI checkout, on the CPU, with [pytest](https://pytest.org) and Hypothesis:
 

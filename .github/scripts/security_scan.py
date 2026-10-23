@@ -15,7 +15,7 @@ SOURCE = ROOT / "DiceForge"
 ALLOWED = [
     ("DiceForge/web/prompt_highlight.js", "layer.innerHTML = highlightPrompt(",
      "highlightPrompt builds the HTML from escapeHTML(text) pieces and its own class names (marksHTML)"),
-    ("DiceForge/web/wildcards.js", "highlight.innerHTML = highlightWildcardFile(",
+    ("DiceForge/web/wildcard_editor.js", "highlight.innerHTML = highlightWildcardFile(",
      "highlightWildcardFile builds the HTML with marksHTML, which escapes every piece of text"),
 ]
 
