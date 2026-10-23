@@ -15,13 +15,12 @@ nodes and features, a patch for fixes. Each version is a [release on GitHub](htt
   ↶ Undo and added (＋ New card) in their yaml file, keeping its comments and layout. 🔁 Replace changes yaml wildcards too.
 - Wildcard Browser: 🂠 Card per line, a yaml card of several lines as a card per line with its own picture, and the A1111 Wildcard Gallery's
   picture places (cards/POSES/sitting.jpeg, POSES/standing/[0].jpeg for a line).
-- Wildcard Note writes to yaml wildcards too.
 - Wildcard Note (DiceForge/utils): a note for a wildcard's lines, with the prompt fields' tools; 💾 Save to WildCard adds its new lines to the
-  wildcard file picked in its list, puts them in place of the file's lines, or makes a new file.
+  wildcard file picked in its list (txt or yaml), puts them in place of the file's lines, or makes a new file.
 - The windows open where they were closed: Wildcard Browser (search, ★ Favorites, the open file with its unsaved changes, scrolling), Tag Browser
-  (search, type, order), syntax guide (search), model browsers (search, tag filter, order).
+  (search, type, order, scrolling), syntax guide (search), model browsers (search, tag filter, order, scrolling).
 - The windows can be resized by their bottom-right corner and keep their size (a double-click on the title: the default size).
-- Wildcard Browser: ⇩ Export zip (every wildcard, or ⇩ zip on a folder, with a card pack's yaml file); ↶ Undo of the last rename, move or
+- Wildcard Browser: ⇩ Export zip (every wildcard, or ⇩ Export zip in a folder's menu, with a card pack's yaml file); ↶ Undo of the last rename, move or
   delete (deleted files wait in a trash folder, the last 50).
 - Wildcard Browser: a right-click menu (or ⋯) on files and folders with every action, so the rows keep only ☆ and + Add; 🎲 Preview picks
   shows what runs would put in for a wildcard or a folder.
@@ -69,10 +68,8 @@ nodes and features, a patch for fixes. Each version is a [release on GitHub](htt
   docs, the unit tests or the agents runs the unit tests alone. The weekly, manual and release runs always have them.
 - CI: the workflows run on Ubuntu 24.04 instead of the newest Ubuntu, so a new runner image doesn't change the tests' system without a
   commit; both workflows use the same versions of the GitHub actions, so Dependabot can update them again.
-- CI: the end-to-end tests pass with ComfyUI's frontend 1.55 too (the weekly run against ComfyUI master): they show a node on the canvas
-  before looking for its panel (the classic canvas now adds a node's panel to the page once the node has been on screen), click the
-  canvas away from the minimap (a click on it moves the view), and give Dice Grid's runs pure colors (the Nodes 2.0 color picker rounds
-  others, 4000000 to 3999744).
+- CI: the end-to-end tests pass with ComfyUI's frontend 1.55 too: they show a node before looking for its panel, click the canvas away
+  from the minimap, and give Dice Grid pure colors (the Nodes 2.0 color picker rounds others).
 - CI: the tests run against ComfyUI of 2026-10-23 (`bc5f880`, frontend 1.55) instead of 2026-09-25, and with Playwright 1.64. Chromium
   and the Ubuntu packages it needs are kept between runs, so a slow Ubuntu mirror no longer adds ten minutes to an end-to-end job.
 

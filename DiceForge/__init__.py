@@ -1,4 +1,4 @@
-# DiceForge: controlled randomness for ComfyUI. Package entry point when the DiceForge folder is in custom_nodes: registers the resolution nodes, the prompt encoder, the random number nodes, the random model and image loaders, LoRA Stack and Dice Grid, which all pick with the seed modes of seed_modes.py.
+# DiceForge: controlled randomness for ComfyUI. Package entry point: registers every DiceForge node (tests/test_node_ids.py checks the list); the modules with HTTP routes add them when imported.
 from typing_extensions import override
 from comfy_api.latest import ComfyExtension
 from .clip_text_encode_pos_neg import CLIPTextEncodePositiveNegative, WildcardsToText
@@ -28,7 +28,7 @@ from . import prompt_styles # Server routes of the prompt styles in CLIP Dual Te
 from . import sampler_presets # Server routes of the KSampler presets in the node menu (web/sampler_presets.js).
 from . import model_manager # Server routes that manage LoRA files: Civitai search and download, rename and delete (web/civitai.js, web/model_browser.js).
 __version__ = "1.0.0" # As in pyproject.toml and CHANGELOG.md (tests/test_release.py).
-WEB_DIRECTORY = "./web" # Frontend extension: feeds the live size previews of the resolution nodes.
+WEB_DIRECTORY = "./web" # Frontend extension: the nodes' previews and panels, the prompt tools, the model browsers and the right-click menus.
 class DiceForgeExtension(ComfyExtension):
     @override
     async def get_node_list(self):

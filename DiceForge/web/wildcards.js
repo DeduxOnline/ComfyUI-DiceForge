@@ -628,7 +628,7 @@ async function openBrowser(node) {
     link.remove();
     say(`Downloading ${folder ? `the folder ${folder}` : "every wildcard"} as a zip.`);
   }
-  const exportButton = element("button", { class: "export", title: "Download every wildcard as a zip (⇩ zip on a folder downloads that folder)", onclick: () => exportZip() }, "⇩ Export zip");
+  const exportButton = element("button", { class: "export", title: "Download every wildcard as a zip (⇩ Export zip in a folder's menu downloads that folder)", onclick: () => exportZip() }, "⇩ Export zip");
   // txt ⇄ yaml: a txt file or a folder of them becomes one yaml file (hair/ -> hair.yaml), a yaml file becomes one txt file per key. The
   // wildcard names stay the same, so prompts keep working; card pictures stay where they are.
   async function convert(name, to) {
