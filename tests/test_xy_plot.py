@@ -31,7 +31,7 @@ def test_numbers_lists_and_ranges():
 
 @pytest.mark.parametrize("text, axis, message", [("4.5", "steps", "whole numbers"), ("0", "steps", "out of range"), ("1.5", "denoise", "out of range"),
                                                   ("abc", "cfg", "not a number"), ("1-5:0", "cfg", "step of"), ("1-1000", "seed", "more than 64"),
-                                                  ("1e999", "cfg", "not a number"), ("nan", "cfg", "not a number"), ("0-1e999", "cfg", "not a usable number"),
+                                                  ("1e999", "cfg", "not a number"), ("nan", "cfg", "not a number"), ("0-1e999", "cfg", "not a number"),
                                                   ("0-" + "9" * 400 + ".5", "cfg", "not a usable number"), ("0-" + "9" * 400, "seed", "too many values")])
 def test_bad_numbers_say_what_is_wrong(text, axis, message):
     with pytest.raises(ValueError, match=message):

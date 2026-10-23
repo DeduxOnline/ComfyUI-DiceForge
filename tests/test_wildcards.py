@@ -56,7 +56,7 @@ def test_wildcards_that_use_another_one_twice_stop_at_the_budget(wildcards):
     with pytest.raises(ValueError, match="more than 100000 choices, wildcards and variables"):
         resolve("__a0__")
     assert time.time() - started < 20
-    assert resolve("__a5__")[0] == " ".join(["x"] * 32) # A few levels are fine.
+    assert resolve("__a25__")[0] == " ".join(["x"] * 32) # A few levels are fine (a25 is five levels above x).
 
 
 def test_variables_that_use_another_one_twice_stop_at_the_length_limit():
