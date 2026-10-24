@@ -36,6 +36,8 @@ app.registerExtension({
     requestAnimationFrame(() => fitNodeHeight(node)); // After the other DiceForge extensions add their widgets to the node.
     const onConfigure = node.onConfigure;
     node.onConfigure = function (...args) {
+      // Loading keeps the properties the workflow doesn't have: a height a panel fitted the new node to is not the saved one's.
+      if (!(FITTED in (args[0]?.properties ?? {}))) delete node.properties?.[FITTED];
       const result = onConfigure?.apply(this, args);
       requestAnimationFrame(() => fitNodeHeight(node)); // A loaded workflow's node: its saved height, unless it has the gap.
       return result;
