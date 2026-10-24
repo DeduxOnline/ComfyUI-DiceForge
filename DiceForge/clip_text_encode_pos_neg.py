@@ -582,7 +582,7 @@ class CLIPTextEncodePositiveNegative(io.ComfyNode):
                     advanced=True,
                 ),
             ],
-            has_intermediate_output=True, # The prompts of the last run reach the node's preview also when the node comes from the cache.
+            has_intermediate_output=True, # The prompts of the run reach the prompt history also when the node comes from the cache.
             # Outputs for the node: the model with the prompts' LoRAs first, then positive and negative conditioning, then the prompts as encoded
             # (with choices and wildcards filled in). Workflows saved with the model last are reordered when loaded (web/prompt_preview.js).
             outputs=[
@@ -614,7 +614,7 @@ class CLIPTextEncodePositiveNegative(io.ComfyNode):
         # Logging the prompts when choices or wildcards changed them, for debugging and verification purposes.
         if (positive_text, negative_text) != (positive, negative):
             logging.info(f"[DiceForge] CLIP Dual Text Encode | Seed: {seed} ({seed_mode}{note}) | Positive: {positive_text} | Negative: {negative_text}")
-        # The prompts as encoded, for the node's preview in the page (web/prompt_preview.js), with the seed and mode they came from.
+        # The prompts as encoded, for the prompt history in the page (web/prompt_preview.js), with the seed and mode they came from.
         if loras:
             applied = ", ".join(f"{os.path.splitext(os.path.basename(name))[0]} {model_weight:g}" for name, model_weight, _ in loras)
             note += f", LoRAs {applied}"
