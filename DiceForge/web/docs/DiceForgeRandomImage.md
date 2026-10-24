@@ -1,22 +1,29 @@
-### Random Image
+Loads an image picked from a folder, like Load Image, with the DiceForge seed modes (deck, shuffle... go through every image before repeating one).
 
 ![Random Image in deck mode feeding Dice Grid, after four runs](images/random_image_dice_grid.png)
 
-Like **Load Image**, but the image is picked from a folder with the [seed modes](https://github.com/DeduxOnline/ComfyUI-DiceForge#seed-modes-for-sizes): with `deck` and *increment* an img2img or ControlNet series goes through every image once before any repeats. After each run the node shows the picked image, its file name (click to copy), size (and frames of an animated one), folder, and the seed and mode it came from; click the image to open it full size. The preview is kept with the workflow, so it is still there after a reload, and it also updates when the node comes from ComfyUI's cache. A file of the input folder is shown from there; one from `path` through a temporary copy, which ComfyUI clears on restart (the preview then says to run again).
+## Inputs
 
-| Input | Where | Description |
+| Input | Type | Description |
 |---|---|---|
-| `folder` | main | A folder in `ComfyUI/input`, subfolders included; `(all)` for every image in `input` (the mask editor's `clipspace` folder is left out). After adding folders, refresh the node definitions (**R**). |
-| `seed` | main | Seed for the pick. With `deck` or `sequential`, set *control after generate* to *increment*. |
-| `seed_mode` | Advanced | `random`, `deck`, `shuffle`, `balanced` or `sequential` (files sorted by name). |
-| `path` | Advanced | Any folder on this computer instead, for example `D:/refs/poses` (subfolders included). Empty: use `folder`. |
+| `folder` | COMBO | The folder in ComfyUI/input to pick the image from, subfolders included. (all): every image in input. Refresh the node definitions (R) after adding folders. |
+| `seed` | INT | Seed for the random pick. With deck or sequential, set control after generate to increment. |
 
-| Output | Description |
-|---|---|
-| `image` | The picked image; all frames for an animated GIF or WebP, as in Load Image. |
-| `mask` | The mask from the alpha channel (1 where transparent), as in Load Image. |
-| `file_name` | The picked file, relative to the folder. |
+## Advanced inputs
 
-- Supported files: png, jpg, jpeg, webp, bmp, gif, tif, tiff.
-- The image is loaded with the same steps as Load Image, and gives the same result. When ComfyUI's video reader fails on a file (it does on some WebP files, and then Load Image fails too), Random Image reads it with Pillow instead.
-- Adding, removing or editing images in the folder makes the node pick again.
+Under **Show advanced inputs** on the node.
+
+| Input | Type | Description |
+|---|---|---|
+| `seed_mode` | COMBO | How the pick changes from run to run. random: every pick is independent, so the same one can come up again soon. deck: the seed steps through a shuffled order of the images; with control after generate on increment, every one comes once before any repeats. Reproducible. shuffle: like shuffle in a music player, the node remembers the images already used and picks from the rest with each new seed (increment or randomize); remembered in a file, so it continues after a restart. The same seed gives the same pick again. balanced: one just picked gets a low chance, and those not picked for a while get a higher one, so repeats are rare but possible. Remembered in a file. The same seed gives the same pick again. sequential: the seed is the position in the list (sorted by name), so seeds 0, 1, 2... go through the images in order. Reproducible. |
+| `path` | STRING | Any folder on this computer to pick from instead of the input folder, for example D:/refs/poses (subfolders included). Empty: use folder. |
+
+## Outputs
+
+| Output | Type | Description |
+|---|---|---|
+| `image` | IMAGE | The picked image (all frames of an animated image). |
+| `mask` | MASK | The mask from the image's alpha channel (1 where transparent), as in Load Image. |
+| `file_name` | STRING | The picked file, relative to the folder, for example for the file name of the result. |
+
+More in the [DiceForge guide](https://github.com/DeduxOnline/ComfyUI-DiceForge#random-image): examples, tips, and how it works with the other nodes.

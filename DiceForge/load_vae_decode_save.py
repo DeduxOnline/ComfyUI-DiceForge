@@ -6,6 +6,8 @@ _vae_cache = {"name": None, "vae": None}
 # shown, as Save Image does) or Hide&Save (saved, not shown). The images are passed on in every case.
 IMAGE_OUTPUTS = ["Hide", "Preview", "Save", "Hide&Save"]
 # The VAE used, passed on (for an upscale and a second decode, a hires fix, an inpaint encode...): the one loaded, or the one of the vae input.
+def images_output():
+    return io.Image.Output(display_name="images", tooltip="The decoded images, passed on whatever image_output is: for example to an upscale.")
 def vae_output():
     return io.Vae.Output(display_name="vae", tooltip="The VAE used for decoding, passed on: for example for VAE Encode in a hires fix or inpaint.")
 def image_output_input():
@@ -52,6 +54,7 @@ class LoadVAEDecodeSave(io.ComfyNode):
             node_id="DiceForgeLoadVAEDecodeSave",
             display_name="Load VAE + Decode + Save",
             category="DiceForge/image",
+            description="Load VAE, VAE Decode and Save Image in one node: decodes the latent with the VAE picked in its list, then shows or saves the images as image_output says.",
             inputs=[
                 io.Latent.Input("samples", tooltip="The latent to decode."),
                 io.Combo.Input(
@@ -66,7 +69,7 @@ class LoadVAEDecodeSave(io.ComfyNode):
                 ),
                 image_output_input(),
             ],
-            outputs=[io.Image.Output(display_name="images"), vae_output()],
+            outputs=[images_output(), vae_output()],
             hidden=[io.Hidden.prompt, io.Hidden.extra_pnginfo],
             is_output_node=True,
         )
@@ -89,13 +92,14 @@ class VAEDecodeSave(io.ComfyNode):
             node_id="DiceForgeVAEDecodeSave",
             display_name="VAE Decode + Save",
             category="DiceForge/image",
+            description="VAE Decode and Save Image in one node: decodes the latent with the VAE of its vae input, then shows or saves the images as image_output says.",
             inputs=[
                 io.Latent.Input("samples", tooltip="The latent to decode."),
                 io.Vae.Input("vae", tooltip="The VAE used for decoding, for example the VAE output of Load Checkpoint or Load VAE."),
                 io.String.Input("filename_prefix", default="ComfyUI", tooltip=FILENAME_PREFIX_TOOLTIP),
                 image_output_input(),
             ],
-            outputs=[io.Image.Output(display_name="images"), vae_output()],
+            outputs=[images_output(), vae_output()],
             hidden=[io.Hidden.prompt, io.Hidden.extra_pnginfo],
             is_output_node=True,
         )

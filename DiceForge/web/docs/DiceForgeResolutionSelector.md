@@ -1,44 +1,35 @@
-### Resolution Selector (Random)
+Calculate a size from an aspect ratio and a megapixel target (or a random aspect ratio from the seed) and output an empty latent of that size.
 
 ![Resolution Selector (Random) in Nodes 2.0, 16:9 rescaled to a longest side of 1920](images/resolution_selector.png)
 
-Node id: `DiceForgeResolutionSelector`.
+## Inputs
 
-It works like the core ComfyUI *Resolution Selector* followed by **Empty Latent Image**, using the same size calculation, and adds random aspect ratios. For fixed ratios, the size is identical to the core node's.
+| Input | Type | Description |
+|---|---|---|
+| `aspect_ratio` | COMBO | Aspect ratio for the output dimensions. Random options pick one from the seed: listed ratios, or any ratio up to max\_aspect for Chaos. |
+| `megapixels` | FLOAT | Target total megapixels. 1.0 MP = 1024x1024 for square. |
+| `preview` (optional) | RESOLUTION_PREVIEW | Live preview of the calculated output resolution. Random options show the size of the last run, until the settings change. |
+| `seed` | INT | Seed for random aspect ratio selection. Ignored for fixed aspect ratios. |
+| `rescale` (optional) | COMFY_DYNAMICCOMBO_V3 | Rescale the picked size, like HiresFix: by percentage of each side, to a width and/or height, or to a longest side. |
 
-#### Inputs
+## Advanced inputs
 
-| Input | Section | Default | Description |
-|---|---|---|---|
-| `aspect_ratio` | main | `1:1 (Square)` | A fixed ratio, or one of the random options below. |
-| `megapixels` | main | `1.0` | Target total size (0.1–16). 1.0 MP = 1024x1024 for a square. |
-| `preview` | main | — | Live preview of the output size and megapixels. Drawn in the Nodes 2.0 design only: in the classic canvas this core widget stays empty, in the core *Resolution Selector* too. For random options it shows the size of the last run, as long as the settings other than `seed` stay the same, and "—" before a run or after a change. |
-| `seed` | main | `0` | Seed for the random options. By default it is randomized after each run (*control after generate*), so every run gets a new random ratio. Set it to *fixed* to repeat a result. |
-| `multiple` | Advanced | `8` | Rounds width and height to the nearest multiple of this value (8–256, in steps of 8). Use 64 for SDXL training sizes. Random Chaos rounds down. |
-| `batch` | Advanced | `1` | Number of latents in the batch (1–32). |
-| `max_aspect` | Advanced | `2.0` | Random Chaos only: the most stretched ratio allowed (1.0–4.0). 2.0 means up to 2:1 or 1:2. |
-| `seed_mode` | Advanced | `random` | How the random options change from run to run, as in SDXL Resolution List. See [Seed modes for sizes](https://github.com/DeduxOnline/ComfyUI-DiceForge#seed-modes-for-sizes). |
-| `rescale` | main | `by percentage` | Rescales the size calculated from `aspect_ratio` and `megapixels`, with the same modes as in [SDXL Resolution List](https://github.com/DeduxOnline/ComfyUI-DiceForge#sdxl-resolution-list): `percent` of each side (150: 1:1 at 1 MP becomes 1536x1536), a `width` and/or `height` (0 follows the aspect ratio), or the `longer_side` (16:9 with 1920 becomes 1920x1080). Then each side is rounded to `multiple`. At 100% the size is exactly what it was without rescale; an API prompt without `rescale` gets 100%. |
+Under **Show advanced inputs** on the node.
 
-#### Outputs
+| Input | Type | Description |
+|---|---|---|
+| `multiple` | INT | Round width and height to a multiple of this value (8 for the VAE, 64 for SDXL training buckets). Random Chaos sizes round down. |
+| `batch` | INT | Number of images to generate in a batch. |
+| `max_aspect` | FLOAT | Random Chaos options only: the most stretched aspect ratio allowed (2.0 = up to 2:1 or 1:2). |
+| `seed_mode` | COMBO | How random sizes change from run to run. random: every pick is independent, so the same size can come up again soon. deck: the seed steps through a shuffled order; with control after generate on increment, every size comes once before any repeats. Reproducible. shuffle: like shuffle in a music player, the node remembers the sizes already used and picks from the rest with each new seed (increment or randomize); remembered in a file, so it continues after a restart. The same seed gives the same size again. balanced: a size just picked gets a low chance, and sizes not picked for a while get a higher one, so repeats are rare but possible. Remembered in a file. The same seed gives the same size again. sequential: the seed is the position in the list, so seeds 0, 1, 2... go through the sizes in order. Reproducible. Random Chaos: the aspect range is split into equal parts that take turns (in order for sequential), with a random ratio inside each part. |
 
-| Output | Description |
-|---|---|
-| `latent` | Empty latent batch, identical to what **Empty Latent Image** makes for this size and `batch`. Connect it to the `latent_image` input of **KSampler**. |
-| `width` | Width in pixels, for example for an upscale or hires-fix step. |
-| `height` | Height in pixels. |
-| `seed` | The seed used for this run, the same as the node's `seed` input. For example, connect it to the `seed` input of **KSampler**. |
+## Outputs
 
-#### Aspect ratios
+| Output | Type | Description |
+|---|---|---|
+| `latent` | LATENT | Empty latent batch, the same as Empty Latent Image makes for this size. |
+| `width` | INT | Width of the latent in pixels. |
+| `height` | INT | Height of the latent in pixels. |
+| `seed` | INT | The seed used for this run, for example to pass on to KSampler. |
 
-1:1, 2:3, 3:2, 3:4, 4:3, 7:9, 9:7, 9:16, 16:9, 9:21, 21:9.
-
-#### Random options
-
-- **Random Any / Random Portrait / Random Landscape**: one of the listed ratios (any, only portrait or only landscape), each equally likely.
-- **Random Chaos Any / Random Chaos Portrait / Random Chaos Landscape**: any ratio up to `max_aspect`. Wide and tall ratios are equally likely.
-
-#### Notes
-
-- Fixed and Random ratios round to the nearest `multiple`, like the core node, so the size can be slightly above or below `megapixels` (about 0.94–1.06 at 1.0 MP).
-- Random Chaos rounds down, so it never exceeds `megapixels` (it lands at about 0.9–1.0 of it), and Random Chaos Portrait/Landscape never return a square (unless `rescale` sets a square size, as in SDXL Resolution List).
+More in the [DiceForge guide](https://github.com/DeduxOnline/ComfyUI-DiceForge#resolution-selector-random): examples, tips, and how it works with the other nodes.

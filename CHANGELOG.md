@@ -56,6 +56,8 @@ nodes and features, a patch for fixes. Each version is a [release on GitHub](htt
   doesn't change Anima.
 
 ### Changed
+- Node help: short pages for the side panel, each node's own: its description, picture, inputs and outputs (advanced ones apart)
+  with their tooltips, and a link to its README section. Load VAE + Decode + Save and VAE Decode + Save got a description.
 - Every node id starts with DiceForge, so no other node pack can take a DiceForge node's place in a workflow (ComfyUI-RuiquNodes has a
   VAEDecodeSave): `SDXLResolutionListLatent` is now `DiceForgeSDXLResolutionList`, `ResolutionSelectorRandomLatent`
   `DiceForgeResolutionSelector`, `CLIPTextEncodePositiveNegative` `DiceForgeCLIPDualTextEncode`, `LoadVAEDecodeSave`

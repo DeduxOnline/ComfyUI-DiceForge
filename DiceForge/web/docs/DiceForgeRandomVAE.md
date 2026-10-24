@@ -1,21 +1,27 @@
-### Random LoRA, Random Checkpoint, Random Diffusion Model and Random VAE
+Loads a VAE picked from a folder, like Load VAE, with the DiceForge seed modes (deck, shuffle... go through every VAE before repeating one).
 
 ![Random LoRA, Random Checkpoint, Random Diffusion Model and Random VAE in Nodes 2.0](images/random_loaders.png)
 
-Loaders that pick the file from a folder with the [seed modes](https://github.com/DeduxOnline/ComfyUI-DiceForge#seed-modes-for-sizes), then load it with the core loader (**Load LoRA**, **Load Checkpoint**, **Load Diffusion Model**, **Load VAE**), so the result is the same as picking that file by hand.
+## Inputs
 
-| Input | Where | Description |
+| Input | Type | Description |
 |---|---|---|
-| `folder` | main | A folder in `models/loras`, `models/checkpoints`, `models/diffusion_models` or `models/vae`, subfolders included; `(all)` for every file. After adding folders, refresh the node definitions (**R**). |
-| `seed` | main | Seed for the pick. With `deck` or `sequential`, set *control after generate* to *increment*. |
-| `seed_mode` | Advanced | `random`, `deck`, `shuffle`, `balanced` or `sequential`, as for the resolution nodes. `sequential` goes through the files sorted by name. |
-| `model`, `clip` | Random LoRA | The model and CLIP to apply the LoRA to. `clip` is optional: leave it unconnected to change only the model. |
-| `strength_model`, `strength_clip` | Random LoRA | As in **Load LoRA**. Connect **Random Float** to them to vary the strength too. |
-| `include_none` | Random LoRA, Advanced | Adds "no LoRA" as one more option, so some runs use the model as it is. |
-| `weight_dtype` | Random Diffusion Model, Advanced | As in **Load Diffusion Model**. |
+| `folder` | COMBO | The folder to pick the VAE from, subfolders included. (all): every VAE. Refresh the node definitions (R) after adding folders. |
+| `seed` | INT | Seed for the random pick. With deck or sequential, set control after generate to increment. |
 
-Each loader outputs what its core loader does (`model`, `clip`, `vae`) plus the picked file name (`lora_name`, `ckpt_name`, `model_name`, `vae_name`; empty for "no LoRA"), for example to put it in the image file name. The picked file is also written to the console.
+## Advanced inputs
 
-- Adding or removing files in the folder makes the node pick again, and `deck`, `shuffle` and `balanced` start a new round for the new list.
-- An empty folder stops the run with an error that names it.
-- With `deck` and *increment*, a checkpoint comparison shows every checkpoint once before any repeats; with `shuffle` it continues after a restart.
+Under **Show advanced inputs** on the node.
+
+| Input | Type | Description |
+|---|---|---|
+| `seed_mode` | COMBO | How the pick changes from run to run. random: every pick is independent, so the same one can come up again soon. deck: the seed steps through a shuffled order of the VAEs; with control after generate on increment, every one comes once before any repeats. Reproducible. shuffle: like shuffle in a music player, the node remembers the VAEs already used and picks from the rest with each new seed (increment or randomize); remembered in a file, so it continues after a restart. The same seed gives the same pick again. balanced: one just picked gets a low chance, and those not picked for a while get a higher one, so repeats are rare but possible. Remembered in a file. The same seed gives the same pick again. sequential: the seed is the position in the list (sorted by name), so seeds 0, 1, 2... go through the VAEs in order. Reproducible. |
+
+## Outputs
+
+| Output | Type | Description |
+|---|---|---|
+| `vae` | VAE | The VAE used for encoding and decoding images to and from latent space. |
+| `vae_name` | STRING | The picked VAE file, for example for the label of Dice Grid. |
+
+More in the [DiceForge guide](https://github.com/DeduxOnline/ComfyUI-DiceForge#random-lora-random-checkpoint-random-diffusion-model-and-random-vae): examples, tips, and how it works with the other nodes.

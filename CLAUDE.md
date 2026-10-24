@@ -18,8 +18,8 @@ section describes the tests, the agents and the release.
      `e2e/ui-*.spec.js`.
    - A new route goes into `ROUTES` in `tests/test_robustness.py`.
 3. Update `README.md` (what users see and do) and `CHANGELOG.md` (under `[Unreleased]`: Added, Changed, Fixed or Removed), in the voice of
-   the text around. A node's README section is its help page too (`DiceForge/web/docs/<node id>.md`): after a README change, write the
-   pages again with `DICEFORGE_WRITE_NODE_DOCS=1 python -m pytest tests/test_node_docs.py` (CI fails while they differ). Screenshots
+   the text around. A node's help page (`DiceForge/web/docs/<node id>.md`) is written from its schema (description, tooltips) and its
+   README section (picture, link): after a change to either, write the pages again with `DICEFORGE_WRITE_NODE_DOCS=1 python -m pytest tests/test_node_docs.py` (CI fails while they differ). Screenshots
    are in `DiceForge/web/docs/images`, for both.
 4. Before committing: `python .github/scripts/review_checks.py origin/main` (line endings, syntax, unsafe code, routes, missing tests or
    docs), or ask the `reviewer` agent. On the author's computer `python` is the
@@ -77,7 +77,7 @@ DiceForge nodes should feel like ComfyUI's own (https://docs.comfy.org/basic-con
 - **Menus:** extra tools go in the node's right-click menu (`getNodeMenuItems`) or a window it opens, after the core items (color, title,
   clone, mode). Nothing duplicates the selection toolbox (color, bypass, lock, delete).
 - **Modes:** a node runs when its inputs change, so a random node says when it must run again (`fingerprint_inputs`). Bypass passes
-  inputs to outputs of the same type: loader-like nodes (LoRA Stack: `model`, `clip`) stay usable bypassed. No test covers Bypass yet.
+  inputs to outputs of the same type: loader-like nodes (LoRA Stack: `model`, `clip`) stay usable bypassed (`e2e/ui-nodes.spec.js` checks the model nodes).
 - **Workflows people get** (templates, examples) use only core and DiceForge nodes, so nothing shows as missing.
 
 ## Code
@@ -166,7 +166,7 @@ Update this section as the steps get done, and remove it when they all are.
        (21:9) is still missing.
      - `example_workflows/` at the repository root: workflow JSON files, each with a `.jpg` of the same name, that ComfyUI's template
        browser shows as a DiceForge section (an Anima text-to-image like the author's `Anima_DiceForge`, an SDXL one, an XY Plot).
-     - Done: node help, `DiceForge/web/docs/<node id>.md` written from the README (`tests/test_node_docs.py`). Left: pages in other
+     - Done: node help, `DiceForge/web/docs/<node id>.md` written from the schema and the README (`tests/test_node_docs.py`). Left: pages in other
        languages (`<node id>/<locale>.md`).
      - Optional: `subgraphs/` (blueprints in the subgraph browser), `locales/` (node, input and tooltip names in other languages).
   2. **The first release, 1.0.0** (it was never published):

@@ -586,7 +586,7 @@ class CLIPTextEncodePositiveNegative(io.ComfyNode):
             # Outputs for the node: the model with the prompts' LoRAs first, then positive and negative conditioning, then the prompts as encoded
             # (with choices and wildcards filled in). Workflows saved with the model last are reordered when loaded (web/prompt_preview.js).
             outputs=[
-                io.Model.Output(display_name="model"), # The model with the prompts' <lora:...> LoRAs (connect it to KSampler instead of the loader's model).
+                io.Model.Output(display_name="model", tooltip="The model with the prompts' <lora:name:weight> LoRAs: connect it to KSampler instead of the loader's model."),
                 io.Conditioning.Output(display_name="positive", tooltip="Conditioning from the positive prompt."),
                 io.Conditioning.Output(display_name="negative", tooltip="Conditioning from the negative prompt."),
                 io.String.Output(display_name="positive_text", tooltip="The positive prompt as encoded: choices, wildcards and variables filled in. Connect it to another text encoder (Flux, SD3...) or a Save Image file name."),
