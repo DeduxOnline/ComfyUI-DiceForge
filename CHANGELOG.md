@@ -93,6 +93,8 @@ nodes and features, a patch for fixes. Each version is a [release on GitHub](htt
   section on updating from it).
 
 ### Fixed
+- CLIP Dual Text Encode: the prompt history no longer goes into the workflow saved in the images a run makes, which handed every earlier
+  prompt to whoever got a picture; the workflow itself keeps it.
 - A DiceForge node the user made taller by dragging its corner keeps that height after a reload, and when its preview or list
   changes; before, it was fitted back to its content (in Nodes 2.0, to its inputs).
 - Wildcard Note: its badge and the node library name DiceForge as its source instead of frontend_only, and it has a description.

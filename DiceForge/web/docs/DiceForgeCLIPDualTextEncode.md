@@ -132,7 +132,7 @@ The prompt fields color the syntax as you type: `__wildcards__` (red with a wavy
 - **Use text** puts the prompts as encoded in the fields: every choice and wildcard fixed as in that run.
 - **📌** pins it: pinned entries stay past the 20. **✕** removes it.
 
-The history (with the images' file names) is kept in the node, with the workflow.
+The history (with the images' file names) is kept in the node, with the workflow. It stays out of the images a run makes: ComfyUI puts the workflow in every image it saves, and the earlier prompts would go to whoever gets a picture. A workflow you save or export still has it.
 
 #### Autocomplete and the Wildcard Browser
 

@@ -118,3 +118,14 @@ def test_the_prompt_highlight_marks():
     ]
     source = js_source("prompt_highlight.js", "NAME_CHAR", "TOKENS", "COUNT", "WEIGHT_START", "globTest", "promptMarks")
     assert run(source, "promptMarks", [args for args, _ in cases]) == [marks for _, marks in cases]
+
+
+@needs_node
+def test_the_workflow_a_run_sends_has_no_prompt_history():
+    history = {"dice_forge_history": [{"positive": "an earlier prompt"}], "dice_forge_height": 120}
+    workflow = {"nodes": [{"id": 1, "properties": history}, {"id": 2}],
+                "definitions": {"subgraphs": [{"id": "a", "nodes": [{"id": 3, "properties": dict(history)}]}]}, "extra": {"ds": 1}}
+    clean = {"nodes": [{"id": 1, "properties": {"dice_forge_height": 120}}, {"id": 2}],
+             "definitions": {"subgraphs": [{"id": "a", "nodes": [{"id": 3, "properties": {"dice_forge_height": 120}}]}]}, "extra": {"ds": 1}}
+    cases = [[workflow], [{"nodes": [{"id": 1}]}], [None]]
+    assert run(js_source("prompt_preview.js", "withoutHistory"), "withoutHistory", cases) == [clean, {"nodes": [{"id": 1}]}, None]

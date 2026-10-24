@@ -6,7 +6,7 @@ import { setField } from "./wildcards.js";
 // Prompt history of CLIP Dual Text Encode (a window, from the node's right-click menu): the last runs' prompts as encoded (20, plus the pinned ones), newest first,
 // each with the images its run made (Save Image, Preview Image, VAE Decode + Save... in the same workflow). From an entry: ↺ Seed puts back its
 // prompts, seed and mode (with control after generate on fixed), so the next run gives the same prompts again; Use text puts the prompts as encoded
-// in the fields, every choice made; 📌 keeps it past the 20; ✕ removes it. The history is kept in the node's properties, so it travels with the workflow.
+// in the fields, every choice made; 📌 keeps it past the 20; ✕ removes it. The history is kept in the node's properties, so it travels with the workflow, but not into the images a run makes.
 const NODE_TYPE = "DiceForgeCLIPDualTextEncode";
 const STYLE = `
 .dfph-back{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:10000;display:flex;align-items:center;justify-content:center}
@@ -155,8 +155,25 @@ export function openHistory(node) {
   draw();
 }
 
+// The workflow a run sends without the history: ComfyUI saves that one in the images it makes (their metadata), where it would hand every
+// earlier prompt to whoever gets a picture. The graph, the tab's autosave and a saved workflow keep the history. Nodes in subgraphs too.
+export function withoutHistory(workflow) {
+  if (!workflow) return workflow;
+  const clean = (nodes) => nodes?.map((node) => node.properties && "dice_forge_history" in node.properties
+    ? { ...node, properties: Object.fromEntries(Object.entries(node.properties).filter(([key]) => key !== "dice_forge_history")) } : node);
+  const subgraphs = workflow.definitions?.subgraphs;
+  return { ...workflow, nodes: clean(workflow.nodes),
+    ...(subgraphs && { definitions: { ...workflow.definitions, subgraphs: subgraphs.map((graph) => ({ ...graph, nodes: clean(graph.nodes) })) } }) };
+}
+
 app.registerExtension({
   name: "DiceForge.PromptPreview",
+  setup() {
+    const queuePrompt = api.queuePrompt;
+    api.queuePrompt = function (number, data, ...rest) {
+      return queuePrompt.call(this, number, data && { ...data, workflow: withoutHistory(data.workflow) }, ...rest);
+    };
+  },
   getNodeMenuItems(node) {
     return node.comfyClass === NODE_TYPE ? [{ content: "🕘 Prompt history", callback: () => openHistory(node) }] : [];
   },
