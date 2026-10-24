@@ -226,6 +226,38 @@ for (const vue of [true, false]) {
       if (vue) await expect.poll(async () => (await nodeElement(page, plain).boundingBox()).height).toBeGreaterThan(500); // Drawn that tall too.
     });
 
+    test("bypassed, the model nodes pass the model and the CLIP on: LoRA Stack, Random LoRA, Variation Seed, Anima NAG", async ({ page }) => {
+      const [checkpoint, stack, lora, variation, nag, sampler, encode] = await addNodes(page, [
+        { type: "CheckpointLoaderSimple" },
+        { type: "DiceForgeLoraStack", pos: [420, 40] },
+        { type: "DiceForgeRandomLora", pos: [820, 40] },
+        { type: "DiceForgeVariationSeed", pos: [1220, 40] },
+        { type: "DiceForgeAnimaNAG", pos: [1620, 40] },
+        { type: "KSampler", pos: [2020, 40] },
+        { type: "CLIPTextEncode", pos: [1220, 520] },
+      ]);
+      const inputs = (bypass) => page.evaluate(async ([ids, bypass]) => {
+        const node = (id) => window.app.graph.getNodeById(id);
+        const link = (from, slot, to, input) => node(from).connect(slot, node(to), node(to).findInputSlot(input));
+        if (!bypass) { // Linked once, by input name: widget inputs have slots too.
+          const [checkpoint, stack, lora, variation, nag, sampler, encode] = ids;
+          link(checkpoint, 0, stack, "model");
+          link(checkpoint, 1, stack, "clip");
+          link(stack, 0, lora, "model");
+          link(stack, 1, lora, "clip");
+          link(lora, 0, variation, "model");
+          link(variation, 0, nag, "model");
+          link(nag, 0, sampler, "model");
+          link(lora, 1, encode, "clip");
+        }
+        for (const id of ids.slice(1, 5)) node(id).mode = bypass ? 4 : 0;
+        const { output } = await window.app.graphToPrompt();
+        return { model: output[ids[5]].inputs.model, clip: output[ids[6]].inputs.clip, left: ids.slice(1, 5).filter((id) => String(id) in output).length };
+      }, [[checkpoint, stack, lora, variation, nag, sampler, encode], bypass]);
+      expect(await inputs(false)).toEqual({ model: [String(nag), 0], clip: [String(lora), 1], left: 4 });
+      expect(await inputs(true)).toEqual({ model: [String(checkpoint), 0], clip: [String(checkpoint), 1], left: 0 }); // Straight from the checkpoint.
+    });
+
     if (vue) {
       test("DiceForge nodes fit their inputs when advanced inputs are shown and hidden", async ({ page }) => { // NOSONAR: expect.poll(...) assertions below.
         const [id] = await addNodes(page, [{ type: "DiceForgeSDXLResolutionList" }]);
