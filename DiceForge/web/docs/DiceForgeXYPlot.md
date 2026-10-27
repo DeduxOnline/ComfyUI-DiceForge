@@ -26,7 +26,7 @@ Under **Show advanced inputs** on the node (Nodes 2.0), or **Show Advanced** in 
 | Input | Type | Default | Description |
 |---|---|---|---|
 | `denoise` | FLOAT | `1` | Denoise of every cell, unless an axis is denoise. |
-| `lora_name` | COMBO | `None` | LoRA of every cell (for a lora strength axis), unless an axis is lora. Applied to model and clip. |
+| `lora_name` | COMBO |  | LoRA of every cell (for a lora strength axis), unless an axis is lora. Applied to model and clip. |
 | `lora_strength` | FLOAT | `1` | LoRA strength, unless an axis is lora strength. |
 | `variation_seed` | INT | `0` | Variation seed of every cell (as Variation Seed), unless an axis is variation seed. |
 | `variation_strength` | FLOAT | `0` | Variation strength of every cell (0: none). A variation seed axis with strength 0.1: variations of one picture. |

@@ -65,7 +65,8 @@ def type_of(item):
 
 
 def default_of(item):
-    """A widget's default as the node starts with it. Not a file name: those come from this computer's models folder (HiresFix's model_name)."""
+    """A widget's default as the node starts with it. Not a model list's: it comes from this computer's models folder (HiresFix's model_name
+    is the first upscale model there, None on GitHub Actions), and the page would differ from one computer to another."""
     value = getattr(item, "default", None)
     if not isinstance(item, io.WidgetInput) or item.force_input or value is None or value == "" or isinstance(item, io.DynamicCombo.Input):
         return ""
@@ -74,7 +75,7 @@ def default_of(item):
     if isinstance(value, float):
         value = f"{value:g}"
     value = str(value)
-    if isinstance(item, io.Combo.Input) and re.search(r"\.\w+$", value):
+    if isinstance(item, io.Combo.Input) and (re.search(r"\.\w+$", value) or value == "None"): # A model list's: a file, or None without one.
         return ""
     return "`" + cell(value if len(value) <= 24 else value[:23] + "…").replace("`", "'") + "`"
 

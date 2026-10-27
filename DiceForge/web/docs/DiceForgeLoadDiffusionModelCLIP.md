@@ -15,7 +15,7 @@ Under **Show advanced inputs** on the node (Nodes 2.0), or **Show Advanced** in 
 
 | Input | Type | Default | Description |
 |---|---|---|---|
-| `clip_name2` | COMBO | `None` | The second text encoder. None loads only clip\_name1, like Load CLIP. A file loads both, like DualCLIPLoader. |
+| `clip_name2` | COMBO |  | The second text encoder. None loads only clip\_name1, like Load CLIP. A file loads both, like DualCLIPLoader. |
 | `type` | COMBO | `stable_diffusion` | The model the text encoders are for. Some types need one file, some need two. |
 | `weight_dtype` | COMBO | `default` | Weight precision of the diffusion model, as in Load Diffusion Model. |
 | `device` | COMBO | `default` | Where the text encoders run, as in Load CLIP. |
