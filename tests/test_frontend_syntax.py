@@ -11,7 +11,8 @@ FILES = sorted(glob.glob(os.path.join(ROOT, "DiceForge", "web", "*.js")) + glob.
                + glob.glob(os.path.join(ROOT, "e2e", "qa", "*.js")))
 
 
-@pytest.mark.skipif(shutil.which("node") is None, reason="node.js is not installed")
+# Skipped only on a computer without node: on GitHub Actions (CI set) a missing node fails, so the check can't pass by doing nothing.
+@pytest.mark.skipif(shutil.which("node") is None and not os.environ.get("CI"), reason="node.js is not installed")
 @pytest.mark.parametrize("path", FILES, ids=lambda path: os.path.relpath(path, ROOT).replace(os.sep, "/"))
 def test_a_javascript_file_parses(path, tmp_path):
     # The frontend's files are ES modules, the end-to-end tests' CommonJS: the extension tells node which.

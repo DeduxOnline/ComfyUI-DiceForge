@@ -87,7 +87,8 @@ jobs:
         run: python .github/scripts/sonar_summary.py
 
   # Whether the end-to-end tests have something to test: a push or pull request that changes only the docs, the unit tests or the agents
-  # leaves them out. The node pack, the e2e tests and this workflow count; the weekly, manual and release runs always have them.
+  # leaves them out. The node pack, the e2e tests and this workflow count; the weekly, manual and release runs always have them. And whether
+  # the JavaScript parses: when it doesn't, the end-to-end tests don't start.
   changes:
     name: What changed
     runs-on: ubuntu-24.04
@@ -113,6 +114,11 @@ jobs:
             echo "e2e=false" >> "$GITHUB_OUTPUT"
             echo "::notice::No change to DiceForge/, e2e/ or this workflow: the end-to-end tests are left out."
           fi
+
+      # One typo stops the whole extension (or a whole spec) from loading: found here in a few seconds, before the five end-to-end jobs start,
+      # which need this job. The same test as in the unit tests; the runner has node.
+      - name: Check that the JavaScript parses
+        run: pipx run pytest --noconftest -q tests/test_frontend_syntax.py
 
   e2e:
     # Five jobs at once, each with its own ComfyUI server (the tests of one server share its files and memory, so they run one at a time).

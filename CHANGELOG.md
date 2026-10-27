@@ -8,7 +8,10 @@ nodes and features, a patch for fixes. Each version is a [release on GitHub](htt
 ## [Unreleased]
 
 ### Added
-- Node help: every DiceForge node's page in ComfyUI's node help panel (Node Info), with its pictures: its section of the README.
+- Node help: every DiceForge node's page in ComfyUI's node help panel (Node Info), short for the side panel and each node's own: its
+  description and picture, what it has besides its inputs (buttons, panels, menu tools, warnings), its inputs with their defaults and
+  tooltips (advanced ones apart, with the inputs a resolution or rescale choice adds), its outputs, and a link to its README section.
+  Load VAE + Decode + Save and VAE Decode + Save got a description.
 - CI: a QA tools workflow, run by hand, for a machine without Node.js: the frontend internals, the pictures and size checks of every
   node in both designs, and the times with a lot of data, on any ComfyUI commit (master by default), kept as the `qa-out` artifact.
 - Wildcard Browser: yaml wildcards are edited, no longer read-only. A yaml file is one row of the tree, opened whole in the lines view and
@@ -56,8 +59,7 @@ nodes and features, a patch for fixes. Each version is a [release on GitHub](htt
   doesn't change Anima.
 
 ### Changed
-- Node help: short pages for the side panel, each node's own: its description, picture, inputs and outputs (advanced ones apart)
-  with their tooltips, and a link to its README section. Load VAE + Decode + Save and VAE Decode + Save got a description.
+- CI: the end-to-end tests start only when every JavaScript file parses, checked in a few seconds before them.
 - Every node id starts with DiceForge, so no other node pack can take a DiceForge node's place in a workflow (ComfyUI-RuiquNodes has a
   VAEDecodeSave): `SDXLResolutionListLatent` is now `DiceForgeSDXLResolutionList`, `ResolutionSelectorRandomLatent`
   `DiceForgeResolutionSelector`, `CLIPTextEncodePositiveNegative` `DiceForgeCLIPDualTextEncode`, `LoadVAEDecodeSave`
@@ -95,8 +97,10 @@ nodes and features, a patch for fixes. Each version is a [release on GitHub](htt
   section on updating from it).
 
 ### Fixed
-- CLIP Dual Text Encode: the prompt history no longer goes into the workflow saved in the images a run makes, which handed every earlier
-  prompt to whoever got a picture; the workflow itself keeps it.
+- CLIP Dual Text Encode's prompt history, Danbooru Tag Enhancer's last prompt and post, and Random Image's picked file no longer go into
+  the workflow saved in the images a run makes, which handed earlier prompts and file names to whoever got a picture; the workflow itself
+  keeps them. A run opened again from the queue or from its picture has none of them. Images saved before still have them in their metadata.
+- HiresFix (Load VAE): the tooltip of its `vae` output says what it is for (the VAE Decode after the second KSampler).
 - A DiceForge node the user made taller by dragging its corner keeps that height after a reload, and when its preview or list
   changes; before, it was fitted back to its content (in Nodes 2.0, to its inputs).
 - Wildcard Note: its badge and the node library name DiceForge as its source instead of frontend_only, and it has a description.

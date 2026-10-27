@@ -28,6 +28,28 @@ test.describe("ComfyUI as DiceForge uses it", () => {
       changed("LiteGraph's node sizes", "e2e/qa/lib.js")).toEqual(["number", "number"]);
   });
 
+  test("a run is sent through api.queuePrompt, with the workflow its images get", async ({ page }) => {
+    await openComfy(page, { vue: false });
+    await addNodes(page, [{ type: "DiceForgeRandomInt" }]);
+    const sent = await page.evaluate(async () => { // Answered here, as by the server: nothing runs.
+      const { api } = await import("/scripts/api.js");
+      const queuePrompt = api.queuePrompt;
+      let seen = null;
+      api.queuePrompt = async (number, data) => {
+        seen = { keys: Object.keys(data ?? {}), nodes: Array.isArray(data?.workflow?.nodes) };
+        return { prompt_id: "dice-forge-contract", number: 0, node_errors: {} };
+      };
+      try {
+        await window.app.queuePrompt(0);
+      } finally {
+        api.queuePrompt = queuePrompt;
+      }
+      return seen;
+    });
+    expect(sent, changed("how a run is sent (api.queuePrompt(number, { output, workflow }), the workflow saved in its images)", "prompt_preview.js"))
+      .toEqual({ keys: expect.arrayContaining(["output", "workflow"]), nodes: true });
+  });
+
   test("the settings DiceForge registers are there, with their defaults", async ({ page }) => {
     await openComfy(page, { vue: false });
     const values = await page.evaluate(() => ["DiceForge.BlurNSFW", "DiceForge.PromptHighlight", "DiceForge.TagAutocomplete"]

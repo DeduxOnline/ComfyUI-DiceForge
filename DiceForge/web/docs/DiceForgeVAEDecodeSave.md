@@ -4,12 +4,12 @@ VAE Decode and Save Image in one node: decodes the latent with the VAE of its va
 
 ## Inputs
 
-| Input | Type | Description |
-|---|---|---|
-| `samples` | LATENT | The latent to decode. |
-| `vae` | VAE | The VAE used for decoding, for example the VAE output of Load Checkpoint or Load VAE. |
-| `filename_prefix` | STRING | The prefix for the file to save. A / makes a subfolder. May include %year%, %month%, %day%, %hour%, %minute%, %second%, %width% and %height%. |
-| `image_output` (optional) | COMBO | Hide: only pass the images on. Preview: show them on the node without saving. Save: save the PNG files and show them, like Save Image. Hide&Save: save without showing. |
+| Input | Type | Default | Description |
+|---|---|---|---|
+| `samples` | LATENT |  | The latent to decode. |
+| `vae` | VAE |  | The VAE used for decoding, for example the VAE output of Load Checkpoint or Load VAE. |
+| `filename_prefix` | STRING | `ComfyUI` | The prefix for the file to save. A / makes a subfolder. May include %year%, %month%, %day%, %hour%, %minute%, %second%, %width% and %height%. |
+| `image_output` | COMBO | `Save` | Hide: only pass the images on. Preview: show them on the node without saving. Save: save the PNG files and show them, like Save Image. Hide&Save: save without showing. |
 
 ## Outputs
 

@@ -2,22 +2,23 @@ Applies several LoRAs, each with its own on/off and strength, like rgthree's Pow
 
 ![LoRA Stack after Load Checkpoint: a random strength, a group of two LoRAs taking turns, and base model warnings](images/lora_stack.png)
 
+The LoRAs are rows on the node: **⋮⋮** (drag to reorder), on/off, the LoRA (click its name to pick another one), **ℹ** (Model info), **🏷** (trigger words), a **group**, **🎲** (random strength), the strength and **✕** (remove). **＋ Add LoRA** opens the LoRA Browser; *Separate CLIP strength* and the groups' settings are under the rows.
+
 ## Inputs
 
-| Input | Type | Description |
-|---|---|---|
-| `model` | MODEL | The diffusion model the LoRAs are applied to. |
-| `clip` (optional) | CLIP | The CLIP model the LoRAs are applied to. Leave it unconnected to change only the model. |
-| `loras` | STRING | The LoRA rows, edited in the node (JSON). |
-| `seed` | INT | Seed for random strengths and groups. With deck or sequential, set control after generate to increment. |
+| Input | Type | Default | Description |
+|---|---|---|---|
+| `model` | MODEL |  | The diffusion model the LoRAs are applied to. |
+| `clip` (optional) | CLIP |  | The CLIP model the LoRAs are applied to. Leave it unconnected to change only the model. |
+| `seed` | INT | `0` | Seed for random strengths and groups. With deck or sequential, set control after generate to increment. |
 
 ## Advanced inputs
 
-Under **Show advanced inputs** on the node.
+Under **Show advanced inputs** on the node (Nodes 2.0), or **Show Advanced** in its right-click menu (classic design).
 
-| Input | Type | Description |
-|---|---|---|
-| `seed_mode` | COMBO | How the pick changes from run to run. random: every pick is independent, so the same one can come up again soon. deck: the seed steps through a shuffled order of the strengths and group combinations; with control after generate on increment, every one comes once before any repeats. Reproducible. shuffle: like shuffle in a music player, the node remembers the strengths and group combinations already used and picks from the rest with each new seed (increment or randomize); remembered in a file, so it continues after a restart. The same seed gives the same pick again. balanced: one just picked gets a low chance, and those not picked for a while get a higher one, so repeats are rare but possible. Remembered in a file. The same seed gives the same pick again. sequential: the seed is the position in the list (sorted by name), so seeds 0, 1, 2... go through the strengths and group combinations in order. Reproducible. |
+| Input | Type | Default | Description |
+|---|---|---|---|
+| `seed_mode` | COMBO | `random` | How the pick changes from run to run. random: every pick is independent, so the same one can come up again soon. deck: the seed steps through a shuffled order of the strengths and group combinations; with control after generate on increment, every one comes once before any repeats. Reproducible. shuffle: like shuffle in a music player, the node remembers the strengths and group combinations already used and picks from the rest with each new seed (increment or randomize); remembered in a file, so it continues after a restart. The same seed gives the same pick again. balanced: one just picked gets a low chance, and those not picked for a while get a higher one, so repeats are rare but possible. Remembered in a file. The same seed gives the same pick again. sequential: the seed is the position in the list (sorted by name), so seeds 0, 1, 2... go through the strengths and group combinations in order. Reproducible. |
 
 ## Outputs
 

@@ -4,18 +4,18 @@ Loads a VAE picked from a folder, like Load VAE, with the DiceForge seed modes (
 
 ## Inputs
 
-| Input | Type | Description |
-|---|---|---|
-| `folder` | COMBO | The folder to pick the VAE from, subfolders included. (all): every VAE. Refresh the node definitions (R) after adding folders. |
-| `seed` | INT | Seed for the random pick. With deck or sequential, set control after generate to increment. |
+| Input | Type | Default | Description |
+|---|---|---|---|
+| `folder` | COMBO | `(all)` | The folder to pick the VAE from, subfolders included. (all): every VAE. Refresh the node definitions (R) after adding folders. |
+| `seed` | INT | `0` | Seed for the random pick. With deck or sequential, set control after generate to increment. |
 
 ## Advanced inputs
 
-Under **Show advanced inputs** on the node.
+Under **Show advanced inputs** on the node (Nodes 2.0), or **Show Advanced** in its right-click menu (classic design).
 
-| Input | Type | Description |
-|---|---|---|
-| `seed_mode` | COMBO | How the pick changes from run to run. random: every pick is independent, so the same one can come up again soon. deck: the seed steps through a shuffled order of the VAEs; with control after generate on increment, every one comes once before any repeats. Reproducible. shuffle: like shuffle in a music player, the node remembers the VAEs already used and picks from the rest with each new seed (increment or randomize); remembered in a file, so it continues after a restart. The same seed gives the same pick again. balanced: one just picked gets a low chance, and those not picked for a while get a higher one, so repeats are rare but possible. Remembered in a file. The same seed gives the same pick again. sequential: the seed is the position in the list (sorted by name), so seeds 0, 1, 2... go through the VAEs in order. Reproducible. |
+| Input | Type | Default | Description |
+|---|---|---|---|
+| `seed_mode` | COMBO | `random` | How the pick changes from run to run. random: every pick is independent, so the same one can come up again soon. deck: the seed steps through a shuffled order of the VAEs; with control after generate on increment, every one comes once before any repeats. Reproducible. shuffle: like shuffle in a music player, the node remembers the VAEs already used and picks from the rest with each new seed (increment or randomize); remembered in a file, so it continues after a restart. The same seed gives the same pick again. balanced: one just picked gets a low chance, and those not picked for a while get a higher one, so repeats are rare but possible. Remembered in a file. The same seed gives the same pick again. sequential: the seed is the position in the list (sorted by name), so seeds 0, 1, 2... go through the VAEs in order. Reproducible. |
 
 ## Outputs
 

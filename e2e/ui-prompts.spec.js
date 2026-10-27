@@ -1057,23 +1057,31 @@ for (const vue of [true, false]) {
       expect(workflow.nodes.find((node) => String(node.id) === String(encode)).properties.dice_forge_history).toHaveLength(21);
     });
 
-    test("the images a run makes don't get the prompt history: the workflow the run sends has none, the graph keeps it", async ({ page }) => {
-      const [encode] = await addNodes(page, [{ type: "DiceForgeCLIPDualTextEncode", widgets: { positive: "a car" } }]);
-      await page.evaluate((id) => {
-        window.app.graph.getNodeById(id).properties.dice_forge_history = [{ positive: "an earlier prompt", negative: "", seed: 1, seed_mode: "random", time: 1 }];
-      }, encode);
+    test("the images a run makes don't get the nodes' last runs: the workflow the run sends has no prompt history, Danbooru post or picked file, the graph keeps them", async ({ page }) => {
+      const ids = await addNodes(page, [
+        { type: "DiceForgeCLIPDualTextEncode", widgets: { positive: "a car" } },
+        { type: "DiceForgeDanbooruEnhancer", pos: [500, 40] },
+        { type: "DiceForgeRandomImage", pos: [40, 520] },
+      ]);
+      const runData = { dice_forge_history: [{ positive: "an earlier prompt", negative: "", seed: 1, seed_mode: "random", time: 1 }],
+        dice_forge_danbooru: { text: "an earlier prompt, 1girl" }, dice_forge_image: { file_name: "cat.png", seed: 1, seed_mode: "random" } };
+      const keys = Object.keys(runData);
+      await page.evaluate(([ids, runData]) => {
+        ids.forEach((id, index) => { const key = Object.keys(runData)[index]; window.app.graph.getNodeById(id).properties[key] = runData[key]; });
+      }, [ids, runData]);
       let sent = null;
       await page.route("**/api/prompt", (route) => { // The run's request is answered here: nothing runs.
         if (route.request().method() !== "POST") return route.continue();
         sent = route.request().postDataJSON();
-        return route.fulfill({ json: { prompt_id: "dice-forge-no-history", number: 0, node_errors: {} } });
+        return route.fulfill({ json: { prompt_id: "dice-forge-no-run-data", number: 0, node_errors: {} } });
       });
       await page.evaluate(() => window.app.queuePrompt(0));
       await expect.poll(() => sent).not.toBeNull();
       await page.unroute("**/api/prompt");
-      const node = sent.extra_data.extra_pnginfo.workflow.nodes.find((item) => String(item.id) === String(encode)); // What the images get.
-      expect(node.properties).not.toHaveProperty("dice_forge_history");
-      expect(await page.evaluate((id) => window.app.graph.getNodeById(id).properties.dice_forge_history, encode)).toHaveLength(1);
+      const nodes = sent.extra_data.extra_pnginfo.workflow.nodes; // What the images get.
+      ids.forEach((id, index) => expect(nodes.find((item) => String(item.id) === String(id)).properties).not.toHaveProperty(keys[index]));
+      const graph = await page.evaluate(([ids, keys]) => ids.map((id, index) => keys[index] in window.app.graph.getNodeById(id).properties), [ids, keys]);
+      expect(graph).toEqual([true, true, true]); // The graph keeps them.
     });
 
     test("Danbooru Tag Enhancer shows the post it took and fills in post_ids for fixed mode, also after a reload", async ({ page, request }) => {

@@ -3,7 +3,7 @@ import comfy.utils
 import folder_paths
 import nodes
 from comfy_api.latest import io
-from .load_vae_decode_save import FILENAME_PREFIX_TOOLTIP, LoadVAEDecodeSave, check_image_output, show_or_save, vae_output
+from .load_vae_decode_save import FILENAME_PREFIX_TOOLTIP, LoadVAEDecodeSave, check_image_output, show_or_save
 from .sdxl_resolution_list_latent import BY_PERCENTAGE, TO_LONGEST_SIDE, TO_WIDTH_HEIGHT, rescaled
 # HiresFix (Load VAE), like Easy-Use's HiresFix but with the VAE picked from a list instead of a vae input: the image made bigger with an upscale
 # model (ESRGAN, 4x-UltraSharp, AnimeSharp...), then rescaled (by percentage of the upscaled image, to a width and/or height, or to a longest side),
@@ -72,7 +72,7 @@ class HiresUpscale(io.ComfyNode):
             outputs=[
                 io.Image.Output(display_name="image", tooltip="The upscaled and rescaled image."),
                 io.Latent.Output(display_name="latent", tooltip="The image encoded with the VAE: for a second KSampler pass (denoise 0.3-0.5)."),
-                vae_output(),
+                io.Vae.Output(display_name="vae", tooltip="The VAE loaded: for the VAE Decode after the second KSampler."),
             ],
         )
 

@@ -5,9 +5,9 @@ _vae_cache = {"name": None, "vae": None}
 # What happens to the decoded images, as in Easy-Use's samplers: Hide (only passed on), Preview (shown on the node, not saved), Save (saved and
 # shown, as Save Image does) or Hide&Save (saved, not shown). The images are passed on in every case.
 IMAGE_OUTPUTS = ["Hide", "Preview", "Save", "Hide&Save"]
-# The VAE used, passed on (for an upscale and a second decode, a hires fix, an inpaint encode...): the one loaded, or the one of the vae input.
 def images_output():
     return io.Image.Output(display_name="images", tooltip="The decoded images, passed on whatever image_output is: for example to an upscale.")
+# The VAE used, passed on (for an upscale and a second decode, a hires fix, an inpaint encode...): the one loaded, or the one of the vae input.
 def vae_output():
     return io.Vae.Output(display_name="vae", tooltip="The VAE used for decoding, passed on: for example for VAE Encode in a hires fix or inpaint.")
 def image_output_input():

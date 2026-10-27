@@ -19,7 +19,7 @@ section describes the tests, the agents and the release.
    - A new route goes into `ROUTES` in `tests/test_robustness.py`.
 3. Update `README.md` (what users see and do) and `CHANGELOG.md` (under `[Unreleased]`: Added, Changed, Fixed or Removed), in the voice of
    the text around. A node's help page (`DiceForge/web/docs/<node id>.md`) is written from its schema (description, tooltips) and its
-   README section (picture, link): after a change to either, write the pages again with `DICEFORGE_WRITE_NODE_DOCS=1 python -m pytest tests/test_node_docs.py` (CI fails while they differ). Screenshots
+   README section (picture, link): after a change to either, write the pages again with `DICEFORGE_WRITE_NODE_DOCS=1 python -m pytest tests/test_node_docs.py` (CI fails while they differ). What a node has besides its inputs (buttons, panels, menu tools, warnings) goes in `NOTES` there. Screenshots
    are in `DiceForge/web/docs/images`, for both.
 4. Before committing: `python .github/scripts/review_checks.py origin/main` (line endings, syntax, unsafe code, routes, missing tests or
    docs), or ask the `reviewer` agent. On the author's computer `python` is the
