@@ -45,8 +45,9 @@ NOTES = {
         "**✂ Selection → new wildcard…**, **🎴 LoRA Browser** (to insert trigger words), **🏷 Tag autocomplete** (download tag lists), "
         "**🏷 Tag Browser** and **🎨 Prompt styles**.",
     "DiceForgeLoraStack": "The LoRAs are rows on the node: **⋮⋮** (drag to reorder), on/off, the LoRA (click its name to pick another one), "
-        "**ℹ** (Model info), **🏷** (trigger words), a **group**, **🎲** (random strength), the strength and **✕** (remove). "
-        "**＋ Add LoRA** opens the LoRA Browser; *Separate CLIP strength* and the groups' settings are under the rows.",
+        "the strength, the group's letter and **⋯** (or right-click the row): **ℹ Model info**, **🏷 Trigger words**, **🎴 Pick another LoRA…**, "
+        "the group (A–D), **🎲 Random strength** and **✕ Remove**. A group's rows stand under its header (how many each run uses). "
+        "**＋ Add LoRA** opens the LoRA Browser; *Separate CLIP strength* is under the rows.",
     "DiceForgeGrid": "Under the node, the cells of the grid: click one to star it (**★**); **💾 Save N kept** saves the starred ones at full size, "
         "with the workflow of their own run; **↺** on a cell opens the workflow of its run.",
     "DiceForgeXYPlot": "The node shows the plot's size and the cell the next run makes; `index` counts up after each run. Its right-click menu has "

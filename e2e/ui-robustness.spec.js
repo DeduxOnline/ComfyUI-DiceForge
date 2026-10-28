@@ -107,7 +107,8 @@ for (const vue of [true, false]) {
       await expect(page.locator(".dfls")).toHaveCount(2);
       // Removing a row in the copy's panel leaves the original alone.
       const copyPanel = page.locator(".dfls").nth(1);
-      await copyPanel.locator(".row").first().locator("button", { hasText: "✕" }).click();
+      await copyPanel.locator(".row").first().locator("button.more").click();
+      await page.locator(".df-menu button", { hasText: "Remove" }).click();
       await expect.poll(async () => JSON.parse(await widgetValue(page, stackCopy, "loras")).rows.length).toBe(1);
       expect(JSON.parse(await widgetValue(page, stack, "loras")).rows.length).toBe(2);
       await setWidget(page, encodeCopy, "positive", "copy");

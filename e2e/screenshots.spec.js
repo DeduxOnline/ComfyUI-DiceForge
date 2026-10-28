@@ -3,7 +3,7 @@
 const path = require("path");
 const fs = require("fs");
 const { test, expect, openComfy, addNodes, connect, setWidget, clickMenu, queueFromPage, nodeElement, writeFile } = require("./helpers");
-const { wildcardMode } = require("./ui-shared");
+const { wildcardMode, rowMenu } = require("./ui-shared");
 const { png } = require("./fixtures");
 
 const OUT = path.join(__dirname, "..", "DiceForge", "web", "docs", "images");
@@ -122,9 +122,9 @@ test.describe("README screenshots (Nodes 2.0)", () => {
     await page.locator(".dflb").first().screenshot({ path: path.join(OUT, "lora_browser.png") });
     for (const name of ["Ink", "Glow", "Film"]) await page.locator(".dflb .card", { hasText: name }).locator("button", { hasText: "+ Add" }).click();
     await page.keyboard.press("Escape");
-    await panel.locator(".row").nth(0).locator("button", { hasText: "🎲" }).click();
-    await panel.locator(".row").nth(1).locator("select").selectOption("A");
-    await panel.locator(".row").nth(2).locator("select").selectOption("A");
+    await rowMenu(page, panel, 0, "Random strength: on");
+    await rowMenu(page, panel, 1, "Group A");
+    await rowMenu(page, panel, 2, "Group A");
     await shot(page, [checkpoint, stack], "lora_stack.png");
     await page.evaluate(() => window.app.graph.clear());
     const [loader] = await addNodes(page, [{ type: "LoraLoader", pos: [400, 220], widgets: { lora_name: "style/ink.safetensors" } }]);

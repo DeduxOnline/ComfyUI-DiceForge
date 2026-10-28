@@ -35,4 +35,9 @@ async function wildcardMode(dialog, mode) {
   await expect(button).toHaveText(mode === "cards" ? "📄 Lines" : "🃏 Cards");
 }
 
-module.exports = { ALL_NODES, promptField, lookUp, cardTitles, submenu, clickSubmenu, wildcardMode };
+// An entry of a LoRA Stack row's ⋯ menu.
+async function rowMenu(page, panel, index, text) {
+  await panel.locator(".row").nth(index).locator("button.more").click();
+  await page.locator(".df-menu button", { hasText: text }).click();
+}
+module.exports = { ALL_NODES, promptField, lookUp, cardTitles, submenu, clickSubmenu, wildcardMode, rowMenu };

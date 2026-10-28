@@ -13,7 +13,8 @@ export function closeMenu() {
   menu?.remove();
   menu = null;
 }
-document.addEventListener("mousedown", (event) => { if (menu && !menu.contains(event.target)) closeMenu(); }, true);
+// pointerdown too: the canvas cancels mousedown, and a row menu in a node (LoRA Stack's) must close on a click on it.
+for (const type of ["mousedown", "pointerdown"]) document.addEventListener(type, (event) => { if (menu && !menu.contains(event.target)) closeMenu(); }, true);
 
 // The menu at a point (a mouse event's, or {clientX, clientY}), kept on the screen.
 export function showMenu(point, items) {
@@ -28,7 +29,10 @@ export function showMenu(point, items) {
   menu.querySelector("button")?.focus({ preventScroll: true }); // The keyboard (↑ ↓ Enter) works in it at once.
   menu.addEventListener("keydown", (event) => {
     const buttons = [...menu.querySelectorAll("button")], at = buttons.indexOf(document.activeElement);
-    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+    if (event.key === "Escape") { // Also where no window asks menuOpen() first (a menu in a node).
+      event.stopPropagation();
+      closeMenu();
+    } else if (event.key === "ArrowDown" || event.key === "ArrowUp") {
       event.preventDefault();
       buttons[(at + (event.key === "ArrowDown" ? 1 : buttons.length - 1)) % buttons.length]?.focus();
     }

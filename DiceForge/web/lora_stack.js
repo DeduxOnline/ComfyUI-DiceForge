@@ -4,11 +4,13 @@ import { MODEL_FILE, openModelInfo } from "./model_info.js";
 import { openModelBrowser, BROWSERS, compareBases } from "./model_browser.js";
 import { fitNodeHeight } from "./node_size.js";
 import { addStyleOnce, askConfirm, asking, askText, background, element, fitToContent } from "./dom.js";
+import { menuButton, withMenu } from "./menu.js";
 
 // LoRA Stack (lora_stack.py): the rows of LoRAs drawn in the node, like rgthree's Power Lora Loader. The node's "loras" text input holds them as JSON;
-// it is hidden and this panel edits it. Each row: on/off, the LoRA (click to change it in the LoRA Browser), Model info, a group, a fixed strength or
-// a random range (🎲), and the CLIP strength when it is set apart. Groups (A-D) take turns: "use 1 to 2 of these". A row made for another base model
-// than the connected model is marked, and the stack can be saved as a preset file and applied in any LoRA Stack.
+// it is hidden and this panel edits it. Each row keeps what is set most: on/off, the LoRA (click to change it in the LoRA Browser), a fixed strength or
+// a random range (🎲, its two values open under the row), the CLIP strength when it is set apart, and its group's letter; the rest is in its ⋯ menu
+// (Model info, trigger words, another LoRA, the group, random strength, remove). Groups (A-D) take turns, under a header: "use 1 of 2". A row made for
+// another base model than the connected model is marked, and the stack can be saved as a preset file and applied in any LoRA Stack.
 const NODE_TYPE = "DiceForgeLoraStack";
 const GROUPS = ["A", "B", "C", "D"];
 const LORAS = BROWSERS.find((spec) => spec.kind === "loras");
@@ -29,19 +31,25 @@ function cleanStack(stack) {
 
 const STYLE = `
 .dfls{display:flex;flex-direction:column;gap:4px;font:12px system-ui,sans-serif;color:#ddd;width:100%;box-sizing:border-box;padding:2px 0}
-.dfls .row{display:flex;overflow:hidden;align-items:center;gap:4px;background:#1f1f1f;border:1px solid #444;border-radius:14px;padding:2px 6px;min-height:24px}
-.dfls .row.off{opacity:.5}.dfls .row.missing{border-color:#a55}.dfls .row.drag{border-color:#6a9ad8}
+.dfls .row{display:flex;overflow:hidden;align-items:center;gap:6px;background:#1f1f1f;border:1px solid #444;border-radius:8px;padding:0 4px 0 2px;min-height:44px;box-sizing:border-box}
+.dfls .row.off .who,.dfls .row.off .str{opacity:.45}.dfls .row.missing{border-color:#d9534f}.dfls .row.drag{border-color:#6a9ad8}
 .dfls .grip{cursor:grab;color:#777;user-select:none;padding:0 2px}
-.dfls .name{flex:1;min-width:40px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}.dfls .name:hover{color:#fff;text-decoration:underline}
+.dfls .who{flex:1;min-width:40px;display:flex;flex-direction:column;overflow:hidden}.dfls .why{color:#ff9e9e;font-size:11px}
+.dfls .name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}.dfls .name:hover{color:#fff;text-decoration:underline}
 .dfls input[type=number]::-webkit-inner-spin-button,.dfls input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
-.dfls input[type=number]{-moz-appearance:textfield;text-align:center;width:40px;flex:none;background:#262626;color:#eee;border:1px solid #555;border-radius:4px;padding:1px 3px;font:inherit}
-.dfls button,.dfls select,.dfls input[type=checkbox],.dfls .grip{flex:none}.dfls select{background:#262626;color:#eee;border:1px solid #555;border-radius:4px;font:inherit;padding:0 1px}
+.dfls input[type=number]{-moz-appearance:textfield;text-align:center;width:44px;flex:none;background:#262626;color:#eee;border:1px solid #555;border-radius:4px;padding:3px;font:inherit}
+.dfls button,.dfls input[type=checkbox],.dfls .grip,.dfls .str,.dfls .badge{flex:none}
 .dfls button{background:#262626;color:#ddd;border:1px solid #555;border-radius:4px;padding:0 5px;font:inherit;cursor:pointer;line-height:18px}.dfls button:hover{background:#333}
-.dfls button.on{background:#3a5a8a;border-color:#6a9ad8;color:#fff}.dfls .muted{color:#999}
-.dfls .add{border-radius:6px;padding:4px;width:100%}.dfls .foot{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-.dfls .group{display:flex;gap:4px;align-items:center;padding:1px 6px;color:#bbb}.dfls .tag{font-weight:700;color:#cfe0ff}
+.dfls button.more{background:none;border:none;font-size:16px;width:28px;height:28px;padding:0;color:#bbb}.dfls button.more:hover{background:#333}
+.dfls .str{display:flex;align-items:center;gap:4px}.dfls .range{cursor:pointer;color:#f5b27a;white-space:nowrap}.dfls .range:hover{text-decoration:underline}
+.dfls .badge{padding:1px 6px;border-radius:5px;background:#3b4a6b;color:#d6e2ff;font-weight:700;font-size:11px}
+.dfls .rand{display:flex;gap:8px;align-items:center;padding:2px 8px 4px 40px;color:#aaa}.dfls .rand label{display:flex;gap:4px;align-items:center}
+.dfls .ghead{display:flex;gap:4px;align-items:center;padding:4px 4px 0;color:#bbb;flex-wrap:wrap}.dfls .ghead .mode{margin-left:auto;color:#888}
+.dfls .muted{color:#999}.dfls .add{border-radius:6px;padding:4px;width:100%}.dfls .foot{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .dfls input[type=checkbox]{margin:0;cursor:pointer}
-.dfls button.none{opacity:.45;text-decoration:line-through}
+.dfls input.switch{appearance:none;-webkit-appearance:none;width:30px;height:18px;border-radius:9px;background:#555;position:relative;transition:background .15s}
+.dfls input.switch::after{content:"";position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#bbb;transition:left .15s}
+.dfls input.switch:checked{background:#1e88e5}.dfls input.switch:checked::after{left:14px;background:#fff}
 .dflt{position:fixed;z-index:10001;background:#262626;border:1px solid #555;border-radius:8px;box-shadow:0 6px 20px #000a;font:13px system-ui,sans-serif;color:#ddd;padding:8px 10px;width:280px;max-height:60vh;overflow:auto;display:flex;flex-direction:column;gap:6px}
 .dflt b{color:#fff}.dflt label{display:flex;gap:6px;align-items:center;cursor:pointer}.dflt .src{color:#888;font-size:11px;margin-left:auto}
 .dflt input[type=text]{background:#1e1e1e;color:#eee;border:1px solid #555;border-radius:4px;padding:3px 6px;font:inherit;flex:1;min-width:0}
@@ -59,6 +67,10 @@ const STYLE = `
 const addStyle = () => addStyleOnce("dfls-style", STYLE);
 const shortName = (file) => file.split(/[\\/]/).pop().replace(/\.[^.]+$/, "");
 const round = (value) => Math.round(value * 100) / 100;
+// A random strength as its row shows it.
+export function rangeText(row) {
+  return `🎲 ${round(row.min ?? row.strength ?? 1).toFixed(2)}–${round(row.max ?? row.strength ?? 1).toFixed(2)}`;
+}
 
 let loraFiles = null; // The files of the loras folders, to mark rows whose file is missing.
 async function loraList() {
@@ -272,49 +284,86 @@ function setUp(node) {
   const connectedBase = () => { const source = modelSource(node); return source ? baseOf(source.kind, source.file) : null; };
   const browse = (target) => openModelBrowser(node, LORAS, { ...target, base: connectedBase() }); // The browser starts on the LoRAs that fit the model.
   let dragged = null;
+  let shownMode; // The seed mode the group headers show.
 
+  const opened = new Set(); // Rows whose random range is open under them (by LoRA name: rows move).
   async function render() {
     const stack = read();
     const files = await loraList();
-    const rows = stack.rows.map((row, index) => {
+    const seedMode = node.widgets?.find((item) => item.name === "seed_mode")?.value ?? "";
+    shownMode = seedMode;
+    const headed = new Set();
+    const groupHead = (name) => {
+      const members = stack.rows.filter((row) => row.group === name && row.on !== false).length;
+      const settings = stack.groups[name] ?? { min: 1, max: 1 };
+      const count = (key, title) => {
+        const input = element("input", { type: "number", min: "0", max: String(members), step: "1", title });
+        input.value = settings[key] ?? 1;
+        input.addEventListener("change", () => update((next) => {
+          const value = Math.max(0, Math.round(Number(input.value) || 0));
+          next.groups[name] = { min: 1, max: 1, ...next.groups[name], [key]: value };
+          if (key === "min" && next.groups[name].max < value) next.groups[name].max = value;
+          if (key === "max" && next.groups[name].min > value) next.groups[name].min = value;
+        }));
+        return input;
+      };
+      return element("div", { class: "ghead", "data-group": name, title: "Every set of LoRAs of the group is one option of the seed mode: with deck or shuffle all of them come before any repeats" },
+        element("span", { class: "badge" }, name), `Group ${name} · use`, count("min", "At least"), "to", count("max", "At most"), `of ${members}${members > 1 ? ", taking turns" : ""}`,
+        element("span", { class: "mode", title: "The seed mode (seed_mode, under the advanced inputs) picks the sets" }, seedMode));
+    };
+    const parts = stack.rows.flatMap((row, index) => {
       const set = (change) => update((next) => change(next.rows[index]));
       const missing = files.size && !files.has(row.lora);
+      const pick = () => browse({
+        label: "Choose", hint: `Choose puts a LoRA in this row (instead of ${shortName(row.lora)}).`,
+        pick: (file) => { set((r) => { r.lora = file; }); return true; },
+      });
+      const toggleRandom = () => set((r) => {
+        r.random = !r.random;
+        if (r.random && r.min == null) { r.min = round((r.strength ?? 1) * 0.6); r.max = r.strength ?? 1; }
+        if (r.random) opened.add(r.lora);
+      });
       const strength = row.random
-        ? [numberInput(row.min ?? row.strength ?? 1, "Lowest strength", (value) => set((r) => { r.min = value; })), element("span", { class: "muted" }, "–"),
-           numberInput(row.max ?? row.strength ?? 1, "Highest strength", (value) => set((r) => { r.max = value; }))]
-        : [numberInput(row.strength ?? 1, stack.separate_clip ? "Model strength" : "Strength (model and CLIP)", (value) => set((r) => { r.strength = value; }))];
+        ? element("span", { class: "range", title: "Random strength, picked between two values by the seed mode: click to set them", onclick: () => {
+          if (!opened.delete(row.lora)) opened.add(row.lora);
+          background(render());
+        } }, rangeText(row))
+        : numberInput(row.strength ?? 1, stack.separate_clip ? "Model strength" : "Strength (model and CLIP)", (value) => set((r) => { r.strength = value; }));
       const clip = stack.separate_clip ? [element("span", { class: "muted", title: "CLIP strength" }, "C"), numberInput(row.clip ?? 1, "CLIP strength", (value) => set((r) => { r.clip = value; }))] : [];
-      const toggle = element("input", { type: "checkbox", title: "On / off" });
+      const toggle = element("input", { type: "checkbox", class: "switch", role: "switch", title: "On / off" });
       toggle.checked = row.on !== false;
       toggle.addEventListener("change", () => set((r) => { r.on = toggle.checked; }));
-      const group = element("select", { title: "Group: the LoRAs of a group take turns (set how many to use below)" },
-        element("option", { value: "" }, "–"), ...GROUPS.map((name) => element("option", { value: name }, name)));
-      group.value = row.group || "";
-      group.addEventListener("change", () => update((next) => {
-        next.rows[index].group = group.value;
-        if (group.value && !next.groups[group.value]) next.groups[group.value] = { min: 1, max: 1 };
-      }));
-      const line = element("div", { class: "row" + (row.on === false ? " off" : "") + (missing ? " missing" : ""), title: missing ? `${row.lora} is not in the loras folders` : "", "data-lora": row.lora },
+      const triggers = row.triggers === "none" ? "none" : row.triggers === "custom" ? `${(row.trigger_words ?? []).length} picked` : "the LoRA's own";
+      const setGroup = (name) => update((next) => {
+        const [moved] = next.rows.splice(index, 1);
+        moved.group = name;
+        const last = next.rows.findLastIndex((item) => item.group === name);
+        next.rows.splice(name && last >= 0 ? last + 1 : Math.min(index, next.rows.length), 0, moved); // Next to the rest of its group.
+        if (name && !next.groups[name]) next.groups[name] = { min: 1, max: 1 };
+      });
+      const items = () => [
+        ["ℹ Model info", () => openModelInfo("loras", row.lora)],
+        [`🏷 Trigger words: ${triggers}…`, () => openTriggers(more, row, (mode, words) => set((r) => { r.triggers = mode; r.trigger_words = words; })),
+          "Which of the LoRA's trigger words go to the triggers output"],
+        ["🎴 Pick another LoRA…", pick],
+        "-",
+        ...["", ...GROUPS].map((name) => [((row.group || "") === name ? "✓ " : "") + (name ? "Group " + name : "No group"), () => setGroup(name),
+          "The LoRAs of a group take turns (how many each run uses: in the group's header)"]),
+        [row.random ? "🎲 Random strength: off" : "🎲 Random strength: on", toggleRandom],
+        "-",
+        ["✕ Remove", () => update((next) => { next.rows.splice(index, 1); })],
+      ];
+      const more = menuButton(items, "Row menu (or right-click the row)");
+      const line = withMenu(element("div", { class: "row" + (row.on === false ? " off" : "") + (missing ? " missing" : ""), title: missing ? `${row.lora} is not in the loras folders` : "", "data-lora": row.lora },
         element("span", { class: "grip", title: "Drag to reorder" }, "⋮⋮"),
         toggle,
-        element("span", { class: "name", title: `${row.lora}\nClick to pick another LoRA`, onclick: () => browse({
-          label: "Choose", hint: `Choose puts a LoRA in this row (instead of ${shortName(row.lora)}).`,
-          pick: (file) => { set((r) => { r.lora = file; }); return true; },
-        }) }, shortName(row.lora)),
+        element("span", { class: "who" },
+          element("span", { class: "name", title: `${row.lora}\nClick to pick another LoRA`, onclick: pick }, shortName(row.lora)),
+          ...(missing ? [element("span", { class: "why" }, "Not in the loras folders")] : [])),
         element("span", { class: "mark" }),
-        element("button", { title: "Model info", onclick: () => openModelInfo("loras", row.lora) }, "ℹ"),
-        element("button", {
-          class: row.triggers === "none" ? "none" : row.triggers === "custom" ? "on" : "",
-          title: row.triggers === "none" ? "Trigger words: none" : row.triggers === "custom" ? `Trigger words: ${(row.trigger_words ?? []).join(", ") || "none picked"}` : "Trigger words: the LoRA's own (click to pick)",
-          onclick: (event) => openTriggers(event.currentTarget, row, (mode, words) => set((r) => { r.triggers = mode; r.trigger_words = words; })),
-        }, row.triggers === "custom" ? `🏷${(row.trigger_words ?? []).length}` : "🏷"),
-        group,
-        element("button", { class: row.random ? "on" : "", title: "Random strength: picked between two values by the seed mode", onclick: () => set((r) => {
-          r.random = !r.random;
-          if (r.random && r.min == null) { r.min = round((r.strength ?? 1) * 0.6); r.max = r.strength ?? 1; }
-        }) }, "🎲"),
-        ...strength, ...clip,
-        element("button", { title: "Remove", onclick: () => update((next) => { next.rows.splice(index, 1); }) }, "✕"));
+        element("span", { class: "str" }, strength, ...clip),
+        ...(row.group ? [element("span", { class: "badge", title: `Group ${row.group}` }, row.group)] : []),
+        more), items);
       // Drag and drop by the grip to reorder.
       const grip = line.querySelector(".grip");
       grip.draggable = true;
@@ -329,32 +378,20 @@ function setUp(node) {
         if (from == null || from === index) return render();
         update((next) => { const [moved] = next.rows.splice(from, 1); next.rows.splice(index, 0, moved); });
       });
-      return line;
-    });
-    const groups = GROUPS.filter((name) => stack.rows.some((row) => row.group === name)).map((name) => {
-      const members = stack.rows.filter((row) => row.group === name && row.on !== false).length;
-      const settings = stack.groups[name] ?? { min: 1, max: 1 };
-      const count = (key, title) => {
-        const input = element("input", { type: "number", min: "0", max: String(members), step: "1", title });
-        input.value = settings[key] ?? 1;
-        input.addEventListener("change", () => update((next) => {
-          const value = Math.max(0, Math.round(Number(input.value) || 0));
-          next.groups[name] = { min: 1, max: 1, ...next.groups[name], [key]: value };
-          if (key === "min" && next.groups[name].max < value) next.groups[name].max = value;
-          if (key === "max" && next.groups[name].min > value) next.groups[name].min = value;
-        }));
-        return input;
-      };
-      return element("div", { class: "group", title: "Every set of LoRAs of the group is one option of the seed mode: with deck or shuffle all of them come before any repeats" },
-        element("span", { class: "tag" }, `Group ${name}:`), "use", count("min", "At least"), "to", count("max", "At most"), `of ${members}`);
+      const head = row.group && !headed.has(row.group) ? [groupHead(row.group)] : [];
+      if (row.group) headed.add(row.group);
+      const range = row.random && opened.has(row.lora) ? [element("div", { class: "rand" },
+        element("label", {}, "min", numberInput(row.min ?? row.strength ?? 1, "Lowest strength", (value) => set((r) => { r.min = value; }))),
+        element("label", {}, "max", numberInput(row.max ?? row.strength ?? 1, "Highest strength", (value) => set((r) => { r.max = value; }))),
+        element("span", {}, "steps of 0.05"))] : [];
+      return [...head, line, ...range];
     });
     const separate = element("input", { type: "checkbox" });
     separate.checked = !!stack.separate_clip;
     separate.addEventListener("change", () => update((next) => { next.separate_clip = separate.checked; }));
     panel.replaceChildren(
-      ...rows,
-      ...(rows.length ? [] : [element("div", { class: "muted" }, "No LoRAs yet.")]),
-      ...groups,
+      ...parts,
+      ...(parts.length ? [] : [element("div", { class: "muted" }, "No LoRAs yet.")]),
       element("button", { class: "add", onclick: () => browse({
         label: "+ Add", multi: true, hint: "+ Add adds a LoRA to the stack; add as many as you like (or pick several with Ctrl+click and add them all), then close.",
         pick: (file) => { update((next) => { next.rows.push({ on: true, lora: file, strength: 1, clip: 1, random: false, group: "" }); }); return `${shortName(file)} added to the stack.`; },
@@ -401,14 +438,17 @@ function setUp(node) {
       mark.title = result?.text ?? "";
     }
   }
-  const timer = setInterval(checkBases, 3000);
+  const timer = setInterval(() => { // The seed mode in the group headers, when it changes.
+    if (node.widgets?.find((item) => item.name === "seed_mode")?.value !== shownMode && read().rows.some((row) => row.group)) background(render());
+    else background(checkBases());
+  }, 3000);
   const onRemoved = node.onRemoved;
   node.onRemoved = function (...args) {
     clearInterval(timer);
     return onRemoved?.apply(this, args);
   };
   node.diceforgeStack = { render, checkBases };
-  if (node.size[0] < 460) node.setSize([460, node.size[1]]); // Room for a row: name, info, group, 🎲, strengths. A loaded workflow's size wins (onConfigure).
+  if (node.size[0] < 400) node.setSize([400, node.size[1]]); // Room for a row: name, strengths, group, ⋯. A loaded workflow's size wins (onConfigure).
   const onConfigure = node.onConfigure;
   node.onConfigure = function (...args) {
     const result = onConfigure?.apply(this, args);

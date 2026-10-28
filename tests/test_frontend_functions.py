@@ -143,6 +143,13 @@ def test_danbooru_tag_enhancers_row_sums_up_the_last_run():
 
 
 @needs_node
+def test_lora_stacks_random_strength_reads_as_a_range():
+    cases = [[{"min": 0.6, "max": 1}], [{"strength": 0.75}], [{}], [{"min": 0.333, "max": 0.9}]]
+    source = js_source("lora_stack.js", "round", "rangeText")
+    assert run(source, "rangeText", cases) == ["🎲 0.60–1.00", "🎲 0.75–0.75", "🎲 1.00–1.00", "🎲 0.33–0.90"]
+
+
+@needs_node
 def test_xy_plots_row_names_the_cell_the_next_run_makes():
     plan = {"x_type": "steps", "y_type": "cfg", "count": 6, "x": ["20 steps", "25 steps", "30 steps"], "y": ["CFG 5", "CFG 7"]}
     row = {"x_type": "cfg", "y_type": "none", "count": 3, "x": ["CFG 4", "CFG 5", "CFG 6"], "y": [""]}

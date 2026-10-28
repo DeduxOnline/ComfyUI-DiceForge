@@ -60,6 +60,9 @@ nodes and features, a patch for fixes. Each version is a [release on GitHub](htt
   doesn't change Anima.
 
 ### Changed
+- LoRA Stack: each row is a switch, the LoRA, its strength (a random one reads *🎲 0.60–1.00*), its group's letter and **⋯**, a menu with
+  Model info, trigger words, another LoRA, the group, random strength and Remove (also on a right-click). A group's rows stand together
+  under a header with how many of them each run uses and the seed mode; a row whose file is missing says so.
 - CI: the end-to-end tests start only when every JavaScript file parses, checked in a few seconds before them.
 - XY Plot is run with ComfyUI's own Run: `index` counts up after each run (*control after generate*: increment) and goes round past the
   last cell, and **▶ Set Run to N cells, from index 0** in the node's menu sets it and the batch count. The node keeps one row, the plot's

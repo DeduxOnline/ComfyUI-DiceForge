@@ -2,7 +2,7 @@ Applies several LoRAs, each with its own on/off and strength, like rgthree's Pow
 
 ![LoRA Stack after Load Checkpoint: a random strength, a group of two LoRAs taking turns, and base model warnings](images/lora_stack.png)
 
-The LoRAs are rows on the node: **⋮⋮** (drag to reorder), on/off, the LoRA (click its name to pick another one), **ℹ** (Model info), **🏷** (trigger words), a **group**, **🎲** (random strength), the strength and **✕** (remove). **＋ Add LoRA** opens the LoRA Browser; *Separate CLIP strength* and the groups' settings are under the rows.
+The LoRAs are rows on the node: **⋮⋮** (drag to reorder), on/off, the LoRA (click its name to pick another one), the strength, the group's letter and **⋯** (or right-click the row): **ℹ Model info**, **🏷 Trigger words**, **🎴 Pick another LoRA…**, the group (A–D), **🎲 Random strength** and **✕ Remove**. A group's rows stand under its header (how many each run uses). **＋ Add LoRA** opens the LoRA Browser; *Separate CLIP strength* is under the rows.
 
 ## Inputs
 

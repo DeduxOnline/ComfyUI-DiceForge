@@ -4,7 +4,7 @@
 const fs = require("fs");
 const { test, expect, basePath, writeFile, openComfy, addNodes, connect, widgetValue, menuItems, clickMenu, answerQuestions } = require("./helpers");
 const { DOWNLOADS } = require("./fixtures");
-const { lookUp, cardTitles } = require("./ui-shared");
+const { lookUp, cardTitles, rowMenu } = require("./ui-shared");
 
 for (const vue of [true, false]) {
   test.describe(vue ? "Nodes 2.0" : "classic nodes", () => {
@@ -562,18 +562,28 @@ for (const vue of [true, false]) {
       await expect(panel.locator(".row").nth(0)).not.toHaveClass(/warn|bad/);
       await expect(panel.locator(".row").nth(1)).toHaveClass(/warn/);
       await expect(panel.locator(".row").nth(2)).toHaveClass(/bad/);
-      // Random strength, a group, trigger words.
-      await panel.locator(".row").nth(0).locator("button", { hasText: "🎲" }).click();
-      await panel.locator(".row").nth(1).locator("select").selectOption("A");
-      await panel.locator(".row").nth(2).locator("select").selectOption("A");
-      await expect(panel.locator(".group")).toContainText("Group A:");
-      await panel.locator(".row").nth(0).locator("button", { hasText: "🏷" }).click();
+      // Random strength, a group, trigger words: from the rows' ⋯ menus.
+      await rowMenu(page, panel, 0, "Random strength: on");
+      await expect(panel.locator(".row").nth(0).locator(".range")).toHaveText("🎲 0.60–1.00");
+      await expect(panel.locator(".rand input")).toHaveCount(2); // Its two values open under the row.
+      await rowMenu(page, panel, 1, "Group A");
+      await rowMenu(page, panel, 2, "Group A");
+      await expect(panel.locator(".ghead")).toContainText("Group A · use");
+      await expect(panel.locator(".ghead")).toContainText("of 2, taking turns");
+      await expect(panel.locator(".row .badge")).toHaveText(["A", "A"]);
+      await rowMenu(page, panel, 0, "Trigger words");
       await page.locator(".dflt label", { hasText: "lineart" }).locator("input").uncheck();
       await page.keyboard.press("Escape");
-      await expect(panel.locator(".row").nth(0).locator("button", { hasText: "🏷" })).toHaveText("🏷1");
+      await panel.locator(".row").nth(0).locator("button.more").click();
+      await expect(page.locator(".df-menu button", { hasText: "Trigger words" })).toHaveText("🏷 Trigger words: 1 picked…");
+      await page.keyboard.press("Escape"); // Closes the menu.
+      await expect(page.locator(".df-menu")).toHaveCount(0);
       const rows = JSON.parse(await widgetValue(page, stack, "loras")).rows;
       expect(rows.map((row) => [row.lora.replace(/\\/g, "/"), !!row.random, row.group ?? ""])).toEqual([["style/ink.safetensors", true, ""], ["style/pony_glow.safetensors", false, "A"], ["style/flux_film.safetensors", false, "A"]]);
       expect(rows[0]).toMatchObject({ triggers: "custom", trigger_words: ["ink style"] });
+      await panel.locator(".row").nth(2).locator("input.switch").uncheck(); // An off row steps back.
+      await expect(panel.locator(".row").nth(2)).toHaveClass(/off/);
+      await expect(panel.locator(".ghead")).toContainText("of 1"); // Off rows don't take part in their group.
       // Presets: save from this stack, apply in the other one.
       await answerQuestions(page, () => `e2e preset ${vue ? "vue" : "classic"}`, 1);
       await panel.locator("button", { hasText: "Save preset" }).click();
@@ -586,6 +596,13 @@ for (const vue of [true, false]) {
       const workflow = await page.evaluate(() => window.app.graph.serialize());
       await page.evaluate(async (workflow) => { window.app.graph.clear(); await window.app.loadGraphData(workflow); }, workflow);
       await expect(page.locator(".dfls").first().locator(".row .name")).toHaveText(["ink", "pony_glow", "flux_film"]);
+      // A row whose file is gone says so.
+      await page.evaluate((id) => {
+        const node = window.app.graph.getNodeById(id), data = node.widgets.find((widget) => widget.name === "loras");
+        data.value = JSON.stringify({ ...JSON.parse(data.value), rows: [{ on: true, lora: "gone/old_character.safetensors", strength: 1 }] });
+        return node.diceforgeStack.render();
+      }, other);
+      await expect(page.locator(".dfls").nth(1).locator(".row.missing .why")).toHaveText("Not in the loras folders");
     });
   });
 }
