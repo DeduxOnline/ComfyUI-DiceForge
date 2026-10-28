@@ -33,8 +33,8 @@ def plain(text):
     return re.sub(r"([_*\\])", r"\\\1", text).replace("<", "&lt;")
 
 
-def cell(text):
-    return text.replace("\n", " ").replace("|", "\\|")
+def one_line(text):
+    return text.replace("\n", " ")
 
 
 # Inputs a node's own frontend hides and replaces: LoRA Stack's rows are kept in loras (web/lora_stack.js), and NOTES says what is shown instead.
@@ -77,34 +77,37 @@ def default_of(item):
     value = str(value)
     if isinstance(item, io.Combo.Input) and (re.search(r"\.\w+$", value) or value == "None"): # A model list's: a file, or None without one.
         return ""
-    return "`" + cell(value if len(value) <= 24 else value[:23] + "…").replace("`", "'") + "`"
+    return "`" + one_line(value if len(value) <= 24 else value[:23] + "…").replace("`", "'") + "`"
 
 
-# The rows of an input table: each input (sockets marked optional; a widget always has a value), and after a DynamicCombo the inputs its
-# options add, once each, with the options that have them.
-def input_rows(schema, items):
+# Inputs and outputs are lists, not tables: the help panel is about 200 pixels wide and cuts a table off, and a list item wraps. Each input
+# (sockets marked optional; a widget always has a value) with its type, default and tooltip, and under a DynamicCombo the inputs its options
+# add, once each, with the options that have them.
+def item_line(name, item, *details):
+    return f"- `{name}` ({', '.join([type_of(item), *(detail for detail in details if detail)])}): {one_line(plain(item.tooltip))}"
+
+
+def input_list(schema, items):
+    lines = []
     for item in items:
         if (schema.node_id, item.id) in HIDDEN:
             continue
         socket = not isinstance(item, io.WidgetInput) or item.force_input
-        yield f"`{item.id}`" + (" (optional)" if item.optional and socket else ""), item
+        default = default_of(item)
+        lines.append(item_line(item.id, item, "optional" if item.optional and socket else None, default and "default " + default))
         if isinstance(item, io.DynamicCombo.Input):
             added = {}
             for option in item.options:
                 for nested in option.inputs:
                     added.setdefault(nested.id, (nested, []))[1].append(option.key)
             for nested, keys in added.values():
-                yield f"`{nested.id}` (`{item.id}`: {', '.join(keys)})", nested
+                default = default_of(nested)
+                lines.append("  " + item_line(nested.id, nested, default and "default " + default, "for " + ", ".join(keys)))
+    return "\n".join(lines)
 
 
-def input_table(schema, items):
-    rows = [f"| {name} | {type_of(item)} | {default_of(item)} | {cell(plain(item.tooltip))} |" for name, item in input_rows(schema, items)]
-    return "\n".join(["| Input | Type | Default | Description |", "|---|---|---|---|"] + rows)
-
-
-def output_table(items):
-    rows = [f"| `{item.display_name or item.id}` | {type_of(item)} | {cell(plain(item.tooltip))} |" for item in items]
-    return "\n".join(["| Output | Type | Description |", "|---|---|---|"] + rows)
+def output_list(items):
+    return "\n".join(item_line(item.display_name or item.id, item) for item in items)
 
 
 # The node's picture: the first of its README section, else one that names it (Random Sampler and Dice Grid share another node's picture).
@@ -119,10 +122,10 @@ def schema_page(schema):
     advanced = [item for item in schema.inputs if item.advanced]
     parts = [plain(schema.description), f"![{picture.group(2)}]({picture.group(1)})" if picture else None,
              NOTES.get(schema.node_id),
-             "## Inputs\n\n" + input_table(schema, shown) if shown else None,
+             "## Inputs\n\n" + input_list(schema, shown) if shown else None,
              "## Advanced inputs\n\nUnder **Show advanced inputs** on the node (Nodes 2.0), or **Show Advanced** in its right-click menu (classic "
-             "design).\n\n" + input_table(schema, advanced) if advanced else None,
-             "## Outputs\n\n" + output_table(schema.outputs),
+             "design).\n\n" + input_list(schema, advanced) if advanced else None,
+             "## Outputs\n\n" + output_list(schema.outputs),
              f"More in the [DiceForge guide]({REPOSITORY}#{slug}): examples, tips, and how it works with the other nodes."]
     return "\n\n".join(part for part in parts if part) + "\n"
 

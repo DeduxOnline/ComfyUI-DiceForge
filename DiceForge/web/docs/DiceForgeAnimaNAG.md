@@ -4,24 +4,18 @@ At CFG 1 ComfyUI skips the negative prompt, so the node turns it back on: 10 Tur
 
 ## Inputs
 
-| Input | Type | Default | Description |
-|---|---|---|---|
-| `model` | MODEL |  | An Anima model (after LoRAs). Connect the output to KSampler's model. |
-| `nag_scale` | FLOAT | `5` | How far from the negative prompt: 1 is off, about 3-7 a clear push, higher ones can burn the picture. |
-| `nag_alpha` | FLOAT | `0.5` | How much of the guided attention goes in: 0 is off, 1 all of it. |
+- `model` (MODEL): An Anima model (after LoRAs). Connect the output to KSampler's model.
+- `nag_scale` (FLOAT, default `5`): How far from the negative prompt: 1 is off, about 3-7 a clear push, higher ones can burn the picture.
+- `nag_alpha` (FLOAT, default `0.5`): How much of the guided attention goes in: 0 is off, 1 all of it.
 
 ## Advanced inputs
 
 Under **Show advanced inputs** on the node (Nodes 2.0), or **Show Advanced** in its right-click menu (classic design).
 
-| Input | Type | Default | Description |
-|---|---|---|---|
-| `nag_tau` | FLOAT | `1.5` | The most the guidance may grow the attention's size (L1 norm), as a multiple of the positive's: keeps a high scale from burning the picture. |
+- `nag_tau` (FLOAT, default `1.5`): The most the guidance may grow the attention's size (L1 norm), as a multiple of the positive's: keeps a high scale from burning the picture.
 
 ## Outputs
 
-| Output | Type | Description |
-|---|---|---|
-| `model` | MODEL | The model with NAG: connect it to KSampler. The negative prompt is KSampler's negative. |
+- `model` (MODEL): The model with NAG: connect it to KSampler. The negative prompt is KSampler's negative.
 
 More in the [DiceForge guide](https://github.com/DeduxOnline/ComfyUI-DiceForge#anima-nag): examples, tips, and how it works with the other nodes.

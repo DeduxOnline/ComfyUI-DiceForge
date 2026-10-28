@@ -11,6 +11,7 @@ nodes and features, a patch for fixes. Each version is a [release on GitHub](htt
 - Node help: every DiceForge node's page in ComfyUI's node help panel (Node Info), short for the side panel and each node's own: its
   description and picture, what it has besides its inputs (buttons, panels, menu tools, warnings), its inputs with their defaults and
   tooltips (advanced ones apart, with the inputs a resolution or rescale choice adds), its outputs, and a link to its README section.
+  Inputs and outputs are lists, which wrap in the narrow panel (a table there was cut off).
   Load VAE + Decode + Save and VAE Decode + Save got a description.
 - CI: a QA tools workflow, run by hand, for a machine without Node.js: the frontend internals, the pictures and size checks of every
   node in both designs, and the times with a lot of data, on any ComfyUI commit (master by default), kept as the `qa-out` artifact.
