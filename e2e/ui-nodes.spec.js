@@ -133,6 +133,17 @@ for (const vue of [true, false]) {
       await expect(plan.locator("td.next")).toHaveText("0");
       await page.keyboard.press("Escape");
       await expect(plan).toHaveCount(0);
+      try { // Widget control mode before: which cell comes next can't be told, so neither the row nor the plan names one.
+        await page.evaluate(() => window.app.extensionManager.setting.set("Comfy.WidgetControlMode", "before"));
+        await expect(row).toHaveText("2 × 2 = 4 cells · set Widget control mode to after to see the next cell");
+        await clickMenu(page, xy, extension, "plot plan");
+        await expect(plan.locator("th")).toHaveCount(5);
+        await expect(plan.locator("td.next")).toHaveCount(0);
+        await page.keyboard.press("Escape");
+      } finally {
+        await page.evaluate(() => window.app.extensionManager.setting.set("Comfy.WidgetControlMode", "after"));
+      }
+      await expect(row).toHaveText("2 × 2 = 4 cells · next: 10 steps, normal");
     });
 
     test("KSampler presets: the right-click submenu, Auto from the checkpoint's base model, saving and deleting your own", async ({ page, request }) => {

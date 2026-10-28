@@ -603,6 +603,23 @@ for (const vue of [true, false]) {
         return node.diceforgeStack.render();
       }, other);
       await expect(page.locator(".dfls").nth(1).locator(".row.missing .why")).toHaveText("Not in the loras folders");
+      // A group's rows stay together under its header, however they came apart (here a workflow edited by hand), and ✓ on a row's own
+      // group moves nothing.
+      await page.evaluate((id) => {
+        const node = window.app.graph.getNodeById(id), data = node.widgets.find((widget) => widget.name === "loras");
+        data.value = JSON.stringify({ ...JSON.parse(data.value), rows: ["a1", "x", "a2"].map((name) => ({ on: true, lora: `gone/${name}.safetensors`, strength: 1, group: name === "x" ? "" : "A" })) });
+        return node.diceforgeStack.render();
+      }, other);
+      const otherPanel = page.locator(".dfls").nth(1);
+      await expect(otherPanel.locator(".row .name")).toHaveText(["a1", "a2", "x"]);
+      await rowMenu(page, otherPanel, 0, "✓ Group A");
+      await expect(otherPanel.locator(".row .name")).toHaveText(["a1", "a2", "x"]);
+      await rowMenu(page, otherPanel, 2, "Group A"); // x joins the group, after its rows.
+      await expect(otherPanel.locator(".ghead")).toContainText("of 3");
+      await rowMenu(page, otherPanel, 0, "Group B"); // a1 leaves it: the group's rows close up behind it.
+      await expect(otherPanel.locator(".row .name")).toHaveText(["a1", "a2", "x"]);
+      await expect(otherPanel.locator(".row .badge")).toHaveText(["B", "A", "A"]);
+      await expect(otherPanel.locator(".ghead")).toHaveCount(2);
     });
   });
 }

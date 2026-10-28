@@ -1150,6 +1150,19 @@ for (const vue of [true, false]) {
       await expect(posts.locator(".added")).toHaveText("+ solo, grin, canine");
       await expect(posts.locator("a.thumb img")).not.toHaveClass(/blur/); // e621's safe isn't blurred.
       await expect(posts.locator("button.keep")).toHaveText("Keep these posts (fixed)");
+      // Post numbers are a site's own: Keep puts the run's site back, and the run is kept only while site and wildcard seed are the run's.
+      await page.keyboard.press("Escape");
+      await setWidget(page, id, "source", "danbooru");
+      await page.locator(".dfdb .last-run").first().click();
+      await posts.locator("button.keep").click();
+      await expect(posts.locator("button.keep")).toHaveText("Kept (fixed)");
+      expect(await widgetValue(page, id, "source")).toBe("e621");
+      expect(await widgetValue(page, id, "mode")).toBe("fixed");
+      await page.keyboard.press("Escape");
+      await setWidget(page, id, "wildcard_seed", (await widgetValue(page, id, "wildcard_seed")) + 1);
+      await page.locator(".dfdb .last-run").first().click();
+      await expect(posts.locator("button.keep")).toHaveText("Keep these posts (fixed)");
+      await expect(posts.locator("button.keep")).toBeEnabled();
     });
 
     test("Danbooru Tag Enhancer: the posts a shared workflow carries link only to web addresses, never to a script", async ({ page }) => {

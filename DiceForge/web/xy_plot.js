@@ -41,13 +41,16 @@ export function nextCell(plan, index) {
   const cell = (Number(index) || 0) % plan.count;
   return { cell, x: plan.x[cell % plan.x.length], y: plan.y_type === "none" ? "" : plan.y[Math.floor(cell / plan.x.length)] };
 }
-// The node's row: the plot's size and what the next run makes.
-export function summaryText(plan, index) {
+// The node's row: the plot's size and what the next run makes. With Widget control mode on before, index counts up before a run except the
+// widget's first one, so which cell comes next can't be told.
+export function summaryText(plan, index, before = false) {
   if (plan.x_type === "none") return "Pick what changes on X (and Y) to make a plot.";
-  const { x, y } = nextCell(plan, index);
   const size = plan.y_type === "none" ? plan.count + (plan.count === 1 ? " cell" : " cells") : `${plan.x.length} × ${plan.y.length} = ${plan.count} cells`;
+  if (before) return `${size} · set Widget control mode to after to see the next cell`;
+  const { x, y } = nextCell(plan, index);
   return `${size} · next: ${y ? x + ", " + y : x}`;
 }
+const countsBefore = () => app.extensionManager?.setting?.get("Comfy.WidgetControlMode") === "before";
 
 // Index on the first cell and ComfyUI's batch count on the number of cells: Run then makes the whole plot, and Dice Grid gets it from its first
 // cell (new_grid), as it needs to. With Widget control mode on before, the frontend counts up before a run, except a widget's very first one,
@@ -55,7 +58,7 @@ export function summaryText(plan, index) {
 function setRun(node, plan) {
   const settings = app.extensionManager?.queueSettings;
   if (!settings) return toast("error", "XY Plot", "This ComfyUI has no batch count to set: queue the cells with Run, one by one.");
-  if (app.extensionManager.setting.get("Comfy.WidgetControlMode") === "before") {
+  if (countsBefore()) {
     return toast("warn", "XY Plot", "Set Widget control mode to after (Settings → Comfy → Node Widget): with before, a plot can't start at its first cell.");
   }
   setValue(node, "index", 0);
@@ -82,8 +85,8 @@ function openPlan(node) {
   document.addEventListener("keydown", onKey, true);
   function draw() {
     const { plan, error } = plans.get(node) ?? {};
-    const index = widgetOf(node, "index")?.value;
-    const key = JSON.stringify([plan, error, index]);
+    const index = widgetOf(node, "index")?.value, before = countsBefore();
+    const key = JSON.stringify([plan, error, index, before]);
     if (key === shownKey) return;
     shownKey = key;
     if (!plan) {
@@ -91,9 +94,9 @@ function openPlan(node) {
       body.replaceChildren(element("div", { class: "error" }, error || "The plot is being read…"));
       return;
     }
-    const next = nextCell(plan, index).cell;
+    const next = before ? -1 : nextCell(plan, index).cell;
     const rows = plan.y_type === "none" ? [""] : plan.y;
-    info.textContent = `${summaryText(plan, index)} (cell ${next})`;
+    info.textContent = summaryText(plan, index, before) + (before ? "" : ` (cell ${next})`);
     body.replaceChildren(element("table", {},
       element("tr", {}, element("th", {}, plan.y_type === "none" ? plan.x_type : `${plan.y_type} \\ ${plan.x_type}`), ...plan.x.map((label) => element("th", {}, label))),
       ...rows.map((label, row) => element("tr", {}, element("th", {}, label),
@@ -112,13 +115,13 @@ app.registerExtension({
     fitToContent(node.addDOMWidget("xy_preview", "diceforge_xy_preview", panel, { serialize: false }), panel);
     let fieldsKey = null, planKey = null, shownKey = null, plan = null, error = ""; // planKey: the fields plan and error are for.
     function render() {
-      const index = widgetOf(node, "index")?.value;
-      const key = JSON.stringify([planKey, error, index]);
+      const index = widgetOf(node, "index")?.value, before = countsBefore();
+      const key = JSON.stringify([planKey, error, index, before]);
       if (key === shownKey) return;
       shownKey = key;
       plans.set(node, { plan, error });
       if (error) panel.replaceChildren(element("div", { class: "error" }, error));
-      else if (plan) panel.replaceChildren(element("div", { class: "summary", title: "The plot, and the cell the next run makes" }, summaryText(plan, index)));
+      else if (plan) panel.replaceChildren(element("div", { class: "summary", title: "The plot, and the cell the next run makes" }, summaryText(plan, index, before)));
       else panel.replaceChildren();
       fitNodeHeight(node);
     }

@@ -73,14 +73,18 @@ function setWidget(node, name, value) {
   widget.callback?.(value);
 }
 const widgetValue = (node, name) => node.widgets?.find((item) => item.name === name)?.value;
-// The run's posts and wildcards again on every run: post_ids and wildcard_seed of that run, with mode on fixed.
+// The run's posts and wildcards again on every run: post_ids, wildcard_seed and the site of that run, with mode on fixed (post numbers are a
+// site's own: the same number on another site is another post).
 function keepPosts(node, last) {
   setWidget(node, "post_ids", last.post_ids);
   if (Number.isInteger(last.wildcard_seed)) setWidget(node, "wildcard_seed", last.wildcard_seed);
+  if (last.site) setWidget(node, "source", last.site);
   setWidget(node, "mode", "fixed");
   node.setDirtyCanvas?.(true, true);
 }
-const kept = (node, last) => widgetValue(node, "mode") === "fixed" && widgetValue(node, "post_ids") === last.post_ids;
+// Kept: the node's next run takes the same posts and wildcards from the same site.
+const kept = (node, last) => widgetValue(node, "mode") === "fixed" && widgetValue(node, "post_ids") === last.post_ids
+  && (!last.site || widgetValue(node, "source") === last.site) && (!Number.isInteger(last.wildcard_seed) || widgetValue(node, "wildcard_seed") === last.wildcard_seed);
 function copyAdded(last, done) {
   if (!navigator.clipboard) return toast("warn", "Can't copy here", "The browser allows copying only on https or localhost.");
   background(navigator.clipboard.writeText(last.added)); // A refused copy (no permission) is logged, not thrown.

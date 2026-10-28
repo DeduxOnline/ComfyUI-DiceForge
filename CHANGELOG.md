@@ -61,15 +61,16 @@ nodes and features, a patch for fixes. Each version is a [release on GitHub](htt
 
 ### Changed
 - LoRA Stack: each row is a switch, the LoRA, its strength (a random one reads *🎲 0.60–1.00*), its group's letter and **⋯**, a menu with
-  Model info, trigger words, another LoRA, the group, random strength and Remove (also on a right-click). A group's rows stand together
-  under a header with how many of them each run uses and the seed mode; a row whose file is missing says so.
+  Model info, trigger words, another LoRA, the group, random strength and Remove (also on a right-click). A group's rows stay together
+  (a row put in a group, dragged or added joins the others) under a header with how many of them each run uses and the seed mode; a row
+  whose file is missing says so.
 - CI: the end-to-end tests start only when every JavaScript file parses, checked in a few seconds before them.
 - XY Plot is run with ComfyUI's own Run: `index` counts up after each run (*control after generate*: increment) and goes round past the
   last cell, and **▶ Set Run to N cells, from index 0** in the node's menu sets it and the batch count. The node keeps one row, the plot's
-  size and the cell the next run makes; **▦ Show the plot plan…** opens the grid of headers in a window.
+  size and the cell the next run makes (with *Widget control mode* on before, which it can't tell, it says so); **▦ Show the plot plan…** opens the grid of headers in a window.
 - Danbooru Tag Enhancer keeps one row about the last run under its inputs (*Last run: 2 posts, +7 tags*), so a run no longer makes the
   node taller. The posts' pictures, the added tags and the search open in a window from that row or the node's menu (🏷 Danbooru posts
-  of the last run…), with Copy tags and Keep these posts (fixed); 📋 Copy the added tags is in the menu too.
+  of the last run…), with Copy tags and Keep these posts (fixed), which also puts back the run's site and wildcard seed; 📋 Copy the added tags is in the menu too.
 - Every node id starts with DiceForge, so no other node pack can take a DiceForge node's place in a workflow (ComfyUI-RuiquNodes has a
   VAEDecodeSave): `SDXLResolutionListLatent` is now `DiceForgeSDXLResolutionList`, `ResolutionSelectorRandomLatent`
   `DiceForgeResolutionSelector`, `CLIPTextEncodePositiveNegative` `DiceForgeCLIPDualTextEncode`, `LoadVAEDecodeSave`

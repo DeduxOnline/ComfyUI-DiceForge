@@ -150,11 +150,21 @@ def test_lora_stacks_random_strength_reads_as_a_range():
 
 
 @needs_node
+def test_lora_stack_keeps_a_groups_rows_together():
+    rows = [{"lora": "a1", "group": "A"}, {"lora": "x", "group": ""}, {"lora": "b1", "group": "B"}, {"lora": "a2", "group": "A"},
+            {"lora": "y", "group": ""}, {"lora": "b2", "group": "B"}]
+    source = js_source("lora_stack.js", "together")
+    order = [[row["lora"] for row in result] for result in run(source, "together", [[rows], [rows[:1] + rows[3:4] + rows[1:2]], [[]]])]
+    assert order == [["a1", "a2", "x", "b1", "b2", "y"], ["a1", "a2", "x"], []]
+
+
+@needs_node
 def test_xy_plots_row_names_the_cell_the_next_run_makes():
     plan = {"x_type": "steps", "y_type": "cfg", "count": 6, "x": ["20 steps", "25 steps", "30 steps"], "y": ["CFG 5", "CFG 7"]}
     row = {"x_type": "cfg", "y_type": "none", "count": 3, "x": ["CFG 4", "CFG 5", "CFG 6"], "y": [""]}
     cases = [[plan, 0], [plan, 4], [plan, 6], [row, 1], [{"x_type": "none", "y_type": "none", "count": 1, "x": [""], "y": [""]}, 0]]
     source = js_source("xy_plot.js", "nextCell", "summaryText")
+    assert run(source, "summaryText", [[plan, 4, True]]) == ["3 × 2 = 6 cells · set Widget control mode to after to see the next cell"]
     assert run(source, "summaryText", cases) == ["3 × 2 = 6 cells · next: 20 steps, CFG 5", "3 × 2 = 6 cells · next: 25 steps, CFG 7",
                                                  "3 × 2 = 6 cells · next: 20 steps, CFG 5", "3 cells · next: CFG 5",
                                                  "Pick what changes on X (and Y) to make a plot."]

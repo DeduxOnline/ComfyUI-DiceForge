@@ -26,7 +26,18 @@ function cleanStack(stack) {
       trigger_words: words.filter((word) => typeof word === "string" || typeof word === "number").map((word) => String(word).trim()).filter(Boolean) };
   });
   const groups = Object.fromEntries(Object.entries(isObject(stack.groups) ? stack.groups : {}).filter(([, settings]) => isObject(settings)));
-  return { ...stack, rows, groups, separate_clip: !!stack.separate_clip };
+  return { ...stack, rows: together(rows), groups, separate_clip: !!stack.separate_clip };
+}
+// A group's rows together, at its first row, so its header (drawn before its first row) stands over all of them: after a drag, a group
+// change, a preset added or a workflow edited by hand. Rows without a group keep their places among them.
+export function together(rows) {
+  const placed = new Set();
+  return rows.flatMap((row) => {
+    if (!row.group) return [row];
+    if (placed.has(row.group)) return [];
+    placed.add(row.group);
+    return rows.filter((item) => item.group === row.group);
+  });
 }
 
 const STYLE = `
@@ -286,7 +297,7 @@ function setUp(node) {
   let dragged = null;
   let shownMode; // The seed mode the group headers show.
 
-  const opened = new Set(); // Rows whose random range is open under them (by LoRA name: rows move).
+  const opened = new Set(); // Rows whose random range is open under them, as "LoRA #n" (the nth row of that LoRA): rows move.
   async function render() {
     const stack = read();
     const files = await loraList();
@@ -313,6 +324,7 @@ function setUp(node) {
     };
     const parts = stack.rows.flatMap((row, index) => {
       const set = (change) => update((next) => change(next.rows[index]));
+      const openKey = `${row.lora} #${stack.rows.slice(0, index).filter((item) => item.lora === row.lora).length}`;
       const missing = files.size && !files.has(row.lora);
       const pick = () => browse({
         label: "Choose", hint: `Choose puts a LoRA in this row (instead of ${shortName(row.lora)}).`,
@@ -321,11 +333,11 @@ function setUp(node) {
       const toggleRandom = () => set((r) => {
         r.random = !r.random;
         if (r.random && r.min == null) { r.min = round((r.strength ?? 1) * 0.6); r.max = r.strength ?? 1; }
-        if (r.random) opened.add(r.lora);
+        if (r.random) opened.add(openKey);
       });
       const strength = row.random
         ? element("span", { class: "range", title: "Random strength, picked between two values by the seed mode: click to set them", onclick: () => {
-          if (!opened.delete(row.lora)) opened.add(row.lora);
+          if (!opened.delete(openKey)) opened.add(openKey);
           background(render());
         } }, rangeText(row))
         : numberInput(row.strength ?? 1, stack.separate_clip ? "Model strength" : "Strength (model and CLIP)", (value) => set((r) => { r.strength = value; }));
@@ -334,13 +346,13 @@ function setUp(node) {
       toggle.checked = row.on !== false;
       toggle.addEventListener("change", () => set((r) => { r.on = toggle.checked; }));
       const triggers = row.triggers === "none" ? "none" : row.triggers === "custom" ? `${(row.trigger_words ?? []).length} picked` : "the LoRA's own";
-      const setGroup = (name) => update((next) => {
-        const [moved] = next.rows.splice(index, 1);
-        moved.group = name;
-        const last = next.rows.findLastIndex((item) => item.group === name);
-        next.rows.splice(name && last >= 0 ? last + 1 : Math.min(index, next.rows.length), 0, moved); // Next to the rest of its group.
-        if (name && !next.groups[name]) next.groups[name] = { min: 1, max: 1 };
-      });
+      const setGroup = (name) => {
+        if ((row.group || "") === name) return; // Its own group (✓): nothing moves.
+        update((next) => { // cleanStack puts it with the rest of its group.
+          next.rows[index].group = name;
+          if (name && !next.groups[name]) next.groups[name] = { min: 1, max: 1 };
+        });
+      };
       const items = () => [
         ["ℹ Model info", () => openModelInfo("loras", row.lora)],
         [`🏷 Trigger words: ${triggers}…`, () => openTriggers(more, row, (mode, words) => set((r) => { r.triggers = mode; r.trigger_words = words; })),
@@ -380,7 +392,7 @@ function setUp(node) {
       });
       const head = row.group && !headed.has(row.group) ? [groupHead(row.group)] : [];
       if (row.group) headed.add(row.group);
-      const range = row.random && opened.has(row.lora) ? [element("div", { class: "rand" },
+      const range = row.random && opened.has(openKey) ? [element("div", { class: "rand" },
         element("label", {}, "min", numberInput(row.min ?? row.strength ?? 1, "Lowest strength", (value) => set((r) => { r.min = value; }))),
         element("label", {}, "max", numberInput(row.max ?? row.strength ?? 1, "Highest strength", (value) => set((r) => { r.max = value; }))),
         element("span", {}, "steps of 0.05"))] : [];
