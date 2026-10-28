@@ -54,8 +54,10 @@ NOTES = {
     "DiceForgeAnimaNAG": "At CFG 1 ComfyUI skips the negative prompt, so the node turns it back on: 10 Turbo steps take 13–14 s instead of 5 s. "
         "It needs the positive and negative prompts in one batch: when low VRAM makes ComfyUI run them apart, that step has no NAG. "
         "With several Anima NAG nodes in a row, the last one counts; on a model other than Anima it stops with an error.",
-    "DiceForgeDanbooruEnhancer": "Under its inputs the node shows the posts' pictures (click one to open the post; pictures that aren't general are "
-        "blurred until clicked), the added tags (click to copy) and what it searched.",
+    "DiceForgeDanbooruEnhancer": "Under its inputs, one row about the last run (*Last run: 2 posts, +7 tags*). Click it, or **🏷 Danbooru posts of the "
+        "last run…** in the node's menu, for a window with the posts' pictures (click one to open the post; pictures that aren't general are "
+        "blurred until clicked), the added tags (**Copy tags**), what it searched, and **Keep these posts (fixed)**. **📋 Copy the added tags** "
+        "is in the menu too.",
 }
 
 

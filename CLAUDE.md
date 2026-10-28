@@ -68,8 +68,9 @@ DiceForge nodes should feel like ComfyUI's own (https://docs.comfy.org/basic-con
 
 - **A node is a function:** typed inputs and widgets, its work, typed outputs. Its body holds inputs and parameters. Before adding a panel
   in a node (a DOM widget), see whether a menu entry, a window, an output or a tooltip does the job: the last run's prompts under CLIP
-  Dual Text Encode were removed for that (2026-10-23; they are in 🕘 Prompt history). The panels there now (Random Image, Danbooru Tag
-  Enhancer, LoRA Stack, Dice Grid, XY Plot) are the node's own work; change them only when the author asks.
+  Dual Text Encode were removed for that (2026-10-23; they are in 🕘 Prompt history). The panels there now (Random Image, LoRA Stack, Dice
+  Grid, XY Plot) are the node's own work; change them only when the author asks. Danbooru Tag Enhancer keeps one row about its last run,
+  and the run opens in a window (2026-10-28).
 - **Core types on the links** (`MODEL`, `CLIP`, `VAE`, `CONDITIONING`, `LATENT`, `IMAGE`, `MASK`, `INT`, `FLOAT`, `STRING`, `BOOLEAN`, and `COMBO` for a list
   input such as KSampler's sampler), so the colors and connections are the ones users know. No look-alike types of our own.
 - **The user owns the look:** title, color and size. A node's height is fitted only by `node_size.js`, which keeps a height the user

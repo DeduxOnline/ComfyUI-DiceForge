@@ -131,3 +131,12 @@ def test_the_workflow_a_run_sends_has_no_run_data():
     cases = [[workflow], [{"nodes": [{"id": 1}]}], [None]]
     source = js_source("prompt_preview.js", "RUN_DATA", "withoutRunData")
     assert run(source, "withoutRunData", cases) == [clean, {"nodes": [{"id": 1}]}, None]
+
+@needs_node
+def test_danbooru_tag_enhancers_row_sums_up_the_last_run():
+    one = {"posts": [{"id": 101, "rating": "g"}], "added": "smile, twintails, blue sky", "mode": "random"}
+    cases = [[one], [{**one, "site": "e621", "posts": [{"id": 201, "rating_name": "safe"}], "added": "solo"}],
+             [{"posts": [{"id": 1}, {"id": 2}, {"id": 3}], "added": "", "mode": "fixed", "site": "danbooru"}]]
+    source = js_source("danbooru_preview.js", "RATINGS", "ratingName", "SITES", "postsName", "summary")
+    assert run(source, "summary", cases) == ["Last run: post #101 (general), +3 tags", "Last run: e621 post #201 (safe), +1 tag",
+                                             "Last run: 3 posts, no tags added · fixed"]

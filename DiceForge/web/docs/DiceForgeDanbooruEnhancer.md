@@ -1,8 +1,8 @@
-Adds tags to a prompt from random Danbooru or e621 posts that have its most telling tags: new posts on every run (random) or the same ones again (fixed); the posts are shown on the node.
+Adds tags to a prompt from random Danbooru or e621 posts that have its most telling tags: new posts on every run (random) or the same ones again (fixed); the last run's posts open in a window from the node.
 
 ![Danbooru Tag Enhancer with its advanced inputs and the post of the last run](images/danbooru_tag_enhancer.png)
 
-Under its inputs the node shows the posts' pictures (click one to open the post; pictures that aren't general are blurred until clicked), the added tags (click to copy) and what it searched.
+Under its inputs, one row about the last run (*Last run: 2 posts, +7 tags*). Click it, or **🏷 Danbooru posts of the last run…** in the node's menu, for a window with the posts' pictures (click one to open the post; pictures that aren't general are blurred until clicked), the added tags (**Copy tags**), what it searched, and **Keep these posts (fixed)**. **📋 Copy the added tags** is in the menu too.
 
 ## Inputs
 

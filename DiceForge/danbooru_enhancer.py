@@ -404,7 +404,7 @@ class DanbooruTagEnhancer(io.ComfyNode):
             display_name="Danbooru Tag Enhancer",
             category="DiceForge/conditioning",
             description="Adds tags to a prompt from random Danbooru or e621 posts that have its most telling tags: new posts on every run (random) or "
-                        "the same ones again (fixed); the posts are shown on the node.",
+                        "the same ones again (fixed); the last run's posts open in a window from the node.",
             search_aliases=["danbooru", "e621", "tag enhancer", "prompt enhancer", "booru", "tags", "enhance prompt", "random post"],
             is_output_node=True, # Runs (and shows its posts) also with nothing connected.
             inputs=[

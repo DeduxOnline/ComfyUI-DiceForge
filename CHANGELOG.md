@@ -61,6 +61,9 @@ nodes and features, a patch for fixes. Each version is a [release on GitHub](htt
 
 ### Changed
 - CI: the end-to-end tests start only when every JavaScript file parses, checked in a few seconds before them.
+- Danbooru Tag Enhancer keeps one row about the last run under its inputs (*Last run: 2 posts, +7 tags*), so a run no longer makes the
+  node taller. The posts' pictures, the added tags and the search open in a window from that row or the node's menu (🏷 Danbooru posts
+  of the last run…), with Copy tags and Keep these posts (fixed); 📋 Copy the added tags is in the menu too.
 - Every node id starts with DiceForge, so no other node pack can take a DiceForge node's place in a workflow (ComfyUI-RuiquNodes has a
   VAEDecodeSave): `SDXLResolutionListLatent` is now `DiceForgeSDXLResolutionList`, `ResolutionSelectorRandomLatent`
   `DiceForgeResolutionSelector`, `CLIPTextEncodePositiveNegative` `DiceForgeCLIPDualTextEncode`, `LoadVAEDecodeSave`

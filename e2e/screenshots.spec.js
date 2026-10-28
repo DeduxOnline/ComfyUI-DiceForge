@@ -236,8 +236,13 @@ test.describe("README screenshots (Nodes 2.0)", () => {
     const [id] = await addNodes(page, [{ type: "DiceForgeDanbooruEnhancer", pos: [400, 220], widgets: { tags: "1girl, hatsune miku", posts: 1 } }]);
     await showAdvanced(page, id);
     await queueFromPage(page, request);
-    await expect(page.locator(".dfdb .added")).toContainText("+ ");
-    await expect(page.locator(".dfdb a.thumb img")).toHaveJSProperty("naturalWidth", 270);
+    await expect(page.locator(".dfdb .last-run")).toContainText("Last run: ");
     await shot(page, [id], "danbooru_tag_enhancer.png");
+    await page.locator(".dfdb .last-run").click();
+    const posts = page.locator(".dfdbw");
+    await expect(posts.locator("a.thumb img")).toHaveJSProperty("naturalWidth", 270);
+    await page.waitForTimeout(800);
+    await posts.screenshot({ path: path.join(OUT, "danbooru_posts.png") });
+    await page.keyboard.press("Escape");
   });
 });

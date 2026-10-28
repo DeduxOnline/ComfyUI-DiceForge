@@ -1084,53 +1084,72 @@ for (const vue of [true, false]) {
       expect(graph).toEqual([true, true, true]); // The graph keeps them.
     });
 
-    test("Danbooru Tag Enhancer shows the post it took and fills in post_ids for fixed mode, also after a reload", async ({ page, request }) => {
+    test("Danbooru Tag Enhancer keeps one row about the post it took, shows the run in a window, and fills in post_ids for fixed mode, also after a reload", async ({ page, request }) => {
       const [id] = await addNodes(page, [{ type: "DiceForgeDanbooruEnhancer", widgets: { tags: "hatsune miku" } }]);
-      const panel = page.locator(".dfdb").first();
-      await expect(panel).toContainText("Run the workflow to see the Danbooru posts it takes and the tags they add here.");
+      const row = page.locator(".dfdb").first();
+      await expect(row).toContainText("Run the workflow to see the Danbooru posts it takes and the tags they add here.");
+      const before = (await row.boundingBox()).height;
       await queueFromPage(page, request); // An output node: it runs with nothing connected.
-      await expect(panel.locator(".added")).toHaveText("+ 1girl, smile, twintails"); // Post 101: rating:g.
-      await expect(panel.locator(".head")).toHaveText("Last run · post #101 (general)");
-      await expect(panel.locator(".search")).toHaveText("Searched: hatsune_miku rating:g");
-      await expect(panel.locator("a.thumb")).toHaveAttribute("href", /\/posts\/101$/);
-      await expect(panel.locator("a.thumb img")).toHaveJSProperty("naturalWidth", 8); // The post's picture.
+      await expect(row.locator(".last-run")).toHaveText("Last run: post #101 (general), +3 tags"); // Post 101: rating:g.
+      expect((await row.boundingBox()).height).toBeCloseTo(before, 0); // A run doesn't make the node taller.
+      await expect(row.locator("img")).toHaveCount(0); // The pictures are in the window.
+      await row.locator(".last-run").click();
+      const posts = page.locator(".dfdbw");
+      await expect(posts.locator(".added")).toHaveText("+ 1girl, smile, twintails");
+      await expect(posts.locator(".search")).toHaveText("Searched: hatsune_miku rating:g");
+      await expect(posts.locator("a.thumb")).toHaveAttribute("href", /\/posts\/101$/);
+      await expect(posts.locator("a.thumb img")).toHaveJSProperty("naturalWidth", 8); // The post's picture.
       await expect.poll(() => widgetValue(page, id, "post_ids")).toBe("101"); // For fixed mode.
-      await setWidget(page, id, "mode", "fixed");
+      await posts.locator("button.keep").click();
+      await expect(posts.locator("button.keep")).toHaveText("Kept (fixed)");
+      await expect(posts.locator("button.keep")).toBeDisabled();
+      expect(await widgetValue(page, id, "mode")).toBe("fixed");
       await queueFromPage(page, request);
-      await expect(panel.locator(".head")).toHaveText("Last run · post #101 (general) · fixed");
-      await expect(panel.locator(".search")).toHaveText("Fixed: post 101");
+      await expect(posts.locator(".search")).toHaveText("Fixed: post 101"); // The open window shows the new run.
+      await page.keyboard.press("Escape");
+      await expect(posts).toHaveCount(0);
+      await expect(row.locator(".last-run")).toHaveText("Last run: post #101 (general), +3 tags · fixed");
       const workflow = await page.evaluate(() => window.app.graph.serialize());
       expect(workflow.nodes.find((node) => String(node.id) === String(id)).properties.dice_forge_danbooru.post_ids).toBe("101");
       await page.evaluate(async (data) => { window.app.graph.clear(); await window.app.loadGraphData(data); }, workflow);
-      await expect(page.locator(".dfdb").first().locator(".added")).toHaveText("+ 1girl, smile, twintails"); // Kept with the workflow.
+      await expect(page.locator(".dfdb .last-run").first()).toHaveText("Last run: post #101 (general), +3 tags · fixed"); // Kept with the workflow.
     });
 
-    test("Danbooru Tag Enhancer previews: pictures of fixed posts, blurred past general, a link for one that won't load; e621; an older result", async ({ page, request }) => {
+    test("Danbooru Tag Enhancer's window: pictures of fixed posts, blurred past general, a link for one that won't load; e621; the node menu", async ({ page, request }) => {
       const [id] = await addNodes(page, [{ type: "DiceForgeDanbooruEnhancer", widgets: { tags: "hatsune miku", mode: "fixed", post_ids: "https://danbooru.donmai.us/posts/101, 102 103", wildcard_seed: 5 } }]);
-      const panel = page.locator(".dfdb").first();
+      const extension = "DiceForge.DanbooruPreview";
+      expect(await menuItems(page, id, extension)).toEqual(["🏷 Danbooru posts of the last run…"]); // Nothing to copy before a run.
       await queueFromPage(page, request);
-      await expect(panel.locator(".head")).toHaveText("Last run · 3 posts · fixed");
-      await expect(panel.locator(".search")).toHaveText("Fixed: posts 101, 102, 103");
-      await expect(panel.locator("a.thumb img")).toHaveCount(2);
-      await expect(panel.locator("a.thumb img").first()).not.toHaveClass(/blur/); // General.
-      const explicit = panel.locator("a.thumb img").nth(1);
+      await expect(page.locator(".dfdb .last-run").first()).toHaveText(/^Last run: 3 posts, (\+\d+ tags?|no tags added) · fixed$/);
+      expect(await menuItems(page, id, extension)).toEqual(["🏷 Danbooru posts of the last run…", "📋 Copy the added tags"]);
+      await clickMenu(page, id, extension, "Danbooru posts");
+      const posts = page.locator(".dfdbw");
+      await expect(posts.locator(".search")).toHaveText("Fixed: posts 101, 102, 103");
+      await expect(posts.locator("button.keep")).toHaveText("Keep these posts (fixed)"); // Fixed, but on the post_ids as typed.
+      await expect(posts.locator("a.thumb img")).toHaveCount(2);
+      await expect(posts.locator("a.thumb img").first()).not.toHaveClass(/blur/); // General.
+      const explicit = posts.locator("a.thumb img").nth(1);
       await expect(explicit).toHaveClass(/blur/); // Explicit: blurred while Blur NSFW is on.
-      await expect(panel.locator("a.thumb.plain")).toHaveText("↗ #103"); // Its picture didn't load: the link to the post.
+      await expect(posts.locator("a.thumb.plain")).toHaveText("↗ #103"); // Its picture didn't load: the link to the post.
       const tabs = page.context().pages().length;
       await explicit.click();
       await expect(explicit).not.toHaveClass(/blur/); // The first click only reveals...
       expect(page.context().pages()).toHaveLength(tabs); // ...and opens nothing.
       expect(await widgetValue(page, id, "post_ids")).toBe("https://danbooru.donmai.us/posts/101, 102 103"); // Fixed: your post_ids stay as typed,
       expect(await widgetValue(page, id, "wildcard_seed")).toBe(5); // and the seed.
+      await posts.getByRole("button", { name: "Close" }).click();
+      await expect(posts).toHaveCount(0);
 
       await setWidget(page, id, "mode", "random");
       await setWidget(page, id, "source", "e621");
       await setWidget(page, id, "tags", "fox, anthro");
       await queueFromPage(page, request);
-      await expect(panel.locator(".head")).toHaveText("Last run · e621 post #201 (safe)");
-      await expect(panel.locator(".added")).toHaveText("+ solo, grin, canine");
-      await expect(panel.locator("a.thumb img")).not.toHaveClass(/blur/); // e621's safe isn't blurred.
+      await expect(page.locator(".dfdb .last-run").first()).toHaveText("Last run: e621 post #201 (safe), +3 tags");
       await expect.poll(() => widgetValue(page, id, "post_ids")).toBe("201"); // Random: this run's post, for fixed mode.
+      await page.locator(".dfdb .last-run").first().click();
+      await expect(posts.locator(".added")).toHaveText("+ solo, grin, canine");
+      await expect(posts.locator("a.thumb img")).not.toHaveClass(/blur/); // e621's safe isn't blurred.
+      await expect(posts.locator("button.keep")).toHaveText("Keep these posts (fixed)");
     });
 
     test("Danbooru Tag Enhancer: the posts a shared workflow carries link only to web addresses, never to a script", async ({ page }) => {
@@ -1140,7 +1159,8 @@ for (const vue of [true, false]) {
         window.app.graph.getNodeById(id).properties.dice_forge_danbooru = { site: "danbooru", mode: "random", search: "", added: "smile",
           posts: [{ id: 7, url: "javascript:window.diceForgeRan = true", preview: "", rating: "g" }, { id: 8, url: "https://danbooru.donmai.us/posts/8", preview: "", rating: "g" }] };
       }, id);
-      const links = page.locator(".dfdb").first().locator("a.thumb.plain");
+      await page.locator(".dfdb .last-run").first().click();
+      const links = page.locator(".dfdbw a.thumb.plain");
       await expect(links).toHaveText(["↗ #7", "↗ #8"]);
       await expect(links.first()).toHaveAttribute("href", ""); // Left empty: nothing to run.
       await expect(links.nth(1)).toHaveAttribute("href", "https://danbooru.donmai.us/posts/8");
