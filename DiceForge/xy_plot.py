@@ -9,8 +9,9 @@ from .model_lists import matching_files
 from .random_sampler import SAMPLERS, SCHEDULERS, options_output, parse_names
 from .variation_seed import with_variation
 # XY Plot: one node gives KSampler the settings of one cell of an X/Y comparison (seed, steps, CFG, sampler, scheduler, LoRA, LoRA strength,
-# denoise, variation seed or variation strength on each axis) and Dice Grid its labels; the node's ▶ Queue button (web/xy_plot.js) queues every cell, index 0 to count - 1, and Dice Grid
-# lays the images out with the values as column and row headers.
+# denoise, variation seed or variation strength on each axis) and Dice Grid its labels. index counts up after each run (control after generate:
+# increment), so ComfyUI's Run with a batch count of the number of cells (Set Run to N cells, in the node's menu: web/xy_plot.js) makes every
+# cell, from index 0, and Dice Grid lays the images out with the values as column and row headers.
 AXES = ("none", "seed", "steps", "cfg", "sampler", "scheduler", "lora", "lora strength", "denoise", "variation seed", "variation strength")
 MAX_VALUES, MAX_CELLS = 64, 256 # Per axis, and in all: a typo like 1-100000 doesn't queue a night of images.
 NUMBER = r"-?\d+(?:\.\d+)?"
@@ -136,15 +137,19 @@ class XYPlot(io.ComfyNode):
             node_id="DiceForgeXYPlot",
             display_name="XY Plot",
             category="DiceForge/sampling",
-            description="Settings for an X/Y comparison grid: each run gives KSampler the values of one cell and Dice Grid its labels; ▶ Queue on the node queues every cell.",
+            description="Settings for an X/Y comparison grid: each run gives KSampler the values of one cell and Dice Grid its labels, and goes on to the next cell; "
+                        "Set Run to N cells in the node's menu makes the whole plot with ComfyUI's Run.",
             search_aliases=["xy plot", "xy grid", "x/y plot", "comparison", "grid", "sampler comparison", "cfg comparison", "lora comparison"],
             inputs=[
                 io.Combo.Input("x_type", options=list(AXES), default="cfg", tooltip="What changes from column to column."),
                 io.String.Input("x_values", multiline=True, default="4, 5.5, 7", tooltip=axis_tip),
                 io.Combo.Input("y_type", options=list(AXES), default="sampler", tooltip="What changes from row to row (none: one row)."),
                 io.String.Input("y_values", multiline=True, default="euler, euler_ancestral, dpmpp_2m", tooltip=axis_tip),
-                io.Int.Input("index", default=0, min=0, max=MAX_CELLS - 1, tooltip="The cell of this run, row by row (▶ Queue sets it for each run)."),
-                # No control after generate: ▶ Queue queues the cells one by one, and the frontend's (randomize by default for an input named seed)
+                # Counts up after each run, so Run goes cell by cell; past the last cell it starts again at the first (a new grid), so its maximum
+                # is far past MAX_CELLS: increment stops at the maximum.
+                io.Int.Input("index", default=0, min=0, max=0xFFFFFFFF, control_after_generate=io.ControlAfterGenerate.increment,
+                             tooltip="The cell of this run, row by row; past the last one it starts again at the first. Counts up after each run, so Run makes the cells one by one."),
+                # No control after generate: the runs of a plot go cell by cell, and the frontend's (randomize by default for an input named seed)
                 # would give each cell another seed.
                 io.Int.Input("seed", default=0, min=0, max=0xFFFFFFFFFFFFFFFF, control_after_generate=False,
                              tooltip="Seed of every cell, unless an axis is seed. It stays the same from cell to cell."),

@@ -72,10 +72,18 @@ def test_each_run_is_one_cell_row_by_row():
 
 
 def test_seed_has_no_control_after_generate():
-    # ▶ Queue queues the cells one by one: a control after generate (the frontend's default for an input named seed) would give each cell
+    # The runs of a plot go cell by cell: a control after generate (the frontend's default for an input named seed) would give each cell
     # another seed.
     seed = next(item for item in XYPlot.define_schema().inputs if item.id == "seed")
     assert seed.as_dict()["control_after_generate"] is False
+
+
+def test_index_counts_up_and_goes_round():
+    # Run with a batch count goes cell by cell; an index far past the last cell is still a cell (increment stops at the maximum, not at 255).
+    index = next(item for item in XYPlot.define_schema().inputs if item.id == "index")
+    assert index.as_dict()["control_after_generate"] == "increment"
+    assert index.as_dict()["max"] > 100000
+    assert run(6 * 1000 + 1) == run(1)
 
 
 def test_labels_of_each_axis():

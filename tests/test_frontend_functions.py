@@ -140,3 +140,14 @@ def test_danbooru_tag_enhancers_row_sums_up_the_last_run():
     source = js_source("danbooru_preview.js", "RATINGS", "ratingName", "SITES", "postsName", "summary")
     assert run(source, "summary", cases) == ["Last run: post #101 (general), +3 tags", "Last run: e621 post #201 (safe), +1 tag",
                                              "Last run: 3 posts, no tags added · fixed"]
+
+
+@needs_node
+def test_xy_plots_row_names_the_cell_the_next_run_makes():
+    plan = {"x_type": "steps", "y_type": "cfg", "count": 6, "x": ["20 steps", "25 steps", "30 steps"], "y": ["CFG 5", "CFG 7"]}
+    row = {"x_type": "cfg", "y_type": "none", "count": 3, "x": ["CFG 4", "CFG 5", "CFG 6"], "y": [""]}
+    cases = [[plan, 0], [plan, 4], [plan, 6], [row, 1], [{"x_type": "none", "y_type": "none", "count": 1, "x": [""], "y": [""]}, 0]]
+    source = js_source("xy_plot.js", "nextCell", "summaryText")
+    assert run(source, "summaryText", cases) == ["3 × 2 = 6 cells · next: 20 steps, CFG 5", "3 × 2 = 6 cells · next: 25 steps, CFG 7",
+                                                 "3 × 2 = 6 cells · next: 20 steps, CFG 5", "3 cells · next: CFG 5",
+                                                 "Pick what changes on X (and Y) to make a plot."]

@@ -1,6 +1,6 @@
-Settings for an X/Y comparison grid: each run gives KSampler the values of one cell and Dice Grid its labels; ▶ Queue on the node queues every cell.
+Settings for an X/Y comparison grid: each run gives KSampler the values of one cell and Dice Grid its labels, and goes on to the next cell; Set Run to N cells in the node's menu makes the whole plot with ComfyUI's Run.
 
-The node shows the headers and the number of images; **▶ Queue N images** queues a run for every cell (click again to stop). Connect `seed` to KSampler, or set KSampler's *control after generate* to *fixed*: otherwise every cell gets another seed.
+The node shows the plot's size and the cell the next run makes; `index` counts up after each run. Its right-click menu has **▶ Set Run to N cells, from index 0** (`index` and ComfyUI's batch count, then click **Run**) and **▦ Show the plot plan…**. Connect `seed` to KSampler, or set KSampler's *control after generate* to *fixed*: otherwise every cell gets another seed.
 
 ## Inputs
 
@@ -8,7 +8,7 @@ The node shows the headers and the number of images; **▶ Queue N images** queu
 - `x_values` (STRING, default `4, 5.5, 7`): Values, separated by commas or new lines. Numbers: 4, 5.5, 7 or ranges 4-8 (step 1) and 3.5-7:0.5. Sampler, scheduler: names, \* for all. LoRA: file names, with or without folder and extension, patterns like style/\*, None for no LoRA.
 - `y_type` (COMBO, default `sampler`): What changes from row to row (none: one row).
 - `y_values` (STRING, default `euler, euler_ancestral,…`): Values, separated by commas or new lines. Numbers: 4, 5.5, 7 or ranges 4-8 (step 1) and 3.5-7:0.5. Sampler, scheduler: names, \* for all. LoRA: file names, with or without folder and extension, patterns like style/\*, None for no LoRA.
-- `index` (INT, default `0`): The cell of this run, row by row (▶ Queue sets it for each run).
+- `index` (INT, default `0`): The cell of this run, row by row; past the last one it starts again at the first. Counts up after each run, so Run makes the cells one by one.
 - `seed` (INT, default `0`): Seed of every cell, unless an axis is seed. It stays the same from cell to cell.
 - `steps` (INT, default `28`): Steps of every cell, unless an axis is steps.
 - `cfg` (FLOAT, default `6`): CFG of every cell, unless an axis is cfg.

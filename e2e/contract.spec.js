@@ -18,6 +18,7 @@ test.describe("ComfyUI as DiceForge uses it", () => {
         "app.refreshComboInNodes": app.refreshComboInNodes, "app.canvas.ds": app.canvas?.ds,
         "app.extensionManager.setting.get": app.extensionManager?.setting?.get, "app.extensionManager.setting.set": app.extensionManager?.setting?.set,
         "app.extensionManager.toast.add": app.extensionManager?.toast?.add,
+        "app.extensionManager.queueSettings.batchCount": typeof app.extensionManager?.queueSettings?.batchCount === "number", // xy_plot.js: Set Run to N cells.
         "api.fetchApi": api.fetchApi, "api.apiURL": api.apiURL, "api.addEventListener": api.addEventListener,
         "LiteGraph.createNode": window.LiteGraph?.createNode,
       };
@@ -92,7 +93,7 @@ test.describe("ComfyUI as DiceForge uses it", () => {
     });
     await queueFromPage(page, request);
     await expect.poll(() => page.evaluate(() => [...new Set(window.contractEvents)].sort((a, b) => a.localeCompare(b))),
-      changed("the names of the run events", "dice_grid.js, prompt_preview.js, xy_plot.js")).toEqual(["executed", "execution_cached", "execution_start"]);
+      changed("the names of the run events", "dice_grid.js, prompt_preview.js")).toEqual(["executed", "execution_cached", "execution_start"]);
   });
 });
 

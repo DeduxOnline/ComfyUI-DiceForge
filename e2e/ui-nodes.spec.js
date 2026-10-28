@@ -1,7 +1,7 @@
 // End-to-end in the browser, the nodes: adding every DiceForge node, the resolution previews, Dice Grid, XY Plot, KSampler presets,
 // Random Image and node heights, in both node designs (Nodes 2.0 and classic), against the real server. Each test builds its own graph.
 const fs = require("fs");
-const { test, expect, basePath, openComfy, drawn, addNodes, connect, widgetValue, setWidget, menuItems, queueFromPage, nodeElement, answerQuestions } = require("./helpers");
+const { test, expect, basePath, openComfy, drawn, addNodes, connect, widgetValue, setWidget, menuItems, clickMenu, queueFromPage, nodeElement, answerQuestions } = require("./helpers");
 const { ALL_NODES, lookUp, submenu, clickSubmenu } = require("./ui-shared");
 const { measure, reloadTall } = require("./qa/lib");
 
@@ -91,7 +91,7 @@ for (const vue of [true, false]) {
       expect(await page.evaluate(() => window.app.graph.nodes.map((node) => node.comfyClass).sort().join())).toBe("DiceForgeGrid,EmptyImage");
     });
 
-    test("XY Plot shows the plot under its fields and queues every cell into Dice Grid", async ({ page, request }) => {
+    test("XY Plot keeps one row about the plot, and Run with the batch count from its menu makes every cell into Dice Grid", async ({ page, request }) => {
       const [xy, image, grid] = await addNodes(page, [
         { type: "DiceForgeXYPlot", widgets: { x_type: "steps", x_values: "10, 20", y_type: "scheduler", y_values: "normal, karras", seed: 123 } },
         { type: "EmptyImage", pos: [460, 40], widgets: { width: 64, height: 64 } },
@@ -100,22 +100,39 @@ for (const vue of [true, false]) {
       await connect(page, image, 0, grid, "image");
       await connect(page, xy, 8, grid, "label");
       await connect(page, xy, 9, grid, "row_label");
-      const panel = page.locator(".dfxy").first();
-      await expect(panel.locator(".axis").first()).toContainText("X · steps10 steps20 steps");
-      await expect(panel.locator(".axis").nth(1)).toContainText("Y · schedulernormalkarras");
-      await expect(panel).toContainText("2 × 2 = 4 images");
+      const row = page.locator(".dfxy").first();
+      const extension = "DiceForge.XYPlot";
+      await expect(row).toHaveText("2 × 2 = 4 cells · next: 10 steps, normal");
+      await setWidget(page, xy, "index", 3);
+      await expect(row).toHaveText("2 × 2 = 4 cells · next: 20 steps, karras");
       await setWidget(page, xy, "x_values", "10, x");
-      await expect(panel.locator(".error")).toContainText("not a number");
-      await expect(panel.locator("button")).toHaveCount(0);
+      await expect(row.locator(".error")).toContainText("not a number");
+      await expect.poll(() => menuItems(page, xy, extension)).toEqual(["▦ Show the plot plan…"]); // Nothing to run.
       await setWidget(page, xy, "x_values", "10, 20");
-      await panel.locator("button", { hasText: "▶ Queue 4 images" }).click();
-      await expect(panel.locator("button")).toHaveText("▶ Queue 4 images", { timeout: 30_000 }); // All queued.
+      await expect(row).toHaveText("2 × 2 = 4 cells · next: 20 steps, karras");
+      expect(await menuItems(page, xy, extension)).toEqual(["▶ Set Run to 4 cells, from index 0", "▦ Show the plot plan…"]);
+      await clickMenu(page, xy, extension, "Set Run");
       expect(await widgetValue(page, xy, "index")).toBe(0);
+      expect(await widgetValue(page, xy, "control_after_generate")).toBe("increment");
+      expect(await page.evaluate(() => window.app.extensionManager.queueSettings.batchCount)).toBe(4);
+      try {
+        await page.evaluate(() => window.app.queuePrompt(0, window.app.extensionManager.queueSettings.batchCount)); // As the Run button does.
+      } finally {
+        await page.evaluate(() => { window.app.extensionManager.queueSettings.batchCount = 1; });
+      }
+      expect(await widgetValue(page, xy, "index")).toBe(4); // Counted up after each run: the next one is the first cell again.
+      await expect(row).toHaveText("2 × 2 = 4 cells · next: 10 steps, normal");
       expect(await widgetValue(page, xy, "seed")).toBe(123); // The same seed for every cell: XY Plot's seed has no control after generate.
       const folder = basePath("output", "e2e");
       await expect.poll(() => fs.existsSync(folder) && fs.readdirSync(folder).some((name) => name.startsWith(`xyui${vue ? "v" : "c"}_`)), { timeout: 60_000 }).toBe(true);
       const queue = async () => { const body = await (await request.get("/queue")).json(); return body.queue_running.length + body.queue_pending.length; };
       await expect.poll(queue, { timeout: 60_000 }).toBe(0);
+      await clickMenu(page, xy, extension, "plot plan");
+      const plan = page.locator(".dfxyp");
+      await expect(plan.locator("th")).toHaveText(["scheduler \\ steps", "10 steps", "20 steps", "normal", "karras"]);
+      await expect(plan.locator("td.next")).toHaveText("0");
+      await page.keyboard.press("Escape");
+      await expect(plan).toHaveCount(0);
     });
 
     test("KSampler presets: the right-click submenu, Auto from the checkpoint's base model, saving and deleting your own", async ({ page, request }) => {

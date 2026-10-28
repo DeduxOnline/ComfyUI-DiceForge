@@ -61,6 +61,9 @@ nodes and features, a patch for fixes. Each version is a [release on GitHub](htt
 
 ### Changed
 - CI: the end-to-end tests start only when every JavaScript file parses, checked in a few seconds before them.
+- XY Plot is run with ComfyUI's own Run: `index` counts up after each run (*control after generate*: increment) and goes round past the
+  last cell, and **▶ Set Run to N cells, from index 0** in the node's menu sets it and the batch count. The node keeps one row, the plot's
+  size and the cell the next run makes; **▦ Show the plot plan…** opens the grid of headers in a window.
 - Danbooru Tag Enhancer keeps one row about the last run under its inputs (*Last run: 2 posts, +7 tags*), so a run no longer makes the
   node taller. The posts' pictures, the added tags and the search open in a window from that row or the node's menu (🏷 Danbooru posts
   of the last run…), with Copy tags and Keep these posts (fixed); 📋 Copy the added tags is in the menu too.
@@ -91,6 +94,7 @@ nodes and features, a patch for fixes. Each version is a [release on GitHub](htt
   tests wait for what they check instead of a fixed time.
 
 ### Removed
+- XY Plot's ▶ Queue button and the headers on the node: Run with the batch count does it (above), the headers are in the plot plan.
 - CLIP Dual Text Encode: the preview of the last run's prompts under the inputs. The prompts as encoded are in 🕘 Prompt history, whose
   entries now also show what the run noted next to the seed (combination N of M, the LoRAs of `<lora:...>` tags).
 - Each node module's own ComfyUI entry point: ComfyUI only loads the package's, and a test checks that it lists every node.
@@ -124,7 +128,7 @@ nodes and features, a patch for fixes. Each version is a [release on GitHub](htt
   them stand for millions of wildcards; a file with them is skipped too.
 - Wildcards and variables that use another one twice, nested deep, stop with an error after 100,000 fill-ins or a million characters,
   instead of a run that never ends; each variable is filled in once.
-- XY Plot: every cell of ▶ Queue gets the same seed. The frontend gave the node's `seed` a *control after generate* (randomize), which
+- XY Plot: every cell of a plot gets the same seed. The frontend gave the node's `seed` a *control after generate* (randomize), which
   changed it after each cell; it has none now.
 - README: what Load Diffusion Model + CLIP has under its advanced inputs, how many downloads run at once, which test files there are, and
   sentences about repairs of earlier versions that are gone.
@@ -161,7 +165,7 @@ The first release on the ComfyUI Registry: install DiceForge from ComfyUI Manage
 - **Dice Grid**: the images of a series in a labeled grid (XY grids too), saved when finished; star the best cells and keep them at full size with
   their workflow.
 - **XY Plot**: an X/Y comparison of seed, steps, CFG, sampler, scheduler, LoRA, LoRA strength, denoise or variation seed/strength, every cell
-  queued with one button.
+  made by one Run.
 - **HiresFix (Load VAE)**: as Easy-Use's HiresFix with the VAE from a list: upscale model, rescale, preview or save, encode.
 - **Danbooru Tag Enhancer**: adds the tags of random Danbooru, e621 or Safebooru posts (a source list) that have the prompt's tags, new ones on every run (random) or the same
   ones again (fixed, from post_ids), with the posts' pictures on the node; any rating or mix of ratings (general to explicit); several posts at once, wildcards in the tags, switches for

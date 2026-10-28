@@ -49,7 +49,8 @@ NOTES = {
         "**＋ Add LoRA** opens the LoRA Browser; *Separate CLIP strength* and the groups' settings are under the rows.",
     "DiceForgeGrid": "Under the node, the cells of the grid: click one to star it (**★**); **💾 Save N kept** saves the starred ones at full size, "
         "with the workflow of their own run; **↺** on a cell opens the workflow of its run.",
-    "DiceForgeXYPlot": "The node shows the headers and the number of images; **▶ Queue N images** queues a run for every cell (click again to stop). "
+    "DiceForgeXYPlot": "The node shows the plot's size and the cell the next run makes; `index` counts up after each run. Its right-click menu has "
+        "**▶ Set Run to N cells, from index 0** (`index` and ComfyUI's batch count, then click **Run**) and **▦ Show the plot plan…**. "
         "Connect `seed` to KSampler, or set KSampler's *control after generate* to *fixed*: otherwise every cell gets another seed.",
     "DiceForgeAnimaNAG": "At CFG 1 ComfyUI skips the negative prompt, so the node turns it back on: 10 Turbo steps take 13–14 s instead of 5 s. "
         "It needs the positive and negative prompts in one batch: when low VRAM makes ComfyUI run them apart, that step has no NAG. "
