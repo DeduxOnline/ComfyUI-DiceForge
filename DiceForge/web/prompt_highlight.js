@@ -10,12 +10,16 @@ const SETTING = "DiceForge.PromptHighlight";
 const STYLE = `
 .dfhl{position:absolute;overflow:hidden;pointer-events:none;white-space:pre-wrap;overflow-wrap:break-word;word-break:normal;box-sizing:border-box;margin:0;border:0;z-index:0}
 textarea.dfhl-input{color:transparent!important;-webkit-text-fill-color:transparent!important;background:transparent!important;position:relative;z-index:1}
-textarea.dfhl-input::placeholder{color:#888!important;-webkit-text-fill-color:#888!important}
+textarea.dfhl-input::placeholder{color:var(--descrip-text,#888)!important;-webkit-text-fill-color:var(--descrip-text,#888)!important}
 textarea.dfhl-input::selection{background:rgba(90,140,230,.4);color:transparent}
-.dfhl .wc{color:#7fd4ff}.dfhl .wc-missing{color:#ff8a8a;text-decoration:underline wavy #ff5c5c;text-decoration-skip-ink:none}
-.dfhl .b0{color:#ffcf5c;font-weight:700}.dfhl .b1{color:#d79bff;font-weight:700}.dfhl .b2{color:#7fe0a8;font-weight:700}.dfhl .bad{color:#fff;background:#b33}
-.dfhl .count{color:#ffa65c}.dfhl .weight{color:#ffa65c}.dfhl .lock{color:#ff6b9d;font-weight:700}.dfhl .var{color:#8be08b}
-.dfhl .lora{color:#ff9ad5;font-weight:600}.dfhl .comment{color:#7a8a7a;font-style:italic}.dfhl .esc{color:#aaa}.dfhl .attn{color:#e0c07f}.dfhl .embed{color:#c4a3ff}
+.dfhl{--dfhl-fg:#ddd}.dfhl .wc{color:color-mix(in srgb,#2196f3 55%,var(--dfhl-fg))}
+.dfhl .wc-missing{color:color-mix(in srgb,#e53935 60%,var(--dfhl-fg));text-decoration:underline wavy #e53935;text-decoration-skip-ink:none}
+.dfhl .b0{color:color-mix(in srgb,#f9a825 55%,var(--dfhl-fg));font-weight:700}.dfhl .b1{color:color-mix(in srgb,#ab47bc 55%,var(--dfhl-fg));font-weight:700}
+.dfhl .b2{color:color-mix(in srgb,#43a047 55%,var(--dfhl-fg));font-weight:700}.dfhl .bad{color:#fff;background:#b33}
+.dfhl .count,.dfhl .weight{color:color-mix(in srgb,#fb8c00 55%,var(--dfhl-fg))}.dfhl .lock{color:color-mix(in srgb,#e91e63 55%,var(--dfhl-fg));font-weight:700}
+.dfhl .var{color:color-mix(in srgb,#7cb342 55%,var(--dfhl-fg))}.dfhl .lora{color:color-mix(in srgb,#ec407a 50%,var(--dfhl-fg));font-weight:600}
+.dfhl .comment{color:color-mix(in srgb,#78909c 50%,var(--dfhl-fg));font-style:italic}.dfhl .esc{color:color-mix(in srgb,var(--dfhl-fg) 65%,transparent)}
+.dfhl .attn{color:color-mix(in srgb,#c49a2c 55%,var(--dfhl-fg))}.dfhl .embed{color:color-mix(in srgb,#7e57c2 55%,var(--dfhl-fg))}
 `;
 
 const NAME_CHAR = String.raw`[\p{L}\p{M}\p{N}_\-./*?]|\$\{\w+\}`; // As the node reads names (clip_text_encode_pos_neg.WILDCARD_PATTERN).
@@ -117,6 +121,21 @@ export function missingWildcards(text, names) {
 
 // The layer behind a field: the field's content box and font, its background (the field itself turns transparent), its scroll position.
 const layers = new Map(); // textarea -> { layer, background, color, title, key }
+// The palette's field colors: when they change, the layer reads the field's colors again.
+const palette = () => {
+  const root = getComputedStyle(document.documentElement);
+  return ["--comfy-input-bg", "--input-text", "--component-node-widget-background", "--component-node-foreground"].map((name) => root.getPropertyValue(name)).join(" ");
+};
+// The field's own colors, read with the class that makes it transparent taken off for that moment (nothing is drawn in between).
+function fieldColors(textarea, state) {
+  textarea.classList.remove("dfhl-input");
+  const style = getComputedStyle(textarea);
+  state.background = style.backgroundColor;
+  state.color = style.color;
+  textarea.classList.add("dfhl-input");
+  textarea.style.caretColor = state.color;
+  state.layer.style.setProperty("--dfhl-fg", state.color);
+}
 const COPIED = ["fontFamily", "fontSize", "fontWeight", "fontStyle", "lineHeight", "letterSpacing", "wordSpacing", "tabSize", "textAlign", "textIndent",
   "paddingTop", "paddingRight", "paddingBottom", "paddingLeft", "borderTopLeftRadius", "borderTopRightRadius", "borderBottomLeftRadius", "borderBottomRightRadius"];
 function attach(textarea) {
@@ -124,10 +143,11 @@ function attach(textarea) {
   const layer = document.createElement("div");
   layer.className = "dfhl";
   textarea.parentElement.insertBefore(layer, textarea);
-  const state = { layer, background: style.backgroundColor, color: style.color, title: textarea.getAttribute("title"), key: "" };
+  const state = { layer, background: style.backgroundColor, color: style.color, title: textarea.getAttribute("title"), key: "", palette: palette() };
   layers.set(textarea, state);
   textarea.classList.add("dfhl-input");
   textarea.style.caretColor = state.color;
+  layer.style.setProperty("--dfhl-fg", state.color);
   textarea.addEventListener("scroll", () => { layer.scrollTop = textarea.scrollTop; layer.scrollLeft = textarea.scrollLeft; });
   textarea.addEventListener("input", () => sync(textarea));
   sync(textarea);
@@ -145,9 +165,14 @@ function sync(textarea) {
   const state = layers.get(textarea);
   if (!state) return;
   const names = knownWildcards();
-  const key = [textarea.value, textarea.offsetLeft, textarea.offsetTop, textarea.clientWidth, textarea.clientHeight, names?.length ?? -1].join("\u0001");
+  const colors = palette();
+  const key = [textarea.value, textarea.offsetLeft, textarea.offsetTop, textarea.clientWidth, textarea.clientHeight, names?.length ?? -1, colors].join("\u0001");
   if (key === state.key) return;
   state.key = key;
+  if (colors !== state.palette) {
+    state.palette = colors;
+    fieldColors(textarea, state);
+  }
   const style = getComputedStyle(textarea), layer = state.layer;
   for (const property of COPIED) layer.style[property] = style[property];
   // Over the field's scrollbar too (its background, no gap), with that much more padding, so the text wraps at the same width as in the field.

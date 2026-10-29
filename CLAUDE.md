@@ -92,6 +92,8 @@ DiceForge nodes should feel like ComfyUI's own (https://docs.comfy.org/basic-con
     `askText` for questions (ComfyUI's dialogs; never the browser's `confirm()` or `prompt()`), `asking()` before a window's own keys;
   - `comfy.js`: `request` for a DiceForge route's JSON (its text as the error), `toast(severity, summary, detail)`;
   - `menu.js`: right-click menus, keys;
+  - `theme.js`: the look of what is in or at a node (class `df-ui`, popups `df-pop`): ComfyUI's palette variables and each design's
+    widget metrics, never fixed colors there (the light palette and users' own ones must work);
   - `window_memory.js`: what windows remember, their size;
   - `node_size.js`: node heights;
   - `move_dialog.js`: the folder picker and drag and drop onto a tree; `media.js`: Civitai pictures and videos, Blur NSFW;

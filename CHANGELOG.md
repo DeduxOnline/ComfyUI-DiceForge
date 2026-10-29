@@ -60,6 +60,9 @@ nodes and features, a patch for fixes. Each version is a [release on GitHub](htt
   doesn't change Anima.
 
 ### Changed
+- What DiceForge shows in nodes (the panels of LoRA Stack, Dice Grid, Random Image, Danbooru Tag Enhancer and XY Plot, the ⋯ menus, the
+  autocomplete) takes its colors from ComfyUI's palette and the look of the node design's own widgets, so it fits the light palette
+  and your own ones too (it stayed dark there); colored text (errors, the random range, links) stays readable on light and dark.
 - LoRA Stack: each row is a switch, the LoRA, its strength (a random one reads *🎲 0.60–1.00*), its group's letter and **⋯**, a menu with
   Model info, trigger words, another LoRA, the group, random strength and Remove (also on a right-click). A group's rows stay together
   (a row put in a group, dragged or added joins the others) under a header with how many of them each run uses and the seed mode; a row
@@ -109,6 +112,7 @@ nodes and features, a patch for fixes. Each version is a [release on GitHub](htt
   section on updating from it).
 
 ### Fixed
+- The prompt highlighting takes the field's new colors after a switch of the color palette, instead of keeping the old palette's.
 - CLIP Dual Text Encode's prompt history, Danbooru Tag Enhancer's last prompt and post, and Random Image's picked file no longer go into
   the workflow saved in the images a run makes, which handed earlier prompts and file names to whoever got a picture; the workflow itself
   keeps them. A run opened again from the queue or from its picture has none of them. Images saved before still have them in their metadata.

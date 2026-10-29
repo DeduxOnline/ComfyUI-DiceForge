@@ -2,6 +2,7 @@ import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
 import { addStyleOnce, background, element, fitToContent } from "./dom.js";
 import { fitNodeHeight } from "./node_size.js";
+import { addThemeStyle } from "./theme.js";
 
 // Random Image shows, under its inputs, the image the last run picked: the picture, its file and folder, its size (and frames of an animated one) and
 // the seed and mode it came from. Click the picture to open it full size, the file name to copy it. Kept in the node's properties, so it is still
@@ -9,11 +10,11 @@ import { fitNodeHeight } from "./node_size.js";
 // temporary copy, which ComfyUI clears on restart: then the preview says so until the next run.
 const NODE_TYPE = "DiceForgeRandomImage";
 const STYLE = `
-.dfip{font:12px system-ui,sans-serif;color:#ccc;display:flex;flex-direction:column;gap:4px;box-sizing:border-box;padding:2px 0}
-.dfip .head{color:#888}.dfip .pic{display:flex;justify-content:center;background:#1e1e1e;border-radius:6px;overflow:hidden;min-height:40px}
+.dfip{display:flex;flex-direction:column;gap:4px;box-sizing:border-box;padding:2px 0}
+.dfip .head{color:var(--df-muted)}.dfip .pic{display:flex;justify-content:center;background:var(--df-surface);border-radius:var(--df-r-card);overflow:hidden;min-height:40px}
 .dfip .pic img{max-width:100%;max-height:360px;object-fit:contain;display:block;cursor:zoom-in}
-.dfip .file{background:#222;border:1px solid #444;border-radius:5px;padding:4px 6px;word-break:break-all;cursor:copy}.dfip .file.copied{border-color:#6a9a6a}
-.dfip .size{color:#999}.dfip .empty{color:#777;font-style:italic;padding:6px}
+.dfip .file{background:var(--df-field);color:var(--df-field-fg);border:1px solid var(--df-field-line);border-radius:var(--df-r-card);padding:4px 8px;word-break:break-all;cursor:copy}
+.dfip .file.copied{border-color:var(--df-ok)}.dfip .size{color:var(--df-muted)}.dfip .empty{padding:6px}
 `;
 const viewURL = (view, stamp) => api.apiURL(`/view?${new URLSearchParams({ filename: view.filename, subfolder: view.subfolder ?? "", type: view.type ?? "input", t: stamp })}`);
 
@@ -21,8 +22,9 @@ app.registerExtension({
   name: "DiceForge.ImagePreview",
   nodeCreated(node) {
     if (node.comfyClass !== NODE_TYPE) return;
+    addThemeStyle();
     addStyleOnce("dfip-style", STYLE);
-    const panel = element("div", { class: "dfip" });
+    const panel = element("div", { class: "dfip df-ui" });
     fitToContent(node.addDOMWidget("image_preview", "diceforge_image_preview", panel, { serialize: false }), panel);
     let shownFrom; // The pick the panel shows (undefined: not drawn yet).
     function render() {

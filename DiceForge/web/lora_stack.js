@@ -5,6 +5,7 @@ import { openModelBrowser, BROWSERS, compareBases } from "./model_browser.js";
 import { fitNodeHeight } from "./node_size.js";
 import { addStyleOnce, askConfirm, asking, askText, background, element, fitToContent } from "./dom.js";
 import { menuButton, withMenu } from "./menu.js";
+import { addThemeStyle } from "./theme.js";
 
 // LoRA Stack (lora_stack.py): the rows of LoRAs drawn in the node, like rgthree's Power Lora Loader. The node's "loras" text input holds them as JSON;
 // it is hidden and this panel edits it. Each row keeps what is set most: on/off, the LoRA (click to change it in the LoRA Browser), a fixed strength or
@@ -41,32 +42,27 @@ export function together(rows) {
 }
 
 const STYLE = `
-.dfls{display:flex;flex-direction:column;gap:4px;font:12px system-ui,sans-serif;color:#ddd;width:100%;box-sizing:border-box;padding:2px 0}
-.dfls .row{display:flex;overflow:hidden;align-items:center;gap:6px;background:#1f1f1f;border:1px solid #444;border-radius:8px;padding:0 4px 0 2px;min-height:44px;box-sizing:border-box}
-.dfls .row.off .who,.dfls .row.off .str{opacity:.45}.dfls .row.missing{border-color:#d9534f}.dfls .row.drag{border-color:#6a9ad8}
-.dfls .grip{cursor:grab;color:#777;user-select:none;padding:0 2px}
-.dfls .who{flex:1;min-width:40px;display:flex;flex-direction:column;overflow:hidden}.dfls .why{color:#ff9e9e;font-size:11px}
-.dfls .name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}.dfls .name:hover{color:#fff;text-decoration:underline}
-.dfls input[type=number]::-webkit-inner-spin-button,.dfls input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
-.dfls input[type=number]{-moz-appearance:textfield;text-align:center;width:44px;flex:none;background:#262626;color:#eee;border:1px solid #555;border-radius:4px;padding:3px;font:inherit}
+.dfls{display:flex;flex-direction:column;gap:4px;width:100%;box-sizing:border-box;padding:2px 0}
+.dfls .row{display:flex;overflow:hidden;align-items:center;gap:6px;background:var(--df-surface);border:1px solid var(--df-line);border-radius:var(--df-r-card);padding:0 4px 0 2px;min-height:44px;box-sizing:border-box}
+.dfls .row.off .who,.dfls .row.off .str{opacity:.45}.dfls .row.missing{border-color:var(--df-error-line)}.dfls .row.drag{border-color:var(--df-primary)}
+.dfls .grip{cursor:grab;color:var(--df-muted);user-select:none;padding:0 2px}
+.dfls .who{flex:1;min-width:40px;display:flex;flex-direction:column;overflow:hidden}.dfls .why{color:var(--df-error);font-size:11px}
+.dfls .name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}.dfls .name:hover{color:var(--df-link);text-decoration:underline}
+.dfls input[type=number]{width:44px;flex:none;padding:0 2px}
 .dfls button,.dfls input[type=checkbox],.dfls .grip,.dfls .str,.dfls .badge{flex:none}
-.dfls button{background:#262626;color:#ddd;border:1px solid #555;border-radius:4px;padding:0 5px;font:inherit;cursor:pointer;line-height:18px}.dfls button:hover{background:#333}
-.dfls button.more{background:none;border:none;font-size:16px;width:28px;height:28px;padding:0;color:#bbb}.dfls button.more:hover{background:#333}
-.dfls .str{display:flex;align-items:center;gap:4px}.dfls .range{cursor:pointer;color:#f5b27a;white-space:nowrap}.dfls .range:hover{text-decoration:underline}
-.dfls .badge{padding:1px 6px;border-radius:5px;background:#3b4a6b;color:#d6e2ff;font-weight:700;font-size:11px}
-.dfls .rand{display:flex;gap:8px;align-items:center;padding:2px 8px 4px 40px;color:#aaa}.dfls .rand label{display:flex;gap:4px;align-items:center}
-.dfls .ghead{display:flex;gap:4px;align-items:center;padding:4px 4px 0;color:#bbb;flex-wrap:wrap}.dfls .ghead .mode{margin-left:auto;color:#888}
-.dfls .muted{color:#999}.dfls .add{border-radius:6px;padding:4px;width:100%}.dfls .foot{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.dfls button.more{width:var(--df-h);padding:0;background:transparent;border-color:transparent;color:var(--df-muted);font-size:16px}
+.dfls .str{display:flex;align-items:center;gap:4px}.dfls .range{cursor:pointer;color:var(--df-warn);white-space:nowrap}.dfls .range:hover{text-decoration:underline}
+.dfls .badge{padding:1px 6px;border-radius:4px;background:var(--df-selected);color:var(--df-fg);font-weight:700;font-size:11px}
+.dfls .rand{display:flex;gap:8px;align-items:center;padding:2px 8px 4px 40px;color:var(--df-muted)}.dfls .rand label{display:flex;gap:4px;align-items:center}
+.dfls .ghead{display:flex;gap:4px;align-items:center;padding:4px 4px 0;color:var(--df-muted);flex-wrap:wrap}.dfls .ghead .mode{margin-left:auto}
+.dfls .add{width:100%}.dfls .foot{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.dfls .foot label{display:flex;gap:6px;align-items:center;cursor:pointer}
 .dfls input[type=checkbox]{margin:0;cursor:pointer}
-.dfls input.switch{appearance:none;-webkit-appearance:none;width:30px;height:18px;border-radius:9px;background:#555;position:relative;transition:background .15s}
-.dfls input.switch::after{content:"";position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#bbb;transition:left .15s}
-.dfls input.switch:checked{background:#1e88e5}.dfls input.switch:checked::after{left:14px;background:#fff}
 .dflt{position:fixed;z-index:10001;background:#262626;border:1px solid #555;border-radius:8px;box-shadow:0 6px 20px #000a;font:13px system-ui,sans-serif;color:#ddd;padding:8px 10px;width:280px;max-height:60vh;overflow:auto;display:flex;flex-direction:column;gap:6px}
 .dflt b{color:#fff}.dflt label{display:flex;gap:6px;align-items:center;cursor:pointer}.dflt .src{color:#888;font-size:11px;margin-left:auto}
 .dflt input[type=text]{background:#1e1e1e;color:#eee;border:1px solid #555;border-radius:4px;padding:3px 6px;font:inherit;flex:1;min-width:0}
 .dflt .line{display:flex;gap:6px;align-items:center}.dflt button{background:#222;color:#eee;border:1px solid #666;border-radius:5px;padding:2px 8px;cursor:pointer;font:inherit}
 .dflt button.on{background:#3a5a8a;border-color:#6a9ad8}.dflt .muted{color:#999;font-size:12px}
-.dfls .row.warn{border-color:#c9a13a}.dfls .row.bad{border-color:#d9534f}.dfls .mark{flex:none;cursor:help}.dfls .model,.dfls .note{padding:0 4px}
+.dfls .row.warn{border-color:var(--df-warn-line)}.dfls .row.bad{border-color:var(--df-error-line)}.dfls .mark{flex:none;cursor:help}.dfls .model,.dfls .note{padding:0 4px}
 .dflp-back{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:10000;display:flex;align-items:center;justify-content:center}
 .dflp{background:#353535;color:#ddd;border:1px solid #555;border-radius:10px;width:min(720px,94vw);max-height:84vh;display:flex;flex-direction:column;padding:14px 16px;font:14px system-ui,sans-serif;box-shadow:0 10px 40px #000a;box-sizing:border-box}
 .dflp h2{margin:0 0 10px;font-size:20px;color:#fff}.dflp .top{display:flex;gap:8px;margin-bottom:10px;align-items:center}
@@ -277,7 +273,8 @@ function setUp(node) {
   if (!data || node.diceforgeStack) return;
   addStyle();
   data.hidden = true; // The JSON stays the node's value (saved and sent to the server); the panel below edits it.
-  const panel = element("div", { class: "dfls" });
+  addThemeStyle();
+  const panel = element("div", { class: "dfls df-ui" });
   // Keys typed in the panel's fields must not reach the canvas shortcuts (Escape still closes dialogs).
   panel.addEventListener("keydown", (event) => { if (event.key !== "Escape" && /^(INPUT|SELECT)$/.test(event.target.tagName)) event.stopPropagation(); });
   const widget = fitToContent(node.addDOMWidget("lora_stack", "diceforge_lora_stack", panel, { serialize: false }), panel);
@@ -398,7 +395,7 @@ function setUp(node) {
         element("span", {}, "steps of 0.05"))] : [];
       return [...head, line, ...range];
     });
-    const separate = element("input", { type: "checkbox" });
+    const separate = element("input", { type: "checkbox", class: "switch", role: "switch" });
     separate.checked = !!stack.separate_clip;
     separate.addEventListener("change", () => update((next) => { next.separate_clip = separate.checked; }));
     panel.replaceChildren(

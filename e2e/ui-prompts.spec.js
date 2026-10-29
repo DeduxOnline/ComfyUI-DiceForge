@@ -110,6 +110,53 @@ for (const vue of [true, false]) {
       await expect(field.locator("xpath=preceding-sibling::div[contains(concat(' ', @class, ' '), ' dfhl ')][1]")).toHaveCount(1);
     });
 
+    test("DiceForge's panels and the prompt highlight take the palette's colors, as the core widgets do, also after a switch", async ({ page }) => {
+      const [clip, stack] = await addNodes(page, [
+        { type: "DiceForgeCLIPDualTextEncode", widgets: { positive: "a __color__ {red|blue}" } },
+        { type: "DiceForgeLoraStack", pos: [560, 60] },
+      ]);
+      await page.evaluate((id) => {
+        const node = window.app.graph.getNodeById(id), data = node.widgets.find((widget) => widget.name === "loras");
+        data.value = JSON.stringify({ rows: [{ on: true, lora: "gone/a.safetensors", strength: 1 }], groups: {} });
+        return node.diceforgeStack.render();
+      }, stack);
+      const field = await promptField(page, clip, "positive");
+      const layer = field.locator("xpath=preceding-sibling::div[contains(concat(' ', @class, ' '), ' dfhl ')][1]");
+      await expect(layer).toHaveCount(1);
+      const strength = page.locator(".dfls .row input[type=number]").first();
+      // A core widget's background in this design: the Vue widgets' in Nodes 2.0, the palette's text fields' in classic.
+      const token = vue ? "--component-node-widget-background" : "--comfy-input-bg";
+      const resolved = () => page.evaluate((token) => {
+        const probe = document.createElement("div");
+        probe.style.background = `var(${token})`;
+        document.body.append(probe);
+        const color = getComputedStyle(probe).backgroundColor;
+        probe.remove();
+        return color;
+      }, token);
+      // The field itself is transparent over the layer: its own background, with that class off for a moment.
+      const fieldBackground = () => field.evaluate((element) => {
+        element.classList.remove("dfhl-input");
+        const color = getComputedStyle(element).backgroundColor;
+        element.classList.add("dfhl-input");
+        return color;
+      });
+      const seen = [];
+      try {
+        for (const palette of ["light", "dark"]) {
+          await page.evaluate((palette) => window.app.extensionManager.setting.set("Comfy.ColorPalette", palette), palette);
+          const background = await resolved();
+          seen.push(background);
+          await expect(strength).toHaveCSS("background-color", background);
+          const own = await fieldBackground();
+          await expect.poll(() => layer.evaluate((element) => getComputedStyle(element).backgroundColor)).toBe(own); // Taken again after the switch.
+        }
+      } finally {
+        await page.evaluate(() => window.app.extensionManager.setting.set("Comfy.ColorPalette", "dark"));
+      }
+      expect(seen[0]).not.toBe(seen[1]); // Light and dark differ: the panel didn't keep one color.
+    });
+
     test("Wildcard Browser adds wildcards to the prompt and edits files", async ({ page }) => {
       writeFile(`models/wildcards/edit_${vue ? "vue" : "classic"}.txt`, "one\ntwo\n");
       const [id] = await addNodes(page, [{ type: "DiceForgeCLIPDualTextEncode", pos: [300, 60], widgets: { positive: "1girl" } }]);

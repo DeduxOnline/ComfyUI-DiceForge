@@ -2,6 +2,7 @@ import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
 import { addStyleOnce, askConfirm, askText, background, element } from "./dom.js";
 import { toast } from "./comfy.js";
+import { addThemeStyle } from "./theme.js";
 
 // Wildcards in CLIP Dual Text Encode: autocomplete after "__" in the prompt fields, the node menu's Wildcard Browser (wildcard_browser.js) and
 // ✂ Selection → new wildcard, and what the other prompt tools share: the prompt fields, inserting at the cursor, the wildcard list.
@@ -121,9 +122,9 @@ function insertIntoNode(node, token, field) {
 }
 
 const STYLE = `
-.dfwc-pop{position:fixed;z-index:10001;background:#262626;border:1px solid #555;border-radius:6px;box-shadow:0 6px 20px #000a;font:13px system-ui,sans-serif;color:#ddd;min-width:220px;max-width:420px;max-height:280px;overflow:auto;padding:3px}
+.dfwc-pop{position:fixed;z-index:10001;min-width:220px;max-width:420px;max-height:280px;overflow:auto;padding:3px}
 .dfwc-pop div{padding:4px 8px;border-radius:4px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.dfwc-pop div.on{background:#3a5a8a;color:#fff}
+.dfwc-pop div.on{background:var(--df-pop-on)}
 .dfwc .picks{border:1px solid #4a6a9a;background:#2a3444;border-radius:6px;padding:6px 8px;margin-top:8px;max-height:32%;overflow:auto}
 .dfwc .picks-head{display:flex;gap:8px;align-items:center;margin-bottom:4px}.dfwc .picks .pick{display:flex;gap:8px;align-items:center;padding:3px 0;border-top:1px solid #3a4a64}
 .dfwc .picks .pick .text{flex:1;min-width:0;white-space:pre-wrap;word-break:break-word}.dfwc .picks button{padding:1px 8px;font-size:12px}
@@ -132,7 +133,7 @@ const STYLE = `
 .dfwc .replace-head{display:flex;gap:6px;align-items:center;flex-wrap:wrap}.dfwc .replace-head input{flex:1;min-width:140px}
 .dfwc .replace .change{display:flex;gap:8px;padding:3px 0;border-top:1px solid #443c64;font-size:12px}.dfwc .replace .change b{min-width:120px}
 .dfwc .replace .change .after{color:#9c9}.dfwc .replace .change .before{color:#c99;text-decoration:line-through}.dfwc .status button.more-action{margin-left:6px;padding:0 8px;font-size:12px}
-.dfwc .row button.more{border:none;background:none;color:#999;padding:0 4px;font-size:15px}.dfwc .row button.more:hover{color:#fff}.dfwc-pop .n{color:#999;float:right;margin-left:12px}.dfwc-pop .browse{color:#9cc8ff;border-top:1px solid #444;margin-top:2px}
+.dfwc .row button.more{border:none;background:none;color:#999;padding:0 4px;font-size:15px}.dfwc .row button.more:hover{color:#fff}.dfwc-pop .n{color:var(--descrip-text,#999);float:right;margin-left:12px}.dfwc-pop .browse{color:var(--df-link);border-top:1px solid var(--border-color,#444);margin-top:2px}
 .dfwc-back{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:10000;display:flex;align-items:center;justify-content:center}
 .dfwc{background:#353535;color:#ddd;border:1px solid #555;border-radius:10px;width:min(1100px,95vw);height:min(760px,90vh);display:flex;flex-direction:column;padding:16px 18px;font:14px system-ui,sans-serif;box-shadow:0 10px 40px #000a;box-sizing:border-box}
 .dfwc h2{margin:0 0 10px;font-size:20px;color:#fff}.dfwc .top{display:flex;gap:8px;margin-bottom:10px}
@@ -280,7 +281,8 @@ async function updatePopup(textarea) {
   popup.textarea = textarea;
   if (!popup.element) {
     addStyle();
-    popup.element = element("div", { class: "dfwc-pop" });
+    addThemeStyle();
+    popup.element = element("div", { class: "dfwc-pop df-pop" });
     document.body.append(popup.element);
   }
   renderPopup();

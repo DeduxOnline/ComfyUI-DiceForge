@@ -87,7 +87,7 @@ Every version is listed in [CHANGELOG.md](CHANGELOG.md) and released on [GitHub]
 | **Decoding and saving** | | |
 | [**Load VAE + Decode + Save, VAE Decode + Save**](#utility-nodes) | DiceForge/image | You want VAE Decode and Save Image (and Load VAE) in one node, with Easy-Use's *image_output* choice. |
 
-All nodes but Wildcard Note (a note, which lives in the frontend like ComfyUI's Note) use the ComfyUI V3 node schema: in the Nodes 2.0 frontend, the secondary inputs (including `seed_mode`) sit in the node's **Advanced** section. Every node works in both node designs, Nodes 2.0 and classic.
+All nodes but Wildcard Note (a note, which lives in the frontend like ComfyUI's Note) use the ComfyUI V3 node schema: in the Nodes 2.0 frontend, the secondary inputs (including `seed_mode`) sit in the node's **Advanced** section. Every node works in both node designs, Nodes 2.0 and classic. What DiceForge shows in a node (LoRA Stack's rows, Dice Grid's cells, the last-run rows, the ⋯ menus, the autocomplete, the prompt highlighting) takes ComfyUI's colors, also light or your own color palette, and the look of the design's own widgets: rounded fields with an outline in classic, the Vue widgets' fields in Nodes 2.0.
 
 The anime prompt builder *Prompt Director* lives in its own repository: [DeduxOnline/ComfyUI-PromptDirector](https://github.com/DeduxOnline/ComfyUI-PromptDirector).
 

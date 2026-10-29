@@ -4,6 +4,7 @@ import { toast } from "./comfy.js";
 import { blurOn } from "./media.js";
 import { fitNodeHeight } from "./node_size.js";
 import { keepSize } from "./window_memory.js";
+import { addThemeStyle } from "./theme.js";
 
 // Danbooru Tag Enhancer keeps one row under its inputs about the last run (its posts and the tags they added), so the node's height never
 // changes with a run. The run itself opens in a window, from that row or the node's menu: the Danbooru or e621 posts (their pictures; a click
@@ -16,9 +17,9 @@ const ratingName = (post) => post.rating_name || RATINGS[post.rating] || "";
 const SITES = { e621: "e621 ", safebooru: "Safebooru " }; // Named before the posts (Danbooru is the default).
 const EMPTY = "Run the workflow to see the Danbooru posts it takes and the tags they add here.";
 const STYLE = `
-.dfdb{font:12px system-ui,sans-serif;color:#ccc;display:flex;flex-direction:column;box-sizing:border-box;padding:2px 0}
-.dfdb .last-run,.dfdb .empty{width:100%;box-sizing:border-box;border:1px dashed #4a4a4a;border-radius:6px;padding:5px 8px;font:inherit;line-height:16px;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.dfdb .last-run{background:#232323;color:#ddd;cursor:pointer}.dfdb .last-run:hover{background:#2c2c2c}.dfdb .empty{border-color:transparent;color:#777;font-style:italic}
+.dfdb{display:flex;flex-direction:column;box-sizing:border-box;padding:2px 0}
+.dfdb .last-run,.dfdb .empty{width:100%;box-sizing:border-box;min-height:var(--df-h);padding:0 8px;line-height:calc(var(--df-h) - 2px);text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dfdb .empty{border:1px solid transparent}
 .dfdbw-back{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:10000;display:flex;align-items:center;justify-content:center}
 .dfdbw{background:#353535;color:#ddd;border:1px solid #555;border-radius:10px;width:min(760px,95vw);height:min(620px,92vh);display:flex;flex-direction:column;gap:8px;padding:14px 16px;font:14px system-ui,sans-serif;box-shadow:0 10px 40px #000a;box-sizing:border-box}
 .dfdbw h2{margin:0;font-size:20px;color:#fff}.dfdbw .top{display:flex;gap:8px;align-items:center}.dfdbw .top .muted{flex:1}.dfdbw .muted{color:#999;font-size:13px}
@@ -142,8 +143,9 @@ app.registerExtension({
   name: "DiceForge.DanbooruPreview",
   nodeCreated(node) {
     if (node.comfyClass !== NODE_TYPE) return;
+    addThemeStyle();
     addStyleOnce("dfdb-style", STYLE);
-    const panel = element("div", { class: "dfdb" });
+    const panel = element("div", { class: "dfdb df-ui" });
     fitToContent(node.addDOMWidget("danbooru_preview", "diceforge_danbooru_preview", panel, { serialize: false }), panel);
     let shownFrom; // The result the row shows (undefined: not drawn yet).
     function render() {

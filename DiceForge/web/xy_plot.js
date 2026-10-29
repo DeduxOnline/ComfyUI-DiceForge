@@ -3,6 +3,7 @@ import { api } from "../../scripts/api.js";
 import { addStyleOnce, asking, background, element, fitToContent } from "./dom.js";
 import { toast } from "./comfy.js";
 import { fitNodeHeight } from "./node_size.js";
+import { addThemeStyle } from "./theme.js";
 
 // XY Plot keeps one row under its fields: the size of the plot and the cell the next run makes (or what is wrong with a field). index counts up
 // after each run (control after generate: increment), so ComfyUI's own Run goes cell by cell: Set Run to N cells, in the node's menu, puts
@@ -10,9 +11,10 @@ import { fitNodeHeight } from "./node_size.js";
 const NODE_TYPE = "DiceForgeXYPlot";
 const FIELDS = ["x_type", "x_values", "y_type", "y_values"];
 const STYLE = `
-.dfxy{font:12px system-ui,sans-serif;color:#ccc;display:flex;flex-direction:column;box-sizing:border-box;padding:2px 0}
-.dfxy .summary{border:1px dashed #4a4a4a;border-radius:6px;padding:5px 8px;line-height:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.dfxy .error{color:#ff9a9a;white-space:pre-wrap}
+.dfxy{display:flex;flex-direction:column;box-sizing:border-box;padding:2px 0}
+.dfxy .summary{min-height:var(--df-h);box-sizing:border-box;background:var(--df-surface);border:1px solid var(--df-line);border-radius:var(--df-r-field);padding:0 8px;
+line-height:calc(var(--df-h) - 2px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dfxy .error{color:var(--df-error);white-space:pre-wrap}
 .dfxyp-back{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:10000;display:flex;align-items:center;justify-content:center}
 .dfxyp{background:#353535;color:#ddd;border:1px solid #555;border-radius:10px;max-width:95vw;max-height:88vh;display:flex;flex-direction:column;gap:8px;padding:14px 16px;font:14px system-ui,sans-serif;box-shadow:0 10px 40px #000a;box-sizing:border-box}
 .dfxyp h2{margin:0;font-size:20px;color:#fff}.dfxyp .top{display:flex;gap:8px;align-items:center}.dfxyp .top .muted{flex:1}.dfxyp .muted{color:#999;font-size:13px}
@@ -110,8 +112,9 @@ app.registerExtension({
   name: "DiceForge.XYPlot",
   nodeCreated(node) {
     if (node.comfyClass !== NODE_TYPE) return;
+    addThemeStyle();
     addStyleOnce("dfxy-style", STYLE);
-    const panel = element("div", { class: "dfxy" });
+    const panel = element("div", { class: "dfxy df-ui" });
     fitToContent(node.addDOMWidget("xy_preview", "diceforge_xy_preview", panel, { serialize: false }), panel);
     let fieldsKey = null, planKey = null, shownKey = null, plan = null, error = ""; // planKey: the fields plan and error are for.
     function render() {

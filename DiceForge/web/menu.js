@@ -1,11 +1,12 @@
 import { addStyleOnce, background, element } from "./dom.js";
+import { addThemeStyle } from "./theme.js";
 
 // The right-click menu of the browsers' rows and cards (and their ⋯ buttons): items are [label, action, title?] or "-" for a line. It closes on
 // a pick, on a click elsewhere, or with Escape (the window's own Escape asks menuOpen() first and calls closeMenu()).
 const STYLE = `
-.df-menu{position:fixed;z-index:10002;background:#262626;border:1px solid #555;border-radius:6px;box-shadow:0 6px 20px #000a;padding:4px;display:flex;flex-direction:column;min-width:210px;font:13px system-ui,sans-serif}
-.df-menu button{background:none;border:none;color:#ddd;text-align:left;padding:5px 10px;border-radius:4px;cursor:pointer;font:inherit;white-space:nowrap}
-.df-menu button:hover,.df-menu button:focus{background:#3a5a8a;color:#fff;outline:none}.df-menu hr{border:none;border-top:1px solid #444;margin:3px 2px}
+.df-menu{position:fixed;z-index:10002;padding:4px;display:flex;flex-direction:column;min-width:210px}
+.df-menu button{background:none;border:none;color:inherit;text-align:left;padding:5px 10px;border-radius:4px;cursor:pointer;font:inherit;white-space:nowrap}
+.df-menu button:hover,.df-menu button:focus{background:var(--df-pop-hover);outline:none}.df-menu hr{border:none;border-top:1px solid var(--border-color,#444);margin:3px 2px}
 `;
 let menu = null;
 export const menuOpen = () => menu !== null;
@@ -18,9 +19,10 @@ for (const type of ["mousedown", "pointerdown"]) document.addEventListener(type,
 
 // The menu at a point (a mouse event's, or {clientX, clientY}), kept on the screen.
 export function showMenu(point, items) {
+  addThemeStyle();
   addStyleOnce("df-menu-style", STYLE);
   closeMenu();
-  menu = element("div", { class: "df-menu", role: "menu" }, ...items.map((item) => (item === "-" ? element("hr") : element("button", { role: "menuitem", title: item[2] ?? "",
+  menu = element("div", { class: "df-menu df-pop", role: "menu" }, ...items.map((item) => (item === "-" ? element("hr") : element("button", { role: "menuitem", title: item[2] ?? "",
     onclick: () => { closeMenu(); background(Promise.resolve().then(item[1])); } }, item[0]))));
   document.body.append(menu);
   const box = menu.getBoundingClientRect();
