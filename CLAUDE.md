@@ -68,7 +68,7 @@ DiceForge nodes should feel like ComfyUI's own (https://docs.comfy.org/basic-con
 
 - **A node is a function:** typed inputs and widgets, its work, typed outputs. Its body holds inputs and parameters. Before adding a panel
   in a node (a DOM widget), see whether a menu entry, a window, an output or a tooltip does the job: the last run's prompts under CLIP
-  Dual Text Encode were removed for that (2026-10-23; they are in 🕘 Prompt history). The panels there now (Random Image, LoRA Stack, Dice
+  Dual Text Encode were removed for that (2026-10-23; they are in Prompt history). The panels there now (Random Image, LoRA Stack, Dice
   Grid) are the node's own work; change them only when the author asks (LoRA Stack's rows: a switch, the strength, a ⋯ menu for the rest,
   group headers; 2026-10-28). Danbooru Tag Enhancer and XY Plot keep one row (the last run, the plot and its next cell), and the rest
   opens in a window from the node's menu; XY Plot runs with ComfyUI's Run (2026-10-28).
@@ -77,7 +77,10 @@ DiceForge nodes should feel like ComfyUI's own (https://docs.comfy.org/basic-con
 - **The user owns the look:** title, color and size. A node's height is fitted only by `node_size.js`, which keeps a height the user
   dragged (it records the height it set in `properties.dice_forge_height`; another one is the user's).
 - **Menus:** extra tools go in the node's right-click menu (`getNodeMenuItems`) or a window it opens, after the core items (color, title,
-  clone, mode). Nothing duplicates the selection toolbox (color, bypass, lock, delete).
+  clone, mode). Nothing duplicates the selection toolbox (color, bypass, lock, delete). Entries have short names and no emoji (the
+  menus can't draw icons); the prompt nodes' tools are grouped under disabled headings (Write, Browse, Set up), each module adding its
+  entries with `addPromptMenuItems` (`wildcards.js`). The Nodes 2.0 menu has no submenu in a submenu: open a `menu.js` menu instead
+  (`showMenuAtPointer`).
 - **Modes:** a node runs when its inputs change, so a random node says when it must run again (`fingerprint_inputs`). Bypass passes
   inputs to outputs of the same type: loader-like nodes (LoRA Stack: `model`, `clip`) stay usable bypassed (`e2e/ui-nodes.spec.js` checks the model nodes).
 - **Workflows people get** (templates, examples) use only core and DiceForge nodes, so nothing shows as missing.

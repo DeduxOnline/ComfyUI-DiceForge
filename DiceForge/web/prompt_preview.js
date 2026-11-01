@@ -1,7 +1,7 @@
 import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
 import { addStyleOnce, asking, element } from "./dom.js";
-import { setField } from "./wildcards.js";
+import { addPromptMenuItems, setField } from "./wildcards.js";
 
 // Prompt history of CLIP Dual Text Encode (a window, from the node's right-click menu): the last runs' prompts as encoded (20, plus the pinned ones), newest first,
 // each with the images its run made (Save Image, Preview Image, VAE Decode + Save... in the same workflow). From an entry: ↺ Seed puts back its
@@ -91,6 +91,7 @@ api.addEventListener("executed", ({ detail }) => {
   for (const { node, time } of runs.get(detail.prompt_id) ?? []) addImage(node, time, image);
 });
 
+addPromptMenuItems("Browse", 4, (node) => (node.comfyClass === NODE_TYPE ? [{ content: "Prompt history", callback: () => openHistory(node) }] : []));
 export function openHistory(node) {
   addStyleOnce("dfpp-style", STYLE);
   const list = element("div", { class: "list" });
@@ -178,9 +179,6 @@ app.registerExtension({
       if (data?.workflow) data.workflow = withoutRunData(data.workflow);
       return queuePrompt.call(this, number, data, ...rest);
     };
-  },
-  getNodeMenuItems(node) {
-    return node.comfyClass === NODE_TYPE ? [{ content: "🕘 Prompt history", callback: () => openHistory(node) }] : [];
   },
   nodeCreated(node) {
     if (node.comfyClass !== NODE_TYPE) return;

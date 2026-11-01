@@ -1,6 +1,6 @@
 Settings for an X/Y comparison grid: each run gives KSampler the values of one cell and Dice Grid its labels, and goes on to the next cell; Set Run to N cells in the node's menu makes the whole plot with ComfyUI's Run.
 
-The node shows the plot's size and the cell the next run makes; `index` counts up after each run. Its right-click menu has **▶ Set Run to N cells, from index 0** (`index` and ComfyUI's batch count, then click **Run**) and **▦ Show the plot plan…**. Connect `seed` to KSampler, or set KSampler's *control after generate* to *fixed*: otherwise every cell gets another seed.
+The node shows the plot's size and the cell the next run makes; `index` counts up after each run. Its right-click menu has **Set Run to N cells, from index 0** (`index` and ComfyUI's batch count, then click **Run**) and **Show the plot plan…**. Connect `seed` to KSampler, or set KSampler's *control after generate* to *fixed*: otherwise every cell gets another seed.
 
 ## Inputs
 

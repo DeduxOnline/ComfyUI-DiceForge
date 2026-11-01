@@ -24,7 +24,13 @@ const cardTitles = (page) => page.$$eval(".dflb .card", (cards) => cards.map((ca
 const submenu = (page, id) => page.evaluate((id) => window.app.extensions.find((item) => item.name === "DiceForge.SamplerPresets")
   .getNodeMenuItems(window.app.graph.getNodeById(id))[0].submenu.options.filter(Boolean).map((item) => item.content), id);
 const clickSubmenu = (page, id, content) => page.evaluate(([id, content]) => window.app.extensions.find((item) => item.name === "DiceForge.SamplerPresets")
-  .getNodeMenuItems(window.app.graph.getNodeById(id))[0].submenu.options.find((item) => item?.content.includes(content)).callback(), [id, content]);
+  .getNodeMenuItems(window.app.graph.getNodeById(id))[0].submenu.options.find((item) => item?.callback && item.content.includes(content)).callback(), [id, content]);
+// The entries of a submenu of the prompt nodes' menu (Prompt styles, Tag lists), and clicking one of them.
+const promptSubmenu = (page, id, name) => page.evaluate(([id, name]) => window.app.extensions.find((item) => item.name === "DiceForge.Wildcards")
+  .getNodeMenuItems(window.app.graph.getNodeById(id)).find((item) => item?.content === name).submenu.options.filter(Boolean).map((item) => item.content), [id, name]);
+const clickPromptSubmenu = (page, id, name, content) => page.evaluate(([id, name, content]) => window.app.extensions.find((item) => item.name === "DiceForge.Wildcards")
+  .getNodeMenuItems(window.app.graph.getNodeById(id)).find((item) => item?.content === name).submenu.options
+  .find((item) => item?.callback && item.content.includes(content)).callback(), [id, name, content]);
 
 // The Wildcard Browser in its cards or lines mode (it opens in the one used last). Its mode button gets its label once the list is drawn, so
 // that is waited for first: a browser still loading is not taken for the other mode.
@@ -40,4 +46,4 @@ async function rowMenu(page, panel, index, text) {
   await panel.locator(".row").nth(index).locator("button.more").click();
   await page.locator(".df-menu button", { hasText: text }).click();
 }
-module.exports = { ALL_NODES, promptField, lookUp, cardTitles, submenu, clickSubmenu, wildcardMode, rowMenu };
+module.exports = { ALL_NODES, promptField, lookUp, cardTitles, submenu, clickSubmenu, promptSubmenu, clickPromptSubmenu, wildcardMode, rowMenu };

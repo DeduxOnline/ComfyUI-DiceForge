@@ -13,7 +13,7 @@ const STACK = JSON.stringify({ rows: [{ lora: "style/ink.safetensors", strength:
 // Values that differ from the defaults, so a value lost on the way shows.
 const CHANGES = {
   DiceForgeSDXLResolutionList: { resolution: "High-Res", "resolution.size": "1152 x 1536", seed: 123456789, rescale: "to longest side", "rescale.longer_side": 2048, multiple: 64, batch: 3, seed_mode: "deck" },
-  DiceForgeResolutionSelector: { aspect_ratio: "Random Chaos Portrait", megapixels: 2.3, seed: 42, multiple: 32, batch: 2, max_aspect: 3.5, seed_mode: "balanced", rescale: "to Width/Height", "rescale.width": 1200, "rescale.height": 0 },
+  DiceForgeResolutionSelector: { aspect_ratio: "Random Chaos Portrait", megapixels: 2.3, seed: 42, multiple: 32, batch: 2, max_aspect: 3.5, seed_mode: "balanced" },
   DiceForgeCLIPDualTextEncode: { positive: "портрет, {a|b} __color__ 🎲\nвторая строка", negative: "нет, ${x}", seed: 9007199254740991, seed_mode: "mutate", trim: false },
   DiceForgeRandomInt: { min: -50, max: 50, step: 5, seed: 7, seed_mode: "sequential" },
   DiceForgeRandomFloat: { min: -1.5, max: 2.25, step: 0.25, seed: 8, seed_mode: "shuffle", parts: 7 },
@@ -135,7 +135,7 @@ for (const vue of [true, false]) {
       fs.writeFileSync(file, Buffer.from([0xea, 0xf0, 0xe0, 0xf1, 0xed, 0xfb, 0xe9, 0x0a]));
       try {
         const [id] = await addNodes(page, [{ type: "DiceForgeCLIPDualTextEncode", pos: [300, 60] }]);
-        await clickMenu(page, id, "DiceForge.Wildcards", "Wildcard Browser");
+        await clickMenu(page, id, "DiceForge.Wildcards", "Wildcards");
         const row = page.locator(".dfwc .row", { hasText: `e2e_unreadable_${vue ? "vue" : "classic"}` });
         await expect(row).toContainText("⚠");
         await expect(row).toHaveAttribute("title", /not UTF-8/);

@@ -460,7 +460,7 @@ def test_an_unknown_rescale_mode_is_a_clear_error():
     from DiceForge.sdxl_resolution_list_latent import rescaled
     with pytest.raises(ValueError, match="Rescale: unknown mode 'sideways'"):
         rescaled(1024, 1024, {"rescale": "sideways"})
-    assert rescaled(1024, 768, None) == (1024, 768) # No rescale at all (Resolution Selector's optional input): 100%.
+    assert rescaled(1024, 768, None) == (1024, 768) # No rescale input: the original size is unchanged.
 
 
 # mutate keeps its last picks only while they fit: a wildcard file that grows gives a multi-pick its full count again.

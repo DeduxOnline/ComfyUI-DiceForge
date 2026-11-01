@@ -2,6 +2,7 @@ import { app } from "../../scripts/app.js";
 import { askConfirm, askText, background } from "./dom.js";
 import { modelSource, fetchBases, baseOf } from "./lora_stack.js";
 import { request, toast } from "./comfy.js";
+import { showMenuAtPointer } from "./menu.js";
 
 // Sampler presets in the right-click menu of KSampler, KSampler Advanced and any node with steps, cfg, sampler_name and scheduler: the settings
 // recommended for Anima, Anima Turbo, Illustrious and NoobAI (eps and v-pred), Auto (the one for the base model of the connected checkpoint, from
@@ -51,6 +52,11 @@ export function presetNameFor(file, base) {
   };
   return (base && family(base)) || family(name);
 }
+// The preset Auto picks for the connected model; its base is asked for in the background, so the menu names the pick by the next time.
+function autoPreset(source) {
+  background(fetchBases([source]));
+  return presets.builtin.find((item) => item.name === presetNameFor(source.file, baseOf(source.kind, source.file))) ?? null;
+}
 async function applyAuto(node) {
   const source = modelSource(node);
   if (!source) {
@@ -59,8 +65,7 @@ async function applyAuto(node) {
   }
   await fetchBases([source]);
   const base = baseOf(source.kind, source.file);
-  const name = presetNameFor(source.file, base);
-  const preset = presets.builtin.find((item) => item.name === name);
+  const preset = autoPreset(source);
   if (preset) applyAndSay(node, preset);
   else toast("warn", "Sampler presets", `No preset for ${source.file.split(/[\\/]/).pop()}${base ? ` (${base})` : ""}: Anima, Illustrious and NoobAI are known.`);
 }
@@ -91,17 +96,18 @@ async function deletePreset(name) {
 
 const describe = (preset) => `${preset.steps} steps · CFG ${preset.cfg}`; // Short, the menu is narrow; the sampler and scheduler are in the message.
 const run = (promise) => promise.catch((error) => toast("error", "Sampler presets", error.message));
-// The entries of the submenu (also what the tests click).
+// The entries of the submenu (also what the tests click), shaped like Prompt styles': Auto with what it would pick, yours under their heading.
 export function presetItems(node) {
-  const presetItem = (preset, mark) => ({ content: `${mark} ${preset.name} · ${describe(preset)}`, callback: () => applyAndSay(node, preset) });
+  const presetItem = (preset) => ({ content: `${preset.name} · ${describe(preset)}`, callback: () => applyAndSay(node, preset) });
+  const source = modelSource(node), auto = source && autoPreset(source);
   return [
-    { content: "✨ Auto (from the connected model)", callback: () => run(applyAuto(node)) },
+    { content: auto ? `Auto: ${auto.name}` : "Auto (for the connected model)", callback: () => run(applyAuto(node)) },
     null,
-    ...presets.builtin.map((preset) => presetItem(preset, "🎲")),
-    ...(presets.user.length ? [null, ...presets.user.map((preset) => presetItem(preset, "★"))] : []),
+    ...presets.builtin.map(presetItem),
+    ...(presets.user.length ? [null, { content: "Yours", disabled: true }, ...presets.user.map(presetItem),
+      { content: "Delete one of yours…", callback: () => showMenuAtPointer(presets.user.map((preset) => [`Delete ${preset.name}`, () => run(deletePreset(preset.name))])) }] : []),
     null,
-    { content: "💾 Save current as preset…", callback: () => run(saveCurrent(node)) },
-    ...presets.user.map((preset) => ({ content: `🗑 Delete ${preset.name}`, callback: () => run(deletePreset(preset.name)) })),
+    { content: "Save current as preset…", callback: () => run(saveCurrent(node)) },
   ];
 }
 
@@ -114,7 +120,7 @@ app.registerExtension({
     if (!isSampler(node)) return [];
     const items = presetItems(node);
     return [{
-      content: "🎲 Sampler presets",
+      content: "Sampler presets",
       has_submenu: true,
       submenu: { options: items }, // Both menus (classic and Nodes 2.0) open it from here.
     }];

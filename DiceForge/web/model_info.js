@@ -214,7 +214,7 @@ function render(panel, info, close, load) {
 app.registerExtension({
   name: "DiceForge.ModelInfo",
   getNodeMenuItems(node) {
-    return modelWidgets(node).map(({ kind, file }) => ({ content: `🛈 Model info: ${file.split(/[\\/]/).pop()}`, callback: () => openModelInfo(kind, file) }));
+    return modelWidgets(node).map(({ kind, file }) => ({ content: `Model info: ${file.split(/[\\/]/).pop()}`, callback: () => openModelInfo(kind, file) }));
   },
 });
 

@@ -1,7 +1,7 @@
 import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
 import { MODEL_FILE, openModelInfo } from "./model_info.js";
-import { insertIntoNode } from "./wildcards.js";
+import { addPromptMenuItems, insertIntoNode } from "./wildcards.js";
 import { openCivitaiSearch } from "./civitai.js";
 import { dragSource, dropTarget, pickFolder } from "./move_dialog.js";
 import { addStyleOnce, askConfirm, asking, askText, background, element, openLink } from "./dom.js";
@@ -715,12 +715,14 @@ async function openBrowser(node, spec, target = targetOf(node, spec)) {
 app.registerExtension({
   name: "DiceForge.ModelBrowser",
   getNodeMenuItems(node) {
+    if (node.comfyClass === CLIP_NODE) return []; // In its Browse group (below).
     return BROWSERS.flatMap((spec) => {
       const targets = targetsOf(node, spec);
-      return targets.map((target) => ({ content: `${spec.icon} ${spec.title} Browser${targets.length > 1 ? ` (${target.model.name})` : ""}`,
+      return targets.map((target) => ({ content: "Browse " + spec.plural + (targets.length > 1 ? " (" + target.model.name + ")" : ""),
         callback: () => openBrowser(node, spec, target) }));
     });
   },
 });
+addPromptMenuItems("Browse", 3, (node) => (node.comfyClass === CLIP_NODE ? [{ content: "LoRAs", callback: () => openBrowser(node, BROWSERS[0], { triggers: true }) }] : []));
 
 export { openBrowser as openModelBrowser, BROWSERS, family, compareBases };

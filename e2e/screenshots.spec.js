@@ -39,9 +39,7 @@ test.describe("README screenshots (Nodes 2.0)", () => {
     await shot(page, [sdxl], "sdxl_resolution_list.png");
     await page.evaluate(() => window.app.graph.clear());
     const [selector] = await addNodes(page, [{ type: "DiceForgeResolutionSelector", pos: [400, 220], widgets: { aspect_ratio: "16:9 (Widescreen)" } }]);
-    await setWidget(page, selector, "rescale", "to longest side");
-    await setWidget(page, selector, "rescale.longer_side", 1920);
-    await expect(nodeElement(page, selector)).toContainText("1920 × 1080");
+    await expect(nodeElement(page, selector)).toContainText("1368 × 768");
     await shot(page, [selector], "resolution_selector.png");
   });
 
@@ -59,7 +57,7 @@ test.describe("README screenshots (Nodes 2.0)", () => {
     await expect(page.locator(".dfwc-pop")).toContainText("__hair/style__");
     await shot(page, [id], "wildcard_autocomplete.png", { extra: [".dfwc-pop"] });
     await page.keyboard.press("Escape");
-    await clickMenu(page, id, "DiceForge.Wildcards", "Wildcard Browser");
+    await clickMenu(page, id, "DiceForge.Wildcards", "Wildcards");
     await page.locator(".dfwc .tree > .row", { hasText: /^color/ }).locator(".name").click();
     await expect(page.locator(".dfwc .edit textarea")).toHaveValue(/red/);
     await page.locator(".dfwc .edit textarea").press("Control+End");
@@ -139,7 +137,7 @@ test.describe("README screenshots (Nodes 2.0)", () => {
 
   test("Find LoRAs on Civitai", async ({ page, request }) => {
     const [loader] = await addNodes(page, [{ type: "LoraLoader", pos: [400, 220] }]);
-    await clickMenu(page, loader, "DiceForge.ModelBrowser", "LoRA Browser");
+    await clickMenu(page, loader, "DiceForge.ModelBrowser", "LoRAs");
     await page.locator(".dflb button.find").click();
     const dialog = page.locator(".dfcv");
     await expect(dialog.locator(".card", { hasText: "Ink" })).toContainText("Already here");
@@ -202,7 +200,7 @@ test.describe("README screenshots (Nodes 2.0)", () => {
       await setWidget(page, image, "color", [0x7a5cc0, 0xc06a5c, 0x5cc08a][run]);
       await queueFromPage(page, request);
     }
-    await clickMenu(page, encode, "DiceForge.PromptPreview", "Prompt history");
+    await clickMenu(page, encode, "DiceForge.Wildcards", "Prompt history");
     await expect(page.locator(".dfph .entry")).toHaveCount(3);
     await page.waitForTimeout(800);
     await page.locator(".dfph").screenshot({ path: path.join(OUT, "prompt_history.png") });
@@ -219,7 +217,7 @@ test.describe("README screenshots (Nodes 2.0)", () => {
     writeFile("models/wildcards/POSES.yaml", "POSES:\n  sitting: sitting, hands on lap,\n  standing: standing, arms crossed,\n  kneeling: kneeling,\n  lying: lying on back,\n");
     for (const [index, pose] of ["sitting", "standing", "kneeling"].entries()) writeFile(`models/wildcards/POSES/${pose}.png`, png(120, 160, [[150, 110, 190], [190, 120, 100], [100, 160, 140]][index]));
     const [id] = await addNodes(page, [{ type: "DiceForgeCLIPDualTextEncode", pos: [400, 220], widgets: { positive: "1girl" } }]);
-    await clickMenu(page, id, "DiceForge.Wildcards", "Wildcard Browser");
+    await clickMenu(page, id, "DiceForge.Wildcards", "Wildcards");
     const dialog = page.locator(".dfwc");
     await wildcardMode(dialog, "cards");
     await dialog.locator('.row[data-name="POSES.yaml"] .name').click();

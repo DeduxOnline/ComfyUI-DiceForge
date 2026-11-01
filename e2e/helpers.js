@@ -99,12 +99,13 @@ const setWidget = (page, id, name, value) => page.evaluate(([id, name, value]) =
   widget.value = value;
   widget.callback?.(value);
 }, [id, name, value]);
-// The node menu entries an extension adds, and clicking one of them (like the right-click menu does).
+// The node menu entries an extension adds (its section headings too, not its separators), and clicking one of them (like the right-click
+// menu does).
 const menuItems = (page, id, extension) => page.evaluate(([id, extension]) =>
-  window.app.extensions.find((item) => item.name === extension).getNodeMenuItems(window.app.graph.getNodeById(id)).map((item) => item.content), [id, extension]);
+  window.app.extensions.find((item) => item.name === extension).getNodeMenuItems(window.app.graph.getNodeById(id)).filter(Boolean).map((item) => item.content), [id, extension]);
 const clickMenu = (page, id, extension, content) => page.evaluate(([id, extension, content]) => {
   const items = window.app.extensions.find((item) => item.name === extension).getNodeMenuItems(window.app.graph.getNodeById(id));
-  items.find((item) => item.content.includes(content)).callback();
+  items.find((item) => item?.callback && item.content.includes(content)).callback();
 }, [id, extension, content]);
 // Queues the graph from the page (like the Run button) and waits for the queue to empty.
 async function queueFromPage(page, request) {

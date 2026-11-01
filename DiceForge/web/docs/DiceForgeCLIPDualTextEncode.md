@@ -2,7 +2,7 @@ Encodes a positive and a negative prompt with the same CLIP model, outputting a 
 
 ![CLIP Dual Text Encode in Nodes 2.0 with wildcards, variables and choices](images/clip_dual_text_encode.png)
 
-Its right-click menu has the prompt tools: **📖 Syntax guide**, **🕘 Prompt history**, **🎲 Wildcard Browser**, **✂ Selection → new wildcard…**, **🎴 LoRA Browser** (to insert trigger words), **🏷 Tag autocomplete** (download tag lists), **🏷 Tag Browser** and **🎨 Prompt styles**.
+Its right-click menu has the prompt tools in three groups. *Write:* **Syntax guide**, **Selection → new wildcard…**, **Prompt styles**. *Browse:* **Wildcards**, **Tags**, **LoRAs** (to insert trigger words), **Prompt history**. *Set up:* **Tag lists** (download the autocomplete's tag lists).
 
 ## Inputs
 

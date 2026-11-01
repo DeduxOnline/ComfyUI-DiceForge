@@ -103,7 +103,7 @@ The anime prompt builder *Prompt Director* lives in its own repository: [DeduxOn
 - To try a range of values, convert a KSampler input such as `cfg` to an input and connect **Random Float** (`min` 4, `max` 8, `step` 0.5) to it.
 - For a series of images without repeats, set `seed_mode` to `deck` and *control after generate* to *increment* on each DiceForge node (reproducible), or use `shuffle` with *increment* or *randomize* (it continues after a restart). Both give an image's result again from its seed.
 - To get a prompt from a few tags, put **Danbooru Tag Enhancer** before CLIP Dual Text Encode, or type tags with the [tag autocomplete](#tag-autocomplete-danbooru-e621).
-- For the right sampler settings, right-click KSampler → **🎲 Sampler presets** → **✨ Auto**.
+- For the right sampler settings, right-click KSampler → **Sampler presets** → **Auto**.
 
 ## Prompts
 
@@ -115,7 +115,13 @@ Node id: `DiceForgeCLIPDualTextEncode`.
 
 Works like two core *CLIP Text Encode (Prompt)* nodes sharing one CLIP model: each prompt is encoded exactly the same way, so the conditioning is identical to the core node's for the same text. On top of that, both prompts support wildcards and `{a|b}` choices, picked from a seed.
 
-Its right-click menu has the prompt tools: **📖 Syntax guide** (every piece of the syntax below with an example; **+ Insert** puts the example where the cursor was, a click copies it), **🕘 Prompt history**, **🎲 Wildcard Browser**, **✂ Selection → new wildcard…** (the part of a prompt you selected becomes a new wildcard file's first line, and `__name__` takes its place; a name already taken gets it as one more line), **🎴 LoRA Browser** (to insert trigger words), **🏷 Tag autocomplete** (download tag lists), **🏷 Tag Browser** and **🎨 Prompt styles**. The windows open where you closed them: the Wildcard Browser with its search, ★ Favorites, the file you had open (with its unsaved changes, as long as the file didn't change meanwhile) and where it was scrolled; the Tag Browser with its search, type, order and where it was scrolled; the syntax guide with its search; the model browsers (below) with their search, tag filter, order and where they were scrolled. Kept in this browser, also after a reload. Each of these windows can be resized by dragging its bottom-right corner, and keeps its size; a double-click on its title gives back the default size. In each of them, **?** (or **⌨**) shows its keys.
+Its right-click menu has the prompt tools, in three groups by what you are doing:
+
+- **Write:** **Syntax guide** (every piece of the syntax below with an example; **+ Insert** puts the example where the cursor was, a click copies it), **Selection → new wildcard…** (the part of a prompt you selected becomes a new wildcard file's first line, and `__name__` takes its place; a name already taken gets it as one more line) and **Prompt styles**.
+- **Browse:** **Wildcards** (the Wildcard Browser), **Tags** (the Tag Browser), **LoRAs** (the LoRA Browser, to insert trigger words) and **Prompt history**.
+- **Set up:** **Tag lists** (download the tag lists of the autocomplete).
+
+The menus have short names, and the windows the full ones. The windows open where you closed them: the Wildcard Browser with its search, ★ Favorites, the file you had open (with its unsaved changes, as long as the file didn't change meanwhile) and where it was scrolled; the Tag Browser with its search, type, order and where it was scrolled; the syntax guide with its search; the model browsers (below) with their search, tag filter, order and where they were scrolled. Kept in this browser, also after a reload. Each of these windows can be resized by dragging its bottom-right corner, and keeps its size; a double-click on its title gives back the default size. In each of them, **?** (or **⌨**) shows its keys.
 
 <img src="DiceForge/web/docs/images/syntax_guide.png" width="980" alt="The Syntax guide window: every piece of the prompt syntax with an example">
 
@@ -233,7 +239,7 @@ The prompt fields color the syntax as you type: `__wildcards__` (red with a wavy
 
 #### Prompt history
 
-**🕘 Prompt history** in the node's right-click menu opens a window with the last 20 runs' prompts as they were encoded (choices, wildcards and variables filled in), newest first, with the time, seed and mode (and *combination N of M* in `combinations`), and **the images each run made**: the first image of every Save Image, Preview Image, VAE Decode + Save… of the workflow in that run (up to 4; click one to open it full size). A preview image is kept by ComfyUI only until it restarts; saved ones stay. A run with the same prompts and seed as the newest one is not added again (its new images join that entry). For each entry:
+**Prompt history** in the node's right-click menu opens a window with the last 20 runs' prompts as they were encoded (choices, wildcards and variables filled in), newest first, with the time, seed and mode (and *combination N of M* in `combinations`), and **the images each run made**: the first image of every Save Image, Preview Image, VAE Decode + Save… of the workflow in that run (up to 4; click one to open it full size). A preview image is kept by ComfyUI only until it restarts; saved ones stay. A run with the same prompts and seed as the newest one is not added again (its new images join that entry). For each entry:
 
 <img src="DiceForge/web/docs/images/prompt_history.png" width="1100" alt="The Prompt history window: the last runs with their images, seeds and prompts">
 
@@ -250,7 +256,7 @@ The history (with the images' file names) is kept in the node, with the workflow
 <img src="DiceForge/web/docs/images/wildcard_browser.png" width="1100" alt="The Wildcard Browser editing color.txt">
 
 - **Autocomplete:** type `__` in the positive or negative field and a list of the wildcard files (with their number of lines) and folders (`folder/*`) opens at the cursor. Keep typing to filter it; ↑/↓ to move, Enter or Tab to insert, Esc to close. The last entry, *📂 Browse wildcards…*, opens the browser.
-- **Wildcard Browser:** right-click the node → *🎲 Wildcard Browser*. It shows the wildcard folders as a tree, with the number of lines of each file and its first lines as a tooltip, and a search box. Folders start closed: click a folder's name to open or close it, or use **Expand all** and **Collapse all**. The browser remembers which folders are open; a search shows every match with its folders open, and opening a file opens its folders.
+- **Wildcard Browser:** right-click the node → *Wildcards*. It shows the wildcard folders as a tree, with the number of lines of each file and its first lines as a tooltip, and a search box. Folders start closed: click a folder's name to open or close it, or use **Expand all** and **Collapse all**. The browser remembers which folders are open; a search shows every match with its folders open, and opening a file opens its folders.
   - **+ Add** next to a file inserts `__name__`, next to a folder `__folder/*__`, where the cursor was last in the node's positive or negative field (at the end of the positive prompt if you have not clicked in one yet). Commas are added when the name would touch other text.
   - **+ New file** creates a file (`hair/color` makes the `hair` folder too) in the first wildcards folder. A name that is already taken is refused, so an existing file is never emptied.
   - Click a file name to open it in the editor on the right, change its lines and **Save** (or Ctrl+S). *Save •* means there are unsaved changes; opening another file asks first whether to drop them. As in a code editor, every line has its number on the left and a thin line under it, the line with the caret is highlighted, and the syntax is colored as in the prompt fields (with `#` comment lines and `3::` line weights); long lines scroll sideways instead of wrapping, so a number always belongs to one option.
@@ -331,13 +337,13 @@ A name without a file makes that file. After a save, the list points at the file
 
 Anime models (Illustrious, NoobAI, Anima, Pony) were trained on Danbooru tags: written the way the model knows them, a tag works much better. While you type a word in a prompt field, the node suggests the most used tags that start with it, or with one of their aliases (`miku → hatsune_miku`), with how often each is used (👤 characters, 🎨 artists, ©️ series). From the third letter on, the most used tags that contain what you typed come after them (`tail` also finds `twintails`). **Enter** or **Tab** puts the tag in as the models learned it: spaces for underscores (emoticons like `^_^` keep theirs), parentheses escaped (`\(`), and a comma after it.
 
-- The tag lists come from [a1111-sd-webui-tagcomplete](https://github.com/DominikDoom/a1111-sd-webui-tagcomplete): right-click CLIP Dual Text Encode → **🏷 Tag autocomplete** → **⬇ Download: Danbooru** (about 100,000 tags) or **e621** (furry models). Download again to update a list.
+- The tag lists come from [a1111-sd-webui-tagcomplete](https://github.com/DominikDoom/a1111-sd-webui-tagcomplete): right-click CLIP Dual Text Encode → **Tag lists** → **Download: Danbooru** (about 100,000 tags) or **e621** (furry models). **✓ Download again** updates a list you have.
 - They are kept in `ComfyUI/user/DiceForge/tags` in that project's CSV format (`tag,type,count,aliases`); any list in that format can be put there by hand. Every list there is used.
 - Turn it off in ComfyUI's settings: *DiceForge → Prompts → Tags*.
 
 ### Tag Browser
 
-Right-click CLIP Dual Text Encode and choose **🏷 Tag Browser** to look through the downloaded tag lists:
+Right-click CLIP Dual Text Encode and choose **Tags** to look through the downloaded tag lists:
 
 - **Search** by name or alias (spaces or underscores), most used first (or by name); tags that start with what you typed come first.
 - **Types**: All, General, 👤 Characters, ©️ Series, 🎨 Artists, ⚙️ Meta, and your **★ Favorites** (☆ next to a tag stars it; kept in `ComfyUI/user/DiceForge/tag_favorites.json`).
@@ -350,7 +356,7 @@ Right-click CLIP Dual Text Encode and choose **🏷 Tag Browser** to look throug
 
 ### Prompt styles
 
-Right-click CLIP Dual Text Encode and choose **🎨 Prompt styles**: named pieces of positive and negative prompt, put in with one click, as A1111's styles. A style already in the prompts is marked ✓, and a second click takes it out again.
+Right-click CLIP Dual Text Encode and choose **Prompt styles**: named pieces of positive and negative prompt, put in with one click, as A1111's styles. A style already in the prompts is marked ✓, and a second click takes it out again.
 
 | Built-in style | Positive (before your prompt) | For |
 |---|---|---|
@@ -361,8 +367,8 @@ Right-click CLIP Dual Text Encode and choose **🎨 Prompt styles**: named piece
 
 Each also puts the usual negative for its family after your negative prompt (`lowres, worst quality, bad quality, bad anatomy…`).
 
-- **✨ Auto** puts in the style of the model connected to the node's `model` input, by its Civitai base model (from [Model info](#model-info)) or its file name, as [KSampler presets](#ksampler-presets) do.
-- **💾 Save the prompts as a style…** saves the node's two prompts under a name (a name of yours again replaces that style, after asking); **🗑 Delete** removes one. Write `{prompt}` where your prompt goes (`{prompt}, film grain, 35mm`); without it the style goes after the prompt.
+- **Auto** puts in the style of the model connected to the node's `model` input, by its Civitai base model (from [Model info](#model-info)) or its file name, as [KSampler presets](#ksampler-presets) do. The menu names the style it picks (*Auto: Illustrious quality*).
+- **Save the prompts as a style…** saves the node's two prompts under a name (a name of yours again replaces that style, after asking). Your styles come under **Yours**; **Delete one of yours…** shows them in a small menu, and removes the one you pick (after asking). Write `{prompt}` where your prompt goes (`{prompt}, film grain, 35mm`); without it the style goes after the prompt.
 - Your styles are kept in `ComfyUI/user/DiceForge/styles.csv`, in A1111's format (`name,prompt,negative_prompt`): an A1111 or Forge `styles.csv` can simply be copied there.
 
 ### Danbooru Tag Enhancer
@@ -376,7 +382,7 @@ A node that makes a few tags a full prompt from a real Danbooru (or e621) post: 
    - The optional **`prompt`** input takes the rest of your prompt (quality and style tags: `masterpiece, best quality…`): it goes first in `text`, is never searched, and its tags are not added again. So the search uses only the tags that say what the picture is.
 2. Connect `text` to CLIP Dual Text Encode's `positive` (or another text encoder). `added_tags` has only the added ones, `post_url` the posts they came from (one link per line), `post_id` the first one's id.
 3. **`mode`** works like a seed's control: **random** takes a new post on every run, like Danbooru's [random post](https://danbooru.donmai.us/posts/random), and writes it into **`post_ids`** (and the wildcards' seed into `wildcard_seed`); switch to **fixed** to keep a run you like: the posts of `post_ids` again, with the same wildcards. You can also type post ids or paste post links into `post_ids` (`4926058, https://danbooru.donmai.us/posts/123`).
-4. Under its inputs the node keeps one row about the last run (*Last run: 2 posts, +7 tags*), so a run never makes it taller. Click the row, or **🏷 Danbooru posts of the last run…** in the node's right-click menu, for a window with the posts' pictures (click one to open the post; pictures that aren't general (on e621: safe) are blurred until clicked, unless *Blur NSFW* is off in the settings, DiceForge → Browsers), the added tags (**Copy tags**) and what it searched. **Keep these posts (fixed)** there switches `mode` to fixed with that run's posts and wildcards, from its site; **📋 Copy the added tags** is in the menu too. It runs also with nothing connected, just to see what it adds.
+4. Under its inputs the node keeps one row about the last run (*Last run: 2 posts, +7 tags*), so a run never makes it taller. Click the row, or **Danbooru posts of the last run…** in the node's right-click menu, for a window with the posts' pictures (click one to open the post; pictures that aren't general (on e621: safe) are blurred until clicked, unless *Blur NSFW* is off in the settings, DiceForge → Browsers), the added tags (**Copy tags**) and what it searched. **Keep these posts (fixed)** there switches `mode` to fixed with that run's posts and wildcards, from its site; **Copy the added tags** is in the menu too. It runs also with nothing connected, just to see what it adds.
 
 How it picks:
 
@@ -462,7 +468,7 @@ The `size` list shows width x height; the aspect ratios are given here for refer
 
 ### Resolution Selector (Random)
 
-<img src="DiceForge/web/docs/images/resolution_selector.png" width="393" alt="Resolution Selector (Random) in Nodes 2.0, 16:9 rescaled to a longest side of 1920">
+<img src="DiceForge/web/docs/images/resolution_selector.png" width="393" alt="Resolution Selector (Random) in Nodes 2.0">
 
 Node id: `DiceForgeResolutionSelector`.
 
@@ -480,7 +486,6 @@ It works like the core ComfyUI *Resolution Selector* followed by **Empty Latent 
 | `batch` | Advanced | `1` | Number of latents in the batch (1–32). |
 | `max_aspect` | Advanced | `2.0` | Random Chaos only: the most stretched ratio allowed (1.0–4.0). 2.0 means up to 2:1 or 1:2. |
 | `seed_mode` | Advanced | `random` | How the random options change from run to run, as in SDXL Resolution List. See [Seed modes for sizes](#seed-modes-for-sizes). |
-| `rescale` | main | `by percentage` | Rescales the size calculated from `aspect_ratio` and `megapixels`, with the same modes as in [SDXL Resolution List](#sdxl-resolution-list): `percent` of each side (150: 1:1 at 1 MP becomes 1536x1536), a `width` and/or `height` (0 follows the aspect ratio), or the `longer_side` (16:9 with 1920 becomes 1920x1080). Then each side is rounded to `multiple`. At 100% the size is exactly what it was without rescale; an API prompt without `rescale` gets 100%. |
 
 #### Outputs
 
@@ -628,7 +633,7 @@ To vary only the sampler, list one scheduler (and the other way round).
 
 <img src="DiceForge/web/docs/images/sampler_presets.png" width="955" alt="The Sampler presets submenu in the right-click menu of KSampler">
 
-Right-click **KSampler**, **KSampler (Advanced)** or any other node with `steps`, `cfg`, `sampler_name` and `scheduler`, and choose **🎲 Sampler presets**. A preset sets those four widgets at once; the seed, denoise and the rest stay as they are. A message says what was set.
+Right-click **KSampler**, **KSampler (Advanced)** or any other node with `steps`, `cfg`, `sampler_name` and `scheduler`, and choose **Sampler presets**. A preset sets those four widgets at once; the seed, denoise and the rest stay as they are. A message says what was set.
 
 | Preset | Steps | CFG | Sampler | Scheduler | For |
 |---|---|---|---|---|---|
@@ -638,8 +643,8 @@ Right-click **KSampler**, **KSampler (Advanced)** or any other node with `steps`
 | **NoobAI (eps)** | 28 | 5 | euler_ancestral | normal | NoobAI-XL epsilon versions. |
 | **NoobAI (v-pred)** | 30 | 4.5 | euler | normal | NoobAI-XL v-prediction: Euler only (other samplers and Karras don't work well with it). A checkpoint not marked as v-pred needs **ModelSamplingDiscrete** (`v_prediction`) in front of KSampler. |
 
-- **✨ Auto** picks the preset for the model connected to the sampler's `model` input. It follows the connection back through LoRA loaders and other nodes in between to Load Checkpoint or Load Diffusion Model. It uses the model's Civitai base model from [Model info](#model-info), and falls back to the file name: *anima*, *turbo*, *noob*, *vpred* / *v-pred*, *illustrious*, *ilxl*. For any other model it says that it doesn't know one, and changes nothing.
-- **💾 Save current as preset…** saves the node's four values under a name of your choice (one of your names again replaces that preset, after asking). Your presets come after the built-in ones (★); **🗑 Delete** removes one. They are kept in `ComfyUI/user/DiceForge/sampler_presets.json`, so every workflow has them. The built-in names can't be reused.
+- **Auto** picks the preset for the model connected to the sampler's `model` input, and the menu names it (*Auto: Illustrious*). It follows the connection back through LoRA loaders and other nodes in between to Load Checkpoint or Load Diffusion Model. It uses the model's Civitai base model from [Model info](#model-info), and falls back to the file name: *anima*, *turbo*, *noob*, *vpred* / *v-pred*, *illustrious*, *ilxl*. For any other model it says that it doesn't know one, and changes nothing.
+- **Save current as preset…** saves the node's four values under a name of your choice (one of your names again replaces that preset, after asking). Your presets come after the built-in ones, under **Yours**; **Delete one of yours…** removes one. They are kept in `ComfyUI/user/DiceForge/sampler_presets.json`, so every workflow has them. The built-in names can't be reused.
 - A sampler or scheduler that your ComfyUI doesn't have is left unchanged, and the message names it.
 
 ### Variation Seed
@@ -817,7 +822,7 @@ The rows are saved in the workflow (in the node's hidden `loras` input, as JSON)
 
 <img src="DiceForge/web/docs/images/model_info.png" width="960" alt="The Model info window for a LoRA, with its Civitai data">
 
-Right-click a node with a model file picked in a list (**Load Checkpoint**, **Load Diffusion Model**, **Load LoRA**, **Load VAE**, **Load CLIP**, **Load Diffusion Model + CLIP**, and custom nodes with such lists) and choose **🛈 Model info**. A dialog like rgthree's LoRA info opens, for every model kind:
+Right-click a node with a model file picked in a list (**Load Checkpoint**, **Load Diffusion Model**, **Load LoRA**, **Load VAE**, **Load CLIP**, **Load Diffusion Model + CLIP**, and custom nodes with such lists) and choose **Model info**. A dialog like rgthree's LoRA info opens, for every model kind:
 
 - the file, its **sha256** and size;
 - what **Civitai** knows about the file, found by its hash: the model and version name, type, base model, trigger words (click one to copy it) and a link;
@@ -829,13 +834,13 @@ The first time, the hash is computed from the whole file, which takes a few seco
 
 ### Model browsers
 
-Right-click a node with a model list and the menu offers the browser for its kind: **🎴 LoRA Browser**, **🗃️ Checkpoint Browser**, **🧊 Diffusion Model Browser**, **🔤 Text Encoder Browser** and **🎨 VAE Browser**. They all work the same way: cards with previews and the Civitai data of [Model info](#model-info), a folder tree, search, filters, favorites and batch actions, and they [manage the files](#managing-model-files-find-on-civitai-rename-delete): find and download on Civitai, move, rename, delete. The LoRA Browser is described in full; the others list what differs.
+Right-click a node with a model list and the menu offers the browser for its kind: **Browse LoRAs** (the LoRA Browser), **Browse checkpoints**, **Browse diffusion models**, **Browse text encoders** and **Browse VAEs**. They all work the same way: cards with previews and the Civitai data of [Model info](#model-info), a folder tree, search, filters, favorites and batch actions, and they [manage the files](#managing-model-files-find-on-civitai-rename-delete): find and download on Civitai, move, rename, delete. The LoRA Browser is described in full; the others list what differs.
 
 #### LoRA Browser
 
 <img src="DiceForge/web/docs/images/lora_browser.png" width="1400" alt="The LoRA Browser with the LoRA cards of the test folder">
 
-Right-click **Load LoRA** (or another node with a LoRA list), **Random LoRA** or **CLIP Dual Text Encode** and choose **🎴 LoRA Browser**. It shows your LoRAs as cards, with the same Civitai data as [Model info](#model-info):
+Right-click **Load LoRA** (or another node with a LoRA list), **Random LoRA** and choose **Browse LoRAs**, or **CLIP Dual Text Encode** and **LoRAs**. It shows your LoRAs as cards, with the same Civitai data as [Model info](#model-info):
 
 - a **preview**: an image saved next to the LoRA (`name.preview.png`, `name.png`, `.jpg`, `.webp`, as Civitai Helper and LoRA Manager save them) or else the first Civitai image (blurred if Civitai rates it R or higher, until clicked; the **Blur NSFW** switch in the toolbar, also in ComfyUI's settings under *DiceForge → Browsers*, turns the blur off everywhere). A video doesn't play by itself: **▶** plays it;
 - the **name** (yours from Model info, or the Civitai model and version), the file, its size, the **base model** and the **trigger words** (click one to copy it; your own trigger words from Model info come first);
@@ -875,7 +880,7 @@ The LoRA, [Checkpoint](#checkpoint-browser) and [Diffusion Model](#diffusion-mod
 
 #### Checkpoint Browser
 
-The same browser for checkpoints: right-click **Load Checkpoint** (or another node with a checkpoint list) or **Random Checkpoint** and choose **🗃️ Checkpoint Browser**. Cards, previews, folder tree, search, base model filter, sorting and Civitai lookups work as in the [LoRA Browser](#lora-browser).
+The same browser for checkpoints: right-click **Load Checkpoint** (or another node with a checkpoint list) or **Random Checkpoint** and choose **Browse checkpoints**. Cards, previews, folder tree, search, base model filter, sorting and Civitai lookups work as in the [LoRA Browser](#lora-browser).
 
 | Opened from | Button | What it does |
 |---|---|---|
@@ -888,18 +893,18 @@ Your **recommended settings** from Model info (steps, CFG, sampler…) are shown
 
 #### Diffusion Model Browser
 
-The same browser for diffusion models (`models/diffusion_models`, and the older `models/unet`): Flux, Qwen, Wan and other models that come without their text encoders and VAE. Right-click **Load Diffusion Model**, **Load Diffusion Model + CLIP** (or another node with a diffusion model list) or **Random Diffusion Model** and choose **🧊 Diffusion Model Browser**.
+The same browser for diffusion models (`models/diffusion_models`, and the older `models/unet`): Flux, Qwen, Wan and other models that come without their text encoders and VAE. Right-click **Load Diffusion Model**, **Load Diffusion Model + CLIP** (or another node with a diffusion model list) or **Random Diffusion Model** and choose **Browse diffusion models**.
 
 | Opened from | Button | What it does |
 |---|---|---|
 | Load Diffusion Model, Load Diffusion Model + CLIP and other diffusion model loaders | **Use** | Puts the model in the node's `unet_name` list. The current one is marked *In use*. |
 | Random Diffusion Model | **Use folder** (in the tree) | Makes Random Diffusion Model pick from that folder. |
 
-Cards, previews, folder tree, search, filters, Civitai lookups, **＋ Find on Civitai**, **✎** and **🗑** work as in the other browsers. On **Load Diffusion Model + CLIP**, the right-click menu also has a **🔤 Text Encoder Browser** for each of its text encoder lists (`clip_name1`, `clip_name2`). Civitai has no model type of its own for diffusion models: they are *Checkpoints* there, so the search shows Checkpoints. Pick a version whose file is the diffusion model alone (often marked fp8, unet or "model only"); a full checkpoint (with its text encoder and VAE) belongs in the Checkpoint Browser. Downloads go to `models/diffusion_models`, even where ComfyUI also has the older `models/unet`.
+Cards, previews, folder tree, search, filters, Civitai lookups, **＋ Find on Civitai**, **✎** and **🗑** work as in the other browsers. On **Load Diffusion Model + CLIP**, the right-click menu also has **Browse text encoders** for each of its text encoder lists (`clip_name1`, `clip_name2`). Civitai has no model type of its own for diffusion models: they are *Checkpoints* there, so the search shows Checkpoints. Pick a version whose file is the diffusion model alone (often marked fp8, unet or "model only"); a full checkpoint (with its text encoder and VAE) belongs in the Checkpoint Browser. Downloads go to `models/diffusion_models`, even where ComfyUI also has the older `models/unet`.
 
 #### Text Encoder Browser and VAE Browser
 
-The same browser for the files of `models/text_encoders` and `models/vae`. Right-click **Load CLIP**, **DualCLIPLoader**, **Load Diffusion Model + CLIP** (one entry per text encoder list) and choose **🔤 Text Encoder Browser**, or **Load VAE**, **Load VAE + Decode + Save** and **Random VAE** for **🎨 VAE Browser**. **Use** puts the file in the list the browser was opened for; **Use folder** in the tree sets Random VAE's folder. Cards, folders, search, favorites, Model info, **✎**, **⇄** and **🗑** work as in the other browsers. **＋ Find on Civitai** is in the VAE Browser only: Civitai has no model type for text encoders.
+The same browser for the files of `models/text_encoders` and `models/vae`. Right-click **Load CLIP**, **DualCLIPLoader**, **Load Diffusion Model + CLIP** (one entry per text encoder list) and choose **Browse text encoders**, or **Load VAE**, **Load VAE + Decode + Save** and **Random VAE** for **Browse VAEs**. **Use** puts the file in the list the browser was opened for; **Use folder** in the tree sets Random VAE's folder. Cards, folders, search, favorites, Model info, **✎**, **⇄** and **🗑** work as in the other browsers. **＋ Find on Civitai** is in the VAE Browser only: Civitai has no model type for text encoders.
 
 The browsers are offered for every node whose list holds model files, whatever the node pack. They also work when another extension keeps the list in its own form, or when ComfyUI's experimental Asset API replaces the list: then the current file is enough, as for Model info.
 

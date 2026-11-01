@@ -2,7 +2,8 @@ import { app } from "../../scripts/app.js";
 import { askConfirm, askText, background } from "./dom.js";
 import { modelSource, fetchBases, baseOf } from "./lora_stack.js";
 import { presetNameFor } from "./sampler_presets.js";
-import { setField, PROMPT_NODE_TYPE } from "./wildcards.js";
+import { addPromptMenuItems, setField, PROMPT_NODE_TYPE } from "./wildcards.js";
+import { showMenuAtPointer } from "./menu.js";
 import { request, toast } from "./comfy.js";
 
 // Prompt styles in the right-click menu of CLIP Dual Text Encode (prompt_styles.py): the quality tags each model family is made for, and your own
@@ -59,6 +60,12 @@ function toggle(node, style) {
 // Auto: the family's quality style for the model on the node's model input (or the one the sampler presets would pick by the file name).
 const FAMILY_STYLES = { "Anima": "Anima quality", "Anima Turbo": "Anima quality", "Illustrious": "Illustrious quality", "NoobAI (eps)": "NoobAI quality",
   "NoobAI (v-pred)": "NoobAI v-pred quality" };
+// The style Auto picks for the connected model (by its base when Model info knows it, else by its file name); the base is asked for in the
+// background, so the menu names the pick by the next time it opens.
+function autoStyle(source) {
+  background(fetchBases([source]));
+  return styles.builtin.find((item) => item.name === FAMILY_STYLES[presetNameFor(source.file, baseOf(source.kind, source.file))]) ?? null;
+}
 async function applyAuto(node) {
   const source = modelSource(node);
   if (!source) {
@@ -67,7 +74,7 @@ async function applyAuto(node) {
   }
   await fetchBases([source]);
   const base = baseOf(source.kind, source.file);
-  const style = styles.builtin.find((item) => item.name === FAMILY_STYLES[presetNameFor(source.file, base)]);
+  const style = autoStyle(source);
   if (!style) {
     toast("warn", "Prompt styles", `No style for ${source.file.split(/[\\/]/).pop()}${base ? ` (${base})` : ""}: Anima, Illustrious and NoobAI are known.`);
     return;
@@ -99,27 +106,26 @@ async function deleteStyle(name) {
 }
 
 const run = (promise) => background(promise.catch((error) => toast("error", "Prompt styles", error.message)));
-// The entries of the submenu (also what the tests click).
+// The entries of the submenu (also what the tests click): Auto with what it would pick, the families' styles, yours under their heading, ✓ on
+// the ones in the prompts. Deleting one of yours opens a small menu of them: ComfyUI's menu has no second button on an entry.
 export function styleItems(node) {
-  const styleItem = (style, mark) => ({ content: `${applied(node, style) ? "✓" : mark} ${style.name}`, callback: () => toggle(node, style) });
+  const styleItem = (style) => ({ content: `${applied(node, style) ? "✓ " : ""}${style.name}`, callback: () => toggle(node, style) });
+  const source = modelSource(node), auto = source && autoStyle(source);
   return [
-    { content: "✨ Auto (quality tags for the connected model)", callback: () => run(applyAuto(node)) },
+    { content: auto ? `Auto: ${auto.name}` : "Auto (for the connected model)", callback: () => run(applyAuto(node)) },
     null,
-    ...styles.builtin.map((style) => styleItem(style, "🎨")),
-    ...(styles.user.length ? [null, ...styles.user.map((style) => styleItem(style, "★"))] : []),
+    ...styles.builtin.map(styleItem),
+    ...(styles.user.length ? [null, { content: "Yours", disabled: true }, ...styles.user.map(styleItem),
+      { content: "Delete one of yours…", callback: () => showMenuAtPointer(styles.user.map((style) => [`Delete ${style.name}`, () => run(deleteStyle(style.name))])) }] : []),
     null,
-    { content: "💾 Save the prompts as a style…", callback: () => run(saveCurrent(node)) },
-    ...styles.user.map((style) => ({ content: `🗑 Delete ${style.name}`, callback: () => run(deleteStyle(style.name)) })),
+    { content: "Save the prompts as a style…", callback: () => run(saveCurrent(node)) },
   ];
 }
+addPromptMenuItems("Write", 3, (node) => (node.comfyClass === PROMPT_NODE_TYPE ? [{ content: "Prompt styles", has_submenu: true, submenu: { options: styleItems(node) } }] : []));
 
 app.registerExtension({
   name: "DiceForge.PromptStyles",
   setup() {
     background(loadStyles());
-  },
-  getNodeMenuItems(node) {
-    if (node.comfyClass !== PROMPT_NODE_TYPE) return [];
-    return [{ content: "🎨 Prompt styles", has_submenu: true, submenu: { options: styleItems(node) } }];
   },
 });

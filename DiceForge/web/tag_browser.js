@@ -1,8 +1,7 @@
-import { app } from "../../scripts/app.js";
 import { addStyleOnce, asking, background, element } from "./dom.js";
 import { compact } from "./civitai_meta.js";
 import { tagText } from "./tag_autocomplete.js";
-import { cursorField, fieldsOf, insertIntoNode, isPromptNode } from "./wildcards.js";
+import { addPromptMenuItems, cursorField, fieldsOf, insertIntoNode } from "./wildcards.js";
 import { keysButton, keysOnQuestion, moveCursor, slashToSearch, typingIn } from "./menu.js";
 import { keepSize, recall, remember, scrollBack } from "./window_memory.js";
 import { request } from "./comfy.js";
@@ -230,9 +229,4 @@ export async function openTagBrowser(node) {
   scrollBack(list, last.scroll);
 }
 
-app.registerExtension({
-  name: "DiceForge.TagBrowser",
-  getNodeMenuItems(node) {
-    return isPromptNode(node) ? [{ content: "🏷 Tag Browser", callback: () => background(openTagBrowser(node)) }] : [];
-  },
-});
+addPromptMenuItems("Browse", 2, (node) => [{ content: "Tags", callback: () => background(openTagBrowser(node)) }]);

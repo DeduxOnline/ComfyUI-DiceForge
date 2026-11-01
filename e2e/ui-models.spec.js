@@ -13,7 +13,7 @@ for (const vue of [true, false]) {
     test("Model info shows what Civitai knows and keeps your notes", async ({ page, request }) => {
       const [id] = await addNodes(page, [{ type: "LoraLoader", widgets: { lora_name: "style/ink.safetensors" } }]);
       const items = await menuItems(page, id, "DiceForge.ModelInfo");
-      expect(items).toEqual(["🛈 Model info: ink.safetensors"]);
+      expect(items).toEqual(["Model info: ink.safetensors"]);
       await clickMenu(page, id, "DiceForge.ModelInfo", "Model info");
       await expect(page.locator(".dfmi h2")).toHaveText("Ink - v2");
       await expect(page.locator(".dfmi")).toContainText("Illustrious");
@@ -48,7 +48,7 @@ for (const vue of [true, false]) {
 
     test("Previews: R-rated ones blurred unless Blur NSFW is off (a switch in the browsers), videos wait for ▶", async ({ page }) => {
       const [loader] = await addNodes(page, [{ type: "LoraLoader" }]);
-      await clickMenu(page, loader, "DiceForge.ModelBrowser", "LoRA Browser");
+      await clickMenu(page, loader, "DiceForge.ModelBrowser", "LoRAs");
       const toggle = page.locator(".dflb .dfblur-switch input");
       await expect(toggle).toBeChecked(); // On by default.
       const probe = () => page.evaluate(async () => { // The module the page loaded (the same instance, by its URL).
@@ -70,7 +70,7 @@ for (const vue of [true, false]) {
 
     test("LoRA Browser picks LoRAs and looks them up on Civitai", async ({ page }) => {
       const [loader, random] = await addNodes(page, [{ type: "LoraLoader" }, { type: "DiceForgeRandomLora", pos: [500, 40] }]);
-      await clickMenu(page, loader, "DiceForge.ModelBrowser", "LoRA Browser");
+      await clickMenu(page, loader, "DiceForge.ModelBrowser", "LoRAs");
       await expect(page.locator(".dflb h2")).toHaveText("LoRA Browser");
       const flux = page.locator(".dflb .card", { hasText: "flux_film" });
       await flux.locator("button", { hasText: /^(🔍|↻) Civitai$/ }).click();
@@ -80,7 +80,7 @@ for (const vue of [true, false]) {
       await page.locator(".dflb .card", { hasText: "ink" }).locator("button", { hasText: /^Use$/ }).click();
       await expect.poll(() => widgetValue(page, loader, "lora_name")).toMatch(/style[\\/]ink\.safetensors/);
       await page.keyboard.press("Escape");
-      await clickMenu(page, random, "DiceForge.ModelBrowser", "LoRA Browser");
+      await clickMenu(page, random, "DiceForge.ModelBrowser", "LoRAs");
       await page.locator(".dflb .tree .row", { hasText: "style" }).locator("button", { hasText: "Use folder" }).click();
       await expect.poll(() => widgetValue(page, random, "folder")).toBe("style");
       await page.keyboard.press("Escape");
@@ -92,7 +92,7 @@ for (const vue of [true, false]) {
       try {
         await page.evaluate(() => localStorage.removeItem("diceforge.browser.loras.open"));
         const [loader, random] = await addNodes(page, [{ type: "LoraLoader" }, { type: "DiceForgeRandomLora", pos: [500, 40] }]);
-        await clickMenu(page, loader, "DiceForge.ModelBrowser", "LoRA Browser");
+        await clickMenu(page, loader, "DiceForge.ModelBrowser", "LoRAs");
         const row = (path) => page.locator(`.dflb .tree .row[data-path="${path}"]`);
         await expect(row(top)).toBeVisible();
         await expect(row(`${top}/a`)).toHaveCount(0); // Subfolders start closed.
@@ -103,7 +103,7 @@ for (const vue of [true, false]) {
         await row(`${top}/a`).locator(".name").click(); // Picking a folder shows its LoRAs (subfolders included).
         await expect(page.locator(".dflb .card")).toHaveCount(2);
         await page.keyboard.press("Escape");
-        await clickMenu(page, loader, "DiceForge.ModelBrowser", "LoRA Browser");
+        await clickMenu(page, loader, "DiceForge.ModelBrowser", "LoRAs");
         await expect(row(`${top}/a`)).toBeVisible(); // Still open when the browser opens again.
         await page.locator(".dflb .tree button.open-all").click();
         await expect(row(`${top}/a/deep`)).toBeVisible();
@@ -115,7 +115,7 @@ for (const vue of [true, false]) {
           widget.options.values.push(value);
           widget.value = value;
         }, [random, `${top}/a/deep`]);
-        await clickMenu(page, random, "DiceForge.ModelBrowser", "LoRA Browser");
+        await clickMenu(page, random, "DiceForge.ModelBrowser", "LoRAs");
         await expect(row(`${top}/a/deep`).locator("button", { hasText: "In use" })).toBeVisible();
         await page.locator(".dflb .tree button.close-all").click();
         await page.keyboard.press("Escape");
@@ -130,7 +130,7 @@ for (const vue of [true, false]) {
       writeFile(`models/loras/${top}/b/two.safetensors`, `${top} two`);
       try {
         const [loader] = await addNodes(page, [{ type: "LoraLoader" }]);
-        await clickMenu(page, loader, "DiceForge.ModelBrowser", "LoRA Browser");
+        await clickMenu(page, loader, "DiceForge.ModelBrowser", "LoRAs");
         await page.locator(".dflb .card", { hasText: "one.safetensors" }).locator("button.move").click();
         const picker = page.locator(".dfmv");
         await expect(picker.locator(`.item[data-folder="${top}/a"]`)).toHaveClass(/here/); // Where it is now.
@@ -156,7 +156,7 @@ for (const vue of [true, false]) {
 
     test("LoRA Browser favorites: ☆ stars a LoRA, ★ Favorites shows only them, and they stay", async ({ page }) => {
       const [loader] = await addNodes(page, [{ type: "LoraLoader" }]);
-      await clickMenu(page, loader, "DiceForge.ModelBrowser", "LoRA Browser");
+      await clickMenu(page, loader, "DiceForge.ModelBrowser", "LoRAs");
       const ink = page.locator(".dflb .card", { hasText: "ink.safetensors" });
       await expect(page.locator(`.dflb .tree .row.favs`)).toContainText("★ Favorites0");
       await ink.locator(".fav").click();
@@ -165,7 +165,7 @@ for (const vue of [true, false]) {
       await expect(page.locator(".dflb .card")).toHaveCount(1);
       await expect(page.locator(".dflb .card")).toContainText("ink.safetensors");
       await page.keyboard.press("Escape");
-      await clickMenu(page, loader, "DiceForge.ModelBrowser", "LoRA Browser"); // Kept on the server.
+      await clickMenu(page, loader, "DiceForge.ModelBrowser", "LoRAs"); // Kept on the server.
       await expect(page.locator(".dflb .tree .row.favs")).toContainText("★ Favorites1");
       await page.locator(".dflb .card", { hasText: "ink.safetensors" }).locator(".fav").click();
       await expect(page.locator(".dflb .tree .row.favs")).toContainText("★ Favorites0");
@@ -177,7 +177,7 @@ for (const vue of [true, false]) {
       for (const name of ["batchy_a", "batchy_b", "batchy_c"]) writeFile(`models/loras/${top}/${name}.safetensors`, `${top} ${name}`);
       try {
         const [loader] = await addNodes(page, [{ type: "LoraLoader" }]);
-        await clickMenu(page, loader, "DiceForge.ModelBrowser", "LoRA Browser");
+        await clickMenu(page, loader, "DiceForge.ModelBrowser", "LoRAs");
         const card = (name) => page.locator(".dflb .card", { hasText: `${name}.safetensors` });
         const bar = page.locator(".dflb .batch");
         await expect(bar).toBeHidden();
@@ -230,7 +230,7 @@ for (const vue of [true, false]) {
         for (const name of ["a", "b"]) expect((await lookUp(request, "loras", `${top}/${name}.safetensors`)).ok()).toBe(true); // Hashed (not on Civitai).
         const [loader] = await addNodes(page, [{ type: "LoraLoader" }]);
         await answerQuestions(page, ({ prompt }) => (prompt ? `${top}/c2` : true));
-        await clickMenu(page, loader, "DiceForge.ModelBrowser", "LoRA Browser");
+        await clickMenu(page, loader, "DiceForge.ModelBrowser", "LoRAs");
         const browser = page.locator(".dflb"), card = (name) => browser.locator(".card").filter({ has: page.locator(".muted", { hasText: `${top}/${name}.safetensors ·` }) }), status = browser.locator(".status");
         await browser.locator(".top input").first().fill(top);
         await expect(card("a").locator(".dupe")).toHaveText(`⧉ The same file as ${top}/b.safetensors`);
@@ -283,7 +283,7 @@ for (const vue of [true, false]) {
       expect((await lookUp(request, "loras", "style/ink.safetensors")).ok()).toBe(true); // Its page names a newer version (v3).
       try {
         const [loader] = await addNodes(page, [{ type: "LoraLoader" }]);
-        await clickMenu(page, loader, "DiceForge.ModelBrowser", "LoRA Browser");
+        await clickMenu(page, loader, "DiceForge.ModelBrowser", "LoRAs");
         const browser = page.locator(".dflb"), status = browser.locator(".status");
         await expect(browser.locator("button.only-updates")).toHaveText("🆕 Updates (1)");
         await browser.locator("button.only-updates").click(); // Only the ones with a newer version.
@@ -334,7 +334,7 @@ for (const vue of [true, false]) {
       for (let index = 0; index < 60; index++) writeFile(`models/loras/${folder}/lora_${String(index).padStart(2, "0")}.safetensors`, `${folder} ${index}`);
       try {
         const [loader] = await addNodes(page, [{ type: "LoraLoader" }]);
-        await clickMenu(page, loader, "DiceForge.ModelBrowser", "LoRA Browser");
+        await clickMenu(page, loader, "DiceForge.ModelBrowser", "LoRAs");
         await expect(page.locator(".dflb .card")).toHaveCount(64);
         const heights = await page.$$eval(".dflb .card", (cards) => cards.map((card) => card.getBoundingClientRect().height));
         expect(Math.min(...heights)).toBeGreaterThan(250); // Not squeezed into the dialog's height (they were 50 px high).
@@ -347,7 +347,7 @@ for (const vue of [true, false]) {
     test("LoRA Browser finds and downloads LoRAs on Civitai, renames and deletes them", async ({ page }) => {
       const tag = vue ? "vue" : "classic", folder = `civitai_${tag}`, loras = (...parts) => basePath("models", "loras", ...parts);
       const [loader] = await addNodes(page, [{ type: "LoraLoader" }]);
-      await clickMenu(page, loader, "DiceForge.ModelBrowser", "LoRA Browser");
+      await clickMenu(page, loader, "DiceForge.ModelBrowser", "LoRAs");
       await page.locator(".dflb button.find").click();
       const dialog = page.locator(".dfcv");
       await expect(dialog.locator(".card", { hasText: "Ink" })).toContainText("Already here: style/ink.safetensors"); // Known by its hash.
@@ -394,8 +394,8 @@ for (const vue of [true, false]) {
 
     test("Checkpoint Browser puts a checkpoint in Load Checkpoint", async ({ page }) => {
       const [loader] = await addNodes(page, [{ type: "CheckpointLoaderSimple" }]);
-      expect(await menuItems(page, loader, "DiceForge.ModelBrowser")).toEqual(["🗃️ Checkpoint Browser"]);
-      await clickMenu(page, loader, "DiceForge.ModelBrowser", "Checkpoint Browser");
+      expect(await menuItems(page, loader, "DiceForge.ModelBrowser")).toEqual(["Browse checkpoints"]);
+      await clickMenu(page, loader, "DiceForge.ModelBrowser", "checkpoints");
       await expect(page.locator(".dflb .tree")).toContainText("sdxl");
       await page.locator(".dflb .card", { hasText: "other" }).locator("button", { hasText: /^Use$/ }).click();
       await expect.poll(() => widgetValue(page, loader, "ckpt_name")).toMatch(/sdxl[\\/]other\.safetensors/);
@@ -405,7 +405,7 @@ for (const vue of [true, false]) {
     test("Checkpoint Browser downloads a checkpoint from Civitai, uses and deletes it", async ({ page }) => {
       const folder = `ckpt_${vue ? "vue" : "classic"}`, checkpoints = (...parts) => basePath("models", "checkpoints", ...parts);
       const [loader] = await addNodes(page, [{ type: "CheckpointLoaderSimple" }]);
-      await clickMenu(page, loader, "DiceForge.ModelBrowser", "Checkpoint Browser");
+      await clickMenu(page, loader, "DiceForge.ModelBrowser", "checkpoints");
       await page.locator(".dflb button.find").click();
       const dialog = page.locator(".dfcv");
       await expect(dialog.locator("h2")).toHaveText("Find checkpoints on Civitai");
@@ -427,9 +427,9 @@ for (const vue of [true, false]) {
 
     test("Diffusion Model Browser puts a model in Load Diffusion Model and a folder in Random Diffusion Model", async ({ page }) => {
       const [loader, random, both] = await addNodes(page, [{ type: "UNETLoader", widgets: { unet_name: "flux1-dev.safetensors" } }, { type: "DiceForgeRandomDiffusionModel", pos: [500, 40] }, { type: "DiceForgeLoadDiffusionModelCLIP", pos: [900, 40] }]);
-      for (const id of [loader, random]) expect(await menuItems(page, id, "DiceForge.ModelBrowser")).toEqual(["🧊 Diffusion Model Browser"]);
-      expect(await menuItems(page, both, "DiceForge.ModelBrowser")).toEqual(["🧊 Diffusion Model Browser", "🔤 Text Encoder Browser (clip_name1)", "🔤 Text Encoder Browser (clip_name2)"]);
-      await clickMenu(page, loader, "DiceForge.ModelBrowser", "Diffusion Model Browser");
+      for (const id of [loader, random]) expect(await menuItems(page, id, "DiceForge.ModelBrowser")).toEqual(["Browse diffusion models"]);
+      expect(await menuItems(page, both, "DiceForge.ModelBrowser")).toEqual(["Browse diffusion models", "Browse text encoders (clip_name1)", "Browse text encoders (clip_name2)"]);
+      await clickMenu(page, loader, "DiceForge.ModelBrowser", "diffusion models");
       await expect(page.locator(".dflb h2")).toHaveText("Diffusion Model Browser");
       await page.locator(".dflb .card", { hasText: "flux1-schnell" }).locator("button", { hasText: /^Use$/ }).click();
       await expect.poll(() => widgetValue(page, loader, "unet_name")).toMatch(/flux[\\/]flux1-schnell\.safetensors/);
@@ -438,7 +438,7 @@ for (const vue of [true, false]) {
       await expect(page.locator(".dfcv .hint")).toContainText("diffusion model alone"); // Civitai has them as Checkpoints.
       await page.keyboard.press("Escape");
       await page.keyboard.press("Escape");
-      await clickMenu(page, random, "DiceForge.ModelBrowser", "Diffusion Model Browser");
+      await clickMenu(page, random, "DiceForge.ModelBrowser", "diffusion models");
       await page.locator(".dflb .tree .row", { hasText: "flux" }).locator("button", { hasText: "Use folder" }).click();
       await expect.poll(() => widgetValue(page, random, "folder")).toBe("flux");
       await page.keyboard.press("Escape");
@@ -455,11 +455,11 @@ for (const vue of [true, false]) {
         widget(diffusion, "unet_name").options.values = models.map((content) => ({ content })); // Objects.
         widget(asset, "unet_name").options.values = []; // As an Asset API widget: no list to read, only its value (the canvas still needs a list to draw).
       }, [checkpoint, diffusion, asset]);
-      expect(await menuItems(page, checkpoint, "DiceForge.ModelBrowser")).toEqual(["🗃️ Checkpoint Browser"]);
-      for (const id of [diffusion, asset]) expect(await menuItems(page, id, "DiceForge.ModelBrowser")).toEqual(["🧊 Diffusion Model Browser"]);
-      expect(await menuItems(page, vae, "DiceForge.ModelBrowser")).toEqual(["🎨 VAE Browser"]);
+      expect(await menuItems(page, checkpoint, "DiceForge.ModelBrowser")).toEqual(["Browse checkpoints"]);
+      for (const id of [diffusion, asset]) expect(await menuItems(page, id, "DiceForge.ModelBrowser")).toEqual(["Browse diffusion models"]);
+      expect(await menuItems(page, vae, "DiceForge.ModelBrowser")).toEqual(["Browse VAEs"]);
       // Text encoders: Use puts one in the widget it was opened for; Civitai has none, so no Find.
-      await clickMenu(page, both, "DiceForge.ModelBrowser", "Text Encoder Browser (clip_name2)");
+      await clickMenu(page, both, "DiceForge.ModelBrowser", "text encoders (clip_name2)");
       await expect(page.locator(".dflb h2")).toHaveText("Text Encoder Browser");
       await expect(page.locator(".dflb button.find")).toHaveCount(0);
       await page.locator(".dflb .card", { hasText: "t5xxl_fp16" }).locator("button", { hasText: /^Use$/ }).click();
@@ -471,7 +471,7 @@ for (const vue of [true, false]) {
     test("LoRA Browser: Civitai tags, counts, creator and a newer version on the cards; filter by tag, sort by downloads; versions in Model info", async ({ page, request }) => {
       for (const file of ["style/ink.safetensors", "style/pony_glow.safetensors", "style/flux_film.safetensors"]) await lookUp(request, "loras", file);
       const [loader] = await addNodes(page, [{ type: "LoraLoader" }]);
-      await clickMenu(page, loader, "DiceForge.ModelBrowser", "LoRA Browser");
+      await clickMenu(page, loader, "DiceForge.ModelBrowser", "LoRAs");
       const ink = page.locator(".dflb .card", { hasText: "Ink - v2" });
       await expect(ink.locator(".ctags span")).toHaveText(["anime", "ink", "lineart"]);
       await expect(ink.locator(".stats .stat")).toHaveText(["👍 2.8K", "⬇ 71.1K", "⚡ 920"]); // No comments: not shown.
@@ -493,7 +493,7 @@ for (const vue of [true, false]) {
       await page.locator(".dflb .top select").last().selectOption("downloads");
       expect((await cardTitles(page)).slice(0, 2)).toEqual(["Ink - v2 [Illustrious]", "Glow - v1 [Pony]"]);
       await page.keyboard.press("Escape");
-      await clickMenu(page, loader, "DiceForge.ModelBrowser", "LoRA Browser");
+      await clickMenu(page, loader, "DiceForge.ModelBrowser", "LoRAs");
       await expect(page.locator(".dflb .top select").last()).toHaveValue("downloads"); // Opens where it was closed.
       await page.keyboard.press("Escape");
       // Model info: the tags and counts by the title, the versions (yours marked, the newer one new).

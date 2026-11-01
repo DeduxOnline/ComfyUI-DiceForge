@@ -1,6 +1,6 @@
 Calculate a size from an aspect ratio and a megapixel target (or a random aspect ratio from the seed) and output an empty latent of that size.
 
-![Resolution Selector (Random) in Nodes 2.0, 16:9 rescaled to a longest side of 1920](images/resolution_selector.png)
+![Resolution Selector (Random) in Nodes 2.0](images/resolution_selector.png)
 
 ## Inputs
 
@@ -8,12 +8,6 @@ Calculate a size from an aspect ratio and a megapixel target (or a random aspect
 - `megapixels` (FLOAT, default `1`): Target total megapixels. 1.0 MP = 1024x1024 for square.
 - `preview` (RESOLUTION_PREVIEW): Live preview of the calculated output resolution. Random options show the size of the last run, until the settings change.
 - `seed` (INT, default `0`): Seed for random aspect ratio selection. Ignored for fixed aspect ratios.
-- `rescale` (COMBO, optional): Rescale the picked size, like HiresFix: by percentage of each side, to a width and/or height, or to a longest side.
-  - `percent` (INT, default `100`, for by percentage): Each side in percent: 150 turns 1024x1024 into 1536x1536 (2.25 times the pixels), 50 into 512x512. Then rounded to multiple.
-  - `width` (INT, default `1536`, for to Width/Height): The width. 0: follows the aspect ratio from the height.
-  - `height` (INT, default `0`, for to Width/Height): The height. 0: follows the aspect ratio from the width. Both set: that exact size, whatever the size picked above.
-  - `longer_side` (INT, default `1536`, for to longest side): The longest side of the size, keeping the aspect ratio: 1536 turns 1216x832 into 1536x1048 (rounded to multiple 8).
-
 ## Advanced inputs
 
 Under **Show advanced inputs** on the node (Nodes 2.0), or **Show Advanced** in its right-click menu (classic design).

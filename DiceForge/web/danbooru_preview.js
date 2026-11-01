@@ -182,8 +182,8 @@ app.registerExtension({
     if (node.comfyClass !== NODE_TYPE) return [];
     const last = node.properties?.dice_forge_danbooru;
     return [
-      { content: "🏷 Danbooru posts of the last run…", callback: () => openPosts(node) },
-      ...(last?.added ? [{ content: "📋 Copy the added tags", callback: () => copyAdded(last, () => toast("success", "Copied the added tags", last.added)) }] : []),
+      { content: "Danbooru posts of the last run…", callback: () => openPosts(node) },
+      ...(last?.added ? [{ content: "Copy the added tags", callback: () => copyAdded(last, () => toast("success", "Copied the added tags", last.added)) }] : []),
     ];
   },
 });

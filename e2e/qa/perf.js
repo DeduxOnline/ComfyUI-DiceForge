@@ -92,9 +92,9 @@ async function windows(page) {
     await close();
     return time;
   };
-  times["Wildcard Browser: open"] = await timed(() => openAndClose(() => clickMenu(page, clip, "DiceForge.Wildcards", "Wildcard Browser"),
+  times["Wildcard Browser: open"] = await timed(() => openAndClose(() => clickMenu(page, clip, "DiceForge.Wildcards", "Wildcards"),
     () => page.locator(".dfwc .row", { hasText: "perf" }).first().waitFor(), () => page.keyboard.press("Escape")));
-  await clickMenu(page, clip, "DiceForge.Wildcards", "Wildcard Browser");
+  await clickMenu(page, clip, "DiceForge.Wildcards", "Wildcards");
   const wildcardSearch = page.locator(".dfwc input[placeholder^='Search wildcards']");
   times["Wildcard Browser: search"] = await timed(async (run) => {
     const name = `list${Math.floor(COUNTS.wildcards / 2) + run}`; // A file of the data, whatever its size.
@@ -103,9 +103,9 @@ async function windows(page) {
   });
   await wildcardSearch.fill("");
   await page.keyboard.press("Escape");
-  times["LoRA Browser: open"] = await timed(() => openAndClose(() => clickMenu(page, loader, "DiceForge.ModelBrowser", "LoRA Browser"),
+  times["LoRA Browser: open"] = await timed(() => openAndClose(() => clickMenu(page, loader, "DiceForge.ModelBrowser", "LoRAs"),
     () => page.locator(".dflb .card").first().waitFor(), () => page.keyboard.press("Escape")));
-  await clickMenu(page, loader, "DiceForge.ModelBrowser", "LoRA Browser");
+  await clickMenu(page, loader, "DiceForge.ModelBrowser", "LoRAs");
   const loraSearch = page.locator(".dflb input[placeholder^='Search by file']");
   times["LoRA Browser: search"] = await timed(async (run) => {
     const name = `lora_${Math.floor(COUNTS.loras / 2) + run}`;

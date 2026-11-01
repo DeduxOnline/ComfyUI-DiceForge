@@ -69,8 +69,8 @@ def sdxl(resolution, rescale, multiple=8, seed=0, mode="random", batch=1):
     return output.result[1], output.result[2], output
 
 
-def selector(aspect, megapixels=1.0, rescale=None, multiple=8, seed=0, mode="random", max_aspect=2.0, batch=1):
-    output = Selector.execute(aspect, megapixels, seed, multiple, batch, max_aspect, mode, None, rescale)
+def selector(aspect, megapixels=1.0, multiple=8, seed=0, mode="random", max_aspect=2.0, batch=1):
+    output = Selector.execute(aspect, megapixels, seed, multiple, batch, max_aspect, mode)
     return output.result[1], output.result[2], output
 
 
@@ -100,9 +100,9 @@ def test_sdxl_sizes_are_multiples_and_reported_consistently(resolution, rescale,
 
 @settings(max_examples=scaled(300))
 @given(aspect=st.sampled_from([*ASPECT_RATIOS, *SELECTOR_LISTED, *SELECTOR_CHAOS]), megapixels=st.integers(1, 160).map(lambda k: round(k * 0.1, 1)),
-       rescale=rescales, multiple=multiples, batch=st.integers(1, 4), seed=seeds, mode=st.sampled_from(SEED_MODES), max_aspect=max_aspects)
-def test_selector_sizes_are_multiples_and_reported_consistently(aspect, megapixels, rescale, multiple, batch, seed, mode, max_aspect, latents):
-    width, height, output = selector(aspect, megapixels, rescale, multiple, seed, mode, max_aspect, batch)
+       multiple=multiples, batch=st.integers(1, 4), seed=seeds, mode=st.sampled_from(SEED_MODES), max_aspect=max_aspects)
+def test_selector_sizes_are_multiples_and_reported_consistently(aspect, megapixels, multiple, batch, seed, mode, max_aspect, latents):
+    width, height, output = selector(aspect, megapixels, multiple, seed, mode, max_aspect, batch)
     assert isinstance(width, int) and isinstance(height, int)
     assert width % multiple == 0 and height % multiple == 0 and width >= multiple and height >= multiple
     assert latents[-1] == (width, height, batch) and output.result[3] == seed
@@ -110,25 +110,14 @@ def test_selector_sizes_are_multiples_and_reported_consistently(aspect, megapixe
     assert (last["width"], last["height"]) == (width, height)
     json.dumps(output.ui)
     if mode in REPRODUCIBLE:
-        assert selector(aspect, megapixels, rescale, multiple, seed, mode, max_aspect, batch)[:2] == (width, height)
+        assert selector(aspect, megapixels, multiple, seed, mode, max_aspect, batch)[:2] == (width, height)
 
 
-# The rescale promises, in every group (Random Chaos included): to Width/Height with both sides gives exactly that size; with one side, that side;
-# to longest side, that longest side (the 1520-instead-of-1536 bug); Portrait and Landscape keep their orientation.
 @settings(max_examples=scaled(300))
 @given(resolution=sdxl_resolutions(), rescale=rescales, multiple=multiples, seed=seeds, mode=st.sampled_from(SEED_MODES))
 def test_sdxl_rescale_promises_hold_in_every_group(resolution, rescale, multiple, seed, mode, latents):
     width, height, _ = sdxl(resolution, rescale, multiple, seed, mode)
     check_rescale_promises(width, height, rescale, multiple, orientation(resolution), resolution.get("max_aspect", 2.0))
-
-
-@settings(max_examples=scaled(300))
-@given(aspect=st.sampled_from([*ASPECT_RATIOS, *SELECTOR_LISTED, *SELECTOR_CHAOS]), rescale=rescales, multiple=multiples, seed=seeds,
-       mode=st.sampled_from(SEED_MODES), max_aspect=max_aspects)
-def test_selector_rescale_promises_hold_for_every_aspect(aspect, rescale, multiple, seed, mode, max_aspect, latents):
-    width, height, _ = selector(aspect, 1.0, rescale, multiple, seed, mode, max_aspect)
-    wanted = SELECTOR_CHAOS.get(aspect)
-    check_rescale_promises(width, height, rescale, multiple, wanted if wanted != "any" else None, max_aspect)
 
 
 def check_rescale_promises(width, height, rescale, multiple, wanted, max_aspect):
@@ -188,13 +177,13 @@ def test_round_to_multiple_is_the_closest_ratio_on_the_grid(width, height, multi
 
 
 @settings(max_examples=scaled(200))
-@given(ratio=st.sampled_from(list(ASPECT_RATIOS.values())), megapixels=st.integers(1, 160).map(lambda k: round(k * 0.1, 1)), multiple=multiples, percent=percents)
-def test_selector_sizes_follow_megapixels_and_ratio(ratio, megapixels, multiple, percent):
-    width, height = Selector.size_for_ratio(*ratio, megapixels, multiple, rescale={"rescale": BY_PERCENTAGE, "percent": percent})
-    scale = math.sqrt(megapixels * 1024 * 1024 / (ratio[0] * ratio[1])) * percent / 100
+@given(ratio=st.sampled_from(list(ASPECT_RATIOS.values())), megapixels=st.integers(1, 160).map(lambda k: round(k * 0.1, 1)), multiple=multiples)
+def test_selector_sizes_follow_megapixels_and_ratio(ratio, megapixels, multiple):
+    width, height = Selector.size_for_ratio(*ratio, megapixels, multiple)
+    scale = math.sqrt(megapixels * 1024 * 1024 / (ratio[0] * ratio[1]))
     for side, exact in ((width, ratio[0] * scale), (height, ratio[1] * scale)):
         assert abs(side - exact) <= multiple / 2 + 1e-9 or side == multiple # Each side rounded to the nearest multiple.
-    down = Selector.size_for_ratio(*ratio, megapixels, multiple, round_down=True, rescale={"rescale": BY_PERCENTAGE, "percent": percent})
+    down = Selector.size_for_ratio(*ratio, megapixels, multiple, round_down=True)
     assert down[0] <= max(multiple, width) and down[1] <= max(multiple, height)
 
 

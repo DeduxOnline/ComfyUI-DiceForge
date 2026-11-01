@@ -16,6 +16,11 @@ export function closeMenu() {
 }
 // pointerdown too: the canvas cancels mousedown, and a row menu in a node (LoRA Stack's) must close on a click on it.
 for (const type of ["mousedown", "pointerdown"]) document.addEventListener(type, (event) => { if (menu && !menu.contains(event.target)) closeMenu(); }, true);
+let lastPoint = { clientX: 200, clientY: 200 };
+document.addEventListener("pointerdown", (event) => { lastPoint = { clientX: event.clientX, clientY: event.clientY }; }, true);
+// The menu where the user last clicked: from an entry of ComfyUI's own node menu, whose callback gets no event in Nodes 2.0, and which can't
+// hold a submenu in a submenu there.
+export const showMenuAtPointer = (items) => setTimeout(() => showMenu(lastPoint, items)); // After ComfyUI's menu has closed.
 
 // The menu at a point (a mouse event's, or {clientX, clientY}), kept on the screen.
 export function showMenu(point, items) {

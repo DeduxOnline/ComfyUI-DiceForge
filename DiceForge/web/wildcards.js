@@ -330,15 +330,30 @@ document.addEventListener("keydown", (event) => {
 document.addEventListener("focusout", (event) => { if (event.target === popup.textarea) setTimeout(closePopup, 150); rememberCursor(event); }, true);
 for (const type of ["keyup", "mouseup", "focusin"]) document.addEventListener(type, rememberCursor, true);
 
+// The prompt nodes' menu: the prompt tools in three groups, by what the user is doing (writing a prompt, browsing for its parts, setting up
+// once), each tool adding its own entries (they all import this module). A group's name is a disabled entry, which both menus draw like
+// ComfyUI's own "Extensions" heading. Short names: the window keeps the full one ("Wildcards" opens the Wildcard Browser).
+const MENU_GROUPS = ["Write", "Browse", "Set up"];
+const menuEntries = []; // { group, order, items(node) }
+export function addPromptMenuItems(group, order, items) {
+  menuEntries.push({ group, order, items });
+}
+export function promptMenu(node) {
+  return MENU_GROUPS.flatMap((group) => {
+    const items = menuEntries.filter((entry) => entry.group === group).sort((a, b) => a.order - b.order).flatMap((entry) => entry.items(node));
+    return items.length ? [{ content: group, disabled: true }, ...items] : [];
+  });
+}
+addPromptMenuItems("Write", 1, (node) => [
+  { content: "Syntax guide", callback: () => import("./syntax_guide.js").then((guide) => guide.openSyntaxGuide(node)).catch((error) => console.error("[DiceForge]", error)) },
+]);
+addPromptMenuItems("Write", 2, (node) => [{ content: "Selection → new wildcard…", callback: () => background(selectionToWildcard(node)) }]);
+addPromptMenuItems("Browse", 1, (node) => [{ content: "Wildcards", callback: () => openBrowser(node) }]);
+
 app.registerExtension({
   name: "DiceForge.Wildcards",
   getNodeMenuItems(node) {
-    // The syntax guide first: this extension registers before the other prompt tools (they all import this module), so its items come first.
-    return isPromptNode(node) ? [
-      { content: "📖 Syntax guide", callback: () => import("./syntax_guide.js").then((guide) => guide.openSyntaxGuide(node)).catch((error) => console.error("[DiceForge]", error)) },
-      { content: "🎲 Wildcard Browser", callback: () => openBrowser(node) },
-      { content: "✂ Selection → new wildcard…", callback: () => background(selectionToWildcard(node)) },
-    ] : [];
+    return isPromptNode(node) ? [null, ...promptMenu(node)] : [];
   },
 });
 

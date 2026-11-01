@@ -48,15 +48,10 @@ for (const vue of [true, false]) {
       if (vue) await expect(nodeElement(page, id)).toContainText("×");
     });
 
-    test("Resolution Selector previews its size with rescale", async ({ page }) => {
+    test("Resolution Selector previews its size", async ({ page }) => {
       const [id] = await addNodes(page, [{ type: "DiceForgeResolutionSelector", widgets: { aspect_ratio: "16:9 (Widescreen)" } }]);
       await expect.poll(() => widgetValue(page, id, "preview_ratio")).toBe("1368:768");
-      await setWidget(page, id, "rescale.percent", 150);
-      await expect.poll(() => widgetValue(page, id, "preview_ratio")).toBe("2048:1152");
-      await setWidget(page, id, "rescale", "to longest side");
-      await setWidget(page, id, "rescale.longer_side", 1920);
-      await expect.poll(() => widgetValue(page, id, "preview_ratio")).toBe("1920:1080");
-      if (vue) await expect(nodeElement(page, id)).toContainText("1920 × 1080");
+      if (vue) await expect(nodeElement(page, id)).toContainText("1368 × 768");
     });
 
     test("Dice Grid's cells panel: star the best cells, save them at full size with their workflow, open a cell's run", async ({ page, request }) => {
@@ -107,10 +102,10 @@ for (const vue of [true, false]) {
       await expect(row).toHaveText("2 × 2 = 4 cells · next: 20 steps, karras");
       await setWidget(page, xy, "x_values", "10, x");
       await expect(row.locator(".error")).toContainText("not a number");
-      await expect.poll(() => menuItems(page, xy, extension)).toEqual(["▦ Show the plot plan…"]); // Nothing to run.
+      await expect.poll(() => menuItems(page, xy, extension)).toEqual(["Show the plot plan…"]); // Nothing to run.
       await setWidget(page, xy, "x_values", "10, 20");
       await expect(row).toHaveText("2 × 2 = 4 cells · next: 20 steps, karras");
-      expect(await menuItems(page, xy, extension)).toEqual(["▶ Set Run to 4 cells, from index 0", "▦ Show the plot plan…"]);
+      expect(await menuItems(page, xy, extension)).toEqual(["Set Run to 4 cells, from index 0", "Show the plot plan…"]);
       await clickMenu(page, xy, extension, "Set Run");
       expect(await widgetValue(page, xy, "index")).toBe(0);
       expect(await widgetValue(page, xy, "control_after_generate")).toBe("increment");
@@ -152,7 +147,7 @@ for (const vue of [true, false]) {
         { type: "CheckpointLoaderSimple", widgets: { ckpt_name: "illustrious_base.safetensors" } },
         { type: "KSampler", pos: [460, 200] },
       ]);
-      expect(await menuItems(page, sampler, "DiceForge.SamplerPresets")).toEqual(["🎲 Sampler presets"]);
+      expect(await menuItems(page, sampler, "DiceForge.SamplerPresets")).toEqual(["Sampler presets"]);
       expect(await menuItems(page, checkpoint, "DiceForge.SamplerPresets")).toEqual([]);
       const values = () => Promise.all(["steps", "cfg", "sampler_name", "scheduler"].map((name) => widgetValue(page, sampler, name)));
       // The real right-click menu: the submenu lists the built-in presets.
@@ -176,6 +171,7 @@ for (const vue of [true, false]) {
       await expect(page.getByText(/connected to the model input/).first()).toBeVisible();
       expect((await values())[0]).toBe(7);
       await connect(page, checkpoint, 0, sampler, 0);
+      await expect.poll(() => submenu(page, sampler)).toContain("Auto: Illustrious"); // What Auto picks, named in the menu.
       await clickSubmenu(page, sampler, "NoobAI (v-pred)");
       await expect.poll(values).toEqual([30, 4.5, "euler", "normal"]);
       await clickSubmenu(page, sampler, "Auto");
@@ -186,12 +182,14 @@ for (const vue of [true, false]) {
       await answerQuestions(page, ({ prompt }) => (prompt ? "E2E mine" : true));
       await clickSubmenu(page, sampler, "Save current");
       await expect.poll(async () => (await (await request.get("/diceforge/sampler-presets")).json()).user.map((item) => item.name)).toContain("E2E mine");
-      await expect.poll(() => submenu(page, sampler)).toContain("★ E2E mine · 21 steps · CFG 6");
+      await expect.poll(() => submenu(page, sampler)).toContain("E2E mine · 21 steps · CFG 6");
+      expect(await submenu(page, sampler)).toContain("Yours"); // Under their own heading.
       await setWidget(page, sampler, "steps", 5);
-      await clickSubmenu(page, sampler, "★ E2E mine");
+      await clickSubmenu(page, sampler, "E2E mine");
       await expect.poll(values).toEqual([21, 6, "euler_ancestral", "karras"]);
-      await clickSubmenu(page, sampler, "🗑 Delete E2E mine");
-      await expect.poll(() => submenu(page, sampler)).not.toContain("★ E2E mine · 21 steps · CFG 6");
+      await clickSubmenu(page, sampler, "Delete one of yours");
+      await page.locator(".df-menu button", { hasText: "Delete E2E mine" }).click();
+      await expect.poll(() => submenu(page, sampler)).not.toContain("E2E mine · 21 steps · CFG 6");
       expect((await (await request.get("/diceforge/sampler-presets")).json()).user).toEqual([]);
     });
 

@@ -60,6 +60,11 @@ nodes and features, a patch for fixes. Each version is a [release on GitHub](htt
   doesn't change Anima.
 
 ### Changed
+- The node menus: CLIP Dual Text Encode's prompt tools in three groups, Write (Syntax guide, Selection → new wildcard…, Prompt styles),
+  Browse (Wildcards, Tags, LoRAs, Prompt history) and Set up (Tag lists, which was Tag autocomplete), with short names; Wildcards to
+  Text and Wildcard Note have the same groups. Every DiceForge menu entry lost its emoji (Browse checkpoints, Model info, Sampler
+  presets…). Prompt styles and Sampler presets name what Auto would pick (*Auto: Illustrious quality*), show your own under *Yours*, and
+  delete one of them from one entry instead of a second list.
 - What DiceForge shows in nodes (the panels of LoRA Stack, Dice Grid, Random Image, Danbooru Tag Enhancer and XY Plot, the ⋯ menus, the
   autocomplete) takes its colors from ComfyUI's palette and the look of the node design's own widgets, so it fits the light palette
   and your own ones too (it stayed dark there); colored text (errors, the random range, links) stays readable on light and dark.

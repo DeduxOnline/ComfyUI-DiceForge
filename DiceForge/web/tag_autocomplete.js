@@ -2,12 +2,12 @@ import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
 import { background } from "./dom.js";
 import { compact } from "./civitai_meta.js";
-import { addCompletionSource, isPromptNode } from "./wildcards.js";
+import { addCompletionSource, addPromptMenuItems } from "./wildcards.js";
 import { toast } from "./comfy.js";
 
 // Danbooru and e621 tag autocomplete in the prompt fields (tag_autocomplete.py): while a word is typed, the most used tags that start with it (or an
 // alias of them), with how often each is used. Accepting one puts it in as the models learned it: spaces for underscores (except in emoticons like
-// ^_^), escaped parentheses, and a comma after it. The tag lists are downloaded from the node's menu (🏷 Tag autocomplete) or put in
+// ^_^), escaped parentheses, and a comma after it. The tag lists are downloaded from the node's menu (Tag lists) or put in
 // ComfyUI/user/DiceForge/tags; a setting turns the autocomplete off.
 const SETTING = "DiceForge.TagAutocomplete";
 const TYPE_MARKS = { general: "", artist: "🎨 ", copyright: "©️ ", character: "👤 ", meta: "⚙️ " };
@@ -67,16 +67,14 @@ app.registerExtension({
     id: SETTING,
     category: ["DiceForge", "Prompts", "Tags"],
     name: "Suggest Danbooru / e621 tags in CLIP Dual Text Encode",
-    tooltip: "While a word is typed in a prompt field, the most used tags that start with it. The tag lists are downloaded from the node's menu (🏷 Tag autocomplete).",
+    tooltip: "While a word is typed in a prompt field, the most used tags that start with it. The tag lists are downloaded from the node's menu (Tag lists).",
     type: "boolean",
     defaultValue: true,
   }],
   setup() {
     background(loadLists());
   },
-  getNodeMenuItems(node) {
-    if (!isPromptNode(node)) return [];
-    const options = lists.map((list) => ({ content: `${list.here ? "✓ Download again" : "⬇ Download"}: ${list.title}`, callback: () => background(download(list)) }));
-    return [{ content: "🏷 Tag autocomplete", has_submenu: true, submenu: { options } }];
-  },
 });
+// Set up, in the prompt nodes' menu: download each list, or download it again (✓: it is here).
+addPromptMenuItems("Set up", 1, () => [{ content: "Tag lists", has_submenu: true, submenu: {
+  options: lists.map((list) => ({ content: `${list.here ? "✓ Download again" : "Download"}: ${list.title}`, callback: () => background(download(list)) })) } }]);

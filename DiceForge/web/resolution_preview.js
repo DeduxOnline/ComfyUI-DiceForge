@@ -21,7 +21,7 @@ function roundToMultiple(width, height, multiple) {
   return best;
 }
 
-// The node's rescale (sdxl_resolution_list_latent.rescaled): by percentage of each side, to a width and/or height, or to a longest side.
+// The SDXL node's rescale: by percentage of each side, to a width and/or height, or to a longest side.
 function rescaled(width, height, current) {
   if (current.rescale === "to Width/Height") {
     const targetWidth = Number(current.rescale_width) || 0, targetHeight = Number(current.rescale_height) || 0;
@@ -43,11 +43,11 @@ function roundHalfEven(value) {
   const floor = Math.floor(value);
   return value - floor === 0.5 ? (floor % 2 === 0 ? floor : floor + 1) : Math.round(value);
 }
-// Resolution Selector's size (ResolutionSelectorRandomLatent.size_for_ratio): the exact size for the aspect ratio and megapixels, rescaled, then each
-// side rounded to multiple.
+// Resolution Selector's size (ResolutionSelectorRandomLatent.size_for_ratio): the exact size for the aspect ratio and megapixels, then each side
+// rounded to multiple.
 function selectorSize(wRatio, hRatio, current) {
   const scale = Math.sqrt((current.megapixels * 1024 * 1024) / (wRatio * hRatio));
-  const [width, height] = rescaled(wRatio * scale, hRatio * scale, current);
+  const width = wRatio * scale, height = hRatio * scale;
   const multiple = current.multiple;
   return [Math.max(multiple, roundHalfEven(width / multiple) * multiple), Math.max(multiple, roundHalfEven(height / multiple) * multiple)];
 }
@@ -94,11 +94,10 @@ const NODES = {
       megapixels: Number(widgetValue(node, "megapixels") ?? 1),
       multiple: Number(widgetValue(node, "multiple") ?? 8),
       max_aspect: Number(widgetValue(node, "max_aspect") ?? 2),
-      ...rescaleSettings(node),
     }),
     isRandom: (current) => current.aspect_ratio.startsWith("Random"),
     usesMaxAspect: (current) => current.aspect_ratio.startsWith("Random Chaos"),
-    // The final size, as the node computes it (megapixels, rescale, rounding), given to the preview as the ratio and megapixels of an exact multiple.
+    // The final size, as the node computes it (megapixels and rounding), given to the preview as the ratio and megapixels of an exact multiple.
     fixed: (current) => {
       const match = /^(\d+(?:\.\d+)?)\s*:\s*(\d+(?:\.\d+)?)/.exec(current.aspect_ratio);
       if (!match || !(current.megapixels > 0) || !(current.multiple > 0)) return null;

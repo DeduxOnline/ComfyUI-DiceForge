@@ -98,6 +98,6 @@ app.registerExtension({
     if (note && pack) note.python_module = pack.python_module;
   },
   getNodeMenuItems(node) {
-    return node.comfyClass === NODE_TYPE ? [{ content: "↻ Refresh the file list", callback: () => background(wildcardList(true)) }] : [];
+    return node.comfyClass === NODE_TYPE ? [{ content: "Refresh the file list", callback: () => background(wildcardList(true)) }] : [];
   },
 });

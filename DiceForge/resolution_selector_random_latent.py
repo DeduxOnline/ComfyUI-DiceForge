@@ -3,7 +3,6 @@ import math
 import nodes
 from comfy_api.latest import io
 from .seed_modes import MEMORY, SEED_MODES, SEED_MODE_TOOLTIP, make_picker, pick_label, pick_in_range
-from .sdxl_resolution_list_latent import describe_rescale, keep_orientation, rescale_input, rescale_settings, rescaled
 # Aspect ratios for the canvas, in the "W:H (Name)" form the frontend resolution preview reads.
 ASPECT_RATIOS = {
     "1:1 (Square)": (1, 1),
@@ -101,7 +100,6 @@ class ResolutionSelectorRandomLatent(io.ComfyNode):
                     tooltip=SEED_MODE_TOOLTIP,
                     advanced=True,
                 ),
-                rescale_input(optional=True), # Last, so workflows and prompts made before it keep working (it starts at by percentage 100).
             ],
             # Outputs for the node: the empty latent batch, its width and height in pixels, and the seed.
             outputs=[
@@ -111,13 +109,12 @@ class ResolutionSelectorRandomLatent(io.ComfyNode):
                 io.Int.Output(display_name="seed", tooltip="The seed used for this run, for example to pass on to KSampler."),
             ],
         )
-    # Megapixel sizing, the same math as the core Resolution Selector (so 100% gives the same size), with the rescale applied to the exact size
-    # before each side is rounded to multiple.
+    # Megapixel sizing, the same math as the core Resolution Selector, before each side is rounded to multiple.
     @staticmethod
-    def size_for_ratio(w_ratio, h_ratio, megapixels, multiple=8, round_down=False, rescale=None):
+    def size_for_ratio(w_ratio, h_ratio, megapixels, multiple=8, round_down=False):
         scale = math.sqrt(megapixels * 1024 * 1024 / (w_ratio * h_ratio))
-        width, height = rescaled(w_ratio * scale, h_ratio * scale, rescale)
-        snap = math.floor if round_down else round # Random Chaos rounds down from the exact size, so it never exceeds its (rescaled) megapixels.
+        width, height = w_ratio * scale, h_ratio * scale
+        snap = math.floor if round_down else round # Random Chaos rounds down from the exact size, so it never exceeds its megapixel target.
         return (
             max(multiple, snap(width / multiple) * multiple),
             max(multiple, snap(height / multiple) * multiple),
@@ -131,7 +128,7 @@ class ResolutionSelectorRandomLatent(io.ComfyNode):
         return math.exp(pick_in_range(low, high, 8 if orientation == "any" else 4, picker, seed, f"Chaos {orientation} {max_aspect}")), 1.0
     # Main method to get the resolution based on the selected option, applying randomization as needed, then building the empty latent with Empty Latent Image.
     @classmethod
-    def execute(cls, aspect_ratio, megapixels=1.0, seed=0, multiple=8, batch=1, max_aspect=2.0, seed_mode="random", preview=None, rescale=None):
+    def execute(cls, aspect_ratio, megapixels=1.0, seed=0, multiple=8, batch=1, max_aspect=2.0, seed_mode="random", preview=None):
         picker = make_picker(seed_mode, seed) # How random picks follow the seed (random: reproducible, same picks as before seed modes existed).
         # Switching logic to determine the aspect ratio based on the selected option, handling listed random and chaos options appropriately.
         if aspect_ratio in RANDOM_LISTED:
@@ -141,16 +138,19 @@ class ResolutionSelectorRandomLatent(io.ComfyNode):
         else:
             w_ratio, h_ratio = ASPECT_RATIOS[aspect_ratio]#Returning the fixed aspect ratio for standard options.
         chaos = aspect_ratio in RANDOM_CHAOS
-        width, height = cls.size_for_ratio(w_ratio, h_ratio, megapixels, multiple, round_down=chaos, rescale=rescale)
+        width, height = cls.size_for_ratio(w_ratio, h_ratio, megapixels, multiple, round_down=chaos)
         if chaos and max_aspect > 1.0:
-            width, height = keep_orientation(width, height, RANDOM_CHAOS[aspect_ratio], multiple, rescale) # Portrait and Landscape stay non-square.
+            if width == height:
+                if RANDOM_CHAOS[aspect_ratio] == "portrait" and width > multiple:
+                    width -= multiple
+                elif RANDOM_CHAOS[aspect_ratio] == "landscape" and height > multiple:
+                    height -= multiple
         MEMORY.save()
-        # Logging the final resolution, megapixels, rescale, seed, and batch size for debugging and verification purposes.
         logging.info(
-            f"[DiceForge] Resolution Selector (Random, Latent) | Size: {width}x{height} ({width * height / (1024 * 1024):.2f} MP) | Aspect: {aspect_ratio} | Rescale: {describe_rescale(rescale)} | Multiple: {multiple} | Seed: {seed} ({seed_mode}) | Batch: {batch}"
+            f"[DiceForge] Resolution Selector (Random, Latent) | Size: {width}x{height} ({width * height / (1024 * 1024):.2f} MP) | Aspect: {aspect_ratio} | Multiple: {multiple} | Seed: {seed} ({seed_mode}) | Batch: {batch}"
         )
         latent = nodes.EmptyLatentImage().generate(width, height, batch)[0]
         # The size of this run, with the settings it came from, for the preview of random options in the frontend extension.
         last_size = {"width": width, "height": height, "aspect_ratio": aspect_ratio, "megapixels": megapixels, "multiple": multiple, "max_aspect": max_aspect,
-                     **rescale_settings(rescale)}
+                     }
         return io.NodeOutput(latent, width, height, seed, ui={"dice_forge_last_size": [last_size]})

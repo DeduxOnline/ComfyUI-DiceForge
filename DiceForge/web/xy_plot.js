@@ -156,8 +156,8 @@ app.registerExtension({
     if (node.comfyClass !== NODE_TYPE) return [];
     const plan = plans.get(node)?.plan;
     return [
-      ...(plan && plan.x_type !== "none" ? [{ content: `▶ Set Run to ${plan.count} cells, from index 0`, callback: () => setRun(node, plan) }] : []),
-      { content: "▦ Show the plot plan…", callback: () => openPlan(node) },
+      ...(plan && plan.x_type !== "none" ? [{ content: `Set Run to ${plan.count} cells, from index 0`, callback: () => setRun(node, plan) }] : []),
+      { content: "Show the plot plan…", callback: () => openPlan(node) },
     ];
   },
 });

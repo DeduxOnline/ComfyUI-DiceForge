@@ -41,9 +41,9 @@ def one_line(text):
 HIDDEN = {("DiceForgeLoraStack", "loras")}
 # What a node has besides its inputs: buttons, panels and menu tools of its frontend, and the warnings a short page must not lose.
 NOTES = {
-    "DiceForgeCLIPDualTextEncode": "Its right-click menu has the prompt tools: **📖 Syntax guide**, **🕘 Prompt history**, **🎲 Wildcard Browser**, "
-        "**✂ Selection → new wildcard…**, **🎴 LoRA Browser** (to insert trigger words), **🏷 Tag autocomplete** (download tag lists), "
-        "**🏷 Tag Browser** and **🎨 Prompt styles**.",
+    "DiceForgeCLIPDualTextEncode": "Its right-click menu has the prompt tools in three groups. *Write:* **Syntax guide**, **Selection → new wildcard…**, "
+        "**Prompt styles**. *Browse:* **Wildcards**, **Tags**, **LoRAs** (to insert trigger words), **Prompt history**. *Set up:* **Tag lists** "
+        "(download the autocomplete's tag lists).",
     "DiceForgeLoraStack": "The LoRAs are rows on the node: **⋮⋮** (drag to reorder), on/off, the LoRA (click its name to pick another one), "
         "the strength, the group's letter and **⋯** (or right-click the row): **ℹ Model info**, **🏷 Trigger words**, **🎴 Pick another LoRA…**, "
         "the group (A–D), **🎲 Random strength** and **✕ Remove**. A group's rows stand under its header (how many each run uses). "
@@ -51,14 +51,14 @@ NOTES = {
     "DiceForgeGrid": "Under the node, the cells of the grid: click one to star it (**★**); **💾 Save N kept** saves the starred ones at full size, "
         "with the workflow of their own run; **↺** on a cell opens the workflow of its run.",
     "DiceForgeXYPlot": "The node shows the plot's size and the cell the next run makes; `index` counts up after each run. Its right-click menu has "
-        "**▶ Set Run to N cells, from index 0** (`index` and ComfyUI's batch count, then click **Run**) and **▦ Show the plot plan…**. "
+        "**Set Run to N cells, from index 0** (`index` and ComfyUI's batch count, then click **Run**) and **Show the plot plan…**. "
         "Connect `seed` to KSampler, or set KSampler's *control after generate* to *fixed*: otherwise every cell gets another seed.",
     "DiceForgeAnimaNAG": "At CFG 1 ComfyUI skips the negative prompt, so the node turns it back on: 10 Turbo steps take 13–14 s instead of 5 s. "
         "It needs the positive and negative prompts in one batch: when low VRAM makes ComfyUI run them apart, that step has no NAG. "
         "With several Anima NAG nodes in a row, the last one counts; on a model other than Anima it stops with an error.",
-    "DiceForgeDanbooruEnhancer": "Under its inputs, one row about the last run (*Last run: 2 posts, +7 tags*). Click it, or **🏷 Danbooru posts of the "
+    "DiceForgeDanbooruEnhancer": "Under its inputs, one row about the last run (*Last run: 2 posts, +7 tags*). Click it, or **Danbooru posts of the "
         "last run…** in the node's menu, for a window with the posts' pictures (click one to open the post; pictures that aren't general are "
-        "blurred until clicked), the added tags (**Copy tags**), what it searched, and **Keep these posts (fixed)**. **📋 Copy the added tags** "
+        "blurred until clicked), the added tags (**Copy tags**), what it searched, and **Keep these posts (fixed)**. **Copy the added tags** "
         "is in the menu too.",
 }
 
