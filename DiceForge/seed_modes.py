@@ -250,8 +250,7 @@ SEED_MODE_TOOLTIP = ("How random sizes change from run to run.\n"
     "deck: the seed steps through a shuffled order; with control after generate on increment, every size comes once before any repeats. Reproducible.\n"
     "shuffle: like shuffle in a music player, the node remembers the sizes already used and picks from the rest with each new seed (increment or randomize); remembered in a file, so it continues after a restart. The same seed gives the same size again.\n"
     "balanced: a size just picked gets a low chance, and sizes not picked for a while get a higher one, so repeats are rare but possible. Remembered in a file. The same seed gives the same size again.\n"
-    "sequential: the seed is the position in the list, so seeds 0, 1, 2... go through the sizes in order. Reproducible.\n"
-    "Random Chaos: the aspect range is split into equal parts that take turns (in order for sequential), with a random ratio inside each part.")
+    "sequential: the seed is the position in the list, so seeds 0, 1, 2... go through the sizes in order. Reproducible.")
 # Seed mode tooltip for a node picking one of a list of things (files for the random loaders).
 def seed_mode_tooltip(things):
     return (f"How the pick changes from run to run.\n"
@@ -289,7 +288,7 @@ def pick_in_range(low, high, parts, picker, seed, name):
     return picker.rng.uniform(low + width * part, low + width * (part + 1))
 # One of `count` positions (0 to count - 1). random: uniform; sequential: the seed is the position. The other modes treat each position as an option
 # up to INDEX_LIMIT positions, so every one comes once before any repeats; past that they take turns between INDEX_PARTS equal parts of the range
-# (like Random Chaos), with a random position inside the part.
+# with a random position inside the part.
 INDEX_LIMIT = 1000
 INDEX_PARTS = 100
 def pick_index(count, picker, seed, name):

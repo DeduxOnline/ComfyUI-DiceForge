@@ -5,8 +5,7 @@ Pick a resolution from the SDXL list (or at random from the seed) and output an 
 ## Inputs
 
 - `resolution` (COMBO): Resolution group: fixed sizes, or random sizes picked from the seed.
-  - `size` (COMBO, default `1024 x 1024`, for Standard, High-Res, Random, Random Chaos): Standard SDXL size, width x height.
-  - `max_aspect` (FLOAT, default `2`, for Random Chaos): The most stretched aspect ratio allowed (2.0 = up to 2:1 or 1:2).
+  - `size` (COMBO, default `1024 x 1024`, for Standard, High-Res and Random): Standard SDXL size, width x height.
 - `preview` (RESOLUTION_PREVIEW): Live preview of the output size. Random sizes show the size of the last run, until the settings change.
 - `seed` (INT, default `0`): Seed for random resolution selection.
 - `rescale` (COMBO): Rescale the picked size, like HiresFix: by percentage of each side, to a width and/or height, or to a longest side.
@@ -19,9 +18,9 @@ Pick a resolution from the SDXL list (or at random from the seed) and output an 
 
 Under **Show advanced inputs** on the node (Nodes 2.0), or **Show Advanced** in its right-click menu (classic design).
 
-- `multiple` (INT, default `8`): Round width and height to a multiple of this value (8 for the VAE, 64 for SDXL training buckets). Random Chaos sizes round down.
+- `multiple` (INT, default `8`): Round width and height to a multiple of this value (8 for the VAE, 64 for SDXL training buckets).
 - `batch` (INT, default `1`): Number of images to generate in a batch.
-- `seed_mode` (COMBO, default `random`): How random sizes change from run to run. random: every pick is independent, so the same size can come up again soon. deck: the seed steps through a shuffled order; with control after generate on increment, every size comes once before any repeats. Reproducible. shuffle: like shuffle in a music player, the node remembers the sizes already used and picks from the rest with each new seed (increment or randomize); remembered in a file, so it continues after a restart. The same seed gives the same size again. balanced: a size just picked gets a low chance, and sizes not picked for a while get a higher one, so repeats are rare but possible. Remembered in a file. The same seed gives the same size again. sequential: the seed is the position in the list, so seeds 0, 1, 2... go through the sizes in order. Reproducible. Random Chaos: the aspect range is split into equal parts that take turns (in order for sequential), with a random ratio inside each part.
+- `seed_mode` (COMBO, default `random`): How random sizes change from run to run. random: every pick is independent, so the same size can come up again soon. deck: the seed steps through a shuffled order; with control after generate on increment, every size comes once before any repeats. Reproducible. shuffle: like shuffle in a music player, the node remembers the sizes already used and picks from the rest with each new seed (increment or randomize); remembered in a file, so it continues after a restart. The same seed gives the same size again. balanced: a size just picked gets a low chance, and sizes not picked for a while get a higher one, so repeats are rare but possible. Remembered in a file. The same seed gives the same size again. sequential: the seed is the position in the list, so seeds 0, 1, 2... go through the sizes in order. Reproducible.
 
 ## Outputs
 

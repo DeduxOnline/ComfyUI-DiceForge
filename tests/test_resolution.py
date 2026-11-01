@@ -8,7 +8,7 @@ import shutil
 import subprocess
 import pytest
 from DiceForge.resolution_selector_random_latent import ASPECT_RATIOS, ResolutionSelectorRandomLatent as Selector
-from DiceForge.sdxl_resolution_list_latent import CHAOS_PIXELS, HIGH_RES, RANDOM_LISTED, STANDARD, SDXLResolutionListLatent as SDXL, rescaled
+from DiceForge.sdxl_resolution_list_latent import HIGH_RES, RANDOM_LISTED, STANDARD, SDXLResolutionListLatent as SDXL, rescaled
 
 round_to_multiple = SDXL.round_to_multiple
 
@@ -17,8 +17,8 @@ def by_percentage(percent):
     return {"rescale": "by percentage", "percent": percent}
 
 
-def sdxl(group, size, seed=0, rescale=None, multiple=8, batch=1, mode="random", max_aspect=2.0):
-    latent, width, height, out_seed = SDXL.execute({"resolution": group, "size": size, "max_aspect": max_aspect}, seed, rescale or by_percentage(100), multiple, batch, mode).result
+def sdxl(group, size, seed=0, rescale=None, multiple=8, batch=1, mode="random"):
+    latent, width, height, out_seed = SDXL.execute({"resolution": group, "size": size}, seed, rescale or by_percentage(100), multiple, batch, mode).result
     return latent, width, height, out_seed
 
 
@@ -94,25 +94,6 @@ def test_random_sequential_goes_in_order():
     assert [sdxl("Random", "Any Listed", seed=seed, mode="sequential")[1:3] for seed in range(len(listed))] == listed
 
 
-@pytest.mark.parametrize("orientation, percent, multiple, max_aspect", [("Any", 100, 8, 2.0), ("Portrait", 150, 64, 3.0), ("Landscape", 75, 16, 1.5)])
-def test_random_chaos_stays_in_budget_orientation_and_aspect(orientation, percent, multiple, max_aspect):
-    for seed in range(60):
-        _, width, height, _ = sdxl("Random Chaos", orientation, seed=seed, rescale=by_percentage(percent), multiple=multiple, max_aspect=max_aspect)
-        assert width % multiple == 0 and height % multiple == 0
-        assert width * height <= CHAOS_PIXELS * (percent / 100) ** 2
-        assert max(width, height) / min(width, height) <= max_aspect * 1.15 # Rounding down can stretch a little.
-        if orientation == "Portrait":
-            assert height > width
-        if orientation == "Landscape":
-            assert width > height
-
-
-def test_random_chaos_to_longest_side_keeps_the_longest_side():
-    for seed in range(40):
-        _, width, height, _ = sdxl("Random Chaos", "Any", seed=seed, rescale={"rescale": "to longest side", "longer_side": 1536}, multiple=16)
-        assert 1536 - 16 < max(width, height) <= 1536
-
-
 def test_an_old_node_without_a_group_is_a_clear_error():
     with pytest.raises(ValueError, match="no valid group"):
         SDXL.execute(None, 0, by_percentage(100), 8, 1, "random")
@@ -153,12 +134,6 @@ def old_selector_size(w_ratio, h_ratio, megapixels, multiple=8, round_down=False
 def test_selector_at_100_percent_keeps_the_old_sizes():
     for (w_ratio, h_ratio), megapixels, multiple in itertools.product(ASPECT_RATIOS.values(), (0.5, 1.0, 1.3, 2.25), (8, 16, 64)):
         assert Selector.size_for_ratio(w_ratio, h_ratio, megapixels, multiple) == old_selector_size(w_ratio, h_ratio, megapixels, multiple)
-
-
-def test_selector_chaos_stays_within_the_megapixels():
-    for seed in range(40):
-        _, width, height, _ = Selector.execute("Random Chaos Landscape", megapixels=1.5, seed=seed, multiple=64, max_aspect=2.5).result
-        assert width > height and width * height <= 1.5 * 1024 ** 2 and width % 64 == 0
 
 
 JS_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "DiceForge", "web", "resolution_preview.js")

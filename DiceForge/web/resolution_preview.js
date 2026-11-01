@@ -71,12 +71,10 @@ const NODES = {
     settings: (node) => ({
       group: widgetValue(node, "resolution"),
       size: String(widgetValue(node, "resolution.size") ?? ""),
-      max_aspect: widgetValue(node, "resolution.max_aspect") ?? null,
       ...rescaleSettings(node),
       multiple: Number(widgetValue(node, "multiple") ?? 8),
     }),
     isRandom: (current) => current.group !== "Standard" && current.group !== "High-Res",
-    usesMaxAspect: (current) => current.group === "Random Chaos",
     // The final size, as the node computes it (rescale, then rounding to multiple), given to the preview as ratio and megapixels of an exact
     // multiple, which the preview keeps as it is.
     fixed: (current) => {
@@ -93,10 +91,8 @@ const NODES = {
       aspect_ratio: String(widgetValue(node, "aspect_ratio") ?? ""),
       megapixels: Number(widgetValue(node, "megapixels") ?? 1),
       multiple: Number(widgetValue(node, "multiple") ?? 8),
-      max_aspect: Number(widgetValue(node, "max_aspect") ?? 2),
     }),
     isRandom: (current) => current.aspect_ratio.startsWith("Random"),
-    usesMaxAspect: (current) => current.aspect_ratio.startsWith("Random Chaos"),
     // The final size, as the node computes it (megapixels and rounding), given to the preview as the ratio and megapixels of an exact multiple.
     fixed: (current) => {
       const match = /^(\d+(?:\.\d+)?)\s*:\s*(\d+(?:\.\d+)?)/.exec(current.aspect_ratio);
@@ -113,7 +109,6 @@ function previewInput(config, node, last) {
   if (!config.isRandom(current)) return config.fixed(current);
   if (!last) return null;
   for (const [key, value] of Object.entries(current)) {
-    if (key === "max_aspect" && !config.usesMaxAspect(current)) continue;
     if (String(last[key]) !== String(value)) return null;
   }
   return { ratio: `${last.width}:${last.height}`, megapixels: (last.width * last.height) / (1024 * 1024) };

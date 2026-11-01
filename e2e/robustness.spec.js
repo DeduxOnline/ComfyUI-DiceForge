@@ -353,19 +353,4 @@ test.describe("@api robustness on the real server", () => {
     }
   });
 
-  test("Random Chaos keeps the orientation and the side rescale sets, through the queue", async ({ request }) => {
-    for (const [size, rescale, check] of [
-      ["Portrait", { rescale: "to Width/Height", "rescale.width": 1024, "rescale.height": 0 }, (w, h) => w === 1024 && h > w],
-      ["Landscape", { rescale: "to Width/Height", "rescale.width": 0, "rescale.height": 768 }, (w, h) => h === 768 && w > h],
-      ["Portrait", { rescale: "to longest side", "rescale.longer_side": 1536 }, (w, h) => h === 1536 && w < h],
-      ["Any", { rescale: "to Width/Height", "rescale.width": 640, "rescale.height": 640 }, (w, h) => w === 640 && h === 640],
-    ]) {
-      for (let seed = 0; seed < 12; seed++) {
-        const result = await runPrompt(request, sdxl({ resolution: "Random Chaos", "resolution.size": size, "resolution.max_aspect": 1.05, seed, multiple: 64, ...rescale }));
-        expect(result.status).toBe("success");
-        const [w, h] = [Number(shown(result, "2")), Number(shown(result, "3"))];
-        expect(check(w, h), `${size} ${JSON.stringify(rescale)} seed ${seed}: ${w}x${h}`).toBe(true);
-      }
-    }
-  });
 });

@@ -2,7 +2,7 @@ import logging
 import math
 import nodes
 from comfy_api.latest import io
-from .seed_modes import MEMORY, SEED_MODES, SEED_MODE_TOOLTIP, make_picker, pick_label, pick_in_range
+from .seed_modes import MEMORY, SEED_MODES, SEED_MODE_TOOLTIP, make_picker, pick_label
 # Resolution groups for the nested list: fixed SDXL sizes, high-res sizes, random picks from those lists, and random chaos sizes.
 STANDARD = {
     "1024 x 1024": (1024, 1024),
@@ -32,8 +32,6 @@ RANDOM_LISTED = {
     "Vertical High-Res Listed": [size for size in HIGH_RES.values() if size[0] < size[1]],
     "Horizontal High-Res Listed": [size for size in HIGH_RES.values() if size[0] > size[1]],
 }
-RANDOM_CHAOS = ["Any", "Portrait", "Landscape"] # Orientations for Random Chaos.
-CHAOS_PIXELS = 1024 * 1024 # Pixel budget of Random Chaos before rescale: the SDXL native size.
 # Rescale modes, like the HiresFix node of Easy-Use: by percentage of each side, to a width and/or height, or to a longest side.
 BY_PERCENTAGE, TO_WIDTH_HEIGHT, TO_LONGEST_SIDE = "by percentage", "to Width/Height", "to longest side"
 def rescaled(width, height, rescale):
@@ -50,7 +48,7 @@ def rescaled(width, height, rescale):
             return width * target_height / height, float(target_height)
         return width, height
     if mode == TO_LONGEST_SIDE:
-        side = rescale.get("longer_side", 1024) # Set exactly, not as a factor: float rounding must not take it below (Random Chaos rounds down).
+        side = rescale.get("longer_side", 1024) # Set exactly, not as a factor.
         return (float(side), height * side / width) if width >= height else (width * side / height, float(side))
     factor = (rescale or {}).get("percent", 100) / 100 # Each side: the pixels (megapixels) grow by its square.
     return width * factor, height * factor
@@ -72,22 +70,6 @@ def rescale_input(optional=False):
         tooltip="Rescale the picked size, like HiresFix: by percentage of each side, to a width and/or height, or to a longest side.",
         optional=optional,
     )
-# Random Chaos Portrait and Landscape stay non-square after rounding (a ratio close to 1:1 can round to a square): the shorter side steps down a
-# multiple, keeping the pixel budget, unless the rescale sets that side or it is already at the minimum: then the longer side steps up, unless the
-# rescale sets that one (to longest side, or an exact size): what you set wins, even if that is a square.
-def keep_orientation(width, height, orientation, multiple, rescale):
-    if width != height or orientation not in ("portrait", "landscape"):
-        return width, height
-    mode = (rescale or {}).get("rescale")
-    set_width = mode == TO_WIDTH_HEIGHT and bool(rescale.get("width"))
-    set_height = mode == TO_WIDTH_HEIGHT and bool(rescale.get("height"))
-    if orientation == "portrait": # Width is the shorter side, height the longer.
-        if width > multiple and not set_width:
-            return width - multiple, height
-        return (width, height + multiple) if not set_height and mode != TO_LONGEST_SIDE else (width, height)
-    if height > multiple and not set_height:
-        return width, height - multiple
-    return (width + multiple, height) if not set_width and mode != TO_LONGEST_SIDE else (width, height)
 # The rescale settings a run reports with its size (the preview of random sizes compares them with the node's current ones).
 def rescale_settings(rescale):
     rescale = rescale or {}
@@ -116,10 +98,6 @@ class SDXLResolutionListLatent(io.ComfyNode):
                         io.DynamicCombo.Option("Standard", [size(STANDARD, "Standard SDXL size, width x height.")]),
                         io.DynamicCombo.Option("High-Res", [size(HIGH_RES, "High-res size, width x height.")]),
                         io.DynamicCombo.Option("Random", [size(RANDOM_LISTED, "Picks one of the listed sizes at random from the seed: any, only vertical or only horizontal.")]),
-                        io.DynamicCombo.Option("Random Chaos", [
-                            size(RANDOM_CHAOS, "Orientation of the random aspect ratio: any, only portrait (taller than wide) or only landscape (wider than tall). The size stays within 1024x1024 pixels before rescale (by percentage 150: within 1536x1536 pixels)."),
-                            io.Float.Input("max_aspect", default=2.0, min=1.0, max=4.0, step=0.05, tooltip="The most stretched aspect ratio allowed (2.0 = up to 2:1 or 1:2)."),
-                        ]),
                     ],
                     tooltip="Resolution group: fixed sizes, or random sizes picked from the seed.",
                 ),
@@ -145,7 +123,7 @@ class SDXLResolutionListLatent(io.ComfyNode):
                     min=8,
                     max=256,
                     step=8,
-                    tooltip="Round width and height to a multiple of this value (8 for the VAE, 64 for SDXL training buckets). Random Chaos sizes round down.",
+                    tooltip="Round width and height to a multiple of this value (8 for the VAE, 64 for SDXL training buckets).",
                     advanced=True,
                 ),
                 io.Int.Input(
@@ -174,21 +152,12 @@ class SDXLResolutionListLatent(io.ComfyNode):
             ],
         )
     # Rounding method to make width and height multiples of `multiple` (at least `multiple` itself). Of the multiples just below and above each side,
-    # the pair closest to the exact aspect ratio is taken (then the one closest in pixels), so the ratio doesn't drift. round_down: both below, so the
-    # size never goes over the pixel budget (Random Chaos).
+    # the pair closest to the exact aspect ratio is taken (then the one closest in pixels), so the ratio doesn't drift.
     @staticmethod
     def round_to_multiple(width, height, multiple=8, round_down=False):
         steps = lambda value: {max(multiple, math.floor(value / multiple) * multiple)} | (set() if round_down else {max(multiple, math.ceil(value / multiple) * multiple)})
         ratio, pixels = math.log(width / height), width * height
         return min(((w, h) for w in steps(width) for h in steps(height)), key=lambda size: (round(abs(math.log(size[0] / size[1]) - ratio), 9), abs(size[0] * size[1] - pixels), size))
-    # Chaos-based random size: an aspect ratio picked uniformly in log scale up to max_aspect (wide and tall equally likely), in the chosen orientation, sized to the pixel budget.
-    # Seed modes other than random take turns between 8 equal parts of the range (4 for one orientation).
-    @staticmethod
-    def chaos_size(picker, seed, orientation="Any", max_aspect=2.0, pixels=CHAOS_PIXELS):
-        low = 0.0 if orientation == "Landscape" else -math.log(max_aspect)
-        high = 0.0 if orientation == "Portrait" else math.log(max_aspect)
-        ratio = math.exp(pick_in_range(low, high, 8 if orientation == "Any" else 4, picker, seed, f"Chaos {orientation} {max_aspect}"))
-        return math.sqrt(pixels * ratio), math.sqrt(pixels / ratio)
     # Main method to get the resolution based on the selected option, applying randomization and rounding as needed, then building the empty latent with Empty Latent Image.
     @classmethod
     def execute(cls, resolution=None, seed=0, rescale=None, multiple=8, batch=1, seed_mode="random", preview=None):
@@ -196,19 +165,13 @@ class SDXLResolutionListLatent(io.ComfyNode):
             raise ValueError("SDXL Resolution List (Latent): the resolution list of this node has no valid group. Pick the group and size again, or add the node again.")
         picker = make_picker(seed_mode, seed) # How random picks follow the seed (random: reproducible, same picks as before seed modes existed).
         group, size = resolution["resolution"], resolution["size"] # Nested list value: the group, and the size picked in it.
-        # Switching logic to determine the width and height based on the selected group, handling random picks and chaos sizes appropriately.
+        # Switching logic to determine the width and height based on the selected group.
         if group == "Random":
             width, height = map(int, pick_label([f"{w} x {h}" for w, h in RANDOM_LISTED[size]], picker, seed).split(" x "))#Returning a random resolution from the listed sizes.
-        elif group == "Random Chaos":
-            width, height = cls.chaos_size(picker, seed, size, resolution.get("max_aspect", 2.0), CHAOS_PIXELS)#Returning a random aspect ratio within the 1024x1024 pixel budget for chaos sizes.
         else:
             width, height = (HIGH_RES if group == "High-Res" else STANDARD)[size]#Returning the fixed resolution for standard and high-res sizes.
-        # Rescale (by percentage, to width/height or to longest side), then rounding to multiple; Chaos sizes round down, so they stay within their
-        # rescaled pixel budget.
-        chaos = group == "Random Chaos"
-        width, height = cls.round_to_multiple(*rescaled(width, height, rescale), multiple, round_down=chaos)
-        if chaos and max(resolution.get("max_aspect", 2.0), 1.0) > 1.0:
-            width, height = keep_orientation(width, height, size.lower(), multiple, rescale)
+        # Rescale (by percentage, to width/height or to longest side), then round to multiple.
+        width, height = cls.round_to_multiple(*rescaled(width, height, rescale), multiple)
         MEMORY.save()
         # Logging the final resolution, rescale, multiple, seed, and batch size for debugging and verification purposes.
         logging.info(
@@ -216,6 +179,6 @@ class SDXLResolutionListLatent(io.ComfyNode):
         )
         latent = nodes.EmptyLatentImage().generate(width, height, batch)[0]
         # The size of this run, with the settings it came from, for the preview of random sizes in the frontend extension.
-        last_size = {"width": width, "height": height, "group": group, "size": size, "max_aspect": resolution.get("max_aspect"), "multiple": multiple,
+        last_size = {"width": width, "height": height, "group": group, "size": size, "multiple": multiple,
                      **rescale_settings(rescale)}
         return io.NodeOutput(latent, width, height, seed, ui={"dice_forge_last_size": [last_size]})

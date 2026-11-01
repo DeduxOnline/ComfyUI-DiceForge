@@ -411,16 +411,15 @@ How it picks:
 
 Node id: `DiceForgeSDXLResolutionList`.
 
-The resolution is a nested list: first pick a group in `resolution`, then a size of that group in `size`. The Random Chaos group also shows `max_aspect`.
+The resolution is a nested list: first pick a group in `resolution`, then a size of that group in `size`.
 
 #### Inputs
 
 | Input | Section | Default | Description |
 |---|---|---|---|
-| `resolution` | main | `Standard` | Group: `Standard`, `High-Res`, `Random` or `Random Chaos` (see below). |
-| `size` | main | `1024 x 1024` | A size of the chosen group: a fixed size for Standard and High-Res, a list to pick from for Random, an orientation for Random Chaos (`Any`, `Portrait` or `Landscape`). |
-| `max_aspect` | main (Random Chaos only) | `2.0` | The most stretched aspect ratio Random Chaos may pick (1.0–4.0): 2.0 means up to 2:1 or 1:2, 1.0 gives only squares. |
-| `preview` | main | — | Live preview of the output size and megapixels, the same widget as in the core *Resolution Selector*. Drawn in the Nodes 2.0 design only: in the classic canvas this core widget stays empty, in the core *Resolution Selector* too. For the Random and Random Chaos groups it shows the size of the last run, as long as the settings other than `seed` stay the same, and "—" before a run or after a change. |
+| `resolution` | main | `Standard` | Group: `Standard`, `High-Res` or `Random`. |
+| `size` | main | `1024 x 1024` | A fixed size for Standard and High-Res, or a listed size to pick from for Random. |
+| `preview` | main | — | Live preview of the output size and megapixels, the same widget as in the core *Resolution Selector*. Drawn in the Nodes 2.0 design only: in the classic canvas this core widget stays empty, in the core *Resolution Selector* too. For the Random group it shows the size of the last run, as long as the settings other than `seed` stay the same, and "—" before a run or after a change. |
 | `seed` | main | `0` | Seed for the random options. The same seed always gives the same size. |
 | `rescale` | main | `by percentage` | Rescales the picked size, like the HiresFix node of Easy-Use. The input under it depends on the mode (below). Then the size is rounded to `multiple`, taking the nearby multiples closest to the exact aspect ratio. |
 | `percent` | main (*by percentage*) | `100` | Each side in percent (5–1000): `150` turns 1024x1024 into 1536x1536, `50` into 512x512. The number of pixels (megapixels) grows by its square: `150` gives 2.25 times the pixels, `200` four times. |
@@ -456,11 +455,6 @@ The `size` list shows width x height; the aspect ratios are given here for refer
 - **Random**: picks one of the listed sizes at random from the seed.
   - **Any Listed / Any High-Res Listed**: one of the Standard or High-Res sizes above.
   - **Vertical Listed / Horizontal Listed** (and their **High-Res** versions): only portrait or only landscape sizes.
-- **Random Chaos**: a random aspect ratio up to `max_aspect`, at about 1024x1024 pixels (the SDXL native size), then rescaled like the other groups: by percentage 150 gives about 1536x1536 pixels (2.25 MP), to longest side 1536 gives a longest side of exactly 1536.
-  - **Any**: wide or tall, equally likely (the ratio is picked evenly in log scale).
-  - **Portrait / Landscape**: only taller than wide, or only wider than tall; never a square. When the size would round to a square, the shorter side steps down one `multiple`; if `rescale` sets that side (or it is already the smallest), the longer side steps up instead. What `rescale` sets is kept: an exact size (`to Width/Height` with both sides) or a longest side at the smallest `multiple` can be a square.
-  - The size rounds down to `multiple`, so it never exceeds its rescaled budget (it lands at about 0.9–1.0 of that).
-
 #### Notes
 
 - Rounding to `multiple` applies to fixed sizes too. With the default 8 every listed size stays exact; with 64, 864 becomes 896.
@@ -482,9 +476,8 @@ It works like the core ComfyUI *Resolution Selector* followed by **Empty Latent 
 | `megapixels` | main | `1.0` | Target total size (0.1–16). 1.0 MP = 1024x1024 for a square. |
 | `preview` | main | — | Live preview of the output size and megapixels. Drawn in the Nodes 2.0 design only: in the classic canvas this core widget stays empty, in the core *Resolution Selector* too. For random options it shows the size of the last run, as long as the settings other than `seed` stay the same, and "—" before a run or after a change. |
 | `seed` | main | `0` | Seed for the random options. By default it is randomized after each run (*control after generate*), so every run gets a new random ratio. Set it to *fixed* to repeat a result. |
-| `multiple` | Advanced | `8` | Rounds width and height to the nearest multiple of this value (8–256, in steps of 8). Use 64 for SDXL training sizes. Random Chaos rounds down. |
+| `multiple` | Advanced | `8` | Rounds width and height to the nearest multiple of this value (8–256, in steps of 8). Use 64 for SDXL training sizes. |
 | `batch` | Advanced | `1` | Number of latents in the batch (1–32). |
-| `max_aspect` | Advanced | `2.0` | Random Chaos only: the most stretched ratio allowed (1.0–4.0). 2.0 means up to 2:1 or 1:2. |
 | `seed_mode` | Advanced | `random` | How the random options change from run to run, as in SDXL Resolution List. See [Seed modes for sizes](#seed-modes-for-sizes). |
 
 #### Outputs
@@ -503,12 +496,9 @@ It works like the core ComfyUI *Resolution Selector* followed by **Empty Latent 
 #### Random options
 
 - **Random Any / Random Portrait / Random Landscape**: one of the listed ratios (any, only portrait or only landscape), each equally likely.
-- **Random Chaos Any / Random Chaos Portrait / Random Chaos Landscape**: any ratio up to `max_aspect`. Wide and tall ratios are equally likely.
-
 #### Notes
 
 - Fixed and Random ratios round to the nearest `multiple`, like the core node, so the size can be slightly above or below `megapixels` (about 0.94–1.06 at 1.0 MP).
-- Random Chaos rounds down, so it never exceeds `megapixels` (it lands at about 0.9–1.0 of it), and Random Chaos Portrait/Landscape never return a square (unless `rescale` sets a square size, as in SDXL Resolution List).
 
 ### Seed modes for sizes
 
@@ -521,8 +511,6 @@ Both resolution nodes (and [Random Int and Random Float](#random-int-and-random-
 | `shuffle` | Like shuffle in a music player: the node remembers which sizes were used and picks from the rest with each new seed (*increment* or *randomize*). | The same seed gives the same size again. |
 | `balanced` | A size that just came up gets a low chance, and the longer one is missed, the higher its chance: repeats are rare but possible. | The same seed gives the same size again. |
 | `sequential` | The seed is the position in the list: seeds 0, 1, 2… go through the sizes in order, then start over. | The same seed gives the same size. |
-
-**Random Chaos** has no list, so the modes other than `random` split the aspect range into 8 equal parts (4 for Portrait or Landscape), take turns between the parts as above, and pick a random ratio inside the part. Runs then cover tall, square-ish and wide shapes evenly: in 8 runs about 8 of the 8 parts, against about 5 with `random`. `sequential` takes the middle of each part in order, sweeping from the tallest to the widest shape (at 1 MP and `max_aspect` 2.0: 752x1384, 824x1264 … 1384x752).
 
 `shuffle` and `balanced` keep their memory in the same [memory file](#memory-file) as CLIP Dual Text Encode, so they continue after a restart.
 
@@ -559,7 +547,7 @@ A random number between `min` and `max`, picked from the seed with the same [see
 
 - **Values on a step** (every Random Int, Random Float with `step` above 0): each possible value is an option, like a size in a list. `deck` and `shuffle` give every value once before any repeats (1 to 6: six runs, six different values), and `sequential` counts up from `min` by `step`, then starts over.
 - **More than 1000 possible values** (for example 0 to 1,000,000): `deck`, `shuffle` and `balanced` take turns between 100 equal parts of the range instead, with a random value inside the part, so 100 runs land in 100 different parts. `sequential` still counts up.
-- **Random Float with `step` 0**: the range is split into `parts` equal parts, like Random Chaos: in 10 runs over 0–1, `deck` and `shuffle` hit all 10 tenths (about 7 with `random`). `sequential` gives the middle of each part in order (0.05, 0.15 … 0.95).
+- **Random Float with `step` 0**: the range is split into `parts` equal parts: in 10 runs over 0–1, `deck` and `shuffle` hit all 10 tenths (about 7 with `random`). `sequential` gives the middle of each part in order (0.05, 0.15 … 0.95).
 - The value is written to the console on every run.
 
 ### Random LoRA, Random Checkpoint, Random Diffusion Model and Random VAE
@@ -948,7 +936,7 @@ Without `COMFYUI_PATH`, the tests look for `ComfyUI` next to this repository. Th
 The `e2e` folder has end-to-end tests with [Playwright](https://playwright.dev): they start a real ComfyUI with DiceForge and drive it like a user would.
 
 - **Workflows** (`api.spec.js`, no browser): workflows queued through ComfyUI's own queue, as the Run button does: every node is loaded, CLIP Dual Text Encode fills in wildcards, yaml keys, weights and variables; deck and combinations deal every option over runs; the same inputs come from ComfyUI's cache until a wildcard file changes; shuffle remembers between runs; the resolution nodes make latents of the right size; VAE Decode + Save writes PNG files with the workflow; Dice Grid saves a finished grid; Random Image loads a folder; Random Sampler's outputs are accepted by KSampler; and the server routes of the Wildcard Browser, Model info, the model browsers and LoRA Stack presets.
-- **Robustness on the real server** (`robustness.spec.js`, no browser): junk HTTP requests to every DiceForge route (always a 4xx answer, never a server error) and names that try to reach outside DiceForge's folders (`../`, absolute paths, encoded slashes: nothing read, written or deleted outside); an error in a node stops only that prompt, with a clear message, and the next prompt runs; prompts with invalid inputs are refused by ComfyUI; the seed memory file damaged or replaced while ComfyUI runs, damaged wildcard (BOM, other encodings, broken yaml), model info, preset and Dice Grid files; many prompts queued at once; every seed mode through the queue (the same seed from ComfyUI's cache with the same prompt, mutate changing one choice per new seed, combinations listing every prompt once); text in any script and emoji; a 50 000-line wildcard; Random Chaos keeping its orientation and the side `rescale` sets.
+- **Robustness on the real server** (`robustness.spec.js`, no browser): junk HTTP requests to every DiceForge route (always a 4xx answer, never a server error) and names that try to reach outside DiceForge's folders (`../`, absolute paths, encoded slashes: nothing read, written or deleted outside); an error in a node stops only that prompt, with a clear message, and the next prompt runs; prompts with invalid inputs are refused by ComfyUI; the seed memory file damaged or replaced while ComfyUI runs, damaged wildcard (BOM, other encodings, broken yaml), model info, preset and Dice Grid files; many prompts queued at once; every seed mode through the queue (the same seed from ComfyUI's cache with the same prompt, mutate changing one choice per new seed, combinations listing every prompt once); text in any script and emoji; a 50 000-line wildcard.
 - **Browser** (`ui-prompts.spec.js`, `ui-models.spec.js`, `ui-nodes.spec.js`, in both node designs, Nodes 2.0 and classic): every node can be added; the resolution preview; CLIP Dual Text Encode's prompt history, syntax highlighting, `__` and `<lora:` autocomplete, tag autocomplete, Tag Browser and prompt styles; the Wildcard Browser; Model info and **Use these settings**; every model browser (Civitai search and downloads, batch actions, favorites, moving files); LoRA Stack (adding from the browser, the rows' ⋯ menus: 🎲, groups with their headers, 🏷 trigger words; the on/off switch, a missing file, the base model marks, presets, reloading the workflow); KSampler presets; XY Plot's row, menu (Set Run with the batch count) and plot plan; Dice Grid's kept cells; LoRA Stack, Random LoRA, Variation Seed and Anima NAG bypassed, passing the model and CLIP on; Random Image's preview; Danbooru Tag Enhancer's row, window and menu; a workflow run from the page, and the nodes' last runs (prompt history, Danbooru post, Random Image's file) kept out of the workflow its images get; node heights (advanced inputs, workflows saved too tall, previews as tall as their content, a height the user dragged kept after a reload); and every node, new and from a workflow saved too tall, checked for empty areas and cut-off content. `ui-robustness.spec.js`, in both designs too: every DiceForge node keeps every value through saving and loading a workflow twice; damaged workflows (too few, too many or wrong values, junk LoRA Stack data) open without breaking the page; copied nodes are independent; after a failed run the page keeps working; the Wildcard Browser marks an unreadable file; the autocomplete with the mouse, in the negative prompt and after another wildcard; random series of changes to both resolution nodes, after which the preview must show exactly the size the run makes; 64 nodes at once. Any error in the page fails the test.
 - **ComfyUI as DiceForge uses it** (`contract.spec.js`, in both designs): the ComfyUI internals the frontend relies on, each test naming one and the files that use it: the margin and sizing of DOM widgets in the classic canvas, the rows and body of a node in Nodes 2.0, the extension hooks (node menus, loading a workflow), the run events, the call that queues a run (`api.queuePrompt`), the settings. On the weekly run against ComfyUI master, a failure here says what an update changed.
 - **Old workflows** (`compat.spec.js`, in both designs): a workflow saved with each published release (`e2e/workflows/<version>.json`, every DiceForge node with every widget away from its default) opens with every node, every widget value under its name, and every input of the prompt it sends to the server. There is none before the first release: until then, changes that break old workflows are fine.

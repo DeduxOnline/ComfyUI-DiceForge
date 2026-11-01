@@ -19,10 +19,9 @@ from DiceForge.random_int import RandomIntSeedModes as RandomInt
 from DiceForge.random_lora import RandomLoraLoader
 from DiceForge.random_sampler import SAMPLERS, SCHEDULERS, RandomSampler
 from DiceForge.resolution_selector_random_latent import ASPECT_RATIOS
-from DiceForge.resolution_selector_random_latent import RANDOM_CHAOS as SELECTOR_CHAOS
 from DiceForge.resolution_selector_random_latent import RANDOM_LISTED as SELECTOR_LISTED
 from DiceForge.resolution_selector_random_latent import ResolutionSelectorRandomLatent as Selector
-from DiceForge.sdxl_resolution_list_latent import (BY_PERCENTAGE, CHAOS_PIXELS, HIGH_RES, RANDOM_CHAOS, RANDOM_LISTED, STANDARD, TO_LONGEST_SIDE,
+from DiceForge.sdxl_resolution_list_latent import (BY_PERCENTAGE, HIGH_RES, RANDOM_LISTED, STANDARD, TO_LONGEST_SIDE,
                                                    TO_WIDTH_HEIGHT, SDXLResolutionListLatent as SDXL)
 from DiceForge.seed_modes import DeckPicker
 scaled = lambda count: max(1, count * settings.default.max_examples // 200) # Explicit budgets follow the profile (thorough: 15 times).
@@ -39,7 +38,6 @@ rescales = st.one_of(
     st.builds(lambda width, height: {"rescale": TO_WIDTH_HEIGHT, "width": width, "height": height}, sides, sides),
     st.builds(lambda side: {"rescale": TO_LONGEST_SIDE, "longer_side": side}, st.integers(8, 2048).map(lambda k: k * 8)),
 )
-max_aspects = st.integers(20, 80).map(lambda k: round(k * 0.05, 2))
 
 
 @pytest.fixture
@@ -56,11 +54,9 @@ def latents(monkeypatch):
 
 @st.composite
 def sdxl_resolutions(draw):
-    group = draw(st.sampled_from(["Standard", "High-Res", "Random", "Random Chaos"]))
-    sizes = {"Standard": list(STANDARD), "High-Res": list(HIGH_RES), "Random": list(RANDOM_LISTED), "Random Chaos": RANDOM_CHAOS}[group]
+    group = draw(st.sampled_from(["Standard", "High-Res", "Random"]))
+    sizes = {"Standard": list(STANDARD), "High-Res": list(HIGH_RES), "Random": list(RANDOM_LISTED)}[group]
     resolution = {"resolution": group, "size": draw(st.sampled_from(sizes))}
-    if group == "Random Chaos":
-        resolution["max_aspect"] = draw(max_aspects)
     return resolution
 
 
@@ -69,13 +65,9 @@ def sdxl(resolution, rescale, multiple=8, seed=0, mode="random", batch=1):
     return output.result[1], output.result[2], output
 
 
-def selector(aspect, megapixels=1.0, multiple=8, seed=0, mode="random", max_aspect=2.0, batch=1):
-    output = Selector.execute(aspect, megapixels, seed, multiple, batch, max_aspect, mode)
+def selector(aspect, megapixels=1.0, multiple=8, seed=0, mode="random", batch=1):
+    output = Selector.execute(aspect, megapixels, seed, multiple, batch, mode)
     return output.result[1], output.result[2], output
-
-
-def orientation(resolution):
-    return {"Portrait": "portrait", "Landscape": "landscape"}.get(resolution["size"]) if resolution["resolution"] == "Random Chaos" else None
 
 
 def exact_size(rescale):
@@ -99,10 +91,10 @@ def test_sdxl_sizes_are_multiples_and_reported_consistently(resolution, rescale,
 
 
 @settings(max_examples=scaled(300))
-@given(aspect=st.sampled_from([*ASPECT_RATIOS, *SELECTOR_LISTED, *SELECTOR_CHAOS]), megapixels=st.integers(1, 160).map(lambda k: round(k * 0.1, 1)),
-       multiple=multiples, batch=st.integers(1, 4), seed=seeds, mode=st.sampled_from(SEED_MODES), max_aspect=max_aspects)
-def test_selector_sizes_are_multiples_and_reported_consistently(aspect, megapixels, multiple, batch, seed, mode, max_aspect, latents):
-    width, height, output = selector(aspect, megapixels, multiple, seed, mode, max_aspect, batch)
+@given(aspect=st.sampled_from([*ASPECT_RATIOS, *SELECTOR_LISTED]), megapixels=st.integers(1, 160).map(lambda k: round(k * 0.1, 1)),
+       multiple=multiples, batch=st.integers(1, 4), seed=seeds, mode=st.sampled_from(SEED_MODES))
+def test_selector_sizes_are_multiples_and_reported_consistently(aspect, megapixels, multiple, batch, seed, mode, latents):
+    width, height, output = selector(aspect, megapixels, multiple, seed, mode, batch)
     assert isinstance(width, int) and isinstance(height, int)
     assert width % multiple == 0 and height % multiple == 0 and width >= multiple and height >= multiple
     assert latents[-1] == (width, height, batch) and output.result[3] == seed
@@ -110,17 +102,17 @@ def test_selector_sizes_are_multiples_and_reported_consistently(aspect, megapixe
     assert (last["width"], last["height"]) == (width, height)
     json.dumps(output.ui)
     if mode in REPRODUCIBLE:
-        assert selector(aspect, megapixels, multiple, seed, mode, max_aspect, batch)[:2] == (width, height)
+        assert selector(aspect, megapixels, multiple, seed, mode, batch)[:2] == (width, height)
 
 
 @settings(max_examples=scaled(300))
 @given(resolution=sdxl_resolutions(), rescale=rescales, multiple=multiples, seed=seeds, mode=st.sampled_from(SEED_MODES))
 def test_sdxl_rescale_promises_hold_in_every_group(resolution, rescale, multiple, seed, mode, latents):
     width, height, _ = sdxl(resolution, rescale, multiple, seed, mode)
-    check_rescale_promises(width, height, rescale, multiple, orientation(resolution), resolution.get("max_aspect", 2.0))
+    check_rescale_promises(width, height, rescale, multiple)
 
 
-def check_rescale_promises(width, height, rescale, multiple, wanted, max_aspect):
+def check_rescale_promises(width, height, rescale, multiple):
     on_grid = lambda side: side and side % multiple == 0
     if exact_size(rescale):
         if on_grid(rescale["width"]) and on_grid(rescale["height"]):
@@ -132,31 +124,6 @@ def check_rescale_promises(width, height, rescale, multiple, wanted, max_aspect)
         assert height == rescale["height"]
     if rescale and rescale["rescale"] == TO_LONGEST_SIDE and on_grid(rescale["longer_side"]):
         assert max(width, height) == rescale["longer_side"]
-    if wanted and max_aspect > 1.0 and width == height:
-        # A square only when no side may move: the shorter is at the minimum or set, and the longer is set (or is the longest side).
-        mode = rescale and rescale["rescale"]
-        set_width = mode == TO_WIDTH_HEIGHT and bool(rescale["width"])
-        set_height = mode == TO_WIDTH_HEIGHT and bool(rescale["height"])
-        shorter_set, longer_set = (set_width, set_height) if wanted == "portrait" else (set_height, set_width)
-        assert (width == multiple or shorter_set) and (longer_set or mode == TO_LONGEST_SIDE), (width, height)
-    elif wanted and max_aspect > 1.0:
-        assert (width < height) if wanted == "portrait" else (width > height), (width, height)
-
-
-# Random Chaos: within the pixel budget (rounded down), the aspect ratio within max_aspect (give or take the rounding), every orientation obeyed.
-@settings(max_examples=scaled(300))
-@given(size=st.sampled_from(RANDOM_CHAOS), max_aspect=max_aspects, percent=percents, multiple=multiples, seed=seeds, mode=st.sampled_from(SEED_MODES))
-def test_chaos_stays_within_budget_and_aspect(size, max_aspect, percent, multiple, seed, mode, latents):
-    resolution = {"resolution": "Random Chaos", "size": size, "max_aspect": max_aspect}
-    width, height, _ = sdxl(resolution, {"rescale": BY_PERCENTAGE, "percent": percent}, multiple, seed, mode)
-    budget = CHAOS_PIXELS * (percent / 100) ** 2
-    if min(width, height) == multiple:
-        return # The smallest size there is: it can't stay within a smaller budget (and Portrait/Landscape step the longer side up from it).
-    assert width * height <= budget * 1.000001
-    exact_long = math.sqrt(budget * max_aspect) # The longest a side can be at max_aspect.
-    assert max(width, height) <= exact_long + 1e-6
-    slack = math.log((min(width, height) + 2 * multiple) / min(width, height))
-    assert abs(math.log(width / height)) <= math.log(max_aspect) + slack
 
 
 @settings(max_examples=scaled(200))

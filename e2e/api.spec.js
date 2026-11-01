@@ -118,14 +118,9 @@ test.describe("@api workflows and routes", () => {
       expect(result.outputs["1"].dice_forge_last_size[0].group).toBe("Random");
     }
     expect([...listed].sort()).toEqual(["640x1536", "768x1344", "832x1216", "896x1152"]);
-    const selector = (inputs) => size({ 1: { class_type: "DiceForgeResolutionSelector", inputs: { aspect_ratio: "16:9 (Widescreen)", megapixels: 1.0, seed: 0, multiple: 8, batch: 1, max_aspect: 2.0, seed_mode: "random", ...inputs } } });
+    const selector = (inputs) => size({ 1: { class_type: "DiceForgeResolutionSelector", inputs: { aspect_ratio: "16:9 (Widescreen)", megapixels: 1.0, seed: 0, multiple: 8, batch: 1, seed_mode: "random", ...inputs } } });
     result = await runPrompt(request, selector({}));
     expect([shown(result, "2"), shown(result, "3")]).toEqual(["1368", "768"]);
-    result = await runPrompt(request, size({ 1: { class_type: "DiceForgeResolutionSelector", inputs: { aspect_ratio: "Random Chaos Portrait", megapixels: 1.0, seed: 3, multiple: 64, batch: 1, max_aspect: 2.0, seed_mode: "random" } } }));
-    const [width, height] = [Number(shown(result, "2")), Number(shown(result, "3"))];
-    expect(width % 64).toBe(0);
-    expect(height).toBeGreaterThan(width);
-    expect(width * height).toBeLessThanOrEqual(1024 * 1024);
   });
 
   test("a resolution node from the cache still reports its size to the preview", async ({ request }) => {
