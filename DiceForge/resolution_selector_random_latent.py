@@ -79,19 +79,18 @@ class ResolutionSelectorRandomLatent(io.ComfyNode):
                     advanced=True,
                 ),
                 io.Combo.Input(
-                    "seed_mode",
+                    "randomizer_mode",
                     options=SEED_MODES,
                     default="random",
                     tooltip=SEED_MODE_TOOLTIP,
                     advanced=True,
                 ),
             ],
-            # Outputs for the node: the empty latent batch, its width and height in pixels, and the seed.
+            # Outputs for the node: the empty latent batch, its width and height in pixels.
             outputs=[
                 io.Latent.Output(display_name="latent", tooltip="Empty latent batch, the same as Empty Latent Image makes for this size."),
                 io.Int.Output(display_name="width", tooltip="Width of the latent in pixels."),
                 io.Int.Output(display_name="height", tooltip="Height of the latent in pixels."),
-                io.Int.Output(display_name="seed", tooltip="The seed used for this run, for example to pass on to KSampler."),
             ],
         )
     # Megapixel sizing, the same math as the core Resolution Selector, before each side is rounded to multiple.
@@ -106,8 +105,8 @@ class ResolutionSelectorRandomLatent(io.ComfyNode):
         )
     # Main method to get the resolution based on the selected option, applying randomization as needed, then building the empty latent with Empty Latent Image.
     @classmethod
-    def execute(cls, aspect_ratio, megapixels=1.0, seed=0, multiple=8, batch=1, seed_mode="random", preview=None):
-        picker = make_picker(seed_mode, seed) # How random picks follow the seed (random: reproducible, same picks as before seed modes existed).
+    def execute(cls, aspect_ratio, megapixels=1.0, seed=0, multiple=8, batch=1, randomizer_mode="random", preview=None):
+        picker = make_picker(randomizer_mode, seed) # How random picks follow the seed (random: reproducible, same picks as before seed modes existed).
         # Switching logic to determine the aspect ratio based on the selected option, handling listed random and chaos options appropriately.
         if aspect_ratio in RANDOM_LISTED:
             w_ratio, h_ratio = ASPECT_RATIOS[pick_label([name for name, ratio in ASPECT_RATIOS.items() if ratio in RANDOM_LISTED[aspect_ratio]], picker, seed)]#Returning a random aspect ratio from the list.
@@ -116,10 +115,10 @@ class ResolutionSelectorRandomLatent(io.ComfyNode):
         width, height = cls.size_for_ratio(w_ratio, h_ratio, megapixels, multiple)
         MEMORY.save()
         logging.info(
-            f"[DiceForge] Resolution Selector (Random, Latent) | Size: {width}x{height} ({width * height / (1024 * 1024):.2f} MP) | Aspect: {aspect_ratio} | Multiple: {multiple} | Seed: {seed} ({seed_mode}) | Batch: {batch}"
+            f"[DiceForge] Resolution Selector (Random, Latent) | Size: {width}x{height} ({width * height / (1024 * 1024):.2f} MP) | Aspect: {aspect_ratio} | Multiple: {multiple} | Seed: {seed} ({randomizer_mode}) | Batch: {batch}"
         )
         latent = nodes.EmptyLatentImage().generate(width, height, batch)[0]
         # The size of this run, with the settings it came from, for the preview of random options in the frontend extension.
         last_size = {"width": width, "height": height, "aspect_ratio": aspect_ratio, "megapixels": megapixels, "multiple": multiple,
                      }
-        return io.NodeOutput(latent, width, height, seed, ui={"dice_forge_last_size": [last_size]})
+        return io.NodeOutput(latent, width, height, ui={"dice_forge_last_size": [last_size]})

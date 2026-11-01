@@ -136,19 +136,18 @@ class SDXLResolutionListLatent(io.ComfyNode):
                     advanced=True,
                 ),
                 io.Combo.Input(
-                    "seed_mode",
+                    "randomizer_mode",
                     options=SEED_MODES,
                     default="random",
                     tooltip=SEED_MODE_TOOLTIP,
                     advanced=True,
                 ),
             ],
-            # Outputs for the node: the empty latent batch, its width and height in pixels, and the seed.
+            # Outputs for the node: the empty latent batch, its width and height in pixels.
             outputs=[
                 io.Latent.Output(display_name="latent", tooltip="Empty latent batch, the same as Empty Latent Image makes for this size."),
                 io.Int.Output(display_name="width", tooltip="Width of the latent in pixels."),
                 io.Int.Output(display_name="height", tooltip="Height of the latent in pixels."),
-                io.Int.Output(display_name="seed", tooltip="The seed used for this run, for example to pass on to KSampler."),
             ],
         )
     # Rounding method to make width and height multiples of `multiple` (at least `multiple` itself). Of the multiples just below and above each side,
@@ -160,10 +159,10 @@ class SDXLResolutionListLatent(io.ComfyNode):
         return min(((w, h) for w in steps(width) for h in steps(height)), key=lambda size: (round(abs(math.log(size[0] / size[1]) - ratio), 9), abs(size[0] * size[1] - pixels), size))
     # Main method to get the resolution based on the selected option, applying randomization and rounding as needed, then building the empty latent with Empty Latent Image.
     @classmethod
-    def execute(cls, resolution=None, seed=0, rescale=None, multiple=8, batch=1, seed_mode="random", preview=None):
+    def execute(cls, resolution=None, seed=0, rescale=None, multiple=8, batch=1, randomizer_mode="random", preview=None):
         if not isinstance(resolution, dict) or "size" not in resolution: # The nested list came without a valid group (a damaged workflow).
             raise ValueError("SDXL Resolution List (Latent): the resolution list of this node has no valid group. Pick the group and size again, or add the node again.")
-        picker = make_picker(seed_mode, seed) # How random picks follow the seed (random: reproducible, same picks as before seed modes existed).
+        picker = make_picker(randomizer_mode, seed) # How random picks follow the seed (random: reproducible, same picks as before seed modes existed).
         group, size = resolution["resolution"], resolution["size"] # Nested list value: the group, and the size picked in it.
         # Switching logic to determine the width and height based on the selected group.
         if group == "Random":
@@ -175,10 +174,10 @@ class SDXLResolutionListLatent(io.ComfyNode):
         MEMORY.save()
         # Logging the final resolution, rescale, multiple, seed, and batch size for debugging and verification purposes.
         logging.info(
-            f"[DiceForge] SDXL Resolution List (Latent) | {group}: {size} | Size: {width}x{height} | Rescale: {describe_rescale(rescale)} | Multiple: {multiple} | Seed: {seed} ({seed_mode}) | Batch: {batch}"
+            f"[DiceForge] SDXL Resolution List (Latent) | {group}: {size} | Size: {width}x{height} | Rescale: {describe_rescale(rescale)} | Multiple: {multiple} | Seed: {seed} ({randomizer_mode}) | Batch: {batch}"
         )
         latent = nodes.EmptyLatentImage().generate(width, height, batch)[0]
         # The size of this run, with the settings it came from, for the preview of random sizes in the frontend extension.
         last_size = {"width": width, "height": height, "group": group, "size": size, "multiple": multiple,
                      **rescale_settings(rescale)}
-        return io.NodeOutput(latent, width, height, seed, ui={"dice_forge_last_size": [last_size]})
+        return io.NodeOutput(latent, width, height, ui={"dice_forge_last_size": [last_size]})

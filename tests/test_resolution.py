@@ -1,5 +1,5 @@
 # Resolution nodes: SDXL Resolution List (Latent) and Resolution Selector (Random, Latent): listed and random sizes, rescale modes, rounding, Random
-# Chaos budgets and orientations, and the frontend preview's rounding (web/resolution_preview.js) against the node's.
+# Resolution selection and the frontend preview's rounding (web/resolution_preview.js) against the node's.
 import itertools
 import json
 import math
@@ -18,8 +18,8 @@ def by_percentage(percent):
 
 
 def sdxl(group, size, seed=0, rescale=None, multiple=8, batch=1, mode="random"):
-    latent, width, height, out_seed = SDXL.execute({"resolution": group, "size": size}, seed, rescale or by_percentage(100), multiple, batch, mode).result
-    return latent, width, height, out_seed
+    latent, width, height = SDXL.execute({"resolution": group, "size": size}, seed, rescale or by_percentage(100), multiple, batch, mode).result
+    return latent, width, height
 
 
 def test_round_to_multiple_gives_multiples_close_to_the_ratio():
@@ -39,8 +39,8 @@ def test_round_down_never_goes_over_and_never_below_one_multiple():
 
 
 def test_standard_size_makes_the_latent():
-    latent, width, height, seed = sdxl("Standard", "1216 x 832", seed=5, batch=2)
-    assert (width, height, seed) == (1216, 832, 5)
+    latent, width, height = sdxl("Standard", "1216 x 832", seed=5, batch=2)
+    assert (width, height) == (1216, 832)
     assert tuple(latent["samples"].shape) == (2, 4, 104, 152)
 
 
@@ -48,7 +48,7 @@ def test_rescale_by_percentage_multiplies_each_side():
     assert sdxl("Standard", "1024 x 1024", rescale=by_percentage(150), multiple=16)[1:3] == (1536, 1536)
     assert sdxl("Standard", "1024 x 1024", rescale=by_percentage(200))[1:3] == (2048, 2048) # Four times the pixels.
     assert sdxl("Standard", "1216 x 832", rescale=by_percentage(50))[1:3] == (608, 416)
-    _, width, height, _ = sdxl("Standard", "768 x 1344", rescale=by_percentage(130), multiple=16)
+    _, width, height = sdxl("Standard", "768 x 1344", rescale=by_percentage(130), multiple=16)
     assert width % 16 == 0 and height % 16 == 0 and abs(width * height / (768 * 1344) - 1.69) < 0.05 # The pixels grow by the square.
     assert abs(width / height - 768 / 1344) < 0.01
 
@@ -108,18 +108,18 @@ def test_the_run_reports_its_size_for_the_preview():
 
 @pytest.mark.parametrize("mode", ["shuffle", "balanced"])
 def test_remembering_modes_give_a_seed_its_size_again(mode):
-    sizes = {seed: Selector.execute("Random Any", seed=seed, seed_mode=mode).result[1:3] for seed in range(8)}
-    assert {seed: Selector.execute("Random Any", seed=seed, seed_mode=mode).result[1:3] for seed in (7, 2, 0)} == {seed: sizes[seed] for seed in (7, 2, 0)}
+    sizes = {seed: Selector.execute("Random Any", seed=seed, randomizer_mode=mode).result[1:3] for seed in range(8)}
+    assert {seed: Selector.execute("Random Any", seed=seed, randomizer_mode=mode).result[1:3] for seed in (7, 2, 0)} == {seed: sizes[seed] for seed in (7, 2, 0)}
 
 
 def test_selector_fixed_ratio_and_megapixels():
-    _, width, height, _ = Selector.execute("16:9 (Widescreen)", megapixels=1.0, multiple=8).result
+    _, width, height = Selector.execute("16:9 (Widescreen)", megapixels=1.0, multiple=8).result
     assert abs(width / height - 16 / 9) < 0.02 and abs(width * height / 1024 ** 2 - 1.0) < 0.03
 
 
 def test_selector_random_listed_picks_the_right_orientation():
     for seed in range(40):
-        _, width, height, _ = Selector.execute("Random Portrait", seed=seed).result
+        _, width, height = Selector.execute("Random Portrait", seed=seed).result
         assert width < height
         ratio = width / height
         assert any(abs(ratio - w / h) < 0.03 for w, h in ASPECT_RATIOS.values())

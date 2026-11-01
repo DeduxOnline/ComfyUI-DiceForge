@@ -95,7 +95,7 @@ The anime prompt builder *Prompt Director* lives in its own repository: [DeduxOn
 
 - Connect the `latent` output of a resolution node to the `latent_image` input of **KSampler**.
 - Connect the `CLIP` output of your checkpoint loader to **CLIP Dual Text Encode**, then its `positive` and `negative` outputs to the matching inputs of **KSampler**.
-- To drive the image and the canvas size from one seed, connect the `seed` output of a resolution node to the `seed` input of **KSampler**.
+- To drive the image and the canvas size from one seed, use the same seed value for the resolution node and **KSampler**.
 - To compare LoRAs or checkpoints, use **Random LoRA** or **Random Checkpoint** with `seed_mode` `deck` and *increment*: every file of the folder comes once before any repeats.
 - For img2img or ControlNet over a folder of images, use **Random Image** the same way.
 - To compare samplers, connect **Random Sampler** to KSampler's `sampler_name` and `scheduler`, and its `label` to **Dice Grid**.
@@ -427,7 +427,7 @@ The resolution is a nested list: first pick a group in `resolution`, then a size
 | `longer_side` | main (*to longest side*) | `1536` | The longest side, keeping the aspect ratio: 1216x832 becomes 1536x1048 and 832x1216 becomes 1048x1536. Good for random sizes: every size ends up with the same longest side. |
 | `multiple` | Advanced | `8` | Rounds width and height to the nearest multiple of this value (8–256, in steps of 8). Use 64 for SDXL training sizes. |
 | `batch` | Advanced | `1` | Number of latents in the batch (1–32). |
-| `seed_mode` | Advanced | `random` | How the random groups change from run to run: `random`, `deck`, `shuffle`, `balanced` or `sequential`. See [Seed modes for sizes](#seed-modes-for-sizes). |
+| `randomizer_mode` | Advanced | `random` | How the random groups change from run to run: `random`, `deck`, `shuffle`, `balanced` or `sequential`. See [Seed modes for sizes](#seed-modes-for-sizes). |
 
 #### Outputs
 
@@ -478,7 +478,7 @@ It works like the core ComfyUI *Resolution Selector* followed by **Empty Latent 
 | `seed` | main | `0` | Seed for the random options. By default it is randomized after each run (*control after generate*), so every run gets a new random ratio. Set it to *fixed* to repeat a result. |
 | `multiple` | Advanced | `8` | Rounds width and height to the nearest multiple of this value (8–256, in steps of 8). Use 64 for SDXL training sizes. |
 | `batch` | Advanced | `1` | Number of latents in the batch (1–32). |
-| `seed_mode` | Advanced | `random` | How the random options change from run to run, as in SDXL Resolution List. See [Seed modes for sizes](#seed-modes-for-sizes). |
+| `randomizer_mode` | Advanced | `random` | How the random options change from run to run, as in SDXL Resolution List. See [Seed modes for sizes](#seed-modes-for-sizes). |
 
 #### Outputs
 
@@ -487,7 +487,6 @@ It works like the core ComfyUI *Resolution Selector* followed by **Empty Latent 
 | `latent` | Empty latent batch, identical to what **Empty Latent Image** makes for this size and `batch`. Connect it to the `latent_image` input of **KSampler**. |
 | `width` | Width in pixels, for example for an upscale or hires-fix step. |
 | `height` | Height in pixels. |
-| `seed` | The seed used for this run, the same as the node's `seed` input. For example, connect it to the `seed` input of **KSampler**. |
 
 #### Aspect ratios
 
@@ -502,7 +501,7 @@ It works like the core ComfyUI *Resolution Selector* followed by **Empty Latent 
 
 ### Seed modes for sizes
 
-Both resolution nodes (and [Random Int and Random Float](#random-int-and-random-float) and the [random loaders](#random-lora-random-checkpoint-random-diffusion-model-and-random-vae)) have a `seed_mode` input (Advanced) for their random options, with the same modes as [CLIP Dual Text Encode](#seed-modes). Fixed sizes and ratios ignore it.
+Both resolution nodes have a `randomizer_mode` input (Advanced) for their random options. [Random Int and Random Float](#random-int-and-random-float) and the [random loaders](#random-lora-random-checkpoint-random-diffusion-model-and-random-vae) use `seed_mode` with the same modes as [CLIP Dual Text Encode](#seed-modes). Fixed sizes and ratios ignore the randomizer mode.
 
 | Mode | Listed sizes and ratios | Seed |
 |---|---|---|

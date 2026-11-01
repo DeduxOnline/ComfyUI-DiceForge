@@ -82,7 +82,7 @@ def test_sdxl_sizes_are_multiples_and_reported_consistently(resolution, rescale,
     width, height, output = sdxl(resolution, rescale, multiple, seed, mode, batch)
     assert isinstance(width, int) and isinstance(height, int)
     assert width % multiple == 0 and height % multiple == 0 and width >= multiple and height >= multiple
-    assert latents[-1] == (width, height, batch) and output.result[3] == seed
+    assert latents[-1] == (width, height, batch)
     last = output.ui["dice_forge_last_size"][0]
     assert (last["width"], last["height"], last["multiple"]) == (width, height, multiple)
     json.dumps(output.ui) # The preview message goes to the browser as JSON.
@@ -97,7 +97,7 @@ def test_selector_sizes_are_multiples_and_reported_consistently(aspect, megapixe
     width, height, output = selector(aspect, megapixels, multiple, seed, mode, batch)
     assert isinstance(width, int) and isinstance(height, int)
     assert width % multiple == 0 and height % multiple == 0 and width >= multiple and height >= multiple
-    assert latents[-1] == (width, height, batch) and output.result[3] == seed
+    assert latents[-1] == (width, height, batch)
     last = output.ui["dice_forge_last_size"][0]
     assert (last["width"], last["height"]) == (width, height)
     json.dumps(output.ui)

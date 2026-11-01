@@ -36,6 +36,8 @@ test.describe("@api workflows and routes", () => {
     }
     expect(info.DiceForgeResolutionSelector.input.required.rescale).toBeUndefined();
     expect(info.DiceForgeResolutionSelector.input.optional.rescale).toBeUndefined();
+    expect(info.DiceForgeResolutionSelector.input.required.randomizer_mode).toBeDefined();
+    expect(info.DiceForgeSDXLResolutionList.input.required.randomizer_mode).toBeDefined();
     expect(info.DiceForgeCLIPDualTextEncode.input.required.negative[1].advanced).toBe(true);
   });
 
@@ -103,28 +105,28 @@ test.describe("@api workflows and routes", () => {
 
   test("SDXL Resolution List and Resolution Selector make latents of the right size", async ({ request }) => {
     const size = (node) => ({ ...node, 2: { class_type: "PreviewAny", inputs: { source: ["1", 1] } }, 3: { class_type: "PreviewAny", inputs: { source: ["1", 2] } } });
-    let result = await runPrompt(request, size({ 1: { class_type: "DiceForgeSDXLResolutionList", inputs: { resolution: "Standard", "resolution.size": "1216 x 832", seed: 0, rescale: "by percentage", "rescale.percent": 100, multiple: 8, batch: 1, seed_mode: "random" } } }));
+    let result = await runPrompt(request, size({ 1: { class_type: "DiceForgeSDXLResolutionList", inputs: { resolution: "Standard", "resolution.size": "1216 x 832", seed: 0, rescale: "by percentage", "rescale.percent": 100, multiple: 8, batch: 1, randomizer_mode: "random" } } }));
     expect([shown(result, "2"), shown(result, "3")]).toEqual(["1216", "832"]);
-    result = await runPrompt(request, size({ 1: { class_type: "DiceForgeSDXLResolutionList", inputs: { resolution: "Standard", "resolution.size": "1024 x 1024", seed: 0, rescale: "by percentage", "rescale.percent": 150, multiple: 16, batch: 1, seed_mode: "random" } } }));
+    result = await runPrompt(request, size({ 1: { class_type: "DiceForgeSDXLResolutionList", inputs: { resolution: "Standard", "resolution.size": "1024 x 1024", seed: 0, rescale: "by percentage", "rescale.percent": 150, multiple: 16, batch: 1, randomizer_mode: "random" } } }));
     expect([shown(result, "2"), shown(result, "3")]).toEqual(["1536", "1536"]); // 150%: each side, 2.25 times the pixels.
-    result = await runPrompt(request, size({ 1: { class_type: "DiceForgeSDXLResolutionList", inputs: { resolution: "Standard", "resolution.size": "832 x 1216", seed: 0, rescale: "to longest side", "rescale.longer_side": 1536, multiple: 8, batch: 1, seed_mode: "random" } } }));
+    result = await runPrompt(request, size({ 1: { class_type: "DiceForgeSDXLResolutionList", inputs: { resolution: "Standard", "resolution.size": "832 x 1216", seed: 0, rescale: "to longest side", "rescale.longer_side": 1536, multiple: 8, batch: 1, randomizer_mode: "random" } } }));
     expect([shown(result, "2"), shown(result, "3")]).toEqual(["1048", "1536"]);
-    result = await runPrompt(request, size({ 1: { class_type: "DiceForgeSDXLResolutionList", inputs: { resolution: "Standard", "resolution.size": "1216 x 832", seed: 0, rescale: "to Width/Height", "rescale.width": 1920, "rescale.height": 1080, multiple: 8, batch: 1, seed_mode: "random" } } }));
+    result = await runPrompt(request, size({ 1: { class_type: "DiceForgeSDXLResolutionList", inputs: { resolution: "Standard", "resolution.size": "1216 x 832", seed: 0, rescale: "to Width/Height", "rescale.width": 1920, "rescale.height": 1080, multiple: 8, batch: 1, randomizer_mode: "random" } } }));
     expect([shown(result, "2"), shown(result, "3")]).toEqual(["1920", "1080"]);
     const listed = new Set();
     for (let seed = 0; seed < 4; seed++) {
-      result = await runPrompt(request, size({ 1: { class_type: "DiceForgeSDXLResolutionList", inputs: { resolution: "Random", "resolution.size": "Vertical Listed", seed, rescale: "by percentage", "rescale.percent": 100, multiple: 8, batch: 1, seed_mode: "deck" } } }));
+      result = await runPrompt(request, size({ 1: { class_type: "DiceForgeSDXLResolutionList", inputs: { resolution: "Random", "resolution.size": "Vertical Listed", seed, rescale: "by percentage", "rescale.percent": 100, multiple: 8, batch: 1, randomizer_mode: "deck" } } }));
       listed.add(`${shown(result, "2")}x${shown(result, "3")}`);
       expect(result.outputs["1"].dice_forge_last_size[0].group).toBe("Random");
     }
     expect([...listed].sort()).toEqual(["640x1536", "768x1344", "832x1216", "896x1152"]);
-    const selector = (inputs) => size({ 1: { class_type: "DiceForgeResolutionSelector", inputs: { aspect_ratio: "16:9 (Widescreen)", megapixels: 1.0, seed: 0, multiple: 8, batch: 1, seed_mode: "random", ...inputs } } });
+    const selector = (inputs) => size({ 1: { class_type: "DiceForgeResolutionSelector", inputs: { aspect_ratio: "16:9 (Widescreen)", megapixels: 1.0, seed: 0, multiple: 8, batch: 1, randomizer_mode: "random", ...inputs } } });
     result = await runPrompt(request, selector({}));
     expect([shown(result, "2"), shown(result, "3")]).toEqual(["1368", "768"]);
   });
 
   test("a resolution node from the cache still reports its size to the preview", async ({ request }) => {
-    const prompt = { 1: { class_type: "DiceForgeSDXLResolutionList", inputs: { resolution: "Random", "resolution.size": "Any Listed", seed: 777, rescale: "by percentage", "rescale.percent": 100, multiple: 8, batch: 1, seed_mode: "random" } },
+    const prompt = { 1: { class_type: "DiceForgeSDXLResolutionList", inputs: { resolution: "Random", "resolution.size": "Any Listed", seed: 777, rescale: "by percentage", "rescale.percent": 100, multiple: 8, batch: 1, randomizer_mode: "random" } },
       2: { class_type: "PreviewAny", inputs: { source: ["1", 1] } } };
     const first = await runPrompt(request, prompt);
     const again = await runPrompt(request, prompt);

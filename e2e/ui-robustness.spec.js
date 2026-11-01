@@ -12,8 +12,8 @@ const STACK = JSON.stringify({ rows: [{ lora: "style/ink.safetensors", strength:
   { lora: "detail.safetensors", strength: 1.2, on: false }], groups: { A: { min: 0, max: 1 } }, separate_clip: true });
 // Values that differ from the defaults, so a value lost on the way shows.
 const CHANGES = {
-  DiceForgeSDXLResolutionList: { resolution: "High-Res", "resolution.size": "1152 x 1536", seed: 123456789, rescale: "to longest side", "rescale.longer_side": 2048, multiple: 64, batch: 3, seed_mode: "deck" },
-  DiceForgeResolutionSelector: { aspect_ratio: "Random Portrait", megapixels: 2.3, seed: 42, multiple: 32, batch: 2, seed_mode: "balanced" },
+  DiceForgeSDXLResolutionList: { resolution: "High-Res", "resolution.size": "1152 x 1536", seed: 123456789, rescale: "to longest side", "rescale.longer_side": 2048, multiple: 64, batch: 3, randomizer_mode: "deck" },
+  DiceForgeResolutionSelector: { aspect_ratio: "Random Portrait", megapixels: 2.3, seed: 42, multiple: 32, batch: 2, randomizer_mode: "balanced" },
   DiceForgeCLIPDualTextEncode: { positive: "портрет, {a|b} __color__ 🎲\nвторая строка", negative: "нет, ${x}", seed: 9007199254740991, seed_mode: "mutate", trim: false },
   DiceForgeRandomInt: { min: -50, max: 50, step: 5, seed: 7, seed_mode: "sequential" },
   DiceForgeRandomFloat: { min: -1.5, max: 2.25, step: 0.25, seed: 8, seed_mode: "shuffle", parts: 7 },

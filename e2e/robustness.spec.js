@@ -13,7 +13,7 @@ const clip = (positive, negative = "", { seed = 0, mode = "random" } = {}) => ({
   3: { class_type: "PreviewAny", inputs: { source: ["1", 4] } },
 });
 const sdxl = (inputs) => ({
-  1: { class_type: "DiceForgeSDXLResolutionList", inputs: { resolution: "Standard", "resolution.size": "1024 x 1024", seed: 0, rescale: "by percentage", "rescale.percent": 100, multiple: 8, batch: 1, seed_mode: "random", ...inputs } },
+  1: { class_type: "DiceForgeSDXLResolutionList", inputs: { resolution: "Standard", "resolution.size": "1024 x 1024", seed: 0, rescale: "by percentage", "rescale.percent": 100, multiple: 8, batch: 1, randomizer_mode: "random", ...inputs } },
   2: { class_type: "PreviewAny", inputs: { source: ["1", 1] } },
   3: { class_type: "PreviewAny", inputs: { source: ["1", 2] } },
 });
@@ -127,7 +127,7 @@ test.describe("@api robustness on the real server", () => {
         2: { class_type: "PreviewAny", inputs: { source: ["1", 2] } } }, "unknown sampler not_a_sampler"],
       [{ 1: { class_type: "DiceForgeRandomImage", inputs: { folder: "(all)", seed: 0, seed_mode: "random", path: basePath("nowhere") } },
         2: { class_type: "PreviewAny", inputs: { source: ["1", 2] } } }, "Random Image"],
-      [{ 1: { class_type: "DiceForgeSDXLResolutionList", inputs: { resolution: "Standard", "resolution.size": "1024 x 1024", seed: 0, rescale: "by percentage", "rescale.percent": 100, multiple: 8, batch: 1, seed_mode: "random" } },
+      [{ 1: { class_type: "DiceForgeSDXLResolutionList", inputs: { resolution: "Standard", "resolution.size": "1024 x 1024", seed: 0, rescale: "by percentage", "rescale.percent": 100, multiple: 8, batch: 1, randomizer_mode: "random" } },
         2: { class_type: "DiceForgeLoraStack", inputs: { model: ["9", 0], loras: "{oops", seed: 0, seed_mode: "random" } },
         9: { class_type: "CheckpointLoaderSimple", inputs: { ckpt_name: "illustrious_base.safetensors" } } }, null], // The stand-in checkpoint fails first: still an error, not a crash.
     ];
