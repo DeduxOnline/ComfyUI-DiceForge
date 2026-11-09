@@ -210,9 +210,6 @@ def browser_entry(kind, name, path, folder_files):
     fresh = info.get("size") == stat.st_size and info.get("mtime") == stat.st_mtime
     civitai = (info.get("civitai") or {}) if fresh else {}
     user = info.get("user") or {}
-    images = civitai.get("images") or []
-    image = next((image for image in images if image.get("type") != "video"), images[0] if images else None)
-    found = bool(civitai.get("found"))
     return {
         "file": name,
         "sha256": (info.get("sha256") or "") if fresh else "", # Known once looked up: the browsers find duplicates by it.
@@ -221,12 +218,23 @@ def browser_entry(kind, name, path, folder_files):
         "mtime": stat.st_mtime,
         "preview": local_preview(path, folder_files) is not None,
         "checked": bool(civitai.get("checked")) and not civitai.get("error"),
-        "found": found,
-        "name": user.get("name") or (" - ".join(part for part in (civitai.get("model_name"), civitai.get("version_name")) if part) if found else ""),
         "base_model": civitai.get("base_model") or "",
         "trigger_words": [word.strip() for word in (user.get("trigger_words") or "").split(",") if word.strip()] or civitai.get("trigger_words") or [],
         "settings": (user.get("settings") or "").strip(),
-        "image": image and {"url": image.get("url"), "type": image.get("type"), "nsfwLevel": image.get("nsfwLevel")},
+        "image": preview_image(civitai),
+        **civitai_found(civitai, user),
+    }
+# The picture the browser shows for a file: the first one that is not a video (or the first of all).
+def preview_image(civitai):
+    images = civitai.get("images") or []
+    image = next((image for image in images if image.get("type") != "video"), images[0] if images else None)
+    return image and {"url": image.get("url"), "type": image.get("type"), "nsfwLevel": image.get("nsfwLevel")}
+# What the browser shows from Civitai when the file was found there: its name, page, tags, stats and whether an update is out.
+def civitai_found(civitai, user):
+    found = bool(civitai.get("found"))
+    return {
+        "found": found,
+        "name": user.get("name") or (" - ".join(part for part in (civitai.get("model_name"), civitai.get("version_name")) if part) if found else ""),
         "url": civitai.get("url") if found else None,
         "tags": civitai.get("tags") or [] if found else [],
         "stats": civitai.get("stats") if found and civitai.get("stats") else None,
