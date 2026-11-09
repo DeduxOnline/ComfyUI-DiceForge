@@ -329,6 +329,29 @@ for (const vue of [true, false]) {
       await expect(page.locator(".dfls").first().locator(".row .name")).toHaveText(["ink", "detail"]);
     });
 
+    test("LoRA Stack: a LoRA file added while the page is open is no longer missing once the list is read again", async ({ page }) => {
+      test.setTimeout(90_000);
+      const top = `refresh_${vue ? "vue" : "classic"}`, file = `${top}/added.safetensors`;
+      const [stack] = await addNodes(page, [{ type: "DiceForgeLoraStack" }]);
+      // A row for a LoRA that is not on disk yet: the list is read now (it has the LoRAs the other tests put there), so the row is missing.
+      await page.evaluate(([id, lora]) => {
+        const node = window.app.graph.getNodeById(id), data = node.widgets.find((widget) => widget.name === "loras");
+        data.value = JSON.stringify({ ...JSON.parse(data.value || "{}"), rows: [{ on: true, lora, strength: 1 }] });
+        return node.diceforgeStack.render();
+      }, [stack, file]);
+      await expect(page.locator(".dfls").first().locator(".row.missing")).toHaveCount(1);
+      try {
+        writeFile(`models/loras/${file}`, `${top} added`);
+        // The LoRA folders are read again after 30 seconds (web/lora_stack.js). Nothing on the page shows that time passing, so the test waits it out.
+        await page.waitForTimeout(31_000);
+        await page.evaluate((id) => window.app.graph.getNodeById(id).diceforgeStack.render(), stack);
+        await expect(page.locator(".dfls").first().locator(".row.missing")).toHaveCount(0);
+        await expect(page.locator(".dfls").first().locator(".row .name")).toHaveText(["added"]);
+      } finally {
+        fs.rmSync(basePath("models", "loras", top), { recursive: true, force: true });
+      }
+    });
+
     test("LoRA Browser keeps its cards full size with many LoRAs", async ({ page }) => {
       const folder = `many_${vue ? "vue" : "classic"}`;
       for (let index = 0; index < 60; index++) writeFile(`models/loras/${folder}/lora_${String(index).padStart(2, "0")}.safetensors`, `${folder} ${index}`);
