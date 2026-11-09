@@ -911,9 +911,37 @@ def register_routes():
     routes = get_routes()
     if routes is None: # Loaded outside the ComfyUI server (tests): no routes.
         return
+    register_file_routes(routes)
+    register_picture_routes(routes)
+    register_yaml_routes(routes)
+    register_line_routes(routes)
+    register_transfer_routes(routes)
+
+
+def register_file_routes(routes):
     @routes.get("/diceforge/wildcards")
     async def list_wildcards(request):
         return web.json_response(await in_thread(wildcard_listing))
+    @routes.get("/diceforge/wildcards/file")
+    async def read_wildcard_file(request):
+        return web.json_response(await in_thread(wildcard_text, checked_name(request.rel_url.query.get("name"))))
+    @routes.post("/diceforge/wildcards/file")
+    async def save_wildcard_file(request):
+        body = await json_body(request)
+        return web.json_response(await in_thread(save_wildcard, checked_name(body.get("name")), str(body.get("text", "")), body.get("next_to"), body.get("create") is True))
+    @routes.post("/diceforge/wildcards/rename")
+    async def rename_wildcard_file(request):
+        body = await json_body(request)
+        return web.json_response(await in_thread(rename_wildcard, checked_name(body.get("name")), checked_name(body.get("to"))))
+    @routes.delete("/diceforge/wildcards/file")
+    async def delete_wildcard_file(request):
+        return web.json_response(await in_thread(delete_wildcard, checked_name(request.rel_url.query.get("name"))))
+    @routes.post("/diceforge/wildcards/restore")
+    async def restore_wildcard_file(request):
+        return web.json_response(await in_thread(restore_wildcard, (await json_body(request)).get("id")))
+
+
+def register_picture_routes(routes):
     # A card's picture, or with line=N the picture of its line N (counted from 0, as in the yaml list).
     @routes.get("/diceforge/wildcards/picture")
     async def wildcard_picture(request):
@@ -938,6 +966,9 @@ def register_routes():
     async def remove_wildcard_picture(request):
         name, line = checked_name(request.rel_url.query.get("name")), picture_line(request.rel_url.query)
         return web.json_response(await in_thread(remove_picture, name, line))
+
+
+def register_yaml_routes(routes):
     @routes.get("/diceforge/wildcards/yaml")
     async def read_yaml_file(request):
         return web.json_response(await in_thread(yaml_text, request.rel_url.query.get("file")))
@@ -963,23 +994,9 @@ def register_routes():
         if to not in ("yaml", "txt"):
             raise web.HTTPBadRequest(text='Wildcards: "to" must be "yaml" or "txt".')
         return web.json_response(await in_thread(convert, name, to))
-    @routes.get("/diceforge/wildcards/file")
-    async def read_wildcard_file(request):
-        return web.json_response(await in_thread(wildcard_text, checked_name(request.rel_url.query.get("name"))))
-    @routes.post("/diceforge/wildcards/file")
-    async def save_wildcard_file(request):
-        body = await json_body(request)
-        return web.json_response(await in_thread(save_wildcard, checked_name(body.get("name")), str(body.get("text", "")), body.get("next_to"), body.get("create") is True))
-    @routes.post("/diceforge/wildcards/rename")
-    async def rename_wildcard_file(request):
-        body = await json_body(request)
-        return web.json_response(await in_thread(rename_wildcard, checked_name(body.get("name")), checked_name(body.get("to"))))
-    @routes.delete("/diceforge/wildcards/file")
-    async def delete_wildcard_file(request):
-        return web.json_response(await in_thread(delete_wildcard, checked_name(request.rel_url.query.get("name"))))
-    @routes.post("/diceforge/wildcards/restore")
-    async def restore_wildcard_file(request):
-        return web.json_response(await in_thread(restore_wildcard, (await json_body(request)).get("id")))
+
+
+def register_line_routes(routes):
     @routes.get("/diceforge/wildcards/preview")
     async def preview_wildcard(request):
         query = request.rel_url.query
@@ -1004,6 +1021,24 @@ def register_routes():
             return web.json_response(await in_thread(one_at_a_time(replace_in_wildcards), find, replacement, apply))
         except OSError as error:
             raise web.HTTPBadRequest(text=f"Wildcards: can't replace: {error.strerror or error}.") from None
+    @routes.get("/diceforge/wildcards/search")
+    async def search_wildcard_lines(request):
+        text = request.rel_url.query.get("q", "").strip().lower()
+        if len(text) < 2:
+            raise web.HTTPBadRequest(text="Wildcards: search for at least 2 characters.")
+        return web.json_response({"found": await in_thread(search_lines, text)})
+    @routes.post("/diceforge/wildcards/favorite")
+    async def favorite_wildcard(request):
+        body = await json_body(request)
+        name, favorite = checked_name(body.get("name")), body.get("favorite")
+        if not isinstance(favorite, bool):
+            raise web.HTTPBadRequest(text="Wildcards: favorite must be true or false.")
+        return web.json_response(await in_thread(set_favorite, name, favorite))
+
+
+
+
+def register_transfer_routes(routes):
     @routes.get("/diceforge/wildcards/export")
     async def export_wildcards(request):
         folder = request.rel_url.query.get("folder", "").strip()
@@ -1019,17 +1054,6 @@ def register_routes():
         if len(data) > ZIP_BYTES:
             raise web.HTTPRequestEntityTooLarge(max_size=ZIP_BYTES, actual_size=len(data), text="Wildcards: the zip is over 512 MB.")
         return web.json_response(await in_thread(import_into, data, folder))
-    @routes.get("/diceforge/wildcards/search")
-    async def search_wildcard_lines(request):
-        text = request.rel_url.query.get("q", "").strip().lower()
-        if len(text) < 2:
-            raise web.HTTPBadRequest(text="Wildcards: search for at least 2 characters.")
-        return web.json_response({"found": await in_thread(search_lines, text)})
-    @routes.post("/diceforge/wildcards/favorite")
-    async def favorite_wildcard(request):
-        body = await json_body(request)
-        name, favorite = checked_name(body.get("name")), body.get("favorite")
-        if not isinstance(favorite, bool):
-            raise web.HTTPBadRequest(text="Wildcards: favorite must be true or false.")
-        return web.json_response(await in_thread(set_favorite, name, favorite))
+
+
 register_routes()
