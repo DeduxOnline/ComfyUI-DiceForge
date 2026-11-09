@@ -5,7 +5,7 @@ Pick a resolution from the SDXL list (or at random from the seed) and output an 
 ## Inputs
 
 - `resolution` (COMBO): Resolution group: fixed sizes, or random sizes picked from the seed.
-  - `size` (COMBO, default `1024 x 1024`, for Standard, High-Res and Random): Standard SDXL size, width x height.
+  - `size` (COMBO, default `1024 x 1024`, for Standard, High-Res, Random): Standard SDXL size, width x height.
 - `preview` (RESOLUTION_PREVIEW): Live preview of the output size. Random sizes show the size of the last run, until the settings change.
 - `seed` (INT, default `0`): Seed for random resolution selection.
 - `rescale` (COMBO): Rescale the picked size, like HiresFix: by percentage of each side, to a width and/or height, or to a longest side.

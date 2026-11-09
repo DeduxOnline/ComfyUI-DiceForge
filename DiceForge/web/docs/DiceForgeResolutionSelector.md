@@ -8,6 +8,7 @@ Calculate a size from an aspect ratio and a megapixel target (or a random aspect
 - `megapixels` (FLOAT, default `1`): Target total megapixels. 1.0 MP = 1024x1024 for square.
 - `preview` (RESOLUTION_PREVIEW): Live preview of the calculated output resolution. Random options show the size of the last run, until the settings change.
 - `seed` (INT, default `0`): Seed for random aspect ratio selection. Ignored for fixed aspect ratios.
+
 ## Advanced inputs
 
 Under **Show advanced inputs** on the node (Nodes 2.0), or **Show Advanced** in its right-click menu (classic design).
