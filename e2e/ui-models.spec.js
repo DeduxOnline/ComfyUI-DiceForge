@@ -366,7 +366,7 @@ for (const vue of [true, false]) {
       await box.locator("input[type=text]").fill("e2e word, second");
       await box.locator("input[type=text]").press("Enter");
       await expect.poll(async () => (await saved()).rows[0].triggers).toBe("custom");
-      expect((await saved()).rows[0].trigger_words).toEqual(["e2e word", "second"]);
+      expect((await saved()).rows[0].trigger_words).toEqual(["ink style", "lineart", "e2e word", "second"]); // Ink's own words (the default) and yours.
       await box.locator("button", { hasText: "None" }).click();
       await expect.poll(async () => (await saved()).rows[0].triggers).toBe("none");
       await box.locator("button", { hasText: "Default" }).click();
