@@ -200,6 +200,20 @@ def run_metadata(hidden):
     return metadata
 def full_name(file):
     return file[:-4] + ".full.png"
+# A cell starts a new round when a run without a count has this label and row already, or when the round is full.
+def round_is_over(store, cell_label, row, count):
+    repeat = count == 0 and (cell_label or row) and store.has(cell_label, row)
+    return repeat or len(store.state["cells"]) >= (count or MAX_CELLS)
+# The log line of a run: its cells (of the count), and the row and label it was given.
+def log_run(cells, count, row, label):
+    logging.info(f"[DiceForge] Dice Grid | {cells} cell(s){' of ' + str(count) if count else ''} | {row + ' / ' if row else ''}{label}")
+
+
+# What the node shows: the saved grid once the grid is full and saved, otherwise a preview of the grid.
+def grid_ui(cls, store, saved, grid):
+    return ui.SavedImages(saved) if saved and store.state["done"] else ui.PreviewImage(to_tensor(grid), cls=cls)
+
+
 # Node schema (V3 / Nodes 2.0): collects the image of each run into a grid with labels (for example the LoRA or checkpoint name from the random
 # loaders), and saves the grid when it is finished: after `count` images, or, with count 0, when a label comes again (a deck round is over).
 class DiceGrid(io.ComfyNode):
@@ -254,8 +268,7 @@ class DiceGrid(io.ComfyNode):
         saved = None
         for index in range(image.shape[0]):
             cell_label = f"{label} #{index + 1}" if label and image.shape[0] > 1 else label
-            repeat = count == 0 and (cell_label or row) and store.has(cell_label, row)
-            if repeat or len(store.state["cells"]) >= (count or MAX_CELLS):
+            if round_is_over(store, cell_label, row, count):
                 if save and store.state["cells"]:
                     saved = cls.save_grid(render(store.cells(cell_width), columns, cell_width, *layout), filename_prefix) # A round is over: the grid is finished.
                 store.clear()
@@ -267,8 +280,8 @@ class DiceGrid(io.ComfyNode):
                 saved = cls.save_grid(grid, filename_prefix)
         store.save()
         cells = len(store.state["cells"])
-        logging.info(f"[DiceForge] Dice Grid | {cells} cell(s){' of ' + str(count) if count else ''} | {row + ' / ' if row else ''}{label}")
-        shown = ui.SavedImages(saved) if saved and store.state["done"] else ui.PreviewImage(to_tensor(grid), cls=cls)
+        log_run(cells, count, row, label)
+        shown = grid_ui(cls, store, saved, grid)
         return io.NodeOutput(to_tensor(grid), cells, ui=shown)
 # The cells panel under the node (web/dice_grid.js): the cells of the node's grid, their images, ★ to keep the best ones, and saving those at full
 # size (with the run's workflow in them, like Save Image) to the output folder.

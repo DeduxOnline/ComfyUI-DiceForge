@@ -314,14 +314,9 @@ def open_for_writing(path):
 def write_bytes(path, data):
     with open(path, "wb") as out:
         out.write(data)
-async def start_download(kind, version_id, folder=""):
-    civitai_types(kind) # A kind Civitai has, before anything is asked.
-    if isinstance(version_id, bool) or not isinstance(version_id, int) or version_id <= 0:
-        raise web.HTTPBadRequest(text="Civitai: version_id must be a model version number.")
-    folder = checked_relative(folder, "folder") if isinstance(folder, str) and folder.strip() else ""
-    if sum(job["status"] == "downloading" for job in JOBS.values()) >= MAX_DOWNLOADS:
-        raise web.HTTPTooManyRequests(text=f"Civitai: {MAX_DOWNLOADS} downloads are running; start this one when one is done.")
-    version = await civitai_json(f"/model-versions/{version_id}")
+# The model and the file of a Civitai version that a download takes, with the address to download it from. A version whose model is of
+# another kind, or that has no file ComfyUI loads, is a clear error.
+def version_file(kind, version):
     model = version.get("model") if isinstance(version.get("model"), dict) else {}
     if model.get("type") and model["type"] not in CIVITAI_TYPES[kind]:
         raise web.HTTPBadRequest(text=f"Civitai: {model.get('name')} is a {model['type']}, not one of {', '.join(CIVITAI_TYPES[kind])}.")
@@ -329,6 +324,10 @@ async def start_download(kind, version_id, folder=""):
     url = file and (file.get("downloadUrl") or version.get("downloadUrl"))
     if not file or not isinstance(url, str) or urlsplit(url).scheme not in ("http", "https"):
         raise web.HTTPBadRequest(text="Civitai: this version has no file in a format ComfyUI loads.")
+    return model, file, url
+# Where a download goes: the kind's folder, then the folder asked for, with the file's name made safe. Returns the path and the name the
+# browser shows. A file ComfyUI doesn't load, or one already there or downloading, is a clear error.
+def download_target(kind, folder, file):
     root = download_root(kind)
     path = inside(root, *([*folder.split("/")] if folder else []), safe_file_name(file["name"]))
     name = relative_name(root, path)
@@ -338,6 +337,19 @@ async def start_download(kind, version_id, folder=""):
         raise web.HTTPConflict(text=f"Civitai: {name} is already there.")
     if any(job["path"] == path and job["status"] == "downloading" for job in JOBS.values()):
         raise web.HTTPConflict(text=f"Civitai: {name} is already downloading.")
+    return path, name
+
+
+async def start_download(kind, version_id, folder=""):
+    civitai_types(kind) # A kind Civitai has, before anything is asked.
+    if isinstance(version_id, bool) or not isinstance(version_id, int) or version_id <= 0:
+        raise web.HTTPBadRequest(text="Civitai: version_id must be a model version number.")
+    folder = checked_relative(folder, "folder") if isinstance(folder, str) and folder.strip() else ""
+    if sum(job["status"] == "downloading" for job in JOBS.values()) >= MAX_DOWNLOADS:
+        raise web.HTTPTooManyRequests(text=f"Civitai: {MAX_DOWNLOADS} downloads are running; start this one when one is done.")
+    version = await civitai_json(f"/model-versions/{version_id}")
+    model, file, url = version_file(kind, version)
+    path, name = download_target(kind, folder, file)
     job = {"id": uuid.uuid4().hex[:12], "kind": kind, "version_id": version_id, "model": str(model.get("name") or ""), "version": str(version.get("name") or ""),
            "file": name, "path": path, "total": round(float(file.get("sizeKB") or 0) * 1024), "done": 0, "status": "downloading", "error": None,
            "started": time.time()}
