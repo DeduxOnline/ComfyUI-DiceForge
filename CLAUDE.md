@@ -26,6 +26,7 @@ section describes the tests, the agents and the release.
    Microsoft Store stub: `..\..\..\python_embeded\python.exe -X utf8 .github/scripts/review_checks.py origin/main` (without `-X utf8` it
    stops on a cp1251 decode error).
 5. Commit to `main` with a message that says what changed for users. Keep the `Co-Authored-By` trailer Claude Code adds. Push to `main`.
+   The author allows this without asking each time (2026-11-09), once step 4 passes. Big local test runs and starting ComfyUI still need a yes.
 6. Check CI on GitHub (the Tests workflow), and fix it until it is green.
    - **Unit tests and SonarQube Cloud:** a failed Quality Gate fails the run.
    - **Five end-to-end jobs,** left out when a push changes nothing in `DiceForge/`, `e2e/` or `tests.yml` (the `changes` job).
@@ -136,6 +137,18 @@ DiceForge nodes should feel like ComfyUI's own (https://docs.comfy.org/basic-con
 They report and don't change the code, except `docs`, which edits the docs when asked to. Their tools work without them too (README →
 Development → Agents). The author's computer has no Node.js: run `e2e/qa` there through the *QA tools* workflow (`qa.yml`,
 `gh workflow run qa.yml -f comfyui_ref=master`) and read its `qa-out` artifact (`gh run download <id>`).
+
+## Decisions (2026-11-09, tech-debt pass)
+
+- **Keep the five end-to-end jobs on every push.** Merging them into two makes the wait longer (each job runs its files one after another),
+  and minutes are free on a public repository. Don't propose the merge again unless the wait or the runner limits change.
+- **`setWidget` stays as four variants** in `apply_settings.js`, `danbooru_preview.js`, `model_browser.js` and the two `setValue`s: they
+  differ on purpose (skip equal values, check the sampler list, pass the canvas and redraw). `openBrowser` and `saveCurrent` are
+  not duplicates worth merging.
+- **Large JS files** (`wildcard_browser.js`, `model_browser.js`) and CSS strings in JS are split only when a feature touches them.
+- **Broad `except Exception`** in `model_info.py`, `model_manager.py` and `random_image.py` stay; their comments say why.
+- **Node help pages:** after a change to a README section or a node, regenerate them with the command under Running ComfyUI locally, then run
+  `tests/test_node_docs.py` without the flag. CI fails while they differ.
 
 ## Secrets
 
