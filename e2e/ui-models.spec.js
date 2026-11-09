@@ -347,6 +347,69 @@ for (const vue of [true, false]) {
       }
     });
 
+    test("LoRA Stack presets: + Add, ⬇ File, import and 🗑 work, Escape closes; trigger words: Enter adds your own, Default and None; the wheel steps a strength, a random range opens", async ({ page, request }) => {
+      for (const file of ["style/ink.safetensors", "style/pony_glow.safetensors"]) await lookUp(request, "loras", file);
+      const tag = vue ? "vue" : "classic", preset = `e2e stack ${tag}`, imported = `imported ${tag}`;
+      const [stack] = await addNodes(page, [{ type: "DiceForgeLoraStack" }]);
+      const panel = page.locator(".dfls").first();
+      const rows = (value) => page.evaluate(([id, value]) => { // The rows, as the node keeps them.
+        const node = window.app.graph.getNodeById(id), data = node.widgets.find((widget) => widget.name === "loras");
+        data.value = JSON.stringify({ rows: value });
+        return node.diceforgeStack.render();
+      }, [stack, value]);
+      const saved = () => page.evaluate((id) => JSON.parse(window.app.graph.getNodeById(id).widgets.find((widget) => widget.name === "loras").value), stack);
+      await rows([{ on: true, lora: "style/ink.safetensors", strength: 1 }, { on: true, lora: "style/pony_glow.safetensors", strength: 0.8, random: true, min: 0.6, max: 1 }]);
+      await expect(panel.locator(".row")).toHaveCount(2);
+      // Trigger words: Enter adds your own; Default and None set the mode.
+      await rowMenu(page, panel, 0, "Trigger words");
+      const box = page.locator(".dflt");
+      await box.locator("input[type=text]").fill("e2e word, second");
+      await box.locator("input[type=text]").press("Enter");
+      await expect.poll(async () => (await saved()).rows[0].triggers).toBe("custom");
+      expect((await saved()).rows[0].trigger_words).toEqual(["e2e word", "second"]);
+      await box.locator("button", { hasText: "None" }).click();
+      await expect.poll(async () => (await saved()).rows[0].triggers).toBe("none");
+      await box.locator("button", { hasText: "Default" }).click();
+      await expect.poll(async () => (await saved()).rows[0].triggers).toBe("all");
+      await page.keyboard.press("Escape");
+      await expect(box).toHaveCount(0);
+      // The wheel over a strength steps it by 0.05.
+      const strength = panel.locator(".row").nth(0).locator("input[type=number]");
+      await strength.hover();
+      await page.mouse.wheel(0, -100);
+      await expect(strength).toHaveValue("1.05");
+      expect((await saved()).rows[0].strength).toBeCloseTo(1.05, 5);
+      // A random strength's range opens under its row by a click, and closes by another.
+      const range = panel.locator(".row").nth(1).locator(".range");
+      await expect(panel.locator(".rand")).toHaveCount(0);
+      await range.click();
+      await expect(panel.locator(".rand input")).toHaveCount(2);
+      await range.click();
+      await expect(panel.locator(".rand")).toHaveCount(0);
+      // Presets: save this stack, then add it to the node, download it, import a file and delete it.
+      await answerQuestions(page, () => preset, 1);
+      await panel.locator("button", { hasText: "Save preset" }).click();
+      await expect(panel).toContainText("Saved the preset");
+      await panel.locator("button", { hasText: "Presets" }).click();
+      const list = page.locator(".dflp .item", { hasText: preset });
+      await list.locator("button", { hasText: "+ Add" }).click();
+      await expect(panel.locator(".row")).toHaveCount(4); // Its two rows come after the node's two.
+      await panel.locator("button", { hasText: "Presets" }).click();
+      const [download] = await Promise.all([page.waitForEvent("download"), page.locator(".dflp .item", { hasText: preset }).locator("button", { hasText: "⬇ File" }).click()]);
+      expect(download.suggestedFilename()).toBe(`${preset}.json`);
+      await page.locator(".dflp .item", { hasText: preset }).locator("button", { hasText: "Replace" }).click(); // Back to the saved rows, for the rest.
+      await panel.locator("button", { hasText: "Presets" }).click();
+      await page.locator(".dflp input[type=file]").setInputFiles({ name: `${imported}.json`, mimeType: "application/json",
+        buffer: Buffer.from(JSON.stringify({ type: "DiceForge LoRA Stack preset", version: 1, stack: { rows: [{ on: true, lora: "style/ink.safetensors", strength: 0.5 }] } })) });
+      await expect(page.locator(".dflp .status")).toHaveText(`Imported ${imported}.`);
+      await expect(page.locator(".dflp .item", { hasText: imported })).toHaveCount(1);
+      await answerQuestions(page, () => true, 1);
+      await page.locator(".dflp .item", { hasText: imported }).locator("button", { hasText: "🗑" }).click();
+      await expect(page.locator(".dflp .status")).toHaveText(`Deleted ${imported}.`);
+      await page.keyboard.press("Escape"); // Closes the presets, not the node.
+      await expect(page.locator(".dflp")).toHaveCount(0);
+    });
+
     test("LoRA Stack adds several picked LoRAs at once", async ({ page }) => {
       const [stack] = await addNodes(page, [{ type: "DiceForgeLoraStack" }]);
       await page.locator(".dfls").first().locator("button.add").click();
