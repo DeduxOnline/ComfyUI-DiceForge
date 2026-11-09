@@ -598,6 +598,43 @@ for (const vue of [true, false]) {
       await page.keyboard.press("Escape");
     });
 
+    test("Model info: ‹ › and the dots step through the example images, a chip, a prompt or a trigger word copies, the picture opens full size, Refresh asks Civitai again", async ({ page, request }) => {
+      await lookUp(request, "loras", "style/ink.safetensors");
+      const [lora] = await addNodes(page, [{ type: "LoraLoader", widgets: { lora_name: "style/ink.safetensors" } }]);
+      await page.evaluate(() => { // The copies are recorded, not sent to the clipboard (which the browser may refuse).
+        window.copied = [];
+        navigator.clipboard.writeText = async (text) => { window.copied.push(text); };
+      });
+      await clickMenu(page, lora, "DiceForge.ModelInfo", "Model info");
+      const panel = page.locator(".dfmi");
+      await expect(panel.locator(".count")).toHaveText("1 / 2"); // Ink has two example images: the first with how it was made.
+      await panel.locator("button.next").click();
+      await expect(panel.locator(".count")).toHaveText("2 / 2");
+      await expect(panel.locator(".stage .muted")).toHaveText("Civitai has no generation data for this image.");
+      await panel.locator("button.prev").click();
+      await expect(panel.locator(".count")).toHaveText("1 / 2");
+      await panel.locator(".dots span").nth(1).click();
+      await expect(panel.locator(".count")).toHaveText("2 / 2");
+      await panel.locator(".dots span").nth(0).click();
+      await expect(panel.locator(".count")).toHaveText("1 / 2");
+      await panel.locator(".chip", { hasText: "seed" }).click();
+      await panel.locator(".prompt", { hasText: "positive" }).click();
+      const word = await panel.locator(".words span").first().textContent();
+      await panel.locator(".words span").first().click();
+      expect(await page.evaluate(() => window.copied)).toEqual(["3032258275", "Ink test prompt, 1girl", word]);
+      const opened = page.context().waitForEvent("page");
+      await panel.locator(".stage img").click(); // The first click on a picture that is not blurred opens it full size.
+      const full = await opened;
+      await expect(full).toHaveURL(/\/700\.png/);
+      await full.close();
+      const refreshed = page.waitForRequest((sent) => sent.url().includes("/diceforge/model-info") && sent.url().includes("refresh=1"));
+      await panel.locator("button", { hasText: "Refresh from Civitai" }).click();
+      await refreshed;
+      await expect(panel.locator(".count")).toHaveText("1 / 2"); // Drawn again from Civitai's answer.
+      await page.keyboard.press("Escape");
+      await expect(panel).toHaveCount(0);
+    });
+
     test("Model info: Use these settings puts an example image's prompts and settings into the workflow", async ({ page, request }) => {
       await lookUp(request, "loras", "style/ink.safetensors");
       const [lora, encode, sampler, latent] = await addNodes(page, [
