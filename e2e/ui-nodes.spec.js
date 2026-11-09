@@ -218,6 +218,24 @@ for (const vue of [true, false]) {
       await expect(page.locator(".dfip").first().locator("img")).toHaveJSProperty("naturalWidth", file.endsWith("red.png") ? 32 : 16);
     });
 
+    test("Random Image's picked image: a click opens it full size, the file name copies it, a file that is gone says so", async ({ page }) => {
+      const [image] = await addNodes(page, [{ type: "DiceForgeRandomImage", widgets: { folder: "e2e", seed: 1, control_after_generate: "fixed", seed_mode: "sequential" } }]);
+      const panel = page.locator(".dfip").first();
+      const pick = (file, width) => ({ file, folder: "e2e", seed: 1, seed_mode: "sequential", width, height: width / 2, frames: 1, view: { filename: file, subfolder: "e2e", type: "input" } });
+      await page.evaluate(([id, result]) => window.app.graph.getNodeById(id).onExecuted({ dice_forge_image: [result] }), [image, pick("red.png", 32)]);
+      await expect(panel.locator("img")).toHaveJSProperty("naturalWidth", 32);
+      const opened = page.context().waitForEvent("page");
+      await panel.locator("img").click(); // Full size, in a new tab.
+      const full = await opened;
+      await expect(full).toHaveURL(/\/view\?.*filename=red\.png/);
+      await full.close();
+      await panel.locator(".file").click(); // The file name is copied, and flashes as copied for a moment.
+      await expect(panel.locator(".file")).toHaveClass(/copied/);
+      await expect(panel.locator(".file")).not.toHaveClass(/copied/);
+      await page.evaluate(([id, result]) => window.app.graph.getNodeById(id).onExecuted({ dice_forge_image: [result] }), [image, pick("gone.png", 8)]);
+      await expect(panel.locator(".empty")).toHaveText("gone.png is no longer there.");
+    });
+
     test("a node saved taller than it shows is fitted again, unless a text field takes the extra height", async ({ page }) => { // NOSONAR: expect.poll(...) below.
       const [plain, sampler, image, clip] = await addNodes(page, [{ type: "DiceForgeRandomInt" }, { type: "DiceForgeRandomSampler", pos: [400, 40] },
         { type: "DiceForgeRandomImage", pos: [800, 40] }, { type: "DiceForgeCLIPDualTextEncode", pos: [1200, 40] }]);
