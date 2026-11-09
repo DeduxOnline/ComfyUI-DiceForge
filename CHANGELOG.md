@@ -118,6 +118,7 @@ nodes and features, a patch for fixes. Each version is a [release on GitHub](htt
   section on updating from it).
 
 ### Fixed
+- LoRA Stack: the mouse wheel changes a strength you have clicked into, also in Nodes 2.0, where a wheel over the field zoomed the canvas. The field keeps its focus while you wheel.
 - LoRA Stack: a strength changed with the mouse wheel is no longer put back to its old value by a panel redraw that was still waiting for the LoRA list.
 - LoRA Stack: a LoRA file added while ComfyUI runs is no longer marked as missing until the page is reloaded.
 - The prompt highlighting takes the field's new colors after a switch of the color palette, instead of keeping the old palette's.

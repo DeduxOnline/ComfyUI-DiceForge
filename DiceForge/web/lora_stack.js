@@ -257,7 +257,7 @@ async function openTriggers(anchor, row, save) {
 }
 
 function numberInput(value, title, onChange) {
-  const input = element("input", { type: "number", step: "0.05", title });
+  const input = element("input", { type: "number", step: "0.05", title, "data-capture-wheel": "true" }); // Focused, the wheel is the field's: ComfyUI gives it the canvas otherwise.
   input.value = round(value).toFixed(2);
   input.addEventListener("change", () => onChange(Number(input.value) || 0));
   input.addEventListener("wheel", (event) => { // Wheel over the field: ± 0.05, like rgthree's arrows.
@@ -283,13 +283,13 @@ function setUp(node) {
   const read = () => {
     try { return cleanStack(JSON.parse(data.value || "{}")); } catch { return structuredClone(EMPTY); }
   };
-  const write = (stack) => {
+  const write = (stack, redraw = true) => {
     data.value = JSON.stringify(stack);
     data.callback?.(data.value);
-    background(render());
+    if (redraw) background(render()); // A number field keeps its focus when its own change is saved: the wheel goes on working.
     node.setDirtyCanvas?.(true, true);
   };
-  const update = (change) => { const stack = read(); change(stack); write(stack); };
+  const update = (change, redraw = true) => { const stack = read(); change(stack); write(stack, redraw); };
   const connectedBase = () => { const source = modelSource(node); return source ? baseOf(source.kind, source.file) : null; };
   const browse = (target) => openModelBrowser(node, LORAS, { ...target, base: connectedBase() }); // The browser starts on the LoRAs that fit the model.
   let dragged = null;
@@ -323,7 +323,7 @@ function setUp(node) {
         element("span", { class: "mode", title: "The seed mode (seed_mode, under the advanced inputs) picks the sets" }, seedMode));
     };
     const parts = stack.rows.flatMap((row, index) => {
-      const set = (change) => update((next) => change(next.rows[index]));
+      const set = (change, redraw = true) => update((next) => change(next.rows[index]), redraw);
       const openKey = `${row.lora} #${stack.rows.slice(0, index).filter((item) => item.lora === row.lora).length}`;
       const missing = files.size && !files.has(row.lora);
       const pick = () => browse({
@@ -340,8 +340,8 @@ function setUp(node) {
           if (!opened.delete(openKey)) opened.add(openKey);
           background(render());
         } }, rangeText(row))
-        : numberInput(row.strength ?? 1, stack.separate_clip ? "Model strength" : "Strength (model and CLIP)", (value) => set((r) => { r.strength = value; }));
-      const clip = stack.separate_clip ? [element("span", { class: "muted", title: "CLIP strength" }, "C"), numberInput(row.clip ?? 1, "CLIP strength", (value) => set((r) => { r.clip = value; }))] : [];
+        : numberInput(row.strength ?? 1, stack.separate_clip ? "Model strength" : "Strength (model and CLIP)", (value) => set((r) => { r.strength = value; }, false));
+      const clip = stack.separate_clip ? [element("span", { class: "muted", title: "CLIP strength" }, "C"), numberInput(row.clip ?? 1, "CLIP strength", (value) => set((r) => { r.clip = value; }, false))] : [];
       const toggle = element("input", { type: "checkbox", class: "switch", role: "switch", title: "On / off" });
       toggle.checked = row.on !== false;
       toggle.addEventListener("change", () => set((r) => { r.on = toggle.checked; }));
