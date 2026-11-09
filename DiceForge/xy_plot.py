@@ -4,7 +4,7 @@ import folder_paths
 import nodes
 from aiohttp import web
 from comfy_api.latest import io
-from .routes import in_thread, json_body
+from .routes import get_routes, in_thread, json_body
 from .model_lists import matching_files
 from .random_sampler import SAMPLERS, SCHEDULERS, options_output, parse_names
 from .variation_seed import with_variation
@@ -221,10 +221,8 @@ class XYPlot(io.ComfyNode):
 
 # The node's preview (web/xy_plot.js): the labels of both axes and the count, or what is wrong with the values.
 def register_routes():
-    try:
-        from server import PromptServer
-        routes = PromptServer.instance.routes
-    except Exception: # Loaded outside the ComfyUI server (tests): no routes.
+    routes = get_routes()
+    if routes is None: # Loaded outside the ComfyUI server (tests): no routes.
         return
     @routes.post("/diceforge/xy-plot")
     async def xy_preview(request):

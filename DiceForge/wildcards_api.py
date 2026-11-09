@@ -16,7 +16,7 @@ import yaml
 from aiohttp import web
 from .clip_text_encode_pos_neg import WILDCARD_PATTERN, TextLoader, entry_lines, fill_in, find_wildcard, read_text_lines, wildcard_index, yaml_wildcards
 from .http_read import read_up_to
-from .routes import in_thread, json_body
+from .routes import get_routes, in_thread, json_body
 # Server side of the Wildcard Browser and the __ autocomplete (web/wildcards.js): the list of wildcards, and creating, reading, saving, renaming and
 # deleting a wildcard (a txt file, or a key of a yaml file, changed in that file), converting txt files to a yaml file and back, and the cards'
 # pictures. A deleted wildcard goes to a trash folder first, so the Wildcard Browser can undo the delete; a folder (or all of them) can be
@@ -916,10 +916,8 @@ def set_favorite(name, favorite):
         raise web.HTTPBadRequest(text=f"Wildcards: the favorites could not be saved: {error.strerror or error}.") from None
     return {"name": name, "favorite": favorite}
 def register_routes():
-    try:
-        from server import PromptServer
-        routes = PromptServer.instance.routes
-    except Exception: # Loaded outside the ComfyUI server (tests): no routes.
+    routes = get_routes()
+    if routes is None: # Loaded outside the ComfyUI server (tests): no routes.
         return
     @routes.get("/diceforge/wildcards")
     async def list_wildcards(request):

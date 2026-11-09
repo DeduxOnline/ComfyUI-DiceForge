@@ -19,3 +19,12 @@ async def json_body(request):
 # the progress of a run meanwhile (Sonar S7493). The handler reads what the request sends; the rest goes through here.
 async def in_thread(function, *args):
     return await asyncio.get_running_loop().run_in_executor(None, function, *args)
+
+
+# The route table of ComfyUI's server, or None when DiceForge is loaded outside it (the tests): then a module's route registration does nothing.
+def get_routes():
+    try:
+        from server import PromptServer
+        return PromptServer.instance.routes
+    except (ImportError, AttributeError):
+        return None

@@ -3,7 +3,7 @@ import io
 import os
 import folder_paths
 from aiohttp import web
-from .routes import in_thread, json_body
+from .routes import get_routes, in_thread, json_body
 # Prompt styles (web/prompt_styles.js, node menu of CLIP Dual Text Encode): named pieces of positive and negative prompt, put into the prompts with
 # one click, as A1111's styles. Built in: the quality tags each model family is made for; yours: a styles.csv in A1111's format (name, prompt,
 # negative_prompt) in the ComfyUI user folder, so an A1111 styles.csv can simply be copied there. {prompt} in a style's text is where the prompt
@@ -77,10 +77,8 @@ def delete_style(name):
 
 
 def register_routes():
-    try:
-        from server import PromptServer
-        routes = PromptServer.instance.routes
-    except Exception: # Loaded outside the ComfyUI server (tests): no routes.
+    routes = get_routes()
+    if routes is None: # Loaded outside the ComfyUI server (tests): no routes.
         return
     @routes.get("/diceforge/styles")
     async def list_styles(request):

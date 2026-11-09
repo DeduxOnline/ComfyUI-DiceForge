@@ -9,7 +9,7 @@ import aiohttp
 import folder_paths
 from aiohttp import web
 from .http_read import read_text
-from .routes import in_thread, json_body
+from .routes import get_routes, in_thread, json_body
 # Model info for the "Model info" dialog of the frontend (web/model_info.js), like rgthree's LoRA info but for every model kind: the file's sha256,
 # what Civitai knows about it (looked up by that hash), and the user's own notes. Everything is kept in the ComfyUI user folder, one JSON per file,
 # so model folders stay untouched; the hash is only computed again when the file's size or date changes.
@@ -256,10 +256,8 @@ def model_list(kind):
         entries.append(browser_entry(kind, name, path, listings[folder]))
     return {"kind": kind, "files": entries}
 def register_routes():
-    try:
-        from server import PromptServer
-        routes = PromptServer.instance.routes
-    except Exception: # Loaded outside the ComfyUI server (tests): no routes.
+    routes = get_routes()
+    if routes is None: # Loaded outside the ComfyUI server (tests): no routes.
         return
     @routes.get("/diceforge/model-info")
     async def get_model_info(request):

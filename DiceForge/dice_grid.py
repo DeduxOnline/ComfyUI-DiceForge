@@ -12,7 +12,7 @@ from comfy.cli_args import args
 from PIL import Image, ImageDraw, ImageFont
 from PIL.PngImagePlugin import PngInfo
 from comfy_api.latest import io, ui
-from .routes import in_thread, json_body
+from .routes import get_routes, in_thread, json_body
 # Dice Grid collects one image per run (the runs of a DiceForge series) and lays them out in a labeled grid. The cells are kept as small PNG files
 # in the ComfyUI user folder between runs, not in RAM, so a grid survives a restart. Finished grids are saved to the output folder.
 GRID_FOLDER = os.path.join(folder_paths.get_user_directory(), "DiceForge", "grids")
@@ -314,10 +314,8 @@ def keep_cells(body):
     store.save()
     return {"kept": [cell["file"] for cell in store.state["cells"] if cell["kept"]]}
 def register_routes():
-    try:
-        from server import PromptServer
-        routes = PromptServer.instance.routes
-    except Exception: # Loaded outside the ComfyUI server (tests): no routes.
+    routes = get_routes()
+    if routes is None: # Loaded outside the ComfyUI server (tests): no routes.
         return
     @routes.get("/diceforge/grid")
     async def grid_cells(request):

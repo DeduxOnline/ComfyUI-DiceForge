@@ -3,7 +3,7 @@ import os
 import comfy.samplers
 import folder_paths
 from aiohttp import web
-from .routes import in_thread, json_body
+from .routes import get_routes, in_thread, json_body
 # KSampler presets (web/sampler_presets.js, node menu of KSampler and KSampler Advanced): steps, CFG, sampler and scheduler for a model family, from
 # the models' own recommendations, and your own presets, saved in the ComfyUI user folder. "Auto" in the menu picks the built-in one by the base
 # model of the connected checkpoint (Civitai's base model names in BASES).
@@ -69,10 +69,8 @@ def delete_preset(name):
 
 
 def register_routes():
-    try:
-        from server import PromptServer
-        routes = PromptServer.instance.routes
-    except Exception: # Loaded outside the ComfyUI server (tests): no routes.
+    routes = get_routes()
+    if routes is None: # Loaded outside the ComfyUI server (tests): no routes.
         return
     @routes.get("/diceforge/sampler-presets")
     async def list_presets(request):

@@ -79,10 +79,11 @@ export function rangeText(row) {
   return `🎲 ${round(row.min ?? row.strength ?? 1).toFixed(2)}–${round(row.max ?? row.strength ?? 1).toFixed(2)}`;
 }
 
-let loraFiles = null; // The files of the loras folders, to mark rows whose file is missing.
+let loraFiles = null, loraTime = 0; // The files of the loras folders, to mark rows whose file is missing; read again after 30 seconds.
 async function loraList() {
-  if (!loraFiles) {
-    try { loraFiles = new Set(await (await api.fetchApi("/models/loras")).json()); } catch { loraFiles = new Set(); }
+  if (!loraFiles || Date.now() - loraTime > 30000) {
+    try { loraFiles = new Set(await (await api.fetchApi("/models/loras")).json()); } catch { loraFiles ??= new Set(); }
+    loraTime = Date.now();
   }
   return loraFiles;
 }
