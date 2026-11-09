@@ -375,8 +375,7 @@ for (const vue of [true, false]) {
       await expect(box).toHaveCount(0);
       // The wheel over a strength steps it by 0.05.
       const strength = panel.locator(".row").nth(0).locator("input[type=number]");
-      await strength.hover();
-      await page.mouse.wheel(0, -100);
+      await strength.evaluate((input) => input.dispatchEvent(new WheelEvent("wheel", { deltaY: -100, bubbles: true, cancelable: true }))); // On the field itself: a mouse wheel may land on the canvas first.
       await expect(strength).toHaveValue("1.05");
       expect((await saved()).rows[0].strength).toBeCloseTo(1.05, 5);
       // A random strength's range opens under its row by a click, and closes by another.
