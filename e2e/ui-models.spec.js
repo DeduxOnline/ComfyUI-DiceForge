@@ -423,7 +423,7 @@ for (const vue of [true, false]) {
       await civitai.close();
       const key = dialog.locator("button", { hasText: "API key" });
       try {
-        await answerQuestions(page, () => "e2e-key", 1);
+        await answerQuestions(page, () => "e2ekey2026", 1);
         await key.click();
         await expect(dialog.locator(".status")).toHaveText("API key saved.");
         await expect(key).toHaveText("🔑 API key ✓");
