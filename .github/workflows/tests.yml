@@ -191,7 +191,17 @@ jobs:
         working-directory: e2e
         env:
           COMFYUI_PYTHON: python
+          DICEFORGE_JS_COVERAGE: "1"
         run: npx playwright test ${{ matrix.files }}
+
+      - name: Keep the JavaScript coverage of the tests
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: js-coverage-${{ strategy.job-index }}
+          path: e2e/coverage-js/
+          retention-days: 7
+          if-no-files-found: ignore
 
       - name: Keep the Playwright report (screenshots and traces of failures)
         if: ${{ failure() }}
@@ -203,3 +213,23 @@ jobs:
             e2e/results/
           retention-days: 14
           if-no-files-found: ignore
+
+  js-coverage:
+    # Which JavaScript functions of DiceForge/web the end-to-end tests call, merged from the five jobs (not a gate: it reports).
+    name: JavaScript coverage (end-to-end)
+    needs: [changes, e2e]
+    if: ${{ always() && needs.changes.outputs.e2e == 'true' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Get the coverage of the five jobs
+        uses: actions/download-artifact@v7
+        with:
+          pattern: js-coverage-*
+          path: e2e/coverage-js
+          merge-multiple: true
+
+      - name: Merge it and write the summary
+        run: node .github/scripts/js_coverage.js

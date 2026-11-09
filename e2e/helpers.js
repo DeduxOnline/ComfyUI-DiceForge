@@ -1,8 +1,12 @@
 // Helpers for the end-to-end tests: running workflows through ComfyUI's queue, and driving the ComfyUI page (in the Nodes 2.0 or classic design).
 const fs = require("fs");
 const path = require("path");
+const crypto = require("crypto");
 const { test: base, expect } = require("@playwright/test");
 const { BASE } = require("./settings");
+
+// Where a test's JavaScript coverage goes when DICEFORGE_JS_COVERAGE is set (the Tests workflow sets it): .github/scripts/js_coverage.js merges them.
+const COVERAGE_DIR = path.join(__dirname, "coverage-js");
 
 // Every test fails on an uncaught error in the page (a broken frontend extension), and on a DiceForge question it failed to answer.
 const test = base.extend({
@@ -12,6 +16,15 @@ const test = base.extend({
     await use(errors);
     expect(errors, "errors in the page").toEqual([]);
     expect(watchers.get(page)?.failures ?? [], "DiceForge questions not answered").toEqual([]);
+  }, { auto: true }],
+  // Chromium only, which is what the tests run in. Started before the test opens its page, so the scripts that load with it count too.
+  jsCoverage: [async ({ page }, use, testInfo) => {
+    if (!process.env.DICEFORGE_JS_COVERAGE) return use();
+    await page.coverage.startJSCoverage({ resetOnNavigation: false });
+    await use();
+    const entries = (await page.coverage.stopJSCoverage()).filter((entry) => entry.url.includes("/extensions/DiceForge/"));
+    fs.mkdirSync(COVERAGE_DIR, { recursive: true });
+    fs.writeFileSync(path.join(COVERAGE_DIR, `${crypto.randomUUID()}.json`), JSON.stringify({ title: testInfo.title, entries: entries.map(({ url, functions }) => ({ url, functions })) }));
   }, { auto: true }],
 });
 
