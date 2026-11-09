@@ -60,6 +60,7 @@ nodes and features, a patch for fixes. Each version is a [release on GitHub](htt
   doesn't change Anima.
 
 ### Changed
+- Nodes 2.0: a DiceForge node keeps the height you set. It no longer fits itself to its content by itself (the classic canvas still does).
 - The node menus: CLIP Dual Text Encode's prompt tools in three groups, Write (Syntax guide, Selection → new wildcard…, Prompt styles),
   Browse (Wildcards, Tags, LoRAs, Prompt history) and Set up (Tag lists, which was Tag autocomplete), with short names; Wildcards to
   Text and Wildcard Note have the same groups. Every DiceForge menu entry lost its emoji (Browse checkpoints, Model info, Sampler

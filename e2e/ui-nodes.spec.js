@@ -236,7 +236,7 @@ for (const vue of [true, false]) {
       await expect(panel.locator(".empty")).toHaveText("gone.png is no longer there.");
     });
 
-    test("a node saved taller than it shows is fitted again, unless a text field takes the extra height", async ({ page }) => { // NOSONAR: expect.poll(...) below.
+    test("a node saved taller than it shows keeps its height in Nodes 2.0, and is fitted again in the classic canvas unless a text field takes the extra height", async ({ page }) => { // NOSONAR: expect.poll(...) below.
       const [plain, sampler, image, clip] = await addNodes(page, [{ type: "DiceForgeRandomInt" }, { type: "DiceForgeRandomSampler", pos: [400, 40] },
         { type: "DiceForgeRandomImage", pos: [800, 40] }, { type: "DiceForgeCLIPDualTextEncode", pos: [1200, 40] }]);
       const workflow = await page.evaluate(() => window.app.graph.serialize());
@@ -246,6 +246,10 @@ for (const vue of [true, false]) {
       }
       await page.evaluate(async (data) => { window.app.graph.clear(); await window.app.loadGraphData(data); }, workflow);
       const stored = (id) => page.evaluate((id) => window.app.graph.getNodeById(id).size[1], id);
+      if (vue) { // Nodes 2.0 keeps the height the user set (no fitting).
+        for (const id of [plain, image, sampler, clip]) expect(await stored(id)).toBe(900);
+        return;
+      }
       await expect.poll(() => stored(plain)).toBeLessThan(300); // Nothing takes the extra height: it goes.
       await expect.poll(() => stored(image)).toBeLessThan(400); // Its preview is as tall as what it shows, not as the node was.
       expect(await stored(sampler)).toBe(900); // Its samplers and schedulers fields grow with it: the user's height stays.
@@ -264,7 +268,7 @@ for (const vue of [true, false]) {
       const workflow = await page.evaluate(() => window.app.graph.serialize());
       await page.evaluate(async (data) => { window.app.graph.clear(); await window.app.loadGraphData(data); }, workflow);
       await drawn(page);
-      await expect.poll(() => stored(fitted)).toBeLessThan(300); // Not resized: fitted as before.
+      if (!vue) await expect.poll(() => stored(fitted)).toBeLessThan(300); // Not resized: fitted as before (classic canvas).
       expect(await stored(plain)).toBe(700);
       expect(await stored(image)).toBe(700); // Its preview asked for its own height: the user's stays.
       if (vue) await expect.poll(async () => (await nodeElement(page, plain).boundingBox()).height).toBeGreaterThan(500); // Drawn that tall too.

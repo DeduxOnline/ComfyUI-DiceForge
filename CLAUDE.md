@@ -75,8 +75,8 @@ DiceForge nodes should feel like ComfyUI's own (https://docs.comfy.org/basic-con
   opens in a window from the node's menu; XY Plot runs with ComfyUI's Run (2026-10-28).
 - **Core types on the links** (`MODEL`, `CLIP`, `VAE`, `CONDITIONING`, `LATENT`, `IMAGE`, `MASK`, `INT`, `FLOAT`, `STRING`, `BOOLEAN`, and `COMBO` for a list
   input such as KSampler's sampler), so the colors and connections are the ones users know. No look-alike types of our own.
-- **The user owns the look:** title, color and size. A node's height is fitted only by `node_size.js`, which keeps a height the user
-  dragged (it records the height it set in `properties.dice_forge_height`; another one is the user's).
+- **The user owns the look:** title, color and size. In Nodes 2.0 nothing fits a node's height: it stays the size the user set (2026-11-09).
+  In the classic canvas `node_size.js` fits a node to its content and keeps a height the user dragged (`properties.dice_forge_height`).
 - **Menus:** extra tools go in the node's right-click menu (`getNodeMenuItems`) or a window it opens, after the core items (color, title,
   clone, mode). Nothing duplicates the selection toolbox (color, bypass, lock, delete). Entries have short names and no emoji (the
   menus can't draw icons); the prompt nodes' tools are grouped under disabled headings (Write, Browse, Set up), each module adding its
