@@ -11,6 +11,7 @@ from urllib.parse import urlsplit
 import aiohttp
 import folder_paths
 from aiohttp import web
+from .files import remove_empty_folders, root_in
 from .http_read import read_text, read_up_to
 from .model_info import (PREVIEW_ENDINGS, WINDOWS_DEVICE, civitai_details, civitai_summary, info_file, local_preview, model_path,
                          read_info, thumbnail, write_info)
@@ -59,8 +60,7 @@ def extensions():
 def drop_list_cache(kind):
     folder_paths.filename_list_cache.pop(kind, None) # The loaders' lists and the browser see the change at once.
 def root_of(kind, path):
-    path = os.path.abspath(path)
-    return next(root for root in map(os.path.abspath, folder_paths.get_folder_paths(kind)) if path.startswith(root + os.sep))
+    return root_in(folder_paths.get_folder_paths(kind), path)
 def inside(root, *parts):
     path = os.path.abspath(os.path.join(root, *parts))
     if not path.startswith(root + os.sep):
@@ -80,15 +80,6 @@ def companions(path):
     base, folder = os.path.splitext(path)[0], os.path.dirname(path)
     present = set(os.listdir(folder))
     return [(ending, base + ending) for ending in COMPANIONS if os.path.basename(base + ending) in present]
-def remove_empty_folders(folder, root):
-    while folder != root and folder.startswith(root + os.sep):
-        try:
-            os.rmdir(folder)
-        except OSError: # Not empty: it stays, and so do the folders above it.
-            return
-        folder = os.path.dirname(folder)
-
-
 # Update: a new name (the extension stays; "a/b" moves it to the folder a), in the same model folder. The previews, the other info files and the
 # Model info entry (notes, Civitai data, hash) go with it.
 def rename_model(kind, name, to):

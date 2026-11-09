@@ -15,6 +15,7 @@ import folder_paths
 import yaml
 from aiohttp import web
 from .clip_text_encode_pos_neg import WILDCARD_PATTERN, TextLoader, entry_lines, fill_in, find_wildcard, read_text_lines, wildcard_index, yaml_wildcards
+from .files import remove_empty_folders, root_in
 from .http_read import read_up_to
 from .routes import get_routes, in_thread, json_body
 # Server side of the Wildcard Browser and the __ autocomplete (web/wildcards.js): the list of wildcards, and creating, reading, saving, renaming and
@@ -37,22 +38,13 @@ def new_path(name, root=None):
     return path
 # The wildcards folder a file is in.
 def root_of(path):
-    path = os.path.abspath(path)
-    return next(root for root in map(os.path.abspath, folder_paths.get_folder_paths("wildcards")) if path.startswith(root + os.sep))
+    return root_in(folder_paths.get_folder_paths("wildcards"), path)
 # The index entry of an existing wildcard, for renaming or deleting it: {"path"} for a txt file, {"path", "lines", "inner"} for a yaml key.
 def existing_entry(name):
     entry = wildcard_index(refresh=True).get(name)
     if entry is None:
         raise web.HTTPNotFound(text=f"Wildcards: no wildcard {name}.")
     return entry
-# Folders left empty by a delete or a rename go too, up to (not including) the wildcards folder.
-def remove_empty_folders(folder, root):
-    while folder != root and folder.startswith(root + os.sep):
-        try:
-            os.rmdir(folder)
-        except OSError: # Not empty (or not removable): it stays, and so do the folders above it.
-            return
-        folder = os.path.dirname(folder)
 def delete_file(path):
     os.remove(path)
     remove_empty_folders(os.path.dirname(path), root_of(path))
