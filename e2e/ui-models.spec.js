@@ -396,6 +396,45 @@ for (const vue of [true, false]) {
       }
     });
 
+    test("Find on Civitai: the Search button, the order, base model and NSFW choices search again, the blur switch, the Civitai link and the API key", async ({ page }) => {
+      const [loader] = await addNodes(page, [{ type: "LoraLoader" }]);
+      await clickMenu(page, loader, "DiceForge.ModelBrowser", "LoRAs");
+      await page.locator(".dflb button.find").click();
+      const dialog = page.locator(".dfcv");
+      const searched = (text) => page.waitForRequest((sent) => sent.url().includes("/diceforge/civitai/search") && sent.url().includes(text));
+      await dialog.locator("input.query").fill("neon");
+      await Promise.all([searched("query=neon"), dialog.locator("button.go", { hasText: "Search" }).click()]);
+      await expect(dialog.locator(".card")).toHaveCount(1);
+      await Promise.all([searched("sort=Newest"), dialog.locator('select[title="Order"]').selectOption("Newest")]);
+      await Promise.all([searched("base=Illustrious"), dialog.locator('select[title="Base model"]').selectOption("Illustrious")]);
+      await Promise.all([searched("nsfw=1"), dialog.locator("label", { hasText: /^NSFW$/ }).locator("input").check()]);
+      await Promise.all([searched("nsfw=0"), dialog.locator("label", { hasText: /^NSFW$/ }).locator("input").uncheck()]);
+      const blur = dialog.locator(".dfblur-switch input");
+      await expect(blur).toBeChecked();
+      await blur.uncheck(); // Redraws the pictures, and keeps the setting.
+      await expect.poll(() => page.evaluate(() => window.app.extensionManager.setting.get("DiceForge.BlurNSFW"))).toBe(false);
+      await blur.check();
+      await expect.poll(() => page.evaluate(() => window.app.extensionManager.setting.get("DiceForge.BlurNSFW"))).toBe(true);
+      const neon = dialog.locator(".card", { hasText: "Neon" });
+      const opened = page.context().waitForEvent("page");
+      await neon.locator("button", { hasText: "Civitai ↗" }).click();
+      const civitai = await opened;
+      await expect(civitai).toHaveURL(/\/models\/50/); // Neon's page on Civitai (id 50), not the browser.
+      await civitai.close();
+      const key = dialog.locator("button", { hasText: "API key" });
+      try {
+        await answerQuestions(page, () => "e2e-key", 1);
+        await key.click();
+        await expect(dialog.locator(".status")).toHaveText("API key saved.");
+        await expect(key).toHaveText("🔑 API key ✓");
+      } finally {
+        await answerQuestions(page, () => "", 1);
+        await key.click();
+        await expect(dialog.locator(".status")).toHaveText("API key removed.");
+        await expect(key).toHaveText("🔑 API key");
+      }
+    });
+
     test("LoRA Browser finds and downloads LoRAs on Civitai, renames and deletes them", async ({ page }) => {
       const tag = vue ? "vue" : "classic", folder = `civitai_${tag}`, loras = (...parts) => basePath("models", "loras", ...parts);
       const [loader] = await addNodes(page, [{ type: "LoraLoader" }]);
