@@ -139,7 +139,7 @@ async def civitai_lookup(sha256):
                 response.raise_for_status()
                 summary = civitai_summary(json.loads(await read_text(response)))
             return {**summary, **await civitai_model_details(session, summary["model_id"]), "checked": time.time()}
-    except Exception as error:
+    except Exception as error: # Offline, a timeout, or Civitai answering something else than JSON: logged, and kept as the answer.
         logging.warning(f"[DiceForge] Model info: Civitai lookup failed: {error}")
         return {"found": False, "error": str(error), "checked": time.time()}
 # The model file and what is known about it; a new or changed file starts over (its hash and Civitai data), yours stays.

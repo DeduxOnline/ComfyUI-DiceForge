@@ -17,7 +17,7 @@ def load_image_file(path):
     device = comfy.model_management.intermediate_device()
     try:
         components = InputImpl.VideoFromFile(path).get_components()
-    except Exception:
+    except Exception: # The video reader fails on some files (WebP, for one): Pillow below reads them.
         components = None
     if components is not None and components.images.shape[0] > 0:
         mask = (1.0 - components.alpha[..., -1]) if components.alpha is not None else torch.zeros((components.images.shape[0], 64, 64))

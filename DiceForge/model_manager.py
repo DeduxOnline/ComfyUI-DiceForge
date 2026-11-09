@@ -377,7 +377,7 @@ async def run_download(job, version, file, url):
     except asyncio.CancelledError:
         job["status"] = "cancelled"
         raise # Stopped: the cleanup below runs, and the task ends as cancelled.
-    except Exception as error:
+    except Exception as error: # Any failure is kept on the job for the browser to show; the partial file is removed below.
         logging.warning(f"[DiceForge] Civitai download of {job['file']} failed: {error}")
         job.update(status="error", error=str(error) if isinstance(error, DownloadError) else f"Download failed: {error}")
     finally:
