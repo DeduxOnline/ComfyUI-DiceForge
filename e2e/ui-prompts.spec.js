@@ -424,6 +424,29 @@ for (const vue of [true, false]) {
       if (vue) await expect(nodeElement(page, id)).toContainText(facts.other.source); // The source badge under the node.
     });
 
+    test("Wildcard Browser's Replace panel: Enter and Preview list the matches, ✕ closes it", async ({ page }) => {
+      const top = `replace_${vue ? "vue" : "classic"}`;
+      writeFile(`models/wildcards/${top}/look.txt`, "a zirconium gleam\nlight zirconium\n");
+      try {
+        const [id] = await addNodes(page, [{ type: "DiceForgeCLIPDualTextEncode", pos: [300, 60] }]);
+        await clickMenu(page, id, "DiceForge.Wildcards", "Wildcards");
+        const dialog = page.locator(".dfwc"), panel = dialog.locator(".replace"), find = panel.locator(".find"), results = panel.locator(".results");
+        await dialog.locator("button.replace-open").click(); // 🔁 Replace, in the toolbar.
+        await expect(panel).toBeVisible();
+        await find.fill("zirconium");
+        await find.press("Enter"); // Enter in the find or the replace field previews too.
+        await expect(results).toContainText("2 in 1 wildcard:");
+        await panel.locator("button.preview").click();
+        await expect(results.locator(".change")).toHaveCount(1);
+        await expect(results.locator(".change b")).toHaveText(`${top}/look ×2`);
+        await panel.locator("button.close-replace").click(); // ✕ closes the panel, not the browser.
+        await expect(panel).toBeHidden();
+        await expect(dialog).toBeVisible();
+      } finally {
+        fs.rmSync(basePath("models", "wildcards", top), { recursive: true, force: true });
+      }
+    });
+
     test("Wildcard Note's text has the prompt tools: __ suggests wildcards, and the node menu has the Wildcard Browser", async ({ page }) => {
       const [id] = await addNodes(page, [{ type: "DiceForgeWildcardNote", pos: [300, 60] }]);
       expect(await menuItems(page, id, "DiceForge.Wildcards")).toEqual(["Write", "Syntax guide", "Selection → new wildcard…", "Browse", "Wildcards", "Tags", "Set up", "Tag lists"]);

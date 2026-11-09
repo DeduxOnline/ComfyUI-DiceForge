@@ -68,6 +68,35 @@ for (const vue of [true, false]) {
       await expect.poll(() => page.evaluate(() => window.app.extensionManager.setting.get("DiceForge.BlurNSFW"))).toBe(true);
     });
 
+    test("Civitai pictures: a click reveals a blurred one; ▶ takes a video's blur off and shows its playing state", async ({ page }) => {
+      const [loader] = await addNodes(page, [{ type: "LoraLoader" }]);
+      await clickMenu(page, loader, "DiceForge.ModelBrowser", "LoRAs");
+      const result = await page.evaluate(async () => { // The module the page loaded (the same instance, by its URL), as in the test above.
+        const url = (await (await fetch("/extensions")).json()).find((name) => name.endsWith("/media.js"));
+        const { civitaiMedia } = await import(url);
+        const holder = document.createElement("div");
+        document.body.append(holder);
+        const picture = civitaiMedia("/nothing.png", { nsfwLevel: 5 });
+        const video = civitaiMedia("/nothing.mp4", { nsfwLevel: 5, type: "video" });
+        holder.append(picture.wrapper, video.wrapper);
+        const before = picture.media.classList.contains("blur");
+        picture.media.click(); // The first click only reveals.
+        const revealed = !picture.media.classList.contains("blur");
+        const videoBlurred = video.media.classList.contains("blur");
+        const play = video.wrapper.querySelector("button.play");
+        play.click(); // ▶ plays it, which counts as seen (the play itself fails on the stand-in file, and that is caught).
+        const videoRevealed = !video.media.classList.contains("blur");
+        video.media.dispatchEvent(new Event("play"));
+        const playing = { label: play.textContent, wrapper: video.wrapper.classList.contains("playing") };
+        video.media.dispatchEvent(new Event("pause"));
+        const paused = { label: play.textContent, wrapper: video.wrapper.classList.contains("playing") };
+        holder.remove();
+        return { before, revealed, videoBlurred, videoRevealed, playing, paused };
+      });
+      expect(result).toEqual({ before: true, revealed: true, videoBlurred: true, videoRevealed: true,
+        playing: { label: "❚❚", wrapper: true }, paused: { label: "▶", wrapper: false } });
+    });
+
     test("LoRA Browser picks LoRAs and looks them up on Civitai", async ({ page }) => {
       const [loader, random] = await addNodes(page, [{ type: "LoraLoader" }, { type: "DiceForgeRandomLora", pos: [500, 40] }]);
       await clickMenu(page, loader, "DiceForge.ModelBrowser", "LoRAs");

@@ -92,7 +92,8 @@ test.describe("ComfyUI as DiceForge uses it", () => {
       for (const name of ["execution_start", "execution_cached", "executed"]) api.addEventListener(name, () => window.contractEvents.push(name));
     });
     await queueFromPage(page, request);
-    await expect.poll(() => page.evaluate(() => [...new Set(window.contractEvents)].sort((a, b) => a.localeCompare(b))),
+    await page.waitForFunction(() => new Set(window.contractEvents).size === 3); // The three names, once each.
+    expect(await page.evaluate(() => [...new Set(window.contractEvents)].sort((a, b) => a.localeCompare(b))),
       changed("the names of the run events", "dice_grid.js, prompt_preview.js")).toEqual(["executed", "execution_cached", "execution_start"]);
   });
 });
@@ -170,7 +171,8 @@ for (const vue of [true, false]) {
       test("Show advanced inputs sets node.showAdvanced", async ({ page }) => {
         const [clip] = await addNodes(page, [{ type: "DiceForgeCLIPDualTextEncode" }]);
         await page.locator(`[data-node-id="${clip}"]`).getByText(/Show advanced inputs/).click();
-        await expect.poll(() => page.evaluate((id) => window.app.graph.getNodeById(id).showAdvanced, clip),
+        await page.waitForFunction((id) => window.app.graph.getNodeById(id).showAdvanced === true, clip);
+        expect(await page.evaluate((id) => window.app.graph.getNodeById(id).showAdvanced, clip),
           changed("node.showAdvanced (Show advanced inputs in Nodes 2.0)", "the e2e tests and screenshots")).toBe(true);
       });
     }

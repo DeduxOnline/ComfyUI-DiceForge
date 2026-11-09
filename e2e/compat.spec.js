@@ -12,7 +12,10 @@ for (const vue of [true, false]) {
     test.beforeEach(async ({ page }) => openComfy(page, { vue }));
 
     if (!corpus().length) {
-      test.skip("no released version yet: the first published release adds its workflow (e2e/qa/snapshot.js)", () => {});
+      // The body is what the skip assumes: it runs only if the skip is taken out (none is saved yet, so the list is empty).
+      test.skip("no released version yet: the first published release adds its workflow (e2e/qa/snapshot.js)", () => {
+        expect(corpus()).toEqual([]);
+      });
     }
     for (const saved of corpus()) {
       test(`a workflow of DiceForge ${saved.diceforge} opens with every node, value and prompt input it had`, async ({ page }) => {
