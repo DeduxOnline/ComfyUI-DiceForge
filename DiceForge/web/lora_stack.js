@@ -295,10 +295,12 @@ function setUp(node) {
   let dragged = null;
   let shownMode; // The seed mode the group headers show.
 
+  let renders = 0; // Only the newest render draws: an older one still waiting for the list must not put back what the user changed since.
   const opened = new Set(); // Rows whose random range is open under them, as "LoRA #n" (the nth row of that LoRA): rows move.
   async function render() {
-    const stack = read();
+    const turn = ++renders, stack = read();
     const files = await loraList();
+    if (turn !== renders) return;
     const seedMode = node.widgets?.find((item) => item.name === "seed_mode")?.value ?? "";
     shownMode = seedMode;
     const headed = new Set();

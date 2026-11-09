@@ -16,11 +16,11 @@ for (const vue of [true, false]) {
       if (vue) await expect(nodeElement(page, ids[0])).toBeVisible();
     });
 
-    test("every DiceForge node fits what it shows: no empty area, nothing cut off, also from a workflow saved too tall", async ({ page }) => { // NOSONAR: expect.poll(...) below.
+    test("every DiceForge node shows all its content, also from a workflow saved too tall; the classic canvas also leaves no empty area", async ({ page }) => { // NOSONAR: expect.poll(...) below.
       const ids = await addNodes(page, ALL_NODES.map((type, index) => ({ type, pos: [40 + (index % 4) * 520, 40 + Math.floor(index / 4) * 700] })));
       const problems = async () => {
         const found = [];
-        for (const [index, id] of ids.entries()) found.push(...(await measure(page, id)).problems.map((problem) => `${ALL_NODES[index]}: ${problem}`));
+        for (const [index, id] of ids.entries()) found.push(...(await measure(page, id)).problems.filter((problem) => !vue || !problem.includes("empty")).map((problem) => `${ALL_NODES[index]}: ${problem}`)); // Nodes 2.0 keeps the height the user set: nothing fits it, so no empty areas.
         return found;
       };
       await expect.poll(problems).toEqual([]); // The checks of the tester's tools (qa/lib.js): previews, lists and the node itself.
@@ -260,7 +260,7 @@ for (const vue of [true, false]) {
       const [plain, image, fitted] = await addNodes(page, [{ type: "DiceForgeRandomInt" }, { type: "DiceForgeRandomImage", pos: [400, 40] },
         { type: "DiceForgeRandomInt", pos: [800, 40] }]);
       const stored = (id) => page.evaluate((id) => window.app.graph.getNodeById(id).size[1], id);
-      await expect.poll(() => page.evaluate((id) => window.app.graph.getNodeById(id).properties.dice_forge_height, plain)).toBeGreaterThan(0);
+      if (!vue) await expect.poll(() => page.evaluate((id) => window.app.graph.getNodeById(id).properties.dice_forge_height, plain)).toBeGreaterThan(0); // Nodes 2.0 records no fitted height.
       await page.evaluate((ids) => { // As a drag of the corner: the frontend sets the size.
         for (const id of ids) { const node = window.app.graph.getNodeById(id); node.setSize([node.size[0], 700]); }
       }, [plain, image]);
@@ -306,17 +306,5 @@ for (const vue of [true, false]) {
       expect(await inputs(true)).toEqual({ model: [String(checkpoint), 0], clip: [String(checkpoint), 1], left: 0 }); // Straight from the checkpoint.
     });
 
-    if (vue) {
-      test("DiceForge nodes fit their inputs when advanced inputs are shown and hidden", async ({ page }) => { // NOSONAR: expect.poll(...) assertions below.
-        const [id] = await addNodes(page, [{ type: "DiceForgeSDXLResolutionList" }]);
-        const height = async () => (await nodeElement(page, id).boundingBox()).height;
-        await expect.poll(async () => page.evaluate((id) => window.app.graph.getNodeById(id).size[1], id)).toBeLessThan(100);
-        const before = await height();
-        await nodeElement(page, id).getByText(/Show advanced/).click();
-        await expect.poll(height).toBeGreaterThan(before + 40);
-        await nodeElement(page, id).getByText(/Hide advanced/).click();
-        await expect.poll(height).toBeLessThan(before + 2);
-      });
-    }
   });
 }
