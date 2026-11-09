@@ -3,8 +3,8 @@
 // working after each), prompts ComfyUI refuses, many prompts queued at once, every seed mode through the queue, and text in any script.
 const fs = require("fs");
 const path = require("path");
-const { test, expect, runPrompt, shown, basePath, writeFile } = require("./helpers");
-const { BASE, REPO } = require("./settings");
+const { test, expect, runPrompt, shown, basePath, baseDir, writeFile } = require("./helpers");
+const { REPO } = require("./settings");
 
 const MODES = ["random", "deck", "shuffle", "balanced", "combinations", "mutate"];
 const clip = (positive, negative = "", { seed = 0, mode = "random" } = {}) => ({
@@ -57,10 +57,10 @@ test.describe("@api robustness on the real server", () => {
   });
 
   test("no request reaches a file outside DiceForge's folders", async ({ request }) => {
-    const outside = path.join(path.dirname(BASE), "diceforge-e2e-secret.json");
+    const outside = path.join(path.dirname(baseDir()), "diceforge-e2e-secret.json");
     fs.writeFileSync(outside, JSON.stringify({ stack: { rows: [{ lora: "secret" }] }, secret: true }));
     const escapes = ["../../diceforge-e2e-secret", "..%2F..%2Fdiceforge-e2e-secret", "../../../diceforge-e2e-secret", "/etc/passwd", "a/../../../x", "..\\..\\x", "C:\\Windows\\win",
-      `${path.dirname(BASE)}/diceforge-e2e-secret`];
+      `${path.dirname(baseDir())}/diceforge-e2e-secret`];
     try {
       for (const name of escapes) {
         const encoded = encodeURIComponent(name);
@@ -110,7 +110,7 @@ test.describe("@api robustness on the real server", () => {
       }
       expect(fs.readdirSync(basePath("models", "loras")).sort()).toEqual(["detail.preview.png", "detail.safetensors", "style"]); // All put back.
       expect(JSON.parse(fs.readFileSync(outside, "utf8")).secret).toBe(true); // Not overwritten or deleted.
-      const strays = fs.readdirSync(path.dirname(BASE)).filter((name) => /escaped|^x\.(txt|json)$/.test(name));
+      const strays = fs.readdirSync(path.dirname(baseDir())).filter((name) => /escaped|^x\.(txt|json)$/.test(name));
       expect(strays).toEqual([]);
     } finally {
       remove(outside);

@@ -38,6 +38,9 @@ section describes the tests, the agents and the release.
 
 ## Checks
 
+- **End-to-end tests run in parallel** (two workers in CI, each with its own ComfyUI and folder), in any order: a test must not need what
+  another test left on its server, and it puts back what it changes (a setting, a file) in a `finally`, since its server keeps it for the
+  tests that come after it on the same worker.
 - **Let GitHub run the tests.** Locally, only check syntax: `python -m py_compile`, `node --check`, `bash -n`, `review_checks.py`.
 - **Looking at the real thing is fine:** ComfyUI in a browser, screenshots, `e2e/qa` tools.
 - **Sonar** has failed CI here before. Avoid:

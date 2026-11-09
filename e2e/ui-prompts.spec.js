@@ -104,9 +104,12 @@ for (const vue of [true, false]) {
       expect(await marked("bad")).toEqual(["{"]); // Never closed.
       await expect(field).not.toHaveAttribute("title", /No wildcard/);
       await page.evaluate(() => window.app.extensionManager.setting.set("DiceForge.PromptHighlight", false));
-      await expect(layer).toHaveCount(0); // Off: the plain field again.
-      expect(await field.evaluate((element) => element.classList.contains("dfhl-input"))).toBe(false);
-      await page.evaluate(() => window.app.extensionManager.setting.set("DiceForge.PromptHighlight", true));
+      try {
+        await expect(layer).toHaveCount(0); // Off: the plain field again.
+        expect(await field.evaluate((element) => element.classList.contains("dfhl-input"))).toBe(false);
+      } finally {
+        await page.evaluate(() => window.app.extensionManager.setting.set("DiceForge.PromptHighlight", true)); // Also when a check above failed.
+      }
       await expect(field.locator("xpath=preceding-sibling::div[contains(concat(' ', @class, ' '), ' dfhl ')][1]")).toHaveCount(1);
     });
 

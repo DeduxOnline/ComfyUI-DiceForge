@@ -192,6 +192,7 @@ jobs:
         env:
           COMFYUI_PYTHON: python
           DICEFORGE_JS_COVERAGE: "1"
+          DICEFORGE_E2E_WORKERS: "2"
         run: npx playwright test ${{ matrix.files }}
 
       - name: Keep the JavaScript coverage of the tests

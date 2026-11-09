@@ -3,13 +3,15 @@ const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
 const { test: base, expect } = require("@playwright/test");
-const { BASE } = require("./settings");
+const { baseOf, urlOf } = require("./settings");
 
 // Where a test's JavaScript coverage goes when DICEFORGE_JS_COVERAGE is set (the Tests workflow sets it): .github/scripts/js_coverage.js merges them.
 const COVERAGE_DIR = path.join(__dirname, "coverage-js");
 
 // Every test fails on an uncaught error in the page (a broken frontend extension), and on a DiceForge question it failed to answer.
 const test = base.extend({
+  // The address of the worker's own ComfyUI (playwright.config.js starts one per worker): the worker's parallel index picks it.
+  baseURL: async ({}, use, testInfo) => use(urlOf(testInfo.parallelIndex)),
   pageErrors: [async ({ page }, use) => {
     const errors = [];
     page.on("pageerror", (error) => errors.push(error.message));
@@ -50,7 +52,9 @@ async function runPrompt(request, prompt) {
 // The text a Preview Any node showed.
 const shown = (result, id) => result.outputs?.[id]?.text?.[0];
 // A file in the test ComfyUI's base directory.
-const basePath = (...parts) => path.join(BASE, ...parts);
+// The base folder of the worker running the test: that worker's ComfyUI is the one the test talks to.
+const baseDir = () => baseOf(test.info().parallelIndex);
+const basePath = (...parts) => path.join(baseDir(), ...parts);
 function writeFile(relative, text) {
   const file = basePath(relative);
   fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -175,4 +179,4 @@ async function answerQuestions(page, answer = () => true, times = Infinity) {
   });
 }
 
-module.exports = { test, expect, runPrompt, shown, basePath, writeFile, openComfy, drawn, addNodes, connect, widgetValue, setWidget, menuItems, clickMenu, queueFromPage, nodeElement, answerQuestions };
+module.exports = { test, expect, runPrompt, shown, basePath, baseDir, writeFile, openComfy, drawn, addNodes, connect, widgetValue, setWidget, menuItems, clickMenu, queueFromPage, nodeElement, answerQuestions };

@@ -69,11 +69,14 @@ test.describe("@api workflows and routes", () => {
     const prompt = clip("__hair/style__", "", { seed: 42 });
     await runPrompt(request, prompt);
     expect((await runPrompt(request, prompt)).cached).toContain("1");
-    writeFile("models/wildcards/hair/style.txt", "pixie cut\n");
-    const changed = await runPrompt(request, prompt);
-    expect(changed.cached).not.toContain("1");
-    expect(shown(changed, "2")).toBe("pixie cut");
-    writeFile("models/wildcards/hair/style.txt", "bob cut\nlong hair\n");
+    try {
+      writeFile("models/wildcards/hair/style.txt", "pixie cut\n");
+      const changed = await runPrompt(request, prompt);
+      expect(changed.cached).not.toContain("1");
+      expect(shown(changed, "2")).toBe("pixie cut");
+    } finally {
+      writeFile("models/wildcards/hair/style.txt", "bob cut\nlong hair\n"); // As the fixtures have it: other tests read this file.
+    }
   });
 
   test("shuffle remembers between runs on the server, and a seed that came before gives its value again", async ({ request }) => {
