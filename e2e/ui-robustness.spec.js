@@ -195,7 +195,8 @@ for (const vue of [true, false]) {
       for (let round = 0; round < 5; round++) {
         for (let step = 0; step < 8; step++) { // A series of changes, in any order, before looking.
           const [id, fixedGroups] = random.pick([[sdxl, ["Standard", "High-Res"]], [selector, null]]);
-          const change = random.pick(["group", "rescale", "value", "multiple", "megapixels"]);
+          // The Random Resolution Selector has no rescale (removed on 2026-11-01): it changes its aspect, multiple and megapixels.
+          const change = fixedGroups ? random.pick(["group", "rescale", "value", "multiple"]) : random.pick(["group", "multiple", "megapixels"]);
           if (change === "group") {
             if (fixedGroups) {
               await setWidget(page, id, "resolution", random.pick(fixedGroups));
@@ -207,7 +208,7 @@ for (const vue of [true, false]) {
             await setWidget(page, id, "rescale", random.pick(["by percentage", "to Width/Height", "to longest side"]));
           } else if (change === "multiple") {
             await setWidget(page, id, "multiple", random.int(8, 128, 8));
-          } else if (change === "megapixels" && !fixedGroups) {
+          } else if (change === "megapixels") {
             await setWidget(page, id, "megapixels", random.int(3, 30) / 10);
           } else {
             const mode = await widgetValue(page, id, "rescale");
