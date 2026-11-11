@@ -96,6 +96,7 @@ app.registerExtension({
     const note = defs.find((def) => def.name === NODE_TYPE);
     const pack = defs.find((def) => def.name.startsWith("DiceForge") && def.name !== NODE_TYPE && def.python_module);
     if (note && pack) note.python_module = pack.python_module;
+    if (note) note.deprecated = true; // Hidden from the node library for now: a deprecated node stays out of it and still runs in saved workflows.
   },
   getNodeMenuItems(node) {
     return node.comfyClass === NODE_TYPE ? [{ content: "Refresh the file list", callback: () => background(wildcardList(true)) }] : [];

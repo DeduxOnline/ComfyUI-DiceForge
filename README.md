@@ -324,6 +324,8 @@ One prompt field with the same syntax as CLIP Dual Text Encode (wildcards, `{a|b
 
 ### Wildcard Note
 
+For now the node is not in the node library: it is deprecated, so the library hides it, and a workflow that has one keeps working.
+
 A note, like ComfyUI's **Note**, for the lines of a wildcard: write them while you work, with the prompt fields' tools (the `__` and tag autocomplete, syntax highlighting, and the Syntax guide, Wildcard Browser and Tag Browser in its right-click menu), and **💾 Save to WildCard** puts them into a wildcard file. It is not run with the workflow.
 
 - `text`: the lines, one per line. Each is trimmed, and empty lines and repeats are left out.

@@ -56,6 +56,7 @@ nodes and features, a patch for fixes. Each version is a [release on GitHub](htt
   with published releases (from the first one on) open with every value; the README names every node, input and output, and its links and pictures work; code that is never
   allowed (HTML built from text, eval, unsafe yaml, a shell, pickle).
 ### Changed
+- Wildcard Note is out of the node library for now (deprecated: the library hides it, and a workflow that has one still runs it).
 - Random Int and Random Float are in the utils section of the node library: the random section is gone.
 - Nodes 2.0: a DiceForge node keeps the height you set. It no longer fits itself to its content by itself (the classic canvas still does).
 - The node menus: CLIP Dual Text Encode's prompt tools in three groups, Write (Syntax guide, Selection → new wildcard…, Prompt styles),

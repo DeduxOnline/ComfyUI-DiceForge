@@ -413,17 +413,18 @@ for (const vue of [true, false]) {
       }
     });
 
-    test("Wildcard Note has a description and DiceForge as its source (badge, node library), not frontend_only", async ({ page }) => {
+    test("Wildcard Note has a description and DiceForge as its source (badge), and is deprecated for now (out of the node library)", async ({ page }) => {
       const [id] = await addNodes(page, [{ type: "DiceForgeWildcardNote", pos: [300, 60] }]);
       // ComfyUI's node definitions (the store its badges, node library and help read), as the frontend made them for each node.
       const facts = await page.evaluate(() => {
         const pinia = [...document.querySelectorAll("*")].find((element) => element.__vue_app__).__vue_app__.config.globalProperties.$pinia;
         const defs = pinia._s.get("nodeDef").nodeDefsByName;
         const fact = (def) => ({ source: def.nodeSource.displayText, module: def.python_module });
-        return { note: fact(defs.DiceForgeWildcardNote), other: fact(defs.DiceForgeRandomInt), description: defs.DiceForgeWildcardNote.description };
+        return { note: fact(defs.DiceForgeWildcardNote), other: fact(defs.DiceForgeRandomInt), description: defs.DiceForgeWildcardNote.description, deprecated: defs.DiceForgeWildcardNote.deprecated };
       });
       expect(facts.note).toEqual(facts.other);
       expect(facts.description).toContain("Save to WildCard");
+      expect(facts.deprecated).toBe(true); // Hidden from the node library for now; saved workflows still have it.
       if (vue) await expect(nodeElement(page, id)).toContainText(facts.other.source); // The source badge under the node.
     });
 
