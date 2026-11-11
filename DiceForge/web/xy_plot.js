@@ -2,7 +2,6 @@ import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
 import { addStyleOnce, asking, background, element, fitToContent } from "./dom.js";
 import { toast } from "./comfy.js";
-import { fitNodeHeight } from "./node_size.js";
 import { addThemeStyle } from "./theme.js";
 
 // XY Plot keeps one row under its fields: the size of the plot and the cell the next run makes (or what is wrong with a field). index counts up
@@ -126,7 +125,6 @@ app.registerExtension({
       if (error) panel.replaceChildren(element("div", { class: "error" }, error));
       else if (plan) panel.replaceChildren(element("div", { class: "summary", title: "The plot, and the cell the next run makes" }, summaryText(plan, index, before)));
       else panel.replaceChildren();
-      fitNodeHeight(node);
     }
     async function refresh() {
       const values = Object.fromEntries(FIELDS.map((name) => [name, widgetOf(node, name)?.value ?? ""]));

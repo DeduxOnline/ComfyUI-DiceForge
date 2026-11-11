@@ -123,11 +123,11 @@ def test_the_prompt_highlight_marks():
 @needs_node
 def test_the_workflow_a_run_sends_has_no_run_data():
     kept = {"dice_forge_history": [{"positive": "an earlier prompt"}], "dice_forge_danbooru": {"text": "a prompt"},
-            "dice_forge_image": {"file_name": "cat.png"}, "dice_forge_height": 120}
+            "dice_forge_image": {"file_name": "cat.png"}, "dice_forge_note": "kept"}
     workflow = {"nodes": [{"id": 1, "properties": kept}, {"id": 2}],
                 "definitions": {"subgraphs": [{"id": "a", "nodes": [{"id": 3, "properties": dict(kept)}]}]}, "extra": {"ds": 1}}
-    clean = {"nodes": [{"id": 1, "properties": {"dice_forge_height": 120}}, {"id": 2}],
-             "definitions": {"subgraphs": [{"id": "a", "nodes": [{"id": 3, "properties": {"dice_forge_height": 120}}]}]}, "extra": {"ds": 1}}
+    clean = {"nodes": [{"id": 1, "properties": {"dice_forge_note": "kept"}}, {"id": 2}],
+             "definitions": {"subgraphs": [{"id": "a", "nodes": [{"id": 3, "properties": {"dice_forge_note": "kept"}}]}]}, "extra": {"ds": 1}}
     cases = [[workflow], [{"nodes": [{"id": 1}]}], [None]]
     source = js_source("prompt_preview.js", "RUN_DATA", "withoutRunData")
     assert run(source, "withoutRunData", cases) == [clean, {"nodes": [{"id": 1}]}, None]

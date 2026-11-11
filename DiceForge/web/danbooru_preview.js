@@ -2,7 +2,6 @@ import { app } from "../../scripts/app.js";
 import { addStyleOnce, asking, background, element, fitToContent } from "./dom.js";
 import { toast } from "./comfy.js";
 import { blurOn } from "./media.js";
-import { fitNodeHeight } from "./node_size.js";
 import { keepSize } from "./window_memory.js";
 import { addThemeStyle } from "./theme.js";
 
@@ -152,8 +151,7 @@ app.registerExtension({
       const last = shownFrom = node.properties?.dice_forge_danbooru;
       panel.replaceChildren(last?.posts?.length
         ? element("button", { class: "last-run", title: "Open the posts and tags of the last run", onclick: () => openPosts(node) }, summary(last))
-        : element("div", { class: "empty", title: EMPTY }, EMPTY)); // One line as the button, so a run doesn't change the node's height.
-      fitNodeHeight(node);
+        : element("div", { class: "empty", title: EMPTY }, EMPTY)); // One line as the button, so a run keeps the node the same size.
     }
     const onExecuted = node.onExecuted;
     node.onExecuted = function (output) {

@@ -1,7 +1,6 @@
 import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
 import { addStyleOnce, background, element, fitToContent } from "./dom.js";
-import { fitNodeHeight } from "./node_size.js";
 import { addThemeStyle } from "./theme.js";
 
 // Random Image shows, under its inputs, the image the last run picked: the picture, its file and folder, its size (and frames of an animated one) and
@@ -36,7 +35,6 @@ app.registerExtension({
         const url = viewURL(last.view, last.stamp ?? 0);
         const picture = element("img", { src: url, alt: last.file, title: "Click to open it full size" });
         picture.addEventListener("click", () => window.open(url, "_blank", "noopener"));
-        picture.addEventListener("load", () => fit());
         picture.addEventListener("error", () => picture.replaceWith(element("div", { class: "empty" },
           last.view.type === "temp" ? "The preview was a temporary copy, cleared since: run again to see it." : `${last.file} is no longer there.`)));
         const file = element("div", { class: "file", title: `${last.folder}/${last.file} (click to copy)` }, last.file);
@@ -49,10 +47,7 @@ app.registerExtension({
         panel.replaceChildren(element("div", { class: "head" }, `Last run · seed ${last.seed}${mode}`), element("div", { class: "pic" }, picture), file,
           element("div", { class: "size" }, `${last.width} × ${last.height}${last.frames > 1 ? ` · ${last.frames} frames` : ""} · ${last.folder}`));
       }
-      fit();
     }
-    // Room for the preview: taller in the classic canvas, no gap in Nodes 2.0 (node_size.js).
-    const fit = () => fitNodeHeight(node);
     const onExecuted = node.onExecuted;
     node.onExecuted = function (output) {
       const result = output?.dice_forge_image?.[0];

@@ -58,7 +58,7 @@ nodes and features, a patch for fixes. Each version is a [release on GitHub](htt
 ### Changed
 - Wildcard Note is out of the node library for now (deprecated: the library hides it, and a workflow that has one still runs it).
 - Random Int and Random Float are in the utils section of the node library: the random section is gone.
-- Nodes 2.0: a DiceForge node keeps the height you set. It no longer fits itself to its content by itself (the classic canvas still does).
+- Nodes keep the height you set: a DiceForge node no longer fits itself to its content, in either design. ComfyUI still grows a node in the classic canvas when its widgets need more room.
 - The node menus: CLIP Dual Text Encode's prompt tools in three groups, Write (Syntax guide, Selection → new wildcard…, Prompt styles),
   Browse (Wildcards, Tags, LoRAs, Prompt history) and Set up (Tag lists, which was Tag autocomplete), with short names; Wildcards to
   Text and Wildcard Note have the same groups. Every DiceForge menu entry lost its emoji (Browse checkpoints, Model info, Sampler
@@ -83,8 +83,6 @@ nodes and features, a patch for fixes. Each version is a [release on GitHub](htt
   `DiceForgeResolutionSelector`, `CLIPTextEncodePositiveNegative` `DiceForgeCLIPDualTextEncode`, `LoadVAEDecodeSave`
   `DiceForgeLoadVAEDecodeSave`, `VAEDecodeSave` `DiceForgeVAEDecodeSave` and `LoadDiffusionModelCLIP` `DiceForgeLoadDiffusionModelCLIP`. The
   names in the menus stay the same; workflows saved with the old ids show these nodes as missing.
-- Node heights: a node taller than what it shows (a workflow saved so, content that got smaller) is fitted again, in both designs; only
-  a node with a text field, which grows with it, keeps a height the user gave it.
 - Wildcard Browser: the tree takes a third of the window, the editor (or the cards) two thirds.
 - Tag Browser: ↗ opens the tag's wiki page instead of its posts: on e621 for the tags of an e621 list, on Danbooru otherwise.
 - CI: the end-to-end tests run when a change can affect them (the node pack, the end-to-end tests or the test workflow); a change to the
@@ -124,8 +122,6 @@ nodes and features, a patch for fixes. Each version is a [release on GitHub](htt
   the workflow saved in the images a run makes, which handed earlier prompts and file names to whoever got a picture; the workflow itself
   keeps them. A run opened again from the queue or from its picture has none of them. Images saved before still have them in their metadata.
 - HiresFix (Load VAE): the tooltip of its `vae` output says what it is for (the VAE Decode after the second KSampler).
-- A DiceForge node the user made taller by dragging its corner keeps that height after a reload, and when its preview or list
-  changes; before, it was fitted back to its content (in Nodes 2.0, to its inputs).
 - Wildcard Note: its badge and the node library name DiceForge as its source instead of frontend_only, and it has a description.
 - Wildcard Browser: + New file named like an existing one in other upper and lower case (`Color` next to `color.txt`) no longer writes
   over its lines on Windows and macOS: it is refused as taken.

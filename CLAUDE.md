@@ -78,8 +78,8 @@ DiceForge nodes should feel like ComfyUI's own (https://docs.comfy.org/basic-con
   opens in a window from the node's menu; XY Plot runs with ComfyUI's Run (2026-10-28).
 - **Core types on the links** (`MODEL`, `CLIP`, `VAE`, `CONDITIONING`, `LATENT`, `IMAGE`, `MASK`, `INT`, `FLOAT`, `STRING`, `BOOLEAN`, and `COMBO` for a list
   input such as KSampler's sampler), so the colors and connections are the ones users know. No look-alike types of our own.
-- **The user owns the look:** title, color and size. In Nodes 2.0 nothing fits a node's height: it stays the size the user set (2026-11-09).
-  In the classic canvas `node_size.js` fits a node to its content and keeps a height the user dragged (`properties.dice_forge_height`).
+- **The user owns the look:** title, color and size. DiceForge never fits a node's height to its content (2026-11-11): a node keeps the size the user set.
+  ComfyUI still grows a node in the classic canvas when its widgets need more room; DiceForge's panels ask for the height of their content (`fitToContent` in `dom.js`).
 - **Menus:** extra tools go in the node's right-click menu (`getNodeMenuItems`) or a window it opens, after the core items (color, title,
   clone, mode). Nothing duplicates the selection toolbox (color, bypass, lock, delete). Entries have short names and no emoji (the
   menus can't draw icons); the prompt nodes' tools are grouped under disabled headings (Write, Browse, Set up), each module adding its
@@ -102,7 +102,6 @@ DiceForge nodes should feel like ComfyUI's own (https://docs.comfy.org/basic-con
   - `theme.js`: the look of what is in or at a node (class `df-ui`, popups `df-pop`): ComfyUI's palette variables and each design's
     widget metrics, never fixed colors there (the light palette and users' own ones must work);
   - `window_memory.js`: what windows remember, their size;
-  - `node_size.js`: node heights;
   - `move_dialog.js`: the folder picker and drag and drop onto a tree; `media.js`: Civitai pictures and videos, Blur NSFW;
   - `http_read.py`, `model_lists.py`; `routes.py`: `json_body` for every POST body, `in_thread` for a route's file work.
 - **The timers in nodes stay** (a node's preview watching its `properties`, the prompt highlight's scan): each compares a kept key and

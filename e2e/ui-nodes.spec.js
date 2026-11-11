@@ -16,11 +16,11 @@ for (const vue of [true, false]) {
       if (vue) await expect(nodeElement(page, ids[0])).toBeVisible();
     });
 
-    test("every DiceForge node shows all its content, also from a workflow saved too tall; the classic canvas also leaves no empty area", async ({ page }) => { // NOSONAR: expect.poll(...) below.
+    test("every DiceForge node shows all its content, also from a workflow saved too tall", async ({ page }) => { // NOSONAR: expect.poll(...) below.
       const ids = await addNodes(page, ALL_NODES.map((type, index) => ({ type, pos: [40 + (index % 4) * 520, 40 + Math.floor(index / 4) * 700] })));
       const problems = async () => {
         const found = [];
-        for (const [index, id] of ids.entries()) found.push(...(await measure(page, id)).problems.filter((problem) => !vue || !problem.includes("empty")).map((problem) => `${ALL_NODES[index]}: ${problem}`)); // Nodes 2.0 keeps the height the user set: nothing fits it, so no empty areas.
+        for (const [index, id] of ids.entries()) found.push(...(await measure(page, id)).problems.filter((problem) => !problem.includes("empty")).map((problem) => `${ALL_NODES[index]}: ${problem}`)); // Nothing fits a node any more: a gap under its content is its own size.
         return found;
       };
       await expect.poll(problems).toEqual([]); // The checks of the tester's tools (qa/lib.js): previews, lists and the node itself.
@@ -236,31 +236,19 @@ for (const vue of [true, false]) {
       await expect(panel.locator(".empty")).toHaveText("gone.png is no longer there.");
     });
 
-    test("a node saved taller than it shows keeps its height in Nodes 2.0, and is fitted again in the classic canvas unless a text field takes the extra height", async ({ page }) => { // NOSONAR: expect.poll(...) below.
+    test("a node saved taller than it shows keeps its height, in both designs: nothing fits it", async ({ page }) => {
       const [plain, sampler, image, clip] = await addNodes(page, [{ type: "DiceForgeRandomInt" }, { type: "DiceForgeRandomSampler", pos: [400, 40] },
         { type: "DiceForgeRandomImage", pos: [800, 40] }, { type: "DiceForgeCLIPDualTextEncode", pos: [1200, 40] }]);
       const workflow = await page.evaluate(() => window.app.graph.serialize());
-      for (const node of workflow.nodes) { // As a workflow saved with an empty gap under the inputs, before the fitted height was kept.
-        node.size = [node.size[0], 900];
-        delete node.properties.dice_forge_height;
-      }
+      for (const node of workflow.nodes) node.size = [node.size[0], 900]; // As a workflow saved taller than what the node shows.
       await page.evaluate(async (data) => { window.app.graph.clear(); await window.app.loadGraphData(data); }, workflow);
       const stored = (id) => page.evaluate((id) => window.app.graph.getNodeById(id).size[1], id);
-      if (vue) { // Nodes 2.0 keeps the height the user set (no fitting).
-        for (const id of [plain, image, sampler, clip]) expect(await stored(id)).toBe(900);
-        return;
-      }
-      await expect.poll(() => stored(plain)).toBeLessThan(300); // Nothing takes the extra height: it goes.
-      await expect.poll(() => stored(image)).toBeLessThan(400); // Its preview is as tall as what it shows, not as the node was.
-      expect(await stored(sampler)).toBe(900); // Its samplers and schedulers fields grow with it: the user's height stays.
-      expect(await stored(clip)).toBe(900); // Its prompt fields take the extra height.
+      for (const id of [plain, sampler, image, clip]) expect(await stored(id)).toBe(900);
     });
 
-    test("a node the user made taller keeps its height, also after a reload and when its panel is fitted", async ({ page }) => { // NOSONAR: expect.poll(...) below.
-      const [plain, image, fitted] = await addNodes(page, [{ type: "DiceForgeRandomInt" }, { type: "DiceForgeRandomImage", pos: [400, 40] },
-        { type: "DiceForgeRandomInt", pos: [800, 40] }]);
+    test("a node the user made taller keeps its height, also after a reload", async ({ page }) => {
+      const [plain, image] = await addNodes(page, [{ type: "DiceForgeRandomInt" }, { type: "DiceForgeRandomImage", pos: [400, 40] }]);
       const stored = (id) => page.evaluate((id) => window.app.graph.getNodeById(id).size[1], id);
-      if (!vue) await expect.poll(() => page.evaluate((id) => window.app.graph.getNodeById(id).properties.dice_forge_height, plain)).toBeGreaterThan(0); // Nodes 2.0 records no fitted height.
       await page.evaluate((ids) => { // As a drag of the corner: the frontend sets the size.
         for (const id of ids) { const node = window.app.graph.getNodeById(id); node.setSize([node.size[0], 700]); }
       }, [plain, image]);
@@ -268,7 +256,6 @@ for (const vue of [true, false]) {
       const workflow = await page.evaluate(() => window.app.graph.serialize());
       await page.evaluate(async (data) => { window.app.graph.clear(); await window.app.loadGraphData(data); }, workflow);
       await drawn(page);
-      if (!vue) await expect.poll(() => stored(fitted)).toBeLessThan(300); // Not resized: fitted as before (classic canvas).
       expect(await stored(plain)).toBe(700);
       expect(await stored(image)).toBe(700); // Its preview asked for its own height: the user's stays.
       if (vue) await expect.poll(async () => (await nodeElement(page, plain).boundingBox()).height).toBeGreaterThan(500); // Drawn that tall too.

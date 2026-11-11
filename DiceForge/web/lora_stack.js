@@ -2,7 +2,6 @@ import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
 import { MODEL_FILE, openModelInfo } from "./model_info.js";
 import { openModelBrowser, BROWSERS, compareBases } from "./model_browser.js";
-import { fitNodeHeight } from "./node_size.js";
 import { addStyleOnce, askConfirm, asking, askText, background, element, fitToContent } from "./dom.js";
 import { menuButton, withMenu } from "./menu.js";
 import { addThemeStyle } from "./theme.js";
@@ -426,7 +425,6 @@ function setUp(node) {
         })) }, "📂 Presets")),
       modelLine, noteLine);
     background(checkBases());
-    if (!node.flags?.collapsed) fitNodeHeight(node); // Room for the rows (node_size.js).
   }
   const modelLine = element("div", { class: "muted model" });
   const noteLine = element("div", { class: "muted note" });

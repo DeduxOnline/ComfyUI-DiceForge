@@ -83,7 +83,7 @@ async function sheet(browser, rows, name) {
 // - an empty area: under the widgets (the classic canvas), in the body (Nodes 2.0), or under a panel's content (a preview, a list: any widget of
 //   the page's own elements that is no text field, which may grow);
 // - cut-off content: a panel's content taller than its place (unless it scrolls), a classic node shorter than what it shows.
-// GAP: how much empty height counts: the classic canvas leaves 8 to 16 pixels under the last widget of a fitted node, real gaps are 40 and more.
+// GAP: how much empty height counts: the classic canvas leaves 8 to 16 pixels under the last widget of a node sized to its content, real gaps are 40 and more.
 const GAP = 24;
 async function measure(page, id) {
   const node = await page.evaluate(measureNode, [id, GAP]);
@@ -138,13 +138,11 @@ function measurePanels([id, gap]) {
   return { panels, problems };
 }
 
-// The graph saved and loaded again with every node `height` tall (a workflow saved so, without the fitted height node_size.js keeps, which
-// would make it the user's height): the ids stay.
+// The graph saved and loaded again with every node `height` tall (a workflow saved so): the ids stay.
 async function reloadTall(page, height = 900) {
   const workflow = await page.evaluate(() => window.app.graph.serialize());
   for (const node of workflow.nodes) {
     node.size = [node.size[0], height];
-    delete node.properties?.dice_forge_height;
   }
   await page.evaluate(async (data) => {
     window.app.graph.clear();

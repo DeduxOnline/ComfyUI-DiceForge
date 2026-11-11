@@ -79,7 +79,7 @@ test.describe("ComfyUI as DiceForge uses it", () => {
     await page.evaluate(async () => window.app.loadGraphData(window.app.graph.serialize()));
     const calls = await page.evaluate(() => window.contractCalls);
     expect(calls.nodeCreated, changed("nodeCreated", "every DiceForge extension")).toBeGreaterThan(1);
-    expect(calls.onConfigure, changed("a node's onConfigure on loading", "node_size.js, lora_stack.js and the previews")).toBeGreaterThan(0);
+    expect(calls.onConfigure, changed("a node's onConfigure on loading", "lora_stack.js and the previews")).toBeGreaterThan(0);
   });
 
   test("a run sends the events DiceForge listens to: execution_start, execution_cached, executed", async ({ page, request }) => {
@@ -108,14 +108,13 @@ for (const vue of [true, false]) {
         const node = window.app.graph.getNodeById(clip), other = window.app.graph.getNodeById(spare);
         const plain = other.addDOMWidget("contract_probe", "contract_probe", document.createElement("div"), { serialize: false });
         const result = {
-          comfyClass: node.comfyClass, module: node.constructor?.nodeData?.python_module ?? "", margin: plain.margin, layout: typeof plain.computeLayoutSize,
+          comfyClass: node.comfyClass, margin: plain.margin, layout: typeof plain.computeLayoutSize,
           methods: ["addDOMWidget", "computeSize", "setSize", "setDirtyCanvas"].filter((name) => typeof node[name] !== "function"),
         };
         window.app.graph.remove(other);
         return result;
       }, [clip, spare]);
       expect(facts.comfyClass, changed("node.comfyClass", "most of DiceForge/web")).toBe("DiceForgeCLIPDualTextEncode");
-      expect(facts.module, changed("node.constructor.nodeData.python_module", "node_size.js")).toMatch(/DiceForge/i);
       expect(facts.methods, changed("these node methods", "most of DiceForge/web")).toEqual([]);
       expect(facts.margin, changed("a DOM widget's default margin (the classic canvas makes the element 2 × margin shorter)", "dom.js fitToContent")).toBe(10);
       expect(facts.layout, changed("computeLayoutSize of DOM widgets (fitToContent removes it so a panel doesn't take a share of a taller node)", "dom.js"))

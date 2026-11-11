@@ -37,8 +37,7 @@ The request names it; otherwise everything not pushed yet: the base is `origin/m
   must handle both.
 - Keys: a key handler acts only where it applies. Not while typing in a field (`typingIn` in `menu.js`): Delete and F2 in a search box are
   text. The focus comes back after a button that changed it.
-- Node heights: a panel asks for its content's height (`fitToContent` in `dom.js`), and the node is fitted after content changes
-  (`fitNodeHeight` in `node_size.js`).
+- Node heights: a panel asks for its content's height (`fitToContent` in `dom.js`); DiceForge never fits a node's height.
 - State: windows remember what they showed (`window_memory.js`). Listeners and observers added for a window or node are removed with it.
 - Python on ComfyUI: what the nodes write goes to ComfyUI's user and output folders, or the models' folders for model files. Imports of
   ComfyUI modules work with the version CI pins (`.github/workflows/tests.yml`).
@@ -54,7 +53,7 @@ The request names it; otherwise everything not pushed yet: the base is `origin/m
 - **S2245:** `random` outside the seeded, reproducible places listed in `sonar-project.properties`; use `secrets` (`randbelow`).
 - **S4624:** a template literal inside another one's `${...}`.
 - **S3776:** a function harder to follow than about 15 (cognitive complexity); split it.
-- Duplicated blocks: reuse the helpers that exist (`dom.js`, `menu.js`, `window_memory.js`, `node_size.js`; `http_read.py`, `model_lists.py`).
+- Duplicated blocks: reuse the helpers that exist (`dom.js`, `menu.js`, `window_memory.js`; `http_read.py`, `model_lists.py`).
 
 **Tests**
 - Python changes come with unit tests (`tests/`; the fixtures in `tests/conftest.py` keep everything in temporary folders).

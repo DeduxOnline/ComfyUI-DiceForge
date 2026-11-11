@@ -20,7 +20,7 @@ const MARKERS = [
   ["Nodes 2.0 advanced inputs button", /advanced-inputs-button/g, "the e2e tests"],
   ["Show advanced inputs", /Show advanced inputs/g, "the e2e tests"],
   ["node.showAdvanced", /showAdvanced/g, "the e2e tests and screenshots"],
-  ["Nodes 2.0 setting", /Comfy\.VueNodes\.Enabled/g, "node_size.js"],
+  ["Nodes 2.0 setting", /Comfy\.VueNodes\.Enabled/g, "e2e/helpers.js (openComfy)"],
   ["getNodeMenuItems hook", /getNodeMenuItems/g, "the node menus of DiceForge"],
   ["execution_cached event", /execution_cached/g, "dice_grid.js, prompt_preview.js"],
 ];

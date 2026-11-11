@@ -1,7 +1,6 @@
 import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
 import { addStyleOnce, askConfirm, background, element, fitToContent } from "./dom.js";
-import { fitNodeHeight } from "./node_size.js";
 import { request } from "./comfy.js";
 import { addThemeStyle } from "./theme.js";
 
@@ -83,7 +82,6 @@ app.registerExtension({
           element("button", { class: "save primary", ...(kept ? {} : { disabled: "" }), title: "Save the starred cells at full size in output/DiceForge/kept, with their workflow", onclick: () => background(saveKept()) }, `💾 Save ${kept} kept`)),
         cells.length ? element("div", { class: "cells" }, ...tiles) : element("div", { class: "empty" }, "Run the workflow: the cells of the grid show here, to star the best ones."),
         ...(status ? [element("div", { class: "status" }, status)] : []));
-      fitNodeHeight(node);
     }
     const onExecuted = node.onExecuted;
     node.onExecuted = function () {
