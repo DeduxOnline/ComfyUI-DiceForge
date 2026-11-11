@@ -58,7 +58,7 @@ nodes and features, a patch for fixes. Each version is a [release on GitHub](htt
 ### Changed
 - Wildcard Note is out of the node library for now (deprecated: the library hides it, and a workflow that has one still runs it).
 - Random Int and Random Float are in the utils section of the node library: the random section is gone.
-- Nodes keep the height you set: a DiceForge node no longer fits itself to its content, in either design. ComfyUI still grows a node in the classic canvas when its widgets need more room.
+- Nodes keep the height you set: a DiceForge node no longer fits itself to its content, in either design. In the classic canvas a new node can be 8–16 px shorter than its panel's content: drag its corner to give it the room.
 - The node menus: CLIP Dual Text Encode's prompt tools in three groups, Write (Syntax guide, Selection → new wildcard…, Prompt styles),
   Browse (Wildcards, Tags, LoRAs, Prompt history) and Set up (Tag lists, which was Tag autocomplete), with short names; Wildcards to
   Text and Wildcard Note have the same groups. Every DiceForge menu entry lost its emoji (Browse checkpoints, Model info, Sampler

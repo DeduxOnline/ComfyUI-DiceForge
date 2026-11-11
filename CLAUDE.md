@@ -79,7 +79,8 @@ DiceForge nodes should feel like ComfyUI's own (https://docs.comfy.org/basic-con
 - **Core types on the links** (`MODEL`, `CLIP`, `VAE`, `CONDITIONING`, `LATENT`, `IMAGE`, `MASK`, `INT`, `FLOAT`, `STRING`, `BOOLEAN`, and `COMBO` for a list
   input such as KSampler's sampler), so the colors and connections are the ones users know. No look-alike types of our own.
 - **The user owns the look:** title, color and size. DiceForge never fits a node's height to its content (2026-11-11): a node keeps the size the user set.
-  ComfyUI still grows a node in the classic canvas when its widgets need more room; DiceForge's panels ask for the height of their content (`fitToContent` in `dom.js`).
+  In the classic canvas a new node can be 8–16 px shorter than its panel's content (it keeps the height it was made with), so the user drags the corner.
+  DiceForge's panels ask for the height of their content (`fitToContent` in `dom.js`).
 - **Menus:** extra tools go in the node's right-click menu (`getNodeMenuItems`) or a window it opens, after the core items (color, title,
   clone, mode). Nothing duplicates the selection toolbox (color, bypass, lock, delete). Entries have short names and no emoji (the
   menus can't draw icons); the prompt nodes' tools are grouped under disabled headings (Write, Browse, Set up), each module adding its
