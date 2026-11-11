@@ -29,7 +29,7 @@ Around the nodes, DiceForge adds tools to ComfyUI's right-click menus: [model br
 - [Prompts](#prompts): [CLIP Dual Text Encode](#clip-dual-text-encode-wildcards-lora), [Wildcards to Text](#wildcards-to-text), [Wildcard Note](#wildcard-note), [wildcards](#wildcard-files), [tag autocomplete](#tag-autocomplete-danbooru-e621), [Tag Browser](#tag-browser), [prompt styles](#prompt-styles), [Danbooru Tag Enhancer](#danbooru-tag-enhancer)
 - [Image sizes](#image-sizes): [SDXL Resolution List](#sdxl-resolution-list), [Resolution Selector](#resolution-selector-random), [seed modes for sizes](#seed-modes-for-sizes)
 - [Random nodes](#random-nodes): [Random Int and Float](#random-int-and-random-float), [random loaders](#random-lora-random-checkpoint-random-diffusion-model-and-random-vae), [Random Image](#random-image), [Random Sampler](#random-sampler)
-- [Sampling and upscaling](#sampling-and-upscaling): [KSampler presets](#ksampler-presets), [Variation Seed](#variation-seed), [Anima NAG](#anima-nag), [HiresFix (Load VAE)](#hiresfix-load-vae)
+- [Sampling and upscaling](#sampling-and-upscaling): [KSampler presets](#ksampler-presets), [Variation Seed](#variation-seed), [HiresFix (Load VAE)](#hiresfix-load-vae)
 - [Comparing results](#comparing-results): [XY Plot](#xy-plot), [Dice Grid](#dice-grid)
 - [LoRAs and models](#loras-and-models): [LoRA Stack](#lora-stack), [Model info](#model-info), [model browsers](#model-browsers)
 - [Utility nodes](#utility-nodes) · [Development](#development) ([tests](#tests), [releasing](#releasing))
@@ -79,7 +79,6 @@ Every version is listed in [CHANGELOG.md](CHANGELOG.md) and released on [GitHub]
 | [**Load Diffusion Model + CLIP**](#utility-nodes) | DiceForge/loaders | You want Load Diffusion Model and Load CLIP in one node, for models that come as separate files (Flux, Anima, Qwen-Image...). |
 | **Sampling and upscaling** | | |
 | [**Variation Seed**](#variation-seed) | DiceForge/sampling | You like a picture and want it again with small differences (folds, hair, background, a hand), as A1111's variation seed. |
-| [**Anima NAG**](#anima-nag) | DiceForge/sampling | You use Anima with a Turbo LoRA (CFG 1), where the negative prompt does nothing, or the negative prompt isn't strong enough at a higher CFG. |
 | [**HiresFix (Load VAE)**](#hiresfix-load-vae) | DiceForge/image | You want Easy-Use's HiresFix with the VAE picked from a list: upscale model, rescale, preview or save, and a latent for your own second KSampler pass. |
 | **Comparing results** | | |
 | [**XY Plot**](#xy-plot) | DiceForge/sampling | You want an X/Y comparison in one node: seed, steps, CFG, sampler, scheduler, LoRA, LoRA strength, denoise or variation seed/strength on each axis, every combination made by one Run. |
@@ -653,32 +652,6 @@ Variations of a picture, as A1111's *variation seed* (subseed): the same composi
 - It works with the plain KSampler for every model (SD 1.5, SDXL, Illustrious, NoobAI eps and v-pred, Pony, Flux, Anima…), since it changes the noise the sampling starts from, not the latent: flow models (Flux, Anima, Qwen) don't read the latent at full denoise.
 - With several Variation Seed nodes in a row, the last one counts.
 - [XY Plot](#xy-plot) has `variation seed` and `variation strength` axes: a grid of variations of one picture (with `variation_strength` 0.1 under Advanced), or of strengths.
-
-### Anima NAG
-
-Normalized Attention Guidance ([NAG](https://chendaryen.github.io/NAG.github.io/)) for Anima: the negative prompt also steers every cross-attention of the model. With a Turbo LoRA (CFG 1) the negative prompt otherwise does nothing; at a higher CFG it adds to it, for things CFG alone leaves in the picture.
-
-1. Put it on the model line, right before KSampler: the loader's (or LoRA Stack's) `model` in, its `model` out to KSampler.
-2. Write what you don't want in KSampler's negative prompt, as usual: NAG uses that one, there is no second negative.
-
-| Input | Default | Description |
-|---|---|---|
-| `model` | | An Anima model (2B, 2.9B, 3.8B; bf16 or compressed), after LoRAs. |
-| `nag_scale` | 5 | How far from the negative prompt: 1 is off, about 3–7 a clear push. Higher ones change more of the picture. |
-| `nag_alpha` | 0.5 | How much of the guided attention goes in: 0 is off, 1 all of it. |
-| `nag_tau` | 1.5 | Under **Advanced**: the most the guidance may grow the attention's size, as a multiple of the positive prompt's. It keeps a high scale from burning the picture. |
-
-| Output | Description |
-|---|---|
-| `model` | The model with NAG: connect it to KSampler. |
-
-A witch on a hill with `witch hat, hat, headwear` in the negative prompt (Anima base, 896×1152, two seeds, RTX 5060): with the Turbo LoRA at CFG 1 she keeps her hat without NAG and loses it with NAG at the defaults; at CFG 4 she keeps it even with the negative prompt, and loses it with NAG. The pose, the broom and the moon stay.
-
-- In each block, the cross-attention runs once more for the positive prompt, with the negative prompt's text, and the two are blended. The negative is the one ComfyUI already has for CFG, through Anima's own text adapter.
-- At CFG above 1 it costs almost nothing (30 steps: 43 s with, 44 s without). At CFG 1 ComfyUI normally skips the negative prompt, so the node turns it back on: 10 Turbo steps took 13–14 s instead of 5 s.
-- It needs the positive and negative prompts in the same batch, as ComfyUI runs them unless the VRAM is too low; a step that runs them apart has no NAG.
-- ComfyUI's own *Normalized Attention Guidance* node doesn't change Anima: it patches an attention output that Anima doesn't pass through.
-- With several Anima NAG nodes in a row, the last one counts. On a model other than Anima it stops with an error that says so.
 
 ### HiresFix (Load VAE)
 

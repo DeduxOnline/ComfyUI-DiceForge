@@ -53,9 +53,6 @@ NOTES = {
     "DiceForgeXYPlot": "The node shows the plot's size and the cell the next run makes; `index` counts up after each run. Its right-click menu has "
         "**Set Run to N cells, from index 0** (`index` and ComfyUI's batch count, then click **Run**) and **Show the plot plan…**. "
         "Connect `seed` to KSampler, or set KSampler's *control after generate* to *fixed*: otherwise every cell gets another seed.",
-    "DiceForgeAnimaNAG": "At CFG 1 ComfyUI skips the negative prompt, so the node turns it back on: 10 Turbo steps take 13–14 s instead of 5 s. "
-        "It needs the positive and negative prompts in one batch: when low VRAM makes ComfyUI run them apart, that step has no NAG. "
-        "With several Anima NAG nodes in a row, the last one counts; on a model other than Anima it stops with an error.",
     "DiceForgeDanbooruEnhancer": "Under its inputs, one row about the last run (*Last run: 2 posts, +7 tags*). Click it, or **Danbooru posts of the "
         "last run…** in the node's menu, for a window with the posts' pictures (click one to open the post; pictures that aren't general are "
         "blurred until clicked), the added tags (**Copy tags**), what it searched, and **Keep these posts (fixed)**. **Copy the added tags** "
