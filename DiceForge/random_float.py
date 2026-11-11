@@ -16,7 +16,7 @@ class RandomFloatSeedModes(io.ComfyNode):
         return io.Schema(
             node_id="DiceForgeRandomFloat",
             display_name="Random Float",
-            category="DiceForge/random",
+            category="DiceForge/utils",
             description="A random number between min and max, picked from the seed. Seed modes spread the values over the whole range before repeating.",
             search_aliases=["random", "random number", "float", "decimal", "uniform", "random float", "seed modes"],
             inputs=[

@@ -17,6 +17,13 @@ def test_node_ids_are_unique():
     assert len(IDS) == len(set(IDS))
 
 
+def test_random_int_and_float_are_in_the_utils_section():
+    # The node library's sections: there is no random section, so the random numbers sit in utils with the other helpers.
+    categories = {node.define_schema().node_id: node.define_schema().category for node in NODES}
+    assert categories["DiceForgeRandomInt"] == categories["DiceForgeRandomFloat"] == "DiceForge/utils"
+    assert "DiceForge/random" not in categories.values()
+
+
 def test_every_node_is_registered_by_the_package():
     # ComfyUI only runs the package's comfy_entrypoint (DiceForge/__init__.py): a node left out of its list never shows up, and a module's own
     # entry point would never run.

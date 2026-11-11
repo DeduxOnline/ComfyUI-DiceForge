@@ -16,7 +16,7 @@ class RandomIntSeedModes(io.ComfyNode):
         return io.Schema(
             node_id="DiceForgeRandomInt",
             display_name="Random Int",
-            category="DiceForge/random",
+            category="DiceForge/utils",
             description="A random whole number between min and max, picked from the seed. Seed modes can go through every value before repeating one.",
             search_aliases=["random", "random number", "integer", "int", "randint", "random int", "seed modes"],
             inputs=[

@@ -70,7 +70,7 @@ Every version is listed in [CHANGELOG.md](CHANGELOG.md) and released on [GitHub]
 | [**SDXL Resolution List**](#sdxl-resolution-list) | DiceForge/latent | You want the standard SDXL sizes (1024x1024, 1216x832, ...) from a fixed list, or picked at random, rescaled like Easy-Use's HiresFix. |
 | [**Resolution Selector (Random)**](#resolution-selector-random) | DiceForge/latent | You want to set an aspect ratio and a megapixel target, like the core *Resolution Selector* node, or pick the ratio at random. |
 | **Random** | | |
-| [**Random Int, Random Float**](#random-int-and-random-float) | DiceForge/random | You want a random number (steps, CFG, denoise, LoRA strength) that goes through the whole range instead of clustering. |
+| [**Random Int, Random Float**](#random-int-and-random-float) | DiceForge/utils | You want a random number (steps, CFG, denoise, LoRA strength) that goes through the whole range instead of clustering. |
 | [**Random Sampler**](#random-sampler) | DiceForge/sampling | You want to compare samplers and schedulers: it picks a pair for KSampler from the ones you list. |
 | [**Random LoRA, Random Checkpoint, Random Diffusion Model, Random VAE**](#random-lora-random-checkpoint-random-diffusion-model-and-random-vae) | DiceForge/loaders | You want to try the files of a folder one after another, like the core loader with the file picked for you. |
 | [**Random Image**](#random-image) | DiceForge/loaders | You want an input image (img2img, ControlNet pose, IP-Adapter reference) picked from a folder, like **Load Image** with the file picked for you. |
